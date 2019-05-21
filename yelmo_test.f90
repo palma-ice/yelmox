@@ -72,12 +72,9 @@ program yelmo_test
     ! General initialization of yelmo constants (used globally)
     call yelmo_global_init(path_const)
 
-    ! Initialize data objects
-    call yelmo_init(yelmo1,filename=path_par,grid_def="file")
+    ! Initialize data objects and load initial topography
+    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    ! Initialize state variables (topo only)
-    call yelmo_init_state_1(yelmo1,path_par,time=time_init)
-    
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
@@ -152,8 +149,8 @@ program yelmo_test
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-!     yelmo1%bnd%smb   = yelmo1%dta%pd%smb_ann
-!     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m_ann
+!     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
+!     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
@@ -173,7 +170,7 @@ program yelmo_test
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state_2(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
@@ -242,8 +239,8 @@ if (calc_transient_climate) then
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-!         yelmo1%bnd%smb   = yelmo1%dta%pd%smb_ann
-!         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m_ann
+!         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
+!         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
@@ -466,7 +463,7 @@ contains
 
         call nc_write(filename,"enh_bar",ylmo%mat%now%enh_bar,units="1",long_name="Vertically averaged enhancement factor", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa a^-1",long_name="Vertically averaged viscosity", &
+        call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a^-1",long_name="Vertically averaged viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Boundaries
@@ -480,7 +477,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb_ann,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
+        call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -646,7 +643,7 @@ contains
         ! == yelmo_material ==
         call nc_write(filename,"visc",ylmo%mat%now%visc,units="Pa a-1",long_name="Viscosity", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa a^-1",long_name="Vertically averaged viscosity (vertically integerated)", &
+        call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a^-1",long_name="Vertically averaged viscosity (vertically integerated)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
