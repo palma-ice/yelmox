@@ -20,12 +20,12 @@ def run_yelmo():
     parser = argparse.ArgumentParser()
 
     # Add options
-    parser.add_argument('-e','--exe',type=str,default='test',
+    parser.add_argument('-e','--exe',type=str,default='yelmox',
         help='''Define the executable file to use here. Shortcuts:
-test = libyelmo/bin/yelmo_test.x;
-benchmarks = libyelmo/bin/yelmo_benchmarks.x;
-mismip = libyelmo/bin/yelmo_mismip.x;
-initmip = libyelmo/bin/yelmo_initmip.x
+yelmox = libyelmox/bin/yelmox.x;
+benchmarks = libyelmox/bin/yelmo_benchmarks.x;
+mismip = libyelmox/bin/yelmo_mismip.x;
+initmip = libyelmox/bin/yelmo_initmip.x
 ''')
     parser.add_argument('-r','--run',action="store_true",
         help='Run the executable after preparing the job?')
@@ -82,14 +82,14 @@ initmip = libyelmo/bin/yelmo_initmip.x
     if submit: run = True 
 
     # Expand executable path shortcut if defined
-    if exe_path == "test":
-        exe_path = "libyelmo/bin/yelmo_test.x" 
+    if exe_path == "yelmox":
+        exe_path = "libyelmox/bin/yelmox.x" 
     elif exe_path == "benchmarks":
-        exe_path = "libyelmo/bin/yelmo_benchmarks.x"
+        exe_path = "libyelmox/bin/yelmo_benchmarks.x"
     elif exe_path == "mismip":
-        exe_path = "libyelmo/bin/yelmo_mismip.x" 
+        exe_path = "libyelmox/bin/yelmo_mismip.x" 
     elif exe_path == "initmip":
-        exe_path = "libyelmo/bin/yelmo_initmip.x" 
+        exe_path = "libyelmox/bin/yelmo_initmip.x" 
 
     # Also extract executable and path filenames 
     exe_fname = os.path.basename(exe_path)
