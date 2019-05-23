@@ -44,7 +44,7 @@ include config/Makefile_yelmox.mk
 yelmo-static: 
 		$(MAKE) -C $(YELMOROOT) yelmo-static 
 
-yelmox : $(yelmox_libs)
+yelmox : yelmo-static $(yelmox_libs)
 		$(FC) $(DLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox.f90 \
 			$(LFLAGS) $(yelmox_libs) 
 		@echo " "
