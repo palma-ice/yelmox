@@ -7,7 +7,7 @@ LISROOT = /home/woody/gwgi/gwgi007h/apps/lis/lis
 INC_LIS = -I${LISROOT}/include
 LIB_LIS = -L${LISROOT}/lib -llis
 
-YELMOROOT = /home/woody/gwgi/gwgi007h/gmd-release/yelmo
+YELMOROOT = /home/woody/gwgi/gwgi007h/yelmo/yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
