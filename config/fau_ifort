@@ -1,0 +1,19 @@
+FC = ifort
+  
+INC_NC  = -I${NETCDF_F_BASE}/include
+LIB_NC  = -L${NETCDF_F_BASE}/lib -lnetcdff -L${NETCDF_BASE}/lib -lnetcdf
+
+LISROOT = /home/woody/gwgi/gwgi007h/apps/lis/lis
+INC_LIS = -I${LISROOT}/include
+LIB_LIS = -L${LISROOT}/lib -llis
+
+YELMOROOT = /home/woody/gwgi/gwgi007h/gmd-release/yelmo
+INC_YELMO = -I${YELMOROOT}/libyelmo/include
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+FFLAGS  = -module $(objdir) -L$(objdir)
+LFLAGS  = $(LIB_YELMO) $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
+DFLAGS_PROFILE = -O2 -fp-model precise -pg
