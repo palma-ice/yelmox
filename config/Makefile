@@ -40,7 +40,8 @@ include config/Makefile_yelmox.mk
 ##
 ###############################################
 
-# Compile the static library libyelmo 
+# Compile the static library libyelmo,
+# using Makefile located in $(YELMOROOT) directory 
 yelmo-static: 
 		$(MAKE) -C $(YELMOROOT) yelmo-static 
 
