@@ -178,6 +178,7 @@
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = 2.0 
     dTo_const          = 0.5
+    f_p                = 0.05 
 /
 
 &snapclim_hybrid
