@@ -150,7 +150,7 @@ contains
                 if (.not. is_float(i,j) .and. &
                     (is_float(i-1,j).or.is_float(i+1,j).or. &
                      is_float(i,j-1).or.is_float(i,j+1))) then 
-                    is_grz = .TRUE. 
+                    is_grz(i,j) = .TRUE. 
                 end if 
 
             end do 

@@ -9,6 +9,9 @@
 $(objdir)/basal_hydrology.o: $(libdir)/basal_hydrology.f90 $(objdir)/nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/basal_hydro_simple.o: $(libdir)/basal_hydro_simple.f90 $(objdir)/nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/geothermal.o: $(libdir)/geothermal.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -77,7 +80,8 @@ $(objdir)/smbpal.o: $(libdir)/smbpal/smbpal.f90 $(objdir)/smbpal_precision.o $(o
 ##
 #############################################################
 
-yelmox_libs = $(objdir)/basal_hydrology.o \
+yelmox_libs = 			$(objdir)/basal_hydrology.o \
+						$(objdir)/basal_hydro_simple.o \
 					    $(objdir)/geothermal.o \
 					    $(objdir)/hyster.o \
 					    $(objdir)/gaussian_filter.o \
