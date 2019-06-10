@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 80e3                 ! [yr] Ending time
-    time_equil   = 50.0                 ! [yr] Equilibration time 
+    time_end     = 100.0                 ! [yr] Ending time
+    time_equil   = 10.0                 ! [yr] Equilibration time 
     dtt          = 2.0                  ! [yr] Main loop timestep 
     dt1D_out     = 10.0                 ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 2.0                ! [yr] Frequency of writing 2D output files 
     transient    = True                 ! Calculate transient climate? 
 /
 
@@ -64,14 +64,14 @@
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength
+    C_bed_method        = 1               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength
     C_bed_z0            = -100.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    C_bed_z1            = 0.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 500.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 50.0            ! [a m-1] Bed roughness coefficient, stream  
+    cf_frozen           = 100e-5          ! [a m-1] Bed roughness coefficient, frozen 
+    cf_stream           = 20e-5           ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
