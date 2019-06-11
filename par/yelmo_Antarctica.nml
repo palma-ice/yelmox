@@ -99,7 +99,7 @@
     till_phi_max    = 20                ! [degrees] Till friction angle, maximum
     till_phi_zmin   = 0.0               ! [m] Bedrock elevation for till_phi_min
     till_phi_zmax   = 500.0             ! [m] Bedrock elevation for phi_max
-
+/
 
 &ymat
     flow_law                = "glen"
