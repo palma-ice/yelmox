@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 100.0                 ! [yr] Ending time
+    time_end     = 50e3                 ! [yr] Ending time
     time_equil   = 10.0                 ! [yr] Equilibration time 
     dtt          = 2.0                  ! [yr] Main loop timestep 
-    dt1D_out     = 10.0                 ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 2.0                ! [yr] Frequency of writing 2D output files 
+    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
+    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
     transient    = True                 ! Calculate transient climate? 
 /
 
@@ -64,8 +64,8 @@
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 1               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength
-    C_bed_z0            = -100.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength
+    C_bed_z0            = -500.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
@@ -176,14 +176,14 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    sl_path            = "input/lgm-120m.dat"
+    sl_path            = "input/zeros.dat"
 /
 
 &snapclim
     clim_type          = "anom"
-    fname_at           = "input/ramp.dat"
+    fname_at           = "input/zeros.dat"
     fname_ap           = "input/zeros.dat"
-    fname_ao           = "input/ramp.dat"
+    fname_ao           = "input/zeros.dat"
     fname_bt           = "input/zeros.dat"
     fname_bp           = "input/zeros.dat"
     fname_bo           = "input/zeros.dat"
@@ -312,7 +312,7 @@
 &marine_shelf
     bmb_shlf_method    = "anom"
     T_shlf_method      = "mean"
-    use_obs            = False
+    use_obs            = True
     obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
     obs_name           = "bm_actual_sm"
     obs_f              = -1.0
