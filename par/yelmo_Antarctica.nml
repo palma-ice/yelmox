@@ -48,7 +48,6 @@
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
     neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
-
 /
 
 &ydyn
@@ -64,17 +63,19 @@
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf_stream*f_zbed; 3: till strength
-    C_bed_z0            = -500.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf*f_zbed; 3: till strength; 4: cf linear with bed elevation
+    C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1) (bed method 2) or at which C_bed = C_bed_min (bed method 4)
+    C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
+    C_bed_min            = 1e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
+    C_bed_max            = 50e-5         ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 100e-5          ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 20e-5           ! [a m-1] Bed roughness coefficient, stream  
+    cf_frozen           = 200e-5           ! [a m-1] Bed roughness coefficient, frozen (not used in cbed_method 4)
+    cf_stream           = 200e-5            ! [a m-1] Bed roughness coefficient, stream  (not used in cbed_method 4)
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
-    streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
+    streaming_margin    = False            ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution
@@ -84,7 +85,7 @@
 /
 
 &ydyn_neff
-    neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
     neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure
@@ -317,8 +318,8 @@
     obs_name           = "bm_equil_ave"
     obs_f              = 1.0
     obs_lim            = 10.0
-    basin_name         = "none"  !"ronne" "ross"
-    basin_bmb          =    0.0  !   -0.2   -0.2
+    basin_name         = "None"         !"northwest" "northeast" "east"
+    basin_bmb          = 0.0            !        -1.0       -1.0   -1.0
     c_shlf             = -9999.0 
     kappa_shlf         = -9999.0 
     f_grz_shlf         = 10.0
