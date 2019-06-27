@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 50e3                 ! [yr] Ending time
+    time_end     = 1000                 ! [yr] Ending time
     time_equil   = 10.0                 ! [yr] Equilibration time 
     dtt          = 2.0                  ! [yr] Main loop timestep 
-    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
+    dt1D_out     = 10.0                 ! [yr] Frequency of writing 1D output files 
+    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
     transient    = True                 ! Calculate transient climate? 
 /
 
@@ -46,7 +46,7 @@
     H_min             = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+    diffuse_bmb_shlf  = True           ! Allow bmb_shlf to permeate inland at the grounding line 
     neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
 /
 
@@ -86,7 +86,7 @@
 
 &ydyn_neff
     neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
-    neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
+    neff_p          = 1.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
     neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure
     neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure
@@ -110,7 +110,7 @@
     n_glen                  = 3 
     visc_min                = 1e3 
     use_2D_enh              = False 
-    enh_shear               = 3.0
+    enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
 
@@ -181,24 +181,16 @@
 /
 
 &snapclim
-    clim_type          = "anom"
-    fname_at           = "input/zeros.dat"
-    fname_ap           = "input/zeros.dat"
-    fname_ao           = "input/zeros.dat"
+    clim_type          = "homog"
+    fname_at           = "input/alpha_triangle.dat"
+    fname_ap           = "input/alpha_triangle.dat"
+    fname_ao           = "input/alpha_triangle.dat"
     fname_bt           = "input/zeros.dat"
     fname_bp           = "input/zeros.dat"
     fname_bo           = "input/zeros.dat"
-    spatial_const_clim = FALSE
-    ta_clim1           = 0.0 
-    ta_clim2           = -30.0 
-    ta_clim3           = -30.0
-    spatial_const_ocn  = TRUE 
-    to_clim1           = 0.0 
-    to_clim2           = -2.0
-    to_clim3           = -2.0
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0 
-    dTo_const          = 0.5
+    dTa_const          = -10 
+    dTo_const          = -2
     f_p                = 0.05 
 /
 
@@ -325,7 +317,7 @@
     f_grz_shlf         = 10.0
     c_grz              = 1.0 
     kappa_grz          = 10.0 
-    grz_length         = 20.0           ! [km]   
+    grz_length         = 32.0           ! [km]   
     c_deep             = -1.0           ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep         = 2000.0
     T_fp               = -1.8

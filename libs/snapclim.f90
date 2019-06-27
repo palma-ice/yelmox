@@ -53,10 +53,6 @@ module snapclim
         character(len=56)  :: clim_type
         character(len=512) :: fname_at, fname_ap, fname_ao 
         character(len=512) :: fname_bt, fname_bp, fname_bo   
-        logical    :: spatial_const_clim
-        real(prec) :: ta_clim1, ta_clim2, ta_clim3
-        logical    :: spatial_const_ocn 
-        real(prec) :: to_clim1, to_clim2, to_clim3
         logical    :: artificial_acc
         real(prec) :: acc_ross, acc_ronne
         real(prec) :: lapse(2)
@@ -159,7 +155,7 @@ contains
         ! Determine which snapshots should be loaded
         select case(trim(snp%par%clim_type))
 
-            case("const","hybrid","anom")
+            case("const","hybrid","homog")
 
                 load_clim1 = .FALSE.
                 load_clim2 = .FALSE. 
@@ -207,37 +203,18 @@ contains
         if (load_clim1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
-            call snapshot_par_load(snp%clim1%par,filename,"snapclim_clim1",domain,grid_name,init=.TRUE.)
-                
-            if (snp%par%spatial_const_clim) then
-                call set_climate_snapshot(snp%clim1,snp%clim0,nx,ny,year_bp=0.0,tas=snp%par%ta_clim1,f_p=snp%par%f_p)
-            else 
-                call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,domain)
-            end if 
+            call snapshot_par_load(snp%clim1%par,filename,"snapclim_clim1",domain,grid_name,init=.TRUE.)                
+            call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,domain)
+            call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
-            if (snp%par%spatial_const_ocn) then
-                call set_ocn_snapshot(snp%clim1,nx,ny,depth=depth,year_bp=0.0,t_ocn=snp%par%to_clim1)
-            else 
-                call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
-            end if 
         end if 
 
         if (load_clim2) then
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
-            call snapshot_par_load(snp%clim2%par,filename,"snapclim_clim2",domain,grid_name,init=.TRUE.)
-                
-            if (snp%par%spatial_const_clim) then
-                call set_climate_snapshot(snp%clim2,snp%clim0,nx,ny,year_bp=0.0,tas=snp%par%ta_clim2,f_p=snp%par%f_p)
-            else 
-                call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,domain)
-            end if 
-
-            if (snp%par%spatial_const_ocn) then
-                call set_ocn_snapshot(snp%clim2,nx,ny,depth=depth,year_bp=0.0,t_ocn=snp%par%to_clim2)
-            else 
-                call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
-            end if 
+            call snapshot_par_load(snp%clim2%par,filename,"snapclim_clim2",domain,grid_name,init=.TRUE.)                
+            call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,domain)
+            call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
         end if 
 
@@ -245,18 +222,8 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,"snapclim_clim3",domain,grid_name,init=.TRUE.)
-                
-            if (snp%par%spatial_const_clim) then
-                call set_climate_snapshot(snp%clim3,snp%clim0,nx,ny,year_bp=0.0,tas=snp%par%ta_clim3,f_p=snp%par%f_p)
-            else 
-                call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,domain)
-            end if 
-
-            if (snp%par%spatial_const_ocn) then
-                call set_ocn_snapshot(snp%clim3,nx,ny,depth=depth,year_bp=0.0,t_ocn=snp%par%to_clim3)
-            else 
-                call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
-            end if 
+            call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,domain)
+            call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
         end if 
 
@@ -267,14 +234,15 @@ contains
                         snp%hybrid%f_eem,snp%hybrid%f_glac,snp%hybrid%f_hol,snp%hybrid%f_seas)
         end if 
 
-        ! Read in forcing time series 
+        ! Read in forcing time series
+        ! Make sure the time series files do not conatin empty lines at the end
         call read_series(snp%at, snp%par%fname_at)
         call read_series(snp%ap, snp%par%fname_ap)
         call read_series(snp%ao, snp%par%fname_ao)
         call read_series(snp%bt, snp%par%fname_bt)
         call read_series(snp%bp, snp%par%fname_bp)
         call read_series(snp%bo, snp%par%fname_bo)
-    
+   
         ! Also check consistency that in the case of absolute forcing clim0 = clim1,
         ! which is the reference climate 
         if (trim(snp%par%clim_type) .eq. "abs_1ind" .or. trim(snp%par%clim_type) .eq. "abs_2ind") then 
@@ -327,7 +295,6 @@ contains
             south = .FALSE.
         end if 
 
-
         ! Call the appropriate forcing subroutine to obtain anomalies 
         select case(trim(snp%par%clim_type))
             case("const") 
@@ -343,22 +310,22 @@ contains
                 at = sum(dT)/real(size(dT,1))   ! Annual mean 
                 ao = at*snp%hybrid%f_to 
 
-            case("anom")
-                ! Apply a simple anomaly to clim0 
+            case("homog")
+                ! Apply a simple spatially homogeneous anomaly to clim0 
 
                 ! First calculate the current anomaly 
-                dTa_now = at*snp%par%dTa_const
-                dTo_now = at*snp%par%dTo_const
+                dTa_now = (1-at)*snp%par%dTa_const
+                dTo_now = (1-ao)*snp%par%dTo_const
 
                 ! Overwrite with input arguments if available
                 if (present(dTa)) dTa_now = dTa 
                 if (present(dTo)) dTo_now = dTo  
-                
+
                 call forclim_anom(snp%now,snp%clim0,dTa_now,dTo_now,snp%par%f_p)
 
             case("anom_1ind")
                 call forclim_anom_1ind(snp%now,snp%clim0,snp%clim1,snp%clim2,at,ap,ao)
-
+                        
             case("anom_2ind")
                 call forclim_anom_2ind(snp%now,snp%clim0,snp%clim1,snp%clim2,snp%clim3,at,ap,ao,bt,bp,bo)
 
@@ -385,14 +352,16 @@ contains
         do m = 1, 12 
             if (south) then 
                 snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-30.0))/360.0)
+                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
             else 
                 snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-30.0))/360.0)
+                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
             end if 
         end do 
 
         snp%now%pr = snp%now%prcor*exp(snp%par%f_p*(snp%now%tas-snp%now%tsl))
+
+        print*, ' precip=', snp%now%pr(100,100,1)
 
         ! jablasco: artificial accumulation
         nx = size(snp%now%pr_ann,1)
@@ -458,9 +427,6 @@ contains
         real(prec), intent(IN) :: dTa, dTo    ! Current anomaly value for atm and ocn
         real(prec), intent(IN) :: f_p         ! [frac/K] Precip scalar (eg f_p=5)
 
-        !        jablasco: modification of clim_now for adding global warming
-        !        Golledge et al (nature 2014)
-        
         clim_now = clim0 
         clim_now%tsl_ann   = clim0%tsl_ann + dTa 
         clim_now%tsl_sum   = clim0%tsl_sum + dTa
@@ -471,8 +437,6 @@ contains
         clim_now%tsl       = clim0%tsl + dTa 
         clim_now%prcor     = clim0%prcor*exp(f_p*dTa)
         
-!         clim_now%prcor_ann = clim0%prcor_ann*(1+ap*0.01)
-
         return 
     end subroutine forclim_anom
 
@@ -483,7 +447,7 @@ contains
         type(snapclim_state_class), intent(INOUT) :: clim_now
         type(snapclim_state_class), intent(IN)    :: clim0, clim1, clim2 
         real(prec) :: at, ap, ao   
-
+                
         clim_now%tsl_ann = clim0%tsl_ann + (1.0-at)*(clim2%tsl_ann-clim1%tsl_ann)
         clim_now%tsl_sum = clim0%tsl_sum + (1.0-at)*(clim2%tsl_sum-clim1%tsl_sum)
         clim_now%to_ann  = clim0%to_ann  + (1.0-ao)*(clim2%to_ann-clim1%to_ann)
@@ -715,14 +679,6 @@ contains
         call nml_read(filename,"snapclim","fname_bt",           par%fname_bt,      init=init_pars)
         call nml_read(filename,"snapclim","fname_bp",           par%fname_bp,      init=init_pars)
         call nml_read(filename,"snapclim","fname_bo",           par%fname_bo,      init=init_pars)
-        call nml_read(filename,"snapclim","spatial_const_clim", par%spatial_const_clim,init=init_pars)
-        call nml_read(filename,"snapclim","ta_clim1",           par%ta_clim1,       init=init_pars)
-        call nml_read(filename,"snapclim","ta_clim2",           par%ta_clim2,       init=init_pars)
-        call nml_read(filename,"snapclim","ta_clim3",           par%ta_clim3,       init=init_pars)
-        call nml_read(filename,"snapclim","spatial_const_ocn",  par%spatial_const_ocn, init=init_pars)
-        call nml_read(filename,"snapclim","to_clim1",           par%to_clim1,       init=init_pars)
-        call nml_read(filename,"snapclim","to_clim2",           par%to_clim2,       init=init_pars)
-        call nml_read(filename,"snapclim","to_clim3",           par%to_clim3,       init=init_pars)
         call nml_read(filename,"snapclim","artificial_acc",     par%artificial_acc, init=init_pars)
         call nml_read(filename,"snapclim","acc_ross",           par%acc_ross,       init=init_pars)
         call nml_read(filename,"snapclim","acc_ronne",          par%acc_ronne,      init=init_pars)
@@ -892,10 +848,11 @@ contains
                     ! Summer (July or Jan) temperature [degrees C]
                     if (south) then 
                         clim%tas(:,:,m) = clim%ta_ann + &
-                            (clim%ta_sum-clim%ta_ann)*cos(2*pi*(m*30.0-30.0))/360.0
+                            (clim%ta_sum-clim%ta_ann)*cos(2*pi*(m*30.0-30.0)/360.0)
                     else 
-                        clim%tas(:,:,m) = clim%ta_ann + &
-                            (clim%ta_ann-clim%ta_sum)*cos(2*pi*(m*30.0-30.0))/360.0
+                        clim%tas(:,:,m) = clim%ta_ann - &
+                            (clim%ta_sum-clim%ta_ann)*cos(2*pi*(m*30.0-30.0)/360.0)
+                    
                     end if 
 
                     ! Precip distributed evenly throughout the year 
@@ -923,10 +880,10 @@ contains
                 ! Monthly lapse rates from ann and sum (jan or jul)
                 if (south) then 
                     clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                        clim%z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0))/360.0)
+                        clim%z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
                 else 
                     clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                        clim%z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0))/360.0)
+                        clim%z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
                 end if 
 
                 ! Precip
@@ -1079,70 +1036,6 @@ contains
         return 
 
     end subroutine read_ocean_snapshot
-
-    subroutine set_climate_snapshot(clim,clim0,nx,ny,year_bp,tas,f_p)
-
-        implicit none 
-
-        type(snapclim_state_class), intent(INOUT) :: clim
-        type(snapclim_state_class), intent(IN)    :: clim0 
-
-        integer, intent(IN) :: nx, ny 
-        real(prec), intent(IN) :: year_bp 
-        real(prec), intent(IN) :: tas 
-        real(prec), intent(IN) :: f_p 
-        integer :: m 
-
-        ! (Re)allocate the clim object
-        call clim_allocate(clim,nx,ny)
-        
-        clim%mask      = 0.0 
-        clim%z_srf     = 0.0
-
-        clim%tas       = tas 
-        clim%ta_ann    = tas 
-        clim%ta_sum    = tas 
-        clim%tsl_ann   = tas 
-        clim%tsl_sum   = tas 
-
-        clim%prcor_ann = clim0%prcor_ann*exp(f_p*(clim%ta_ann-clim0%tsl_ann))
-        clim%pr_ann    = clim%prcor_ann 
-        
-        do m = 1, 12 
-            clim%pr(:,:,m) = clim%prcor_ann
-            clim%sf(:,:,m) = clim%prcor_ann
-        end do 
-
-        clim%par%clim_year_bp = year_bp 
-
-        return 
-
-    end subroutine set_climate_snapshot
-
-    subroutine set_ocn_snapshot(ocn,nx,ny,depth,year_bp,t_ocn)
-
-        implicit none 
-
-        type(snapclim_state_class), intent(INOUT) :: ocn 
-        integer, intent(IN) :: nx, ny
-        real(prec), intent(IN) :: depth(:)
-        real(prec), intent(IN) :: year_bp 
-        real(prec), intent(IN) :: t_ocn  
-
-        ! Determine the length of output depth dimension
-        ! and allocate the ocn object
-        ocn%nzo      = size(depth)
-        call ocn_allocate(ocn,nx,ny,ocn%nzo)
-        ocn%depth    = depth 
-
-        ocn%to_ann   = t_ocn 
-        ocn%mask_ocn = 0 
-
-        ocn%par%ocn_year_bp = year_bp 
-
-        return 
-
-    end subroutine set_ocn_snapshot
 
     subroutine read_series(series,filename)
         ! This subroutine will read a time series of
@@ -1320,6 +1213,7 @@ contains
             else 
                 alph = (xout - x(j-1)) / (x(j) - x(j-1))
                 yout = y(j-1) + alph*(y(j) - y(j-1))
+
             end if 
         end if 
 

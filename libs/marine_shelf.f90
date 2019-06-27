@@ -111,8 +111,8 @@ contains
         
         else 
 
-            ! Set default psuedo-observation value since none are available 
-            mshlf%now%bmb_obs = 1.0*mshlf%par%obs_f 
+            ! Set default psuedo-observation value since none are available and make them negative (as above) 
+            mshlf%now%bmb_obs = -1.0*mshlf%par%obs_f 
 
         end if 
 
