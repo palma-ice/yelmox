@@ -2,11 +2,11 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 80000                 ! [yr] Ending time
-    time_equil   = 100.0                 ! [yr] Equilibration time 
+    time_end     = 1000                 ! [yr] Ending time
+    time_equil   = 10.0                 ! [yr] Equilibration time 
     dtt          = 2.0                  ! [yr] Main loop timestep 
     dt1D_out     = 10.0                 ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 500.0                ! [yr] Frequency of writing 2D output files 
+    dt2D_out     = 100.0                ! [yr] Frequency of writing 2D output files 
     transient    = True                 ! Calculate transient climate? 
 /
 
@@ -178,28 +178,20 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    sl_path            = "input/degla_sl.dat"
+    sl_path            = "input/zeros.dat"
 /
 
 &snapclim
-    clim_type          = "anom"
-    fname_at           = "input/anom_degla+4.dat"
-    fname_ap           = "input/zeros.dat"
-    fname_ao           = "input/anom_degla+4.dat"
+    clim_type          = "homog"
+    fname_at           = "input/alpha_triangle.dat"
+    fname_ap           = "input/alpha_triangle.dat"
+    fname_ao           = "input/alpha_triangle.dat"
     fname_bt           = "input/zeros.dat"
     fname_bp           = "input/zeros.dat"
     fname_bo           = "input/zeros.dat"
-    spatial_const_clim = FALSE
-    ta_clim1           = 0.0 
-    ta_clim2           = -30.0 
-    ta_clim3           = -30.0
-    spatial_const_ocn  = TRUE 
-    to_clim1           = 0.0 
-    to_clim2           = -2.0
-    to_clim3           = -2.0
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 1.0 
-    dTo_const          = 1.0
+    dTa_const          = -10 
+    dTo_const          = -2
     f_p                = 0.05 
 /
 
