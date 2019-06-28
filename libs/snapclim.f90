@@ -50,12 +50,10 @@ module snapclim
 
     type snapclim_param_class
         integer    :: nx, ny
-        character(len=56)  :: clim_type
+        character(len=56)  :: atm_type
         character(len=56)  :: ocn_type
         character(len=512) :: fname_at, fname_ao 
         character(len=512) :: fname_bt, fname_bo   
-        logical    :: artificial_acc
-        real(prec) :: acc_ross, acc_ronne
         real(prec) :: lapse(2)
         real(prec) :: dTa_const 
         real(prec) :: dTo_const 
@@ -116,7 +114,7 @@ module snapclim
 
     ! === NOTES ===
 
-    ! clim_type indicates the type of climate forcing aplied
+    ! atm_type indicates the type of climate forcing aplied
     ! =1 | No climate_forcing per se ==> only climatologic fields (or any other reference climate)
     ! =2 | Anomalies methode by default (the anomaly from two climate fields interpolated by 1 index+ climatologies)
     ! =3 | Anomalies methode two index (two anomalies from three climate fields interpolated by 2 index+ climatologies)
@@ -144,7 +142,8 @@ contains
         integer,    intent(IN) :: nx, ny  
 
         ! Local variables 
-        logical :: load_clim1, load_clim2, load_clim3 
+        logical :: load_atm1, load_atm2, load_atm3 
+        logical :: load_ocn1, load_ocn2, load_ocn3
         integer :: k, nzo  
         real(prec), allocatable :: depth(:) 
 
@@ -153,31 +152,56 @@ contains
         snp%par%nx = nx 
         snp%par%ny = ny 
 
-        ! Determine which snapshots should be loaded
-        select case(trim(snp%par%clim_type))
+        ! Determine which snapshots should be loaded (atm)
+        select case(trim(snp%par%atm_type))
 
             case("const","hybrid","anom")
 
-                load_clim1 = .FALSE.
-                load_clim2 = .FALSE. 
-                load_clim3 = .FALSE. 
+                load_atm1 = .FALSE.
+                load_atm2 = .FALSE. 
+                load_atm3 = .FALSE. 
 
             case("snap_1ind","snap_1ind_abs")
-                load_clim1 = .TRUE.
-                load_clim2 = .TRUE. 
-                load_clim3 = .FALSE. 
+                load_atm1 = .TRUE.
+                load_atm2 = .TRUE. 
+                load_atm3 = .FALSE. 
 
             case("snap_2ind","snap_2ind_abs") 
-                load_clim1 = .TRUE.
-                load_clim2 = .TRUE. 
-                load_clim3 = .TRUE. 
+                load_atm1 = .TRUE.
+                load_atm2 = .TRUE. 
+                load_atm3 = .TRUE. 
     
             case DEFAULT 
-                write(*,*) "snapclim_init:: Error: clim_type not recognized: "//trim(snp%par%clim_type)
+                write(*,*) "snapclim_init:: Error: atm_type not recognized: "//trim(snp%par%atm_type)
                 stop 
  
         end select 
 
+        ! Determine which snapshots should be loaded (atm)
+        select case(trim(snp%par%ocn_type))
+
+            case("const","hybrid","anom")
+
+                load_ocn1 = .FALSE.
+                load_ocn2 = .FALSE. 
+                load_ocn3 = .FALSE. 
+
+            case("snap_1ind","snap_1ind_abs")
+                load_ocn1 = .TRUE.
+                load_ocn2 = .TRUE. 
+                load_ocn3 = .FALSE. 
+
+            case("snap_2ind","snap_2ind_abs") 
+                load_ocn1 = .TRUE.
+                load_ocn2 = .TRUE. 
+                load_ocn3 = .TRUE. 
+    
+            case DEFAULT 
+                write(*,*) "snapclim_init:: Error: atm_type not recognized: "//trim(snp%par%ocn_type)
+                stop 
+ 
+        end select 
+        
         ! Initialize output ocean depth and ocean temp arrays
         nzo = 23 
         allocate(depth(nzo))
@@ -205,36 +229,36 @@ contains
         call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,domain)
         call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
             
-        if (load_clim1) then
+        if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,"snapclim_clim1",domain,grid_name,init=.TRUE.)                
-            call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,domain)
-            call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,domain)
+            if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
         end if 
 
-        if (load_clim2) then
+        if (load_atm2 .or. load_ocn2) then
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,"snapclim_clim2",domain,grid_name,init=.TRUE.)                
-            call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,domain)
-            call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,domain)
+            if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
         end if 
 
-        if (load_clim3) then
+        if (load_atm3 .or. load_ocn3) then
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,"snapclim_clim3",domain,grid_name,init=.TRUE.)
-            call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,domain)
-            call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,domain)
+            if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
         end if 
 
 
         ! In case we are using the hybrid monthly anomaly time series to generate climate forcing
-        if (trim(snp%par%clim_type) .eq. "hybrid") then  
+        if (trim(snp%par%atm_type) .eq. "hybrid") then  
             call read_series_hybrid(snp%hybrid%dTmon,snp%hybrid%hybrid_path, &
                         snp%hybrid%f_eem,snp%hybrid%f_glac,snp%hybrid%f_hol,snp%hybrid%f_seas)
         end if 
@@ -248,7 +272,7 @@ contains
    
         ! Also check consistency that in the case of absolute forcing clim0 = clim1,
         ! which is the reference climate 
-        if (trim(snp%par%clim_type) .eq. "snap_1ind_abs" .or. trim(snp%par%clim_type) .eq. "snap_2ind_abs") then 
+        if (trim(snp%par%atm_type) .eq. "snap_1ind_abs" .or. trim(snp%par%atm_type) .eq. "snap_2ind_abs") then 
             write(*,*) "snapclim_init:: overriding user choice for clim0, now clim0=clim1 for consistency."
             snp%clim0 = snp%clim1 
         end if 
@@ -269,8 +293,8 @@ contains
         real(prec), intent(IN)    :: z_srf(:,:) 
         real(prec), intent(IN)    :: time    ! Current simulation year
         character(len=*), intent(IN) :: domain 
-        real(prec), intent(IN), optional :: dTa   ! For clim_type='anom'
-        real(prec), intent(IN), optional :: dTo   ! For clim_type='anom'
+        real(prec), intent(IN), optional :: dTa   ! For atm_type='anom'
+        real(prec), intent(IN), optional :: dTo   ! For atm_type='anom'
         
         ! Local variables
         real(prec) :: at, ao, bt, bo
@@ -297,14 +321,15 @@ contains
         end if 
 
         ! Step 1: Call the appropriate forcing subroutine to obtain the
-        ! current monthly atmospheric temperature field.
+        ! current monthly atmospheric sea-level temperature  and sea-level precipitation fields.
 
-        select case(trim(snp%par%clim_type))
+        select case(trim(snp%par%atm_type))
 
             case("const") 
                 ! Constant steady-state climate
 
-                snp%now%tsl = snp%clim0%tsl 
+                snp%now%tsl   = snp%clim0%tsl 
+                snp%now%prcor = snp%clim0%prcor
 
             case("anom")
                 ! Apply a simple spatially homogeneous anomaly
@@ -318,22 +343,31 @@ contains
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
 
             case("snap_1ind")
+
                 call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-                        
+                call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,at)
+                     
             case("snap_2ind")
+                
                 call calc_temp_2ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt)
-
+                call calc_precip_2ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,at,bt)
+                
             case("snap_1ind_abs")
+                
                 call calc_temp_1ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-
+                call calc_precip_1ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,at)
+                
             case("snap_2ind_abs")
+
                 call calc_temp_2ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt) 
+                call calc_precip_2ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,at,bt) 
             
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
-                           "clim_type not recognized: "// trim(snp%par%clim_type) 
+                           "atm_type not recognized: "// trim(snp%par%atm_type) 
                 stop 
 
         end select 
@@ -375,16 +409,15 @@ contains
             
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
-                           "clim_type not recognized: "// trim(snp%par%ocn_type) 
+                           "atm_type not recognized: "// trim(snp%par%ocn_type) 
                 stop 
 
         end select 
 
+        ! Step 3: Now, using the monthly sea-level temperature and precipitation fields calculated above,
+        ! correct for elevation
 
-        ! Step 3: Now, using the monthly temperature anomalies calculated above,
-        ! correct for elevation and calculate precipitation
-
-        ! 3a: Calculate `tas` from `tsl` a seasonal lapse rate to correct for current elevation
+        ! 3a: Calculate monthly `tas` from `tsl` a seasonal lapse rate to correct for current elevation
 
         do m = 1, 12 
             if (south) then 
@@ -396,35 +429,30 @@ contains
             end if 
         end do 
 
-        ! 3b: calculate precipitation correcting for current [sea-level and surface] temperature
-        ! and reference climate temperature. Note, for absolute methods, clim0 should equal clim1
+        ! 3b: Calculate monthly precipitation accounting for current surface elevation
 
-        call calc_precip(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
-        call calc_precip(snp%now%pr,   snp%clim0%pr,   snp%now%tas-snp%clim0%tas,snp%par%f_p)
+        call calc_precip_anom(snp%now%pr,snp%now%prcor,snp%now%tas-snp%now%tsl,snp%par%f_p)
 
         ! Step 4: Calculate annual and summer averages
 
         snp%now%tsl_ann = sum(snp%now%tsl,dim=3) / 12.0_prec 
         snp%now%ta_ann  = sum(snp%now%tas,dim=3) / 12.0_prec 
-        snp%now%pr_ann  = sum(snp%now%pr,dim=3)  / 12.0_prec 
-        
+
         ! Summer (jja or djf) temperature [K]
         if (south) then 
-            snp%now%ta_sum  = sum(snp%now%tas(:,:,[12,1,2]),dim=3)
-            snp%now%tsl_sum = sum(snp%now%tsl(:,:,[12,1,2]),dim=3)
-        else 
-            snp%now%ta_sum  = sum(snp%now%tas(:,:,[6,7,8]),dim=3)
-            snp%now%tsl_sum = sum(snp%now%tsl(:,:,[6,7,8]),dim=3)
+            snp%now%tsl_sum = sum(snp%now%tsl(:,:,[12,1,2]),dim=3)/3.0
+            snp%now%ta_sum  = sum(snp%now%tas(:,:,[12,1,2]),dim=3)/3.0
+        else
+            snp%now%tsl_sum = sum(snp%now%tsl(:,:,[6,7,8]),dim=3)/3.0
+            snp%now%ta_sum  = sum(snp%now%tas(:,:,[6,7,8]),dim=3)/3.0
         end if 
-        snp%now%ta_sum = snp%now%ta_sum/3.0 
-        
+
         ! Annual mean precipitation [mm/a]
         snp%now%prcor_ann = sum(snp%now%prcor,dim=3) / 12.0 * 365.0     ! [mm/d] => [mm/a]
         snp%now%pr_ann    = sum(snp%now%pr,dim=3)    / 12.0 * 365.0     ! [mm/d] => [mm/a]
                 
 
-
-        ! Store current index values in object for output 
+        ! Finally, store current index values in object for output 
         snp%now%at = at 
         snp%now%ao = ao 
         snp%now%bt = bt 
@@ -448,23 +476,6 @@ contains
     ! can be used to calculate the current precip via an anomaly method
     ! with the reference precip and reference temperature.
     ! ======================================================================
-
-    elemental subroutine calc_precip(pr_now,pr0,dT,f_p)
-        ! Calculate current precipitation value given 
-        ! a temperature anomaly (independent of how dT was obtained)
-
-        implicit none 
-
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr0 
-        real(prec), intent(IN)  :: dT       ! Current temperature anomaly
-        real(prec), intent(IN)  :: f_p 
-
-        pr_now = pr0*exp(f_p*dT)
-        
-        return
-         
-    end subroutine calc_precip
 
     elemental subroutine calc_temp_anom(temp_now,temp0,dT)
         ! Calculate current climate from clim0 plus anomaly 
@@ -545,6 +556,86 @@ contains
     end subroutine calc_temp_2ind_abs
 
 
+    elemental subroutine calc_precip_anom(pr_now,pr0,dT,f_p)
+        ! Calculate current precipitation value given 
+        ! a temperature anomaly (independent of how dT was obtained)
+
+        implicit none 
+
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr0 
+        real(prec), intent(IN)  :: dT       ! Current temperature anomaly
+        real(prec), intent(IN)  :: f_p 
+
+        pr_now = pr0*exp(f_p*dT)
+        
+        return
+         
+    end subroutine calc_precip_anom
+
+    elemental subroutine calc_precip_1ind(pr_now,pr0,pr1,pr2,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr0, pr1, pr2 
+        real(prec), intent(IN)  :: aa  
+        
+        pr_now = pr0 + aa*(pr2-pr1)
+
+        return
+
+    end subroutine calc_precip_1ind
+
+    elemental subroutine calc_precip_2ind(pr_now,pr0,pr1,pr2,pr3,aa,bb)
+
+        implicit none
+
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr0, pr1, pr2, pr3 
+        real(prec), intent(IN)  :: aa, bb 
+
+        ! option 1 : strictly correct (needs checking)
+
+!         pr_now = pr0 + aa*( (1.0-bb)*pr2 + bb*pr3 - pr1)
+
+        ! option 2 : deconvoluted
+        
+        ! needs checking
+        pr_now = pr0 + aa*(pr2-pr1) + bb*(pr3-pr2)
+
+        return
+
+    end subroutine calc_precip_2ind
+
+    elemental subroutine calc_precip_1ind_abs(pr_now,pr1,pr2,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr1, pr2
+        real(prec), intent(IN)  :: aa
+
+        pr_now = (1.0-aa)*pr1 + aa*pr2
+
+        return
+
+    end subroutine calc_precip_1ind_abs
+
+    elemental subroutine calc_precip_2ind_abs(pr_now,pr1,pr2,pr3,aa,bb)
+
+        implicit none
+
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr1, pr2, pr3 
+        real(prec), intent(IN)  :: aa, bb
+
+        ! needs checking
+        pr_now = aa*((1.0-bb)*(pr2) + bb*pr3)  + aa*pr1 
+
+        return
+
+    end subroutine calc_precip_2ind_abs
 
 
     subroutine snapclim_par_load(par,hpar,filename,init)
@@ -561,15 +652,12 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"snapclim","clim_type",          par%clim_type,      init=init_pars)
+        call nml_read(filename,"snapclim","atm_type",           par%atm_type,       init=init_pars)
         call nml_read(filename,"snapclim","ocn_type",           par%ocn_type,       init=init_pars)
         call nml_read(filename,"snapclim","fname_at",           par%fname_at,       init=init_pars)
         call nml_read(filename,"snapclim","fname_ao",           par%fname_ao,       init=init_pars)
         call nml_read(filename,"snapclim","fname_bt",           par%fname_bt,       init=init_pars)
         call nml_read(filename,"snapclim","fname_bo",           par%fname_bo,       init=init_pars)
-        call nml_read(filename,"snapclim","artificial_acc",     par%artificial_acc, init=init_pars)
-        call nml_read(filename,"snapclim","acc_ross",           par%acc_ross,       init=init_pars)
-        call nml_read(filename,"snapclim","acc_ronne",          par%acc_ronne,      init=init_pars)
         call nml_read(filename,"snapclim","lapse",              par%lapse,          init=init_pars)
         call nml_read(filename,"snapclim","dTa_const",          par%dTa_const,      init=init_pars)
         call nml_read(filename,"snapclim","dTo_const",          par%dTo_const,      init=init_pars)

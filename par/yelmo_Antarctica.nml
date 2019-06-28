@@ -181,12 +181,11 @@
 /
 
 &snapclim
-    clim_type          = "homog"
+    atm_type           = "anom"
+    ocn_type           = "anom"
     fname_at           = "input/alpha_triangle.dat"
-    fname_ap           = "input/alpha_triangle.dat"
     fname_ao           = "input/alpha_triangle.dat"
     fname_bt           = "input/zeros.dat"
-    fname_bp           = "input/zeros.dat"
     fname_bo           = "input/zeros.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = -10 
