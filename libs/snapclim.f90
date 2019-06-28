@@ -52,8 +52,8 @@ module snapclim
         integer    :: nx, ny
         character(len=56)  :: atm_type
         character(len=56)  :: ocn_type
-        character(len=512) :: fname_at, fname_ao 
-        character(len=512) :: fname_bt, fname_bo   
+        character(len=512) :: fname_at, fname_ao, fname_ap 
+        character(len=512) :: fname_bt, fname_bo, fname_bp   
         real(prec) :: lapse(2)
         real(prec) :: dTa_const 
         real(prec) :: dTo_const 
@@ -90,7 +90,7 @@ module snapclim
         real(prec), allocatable :: to_ann(:,:,:) 
         
         ! Indices 
-        real(prec) :: at, ao, bt, bo
+        real(prec) :: at, ao, ap, bt, bo, bp
 
     end type 
 
@@ -100,8 +100,8 @@ module snapclim
 
         type(snapclim_state_class) :: now  
         type(snapclim_state_class) :: clim0, clim1, clim2, clim3  
-        type(series_type)          :: at, ao 
-        type(series_type)          :: bt, bo  
+        type(series_type)          :: at, ao, ap 
+        type(series_type)          :: bt, bo, bp 
         
         type(hybrid_class)         :: hybrid 
     end type 
@@ -267,8 +267,10 @@ contains
         ! Make sure the time series files do not conatin empty lines at the end
         call read_series(snp%at, snp%par%fname_at)
         call read_series(snp%ao, snp%par%fname_ao)
+        call read_series(snp%ap, snp%par%fname_ap)        
         call read_series(snp%bt, snp%par%fname_bt)
         call read_series(snp%bo, snp%par%fname_bo)
+        call read_series(snp%bp, snp%par%fname_bp)
    
         ! Also check consistency that in the case of absolute forcing clim0 = clim1,
         ! which is the reference climate 
@@ -297,7 +299,7 @@ contains
         real(prec), intent(IN), optional :: dTo   ! For atm_type='anom'
         
         ! Local variables
-        real(prec) :: at, ao, bt, bo
+        real(prec) :: at, ao, ap, bt, bo, bp
         real(prec) :: dTa_now, dTo_now  
         real(prec) :: dT(12) 
         logical :: south 
@@ -307,8 +309,10 @@ contains
         ! Determine the current values of various indices 
         at     = series_interp(snp%at, time)
         ao     = series_interp(snp%ao, time)
+        ap     = series_interp(snp%ap, time)        
         bt     = series_interp(snp%bt, time)
         bo     = series_interp(snp%bo, time)
+        bp     = series_interp(snp%bp, time)
 
         !write(*,"(6f12.2)") time, at, ap, ao, bt, bp, bo
 
@@ -339,7 +343,7 @@ contains
                     dTa_now = dTa 
                 else 
                     ! Calculate the current anomaly from the index
-                    dTa_now = at*snp%par%dTa_const
+                    dTa_now = ap*snp%par%dTa_const
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
@@ -348,22 +352,22 @@ contains
             case("snap_1ind")
 
                 call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-                call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,at)
+                call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
                      
             case("snap_2ind")
                 
                 call calc_temp_2ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt)
-                call calc_precip_2ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,at,bt)
+                call calc_precip_2ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,at,bp)
                 
             case("snap_1ind_abs")
                 
                 call calc_temp_1ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-                call calc_precip_1ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,at)
+                call calc_precip_1ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
                 
             case("snap_2ind_abs")
 
                 call calc_temp_2ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt) 
-                call calc_precip_2ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,at,bt) 
+                call calc_precip_2ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,ap,bp) 
             
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
@@ -455,8 +459,10 @@ contains
         ! Finally, store current index values in object for output 
         snp%now%at = at 
         snp%now%ao = ao 
+        snp%now%ap = ap        
         snp%now%bt = bt 
         snp%now%bo = bo 
+        snp%now%bp = bp
         
         return 
 
@@ -581,7 +587,13 @@ contains
         real(prec), intent(IN)  :: pr0, pr1, pr2 
         real(prec), intent(IN)  :: aa  
         
-        pr_now = pr0 + aa*(pr2-pr1)
+        !pr_now = pr0 + aa*(pr2-pr1)
+        !where (pr1.ne.0.0)
+        if (pr1.ne.0.0) then
+            pr_now = pr0 * ( aa * (pr2/pr1 -1.0) + 1.0)
+        else                        
+            pr_now = pr0
+        end if
 
         return
 
@@ -595,14 +607,15 @@ contains
         real(prec), intent(IN)  :: pr0, pr1, pr2, pr3 
         real(prec), intent(IN)  :: aa, bb 
 
-        ! option 1 : strictly correct (needs checking)
-
-!         pr_now = pr0 + aa*( (1.0-bb)*pr2 + bb*pr3 - pr1)
-
-        ! option 2 : deconvoluted
-        
-        ! needs checking
-        pr_now = pr0 + aa*(pr2-pr1) + bb*(pr3-pr2)
+        if ((pr1.ne.0.0).and.(pr2.ne.0.0)) then
+           ! option 1 : strictly correct (needs checking)   
+           !pr_now = pr0 * ( aa * ( ( (1.0-bb)*pr2 + bb * pr3)/pr1 -1.0) + 1.0)
+           
+           ! option 2 : deconvoluted (for consistency with temperature, use this one)
+            pr_now = pr0 * ( aa * (pr2/pr1 -1.0) + 1.0) * ( bb * (pr3/pr2 -1.0) + 1.0) 
+        else
+            pr_now = pr0
+        end if 
 
         return
 
@@ -631,7 +644,7 @@ contains
         real(prec), intent(IN)  :: aa, bb
 
         ! needs checking
-        pr_now = aa*((1.0-bb)*(pr2) + bb*pr3)  + aa*pr1 
+        pr_now = (1.0-aa)*pr1 + aa*((1.0-bb)*(pr2) + bb*pr3)
 
         return
 
@@ -656,8 +669,10 @@ contains
         call nml_read(filename,"snapclim","ocn_type",           par%ocn_type,       init=init_pars)
         call nml_read(filename,"snapclim","fname_at",           par%fname_at,       init=init_pars)
         call nml_read(filename,"snapclim","fname_ao",           par%fname_ao,       init=init_pars)
+        call nml_read(filename,"snapclim","fname_ap",           par%fname_ap,       init=init_pars)        
         call nml_read(filename,"snapclim","fname_bt",           par%fname_bt,       init=init_pars)
         call nml_read(filename,"snapclim","fname_bo",           par%fname_bo,       init=init_pars)
+        call nml_read(filename,"snapclim","fname_bp",           par%fname_bp,       init=init_pars)
         call nml_read(filename,"snapclim","lapse",              par%lapse,          init=init_pars)
         call nml_read(filename,"snapclim","dTa_const",          par%dTa_const,      init=init_pars)
         call nml_read(filename,"snapclim","dTo_const",          par%dTo_const,      init=init_pars)
@@ -1262,12 +1277,12 @@ contains
         allocate(ocn%to_ann(nx,ny,nz))
         allocate(ocn%mask_ocn(nx,ny,nz))
         
-        if (.not. (nx .eq. size(ocn%ta_ann,1) .and. &
-                   ny .eq. size(ocn%ta_ann,2)) ) then 
+        if (.not. (nx .eq. size(ocn%to_ann,1) .and. &
+                   ny .eq. size(ocn%to_ann,2)) ) then 
 
             write(*,*) "ocn_allocate:: error: ocn [nx,ny] dimensions do not &
                        &match clim [nx,ny] dimensions."
-            write(*,*) "clim nx,ny: ", size(ocn%ta_ann,1), size(ocn%ta_ann,2)
+            write(*,*) "clim nx,ny: ", size(ocn%to_ann,1), size(ocn%to_ann,2)
             write(*,*) "ocn  nx,ny: ", nx, ny 
             stop 
         end if 
