@@ -32,12 +32,12 @@ module snapclim
         character(len=512) :: clim_path 
         character(len=56)  :: clim_names(4)
         logical            :: clim_monthly 
-        real(prec)         :: clim_year_bp 
+        real(prec)         :: clim_time 
 
         character(len=512) :: ocn_path 
         character(len=56)  :: ocn_names(3)
         logical            :: ocn_monthly 
-        real(prec)         :: ocn_year_bp 
+        real(prec)         :: ocn_time 
         
     end type 
 
@@ -51,8 +51,9 @@ module snapclim
     type snapclim_param_class
         integer    :: nx, ny
         character(len=56)  :: clim_type
-        character(len=512) :: fname_at, fname_ap, fname_ao 
-        character(len=512) :: fname_bt, fname_bp, fname_bo   
+        character(len=56)  :: ocn_type
+        character(len=512) :: fname_at, fname_ao 
+        character(len=512) :: fname_bt, fname_bo   
         logical    :: artificial_acc
         real(prec) :: acc_ross, acc_ronne
         real(prec) :: lapse(2)
@@ -91,7 +92,7 @@ module snapclim
         real(prec), allocatable :: to_ann(:,:,:) 
         
         ! Indices 
-        real(prec) :: at, ap, ao, bt, bp, bo
+        real(prec) :: at, ao, bt, bo
 
     end type 
 
@@ -101,8 +102,8 @@ module snapclim
 
         type(snapclim_state_class) :: now  
         type(snapclim_state_class) :: clim0, clim1, clim2, clim3  
-        type(series_type)          :: at, ap, ao 
-        type(series_type)          :: bt, bp, bo  
+        type(series_type)          :: at, ao 
+        type(series_type)          :: bt, bo  
         
         type(hybrid_class)         :: hybrid 
     end type 
@@ -155,25 +156,29 @@ contains
         ! Determine which snapshots should be loaded
         select case(trim(snp%par%clim_type))
 
-            case("const","hybrid","homog")
+            case("const","hybrid","anom")
 
                 load_clim1 = .FALSE.
                 load_clim2 = .FALSE. 
                 load_clim3 = .FALSE. 
 
-            case("anom_1ind","abs_1nd")
+            case("snap_1ind","snap_1ind_abs")
                 load_clim1 = .TRUE.
                 load_clim2 = .TRUE. 
                 load_clim3 = .FALSE. 
 
-            case DEFAULT 
+            case("snap_2ind","snap_2ind_abs") 
                 load_clim1 = .TRUE.
                 load_clim2 = .TRUE. 
                 load_clim3 = .TRUE. 
+    
+            case DEFAULT 
+                write(*,*) "snapclim_init:: Error: clim_type not recognized: "//trim(snp%par%clim_type)
+                stop 
  
         end select 
 
-        ! Initialize output ocean elevation (ie, -depth) and ocean temp arrays
+        ! Initialize output ocean depth and ocean temp arrays
         nzo = 23 
         allocate(depth(nzo))
 
@@ -237,15 +242,13 @@ contains
         ! Read in forcing time series
         ! Make sure the time series files do not conatin empty lines at the end
         call read_series(snp%at, snp%par%fname_at)
-        call read_series(snp%ap, snp%par%fname_ap)
         call read_series(snp%ao, snp%par%fname_ao)
         call read_series(snp%bt, snp%par%fname_bt)
-        call read_series(snp%bp, snp%par%fname_bp)
         call read_series(snp%bo, snp%par%fname_bo)
    
         ! Also check consistency that in the case of absolute forcing clim0 = clim1,
         ! which is the reference climate 
-        if (trim(snp%par%clim_type) .eq. "abs_1ind" .or. trim(snp%par%clim_type) .eq. "abs_2ind") then 
+        if (trim(snp%par%clim_type) .eq. "snap_1ind_abs" .or. trim(snp%par%clim_type) .eq. "snap_2ind_abs") then 
             write(*,*) "snapclim_init:: overriding user choice for clim0, now clim0=clim1 for consistency."
             snp%clim0 = snp%clim1 
         end if 
@@ -258,19 +261,19 @@ contains
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,year_bp,domain,dTa,dTo)
+    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo)
 
         implicit none 
 
         type(snapclim_class), intent(INOUT) :: snp
         real(prec), intent(IN)    :: z_srf(:,:) 
-        real(prec), intent(IN)    :: year_bp    ! Current simulation year
+        real(prec), intent(IN)    :: time    ! Current simulation year
         character(len=*), intent(IN) :: domain 
         real(prec), intent(IN), optional :: dTa   ! For clim_type='anom'
         real(prec), intent(IN), optional :: dTo   ! For clim_type='anom'
         
         ! Local variables
-        real(prec) :: at, ap, ao, bt, bp, bo
+        real(prec) :: at, ao, bt, bo
         real(prec) :: dTa_now, dTo_now  
         real(prec) :: dT(12) 
         logical :: south 
@@ -278,14 +281,12 @@ contains
         integer :: nx, ny, i, j
 
         ! Determine the current values of various indices 
-        at     = series_interp(snp%at, year_bp)
-        ap     = series_interp(snp%ap, year_bp)
-        ao     = series_interp(snp%ao, year_bp)
-        bt     = series_interp(snp%bt, year_bp)
-        bp     = series_interp(snp%bp, year_bp)
-        bo     = series_interp(snp%bo, year_bp)
+        at     = series_interp(snp%at, time)
+        ao     = series_interp(snp%ao, time)
+        bt     = series_interp(snp%bt, time)
+        bo     = series_interp(snp%bo, time)
 
-        !write(*,"(6f12.2)") year_bp, at, ap, ao, bt, bp, bo
+        !write(*,"(6f12.2)") time, at, ap, ao, bt, bp, bo
 
         ! Determine whether the domain is in the south or not, by checking
         ! for the substrings ANT/ant in the domain name 
@@ -295,45 +296,40 @@ contains
             south = .FALSE.
         end if 
 
-        ! Call the appropriate forcing subroutine to obtain anomalies 
+        ! Step 1: Call the appropriate forcing subroutine to obtain the
+        ! current monthly atmospheric temperature field.
+
         select case(trim(snp%par%clim_type))
+
             case("const") 
                 ! Constant steady-state climate
-                call forclim_noforcing(snp%now,snp%clim0)
 
-            case("hybrid") 
-                ! Use hybrid input forcing curve (predetermined - no snapshots)
-                dT = series_2D_interp(snp%hybrid%dTmon, year_bp)
-                call forclim_hybrid(snp%now,snp%clim0,dT,to_fac=snp%hybrid%f_to,f_p=snp%par%f_p,is_south=south)
+                snp%now%tsl = snp%clim0%tsl 
 
-                ! Update external indices 
-                at = sum(dT)/real(size(dT,1))   ! Annual mean 
-                ao = at*snp%hybrid%f_to 
+            case("anom")
+                ! Apply a simple spatially homogeneous anomaly
 
-            case("homog")
-                ! Apply a simple spatially homogeneous anomaly to clim0 
+                if (present(dTa)) then 
+                    ! If available, use argument to define anomaly
+                    dTa_now = dTa 
+                else 
+                    ! Calculate the current anomaly from the index
+                    dTa_now = at*snp%par%dTa_const
+                end if
 
-                ! First calculate the current anomaly 
-                dTa_now = (1-at)*snp%par%dTa_const
-                dTo_now = (1-ao)*snp%par%dTo_const
+                call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
 
-                ! Overwrite with input arguments if available
-                if (present(dTa)) dTa_now = dTa 
-                if (present(dTo)) dTo_now = dTo  
-
-                call forclim_anom(snp%now,snp%clim0,dTa_now,dTo_now,snp%par%f_p)
-
-            case("anom_1ind")
-                call forclim_anom_1ind(snp%now,snp%clim0,snp%clim1,snp%clim2,at,ap,ao)
+            case("snap_1ind")
+                call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
                         
-            case("anom_2ind")
-                call forclim_anom_2ind(snp%now,snp%clim0,snp%clim1,snp%clim2,snp%clim3,at,ap,ao,bt,bp,bo)
+            case("snap_2ind")
+                call calc_temp_2ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt)
 
-            case("abs_1ind")
-                call forclim_abs_1ind(snp%now,snp%clim1,snp%clim2,at,ap,ao)
+            case("snap_1ind_abs")
+                call calc_temp_1ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
 
-            case("abs_2ind")
-                call forclim_abs_2ind(snp%now,snp%clim1,snp%clim2,snp%clim3,at,ap,ao,bt,bp,bo) 
+            case("snap_2ind_abs")
+                call calc_temp_2ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt) 
             
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
@@ -342,48 +338,96 @@ contains
 
         end select 
 
-        ! Correct sea-level temps and precip to current surface elevation
-        snp%now%ta_ann = snp%now%tsl_ann - snp%par%lapse(1)*z_srf
-        snp%now%ta_sum = snp%now%tsl_sum - snp%par%lapse(2)*z_srf
-        snp%now%pr_ann = snp%now%prcor_ann*exp(snp%par%f_p*(snp%now%ta_ann-snp%now%tsl_ann))
-        snp%now%to_ann = snp%now%to_ann ! no correction to sea level needed in the ocean
+        ! Step 2: Call the appropriate forcing subroutine to obtain the
+        ! current monthly oceanic temperature field.
 
-        ! Monthly values 
+        select case(trim(snp%par%ocn_type))
+
+            case("const") 
+                ! Constant steady-state climate
+
+                snp%now%to_ann = snp%clim0%to_ann 
+
+            case("anom")
+                ! Apply a simple spatially homogeneous anomaly
+
+                if (present(dTo)) then 
+                    ! If available, use argument to define anomaly
+                    dTo_now = dTo 
+                else 
+                    ! Calculate the current anomaly from the index
+                    dTo_now = ao*snp%par%dTo_const
+                end if
+
+                call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
+
+            case("snap_1ind")
+                call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
+                        
+            case("snap_2ind")
+                call calc_temp_2ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo)
+
+            case("snap_1ind_abs")
+                call calc_temp_1ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
+
+            case("snap_2ind_abs")
+                call calc_temp_2ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo) 
+            
+            case DEFAULT 
+                write(*,*) "snapclim_update:: error: "// &
+                           "clim_type not recognized: "// trim(snp%par%ocn_type) 
+                stop 
+
+        end select 
+
+
+        ! Step 3: Now, using the monthly temperature anomalies calculated above,
+        ! correct for elevation and calculate precipitation
+
+        ! 3a: Calculate `tas` from `tsl` a seasonal lapse rate to correct for current elevation
+
         do m = 1, 12 
             if (south) then 
                 snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-15.0)/360.0))
             else 
                 snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
+                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-15.0)/360.0))
             end if 
         end do 
 
-        snp%now%pr = snp%now%prcor*exp(snp%par%f_p*(snp%now%tas-snp%now%tsl))
+        ! 3b: calculate precipitation correcting for current [sea-level and surface] temperature
+        ! and reference climate temperature. Note, for absolute methods, clim0 should equal clim1
 
-        print*, ' precip=', snp%now%pr(100,100,1)
+        call calc_precip(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
+        call calc_precip(snp%now%pr,   snp%clim0%pr,   snp%now%tas-snp%clim0%tas,snp%par%f_p)
 
-        ! jablasco: artificial accumulation
-        nx = size(snp%now%pr_ann,1)
-        ny = size(snp%now%pr_ann,2)
-        if (snp%par%artificial_acc) then
-           do i=2,nx-1
-              do j=2,ny-1
-                   if(i.eq.69 .and. j.eq.47) then !Ross=[68,46]
-                      snp%now%pr_ann(i,j) = snp%par%acc_ross*(12000.0/365.0)/32.0
-                   else if(i.eq.54 .and. j.eq.88) then !Ronne=[53,87]
-                      snp%now%pr_ann(i,j) = snp%par%acc_ronne*(12000.0/365.0)/32.0
-                   end if
-              end do
-           end do
-        end if
+        ! Step 4: Calculate annual and summer averages
+
+        snp%now%tsl_ann = sum(snp%now%tsl,dim=3) / 12.0_prec 
+        snp%now%ta_ann  = sum(snp%now%tas,dim=3) / 12.0_prec 
+        snp%now%pr_ann  = sum(snp%now%pr,dim=3)  / 12.0_prec 
+        
+        ! Summer (jja or djf) temperature [K]
+        if (south) then 
+            snp%now%ta_sum  = sum(snp%now%tas(:,:,[12,1,2]),dim=3)
+            snp%now%tsl_sum = sum(snp%now%tsl(:,:,[12,1,2]),dim=3)
+        else 
+            snp%now%ta_sum  = sum(snp%now%tas(:,:,[6,7,8]),dim=3)
+            snp%now%tsl_sum = sum(snp%now%tsl(:,:,[6,7,8]),dim=3)
+        end if 
+        snp%now%ta_sum = snp%now%ta_sum/3.0 
+        
+        ! Annual mean precipitation [mm/a]
+        snp%now%prcor_ann = sum(snp%now%prcor,dim=3) / 12.0 * 365.0     ! [mm/d] => [mm/a]
+        snp%now%pr_ann    = sum(snp%now%pr,dim=3)    / 12.0 * 365.0     ! [mm/d] => [mm/a]
+                
+
 
         ! Store current index values in object for output 
         snp%now%at = at 
-        snp%now%ap = ap 
         snp%now%ao = ao 
         snp%now%bt = bt 
-        snp%now%bp = bp
         snp%now%bo = bo 
         
         return 
@@ -392,272 +436,117 @@ contains
 
 
     ! ======================================================================
-    !
-    ! The routines below return the current 'sea-level' annual mean temp,
-    ! summer temp and annual precip. based on temporally changing weighting
-    ! coefficients:
+    ! The routines below return the current temperature given a method
+    ! with the following guidance:
     ! 1ind = 1 index
     ! 2ind = 2 indices 
     ! anom = anomaly based forcing
+    ! snap_anom = anomaly based forcing using a snapshot
     ! abs  = absolute based forcing 
     !
+    ! Once the current temperature has been calculated, `calc_precip`
+    ! can be used to calculate the current precip via an anomaly method
+    ! with the reference precip and reference temperature.
     ! ======================================================================
 
-    subroutine forclim_noforcing(clim_now,clim0)
-        ! Current climate equals clim0 
+    elemental subroutine calc_precip(pr_now,pr0,dT,f_p)
+        ! Calculate current precipitation value given 
+        ! a temperature anomaly (independent of how dT was obtained)
 
-        implicit none
+        implicit none 
 
-        type(snapclim_state_class), intent(OUT) :: clim_now 
-        type(snapclim_state_class), intent(IN)  :: clim0
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr0 
+        real(prec), intent(IN)  :: dT       ! Current temperature anomaly
+        real(prec), intent(IN)  :: f_p 
 
-        clim_now = clim0 
-
+        pr_now = pr0*exp(f_p*dT)
+        
         return
+         
+    end subroutine calc_precip
 
-    end  subroutine forclim_noforcing
-
-    subroutine forclim_anom(clim_now,clim0,dTa,dTo,f_p)
+    elemental subroutine calc_temp_anom(temp_now,temp0,dT)
         ! Calculate current climate from clim0 plus anomaly 
 
         implicit none 
 
-        type(snapclim_state_class), intent(OUT) :: clim_now
-        type(snapclim_state_class), intent(IN)  :: clim0
-        real(prec), intent(IN) :: dTa, dTo    ! Current anomaly value for atm and ocn
-        real(prec), intent(IN) :: f_p         ! [frac/K] Precip scalar (eg f_p=5)
-
-        clim_now = clim0 
-        clim_now%tsl_ann   = clim0%tsl_ann + dTa 
-        clim_now%tsl_sum   = clim0%tsl_sum + dTa
-        clim_now%to_ann    = clim0%to_ann  + dTo
-        clim_now%prcor_ann = clim0%prcor_ann*exp(f_p*dTa) 
-
-        ! Monthly values 
-        clim_now%tsl       = clim0%tsl + dTa 
-        clim_now%prcor     = clim0%prcor*exp(f_p*dTa)
+        real(prec), intent(OUT) :: temp_now 
+        real(prec), intent(IN)  :: temp0 
+        real(prec), intent(IN)  :: dT            ! Current anomaly value to impose
+         
+        temp_now = temp0 + dT 
         
-        return 
-    end subroutine forclim_anom
+        return
 
-    subroutine forclim_anom_1ind(clim_now,clim0,clim1,clim2,at,ap,ao)
+    end subroutine calc_temp_anom
+
+    elemental subroutine calc_temp_1ind(temp_now,temp0,temp1,temp2,aa)
 
         implicit none
 
-        type(snapclim_state_class), intent(INOUT) :: clim_now
-        type(snapclim_state_class), intent(IN)    :: clim0, clim1, clim2 
-        real(prec) :: at, ap, ao   
-                
-        clim_now%tsl_ann = clim0%tsl_ann + (1.0-at)*(clim2%tsl_ann-clim1%tsl_ann)
-        clim_now%tsl_sum = clim0%tsl_sum + (1.0-at)*(clim2%tsl_sum-clim1%tsl_sum)
-        clim_now%to_ann  = clim0%to_ann  + (1.0-ao)*(clim2%to_ann-clim1%to_ann)
-
-        where (clim1%prcor_ann.ne.0.0)
-            clim_now%prcor_ann = clim0%prcor_ann*((1.0-ap)*(clim2%prcor_ann/clim1%prcor_ann) + ap)
-        elsewhere 
-            clim_now%prcor_ann = clim0%prcor_ann
-        endwhere
-
-        ! Monthly values 
-        clim_now%tsl = clim0%tsl + (1.0-at)*(clim2%tsl-clim1%tsl)
-        clim_now%prcor = clim0%prcor 
-        where (clim1%prcor.ne.0.0) &
-            clim_now%prcor = clim0%prcor*((1.0-ap)*(clim2%prcor/clim1%prcor) + ap)
+        real(prec), intent(OUT) :: temp_now 
+        real(prec), intent(IN)  :: temp0, temp1, temp2 
+        real(prec), intent(IN)  :: aa  
+        
+        temp_now = temp0 + aa*(temp2-temp1)
 
         return
 
-    end subroutine forclim_anom_1ind
+    end subroutine calc_temp_1ind
 
-    subroutine forclim_anom_2ind(clim_now,clim0,clim1,clim2,clim3,at,ap,ao,bt,bp,bo)
+    elemental subroutine calc_temp_2ind(temp_now,temp0,temp1,temp2,temp3,aa,bb)
 
         implicit none
 
-        type(snapclim_state_class), intent(INOUT) :: clim_now
-        type(snapclim_state_class), intent(IN)    :: clim0, clim1, clim2, clim3 
-        real(prec) :: at, ap, ao, bt, bp, bo
+        real(prec), intent(OUT) :: temp_now 
+        real(prec), intent(IN)  :: temp0, temp1, temp2, temp3 
+        real(prec), intent(IN)  :: aa, bb 
 
-        ! option 1 : strictly correct
+        ! option 1 : strictly correct (needs checking)
 
-!       clim_now%tsl_ann = clim0%tsl_ann + (1.0-at)*(((1.0-bt)*(clim2%tsl_ann)+(bt*clim3%tsl_ann))-clim1%tsl_ann)
-!       clim_now%tsl_sum = clim0%tsl_sum + (1.0-at)*(((1.0-bt)*(clim2%tsl_sum)+(bt*clim3%tsl_sum))-clim1%tsl_sum)
-!       clim_now%to_ann  = clim0%to_ann  + (1.0-ao)*(((1.0-bo)*(clim2%to_ann) +(bo*clim3%to_ann)) -clim1%to_ann)
+!         temp_now = temp0 + aa*( (1.0-bb)*temp2 + bb*temp3 - temp1)
 
         ! option 2 : deconvoluted
-                    
-         clim_now%tsl_ann = clim0%tsl_ann + &
-                     ((1.0-at)*(clim2%tsl_ann-clim1%tsl_ann))+(bt*(clim3%tsl_ann-clim2%tsl_ann))
-         clim_now%tsl_sum = clim0%tsl_sum + &
-                     ((1.0-at)*(clim2%tsl_sum-clim1%tsl_sum))+(bt*(clim3%tsl_sum-clim2%tsl_sum))
-
-         clim_now%to_ann  = clim0%to_ann  + &
-                     ((1.0-ao)*(clim2%to_ann-clim1%to_ann)) +(bo*(clim3%to_ann-clim2%to_ann))
-
-        where (clim1%prcor_ann(:,:).ne.0)
-            clim_now%prcor_ann = clim0%prcor_ann* &
-                        ((1.0-ap)*(((1.0-bp)*(clim2%prcor_ann)+(bp*clim3%prcor_ann))/clim1%prcor_ann)+ap)
-        elsewhere 
-            clim_now%prcor_ann = clim0%prcor_ann
-        endwhere
-
-        ! Monthly values 
-        clim_now%tsl = clim0%tsl + &
-            ((1.0-at)*(clim2%tsl-clim1%tsl))+(bt*(clim3%tsl-clim2%tsl))
-        clim_now%prcor = clim0%prcor 
-        where (clim1%prcor.ne.0.0) &
-            clim_now%prcor = clim0%prcor* &
-                ((1.0-ap)*(((1.0-bp)*(clim2%prcor)+(bp*clim3%prcor))/clim1%prcor)+ap)
+        
+        temp_now = temp0 + aa*(temp2-temp1) + bb*(temp3-temp2)
 
         return
 
-    end subroutine forclim_anom_2ind
+    end subroutine calc_temp_2ind
 
-    subroutine forclim_abs_1ind(clim_now,clim1,clim2,at,ap,ao)
+    elemental subroutine calc_temp_1ind_abs(temp_now,temp1,temp2,aa)
 
         implicit none
 
-        type(snapclim_state_class), intent(INOUT) :: clim_now
-        type(snapclim_state_class), intent(IN)    :: clim1, clim2
-        real(prec) :: at, ap, ao
+        real(prec), intent(OUT) :: temp_now 
+        real(prec), intent(IN)  :: temp1, temp2
+        real(prec), intent(IN)  :: aa
 
-        clim_now%tsl_ann   = (1.0-at)*clim2%tsl_ann   + at*clim1%tsl_ann    
-        clim_now%tsl_sum   = (1.0-at)*clim2%tsl_sum   + at*clim1%tsl_sum  
-        clim_now%to_ann    = (1.0-ao)*clim2%to_ann    + ao*clim1%to_ann  
-        clim_now%prcor_ann = (1.0-ap)*clim2%prcor_ann + ap*clim1%prcor_ann
-
-        ! Monthly values 
-        clim_now%tsl   = (1.0-at)*clim2%tsl   + at*clim1%tsl 
-        clim_now%prcor = (1.0-ap)*clim2%prcor + ap*clim1%prcor 
+        temp_now = (1.0-aa)*temp1 + aa*temp2
 
         return
 
-    end subroutine forclim_abs_1ind
+    end subroutine calc_temp_1ind_abs
 
-    subroutine forclim_abs_2ind(clim_now,clim1,clim2,clim3,at,ap,ao,bt,bp,bo)
+    elemental subroutine calc_temp_2ind_abs(temp_now,temp1,temp2,temp3,aa,bb)
 
         implicit none
 
-        type(snapclim_state_class), intent(INOUT) :: clim_now
-        type(snapclim_state_class), intent(IN)    :: clim1, clim2, clim3
-        real(prec) :: at, ap, ao, bt, bp, bo 
+        real(prec), intent(OUT) :: temp_now 
+        real(prec), intent(IN)  :: temp1, temp2, temp3 
+        real(prec), intent(IN)  :: aa, bb
 
-        clim_now%tsl_ann    = (1.0-at)*((1.0-bt)*(clim2%tsl_ann)  + bt*clim3%tsl_ann)   + at*clim1%tsl_ann
-        clim_now%tsl_sum    = (1.0-at)*((1.0-bt)*(clim2%tsl_sum)  + bt*clim3%tsl_sum)   + at*clim1%tsl_sum
-        clim_now%to_ann     = (1.0-ao)*((1.0-bo)*(clim2%to_ann)   + bo*clim3%to_ann)    + ao*clim1%to_ann
-        clim_now%prcor_ann  = (1.0-ap)*((1.0-bp)*(clim2%prcor_ann)+ bp*clim3%prcor_ann) + ap*clim1%prcor_ann
-
-        ! Monthly values 
-        clim_now%tsl    = (1.0-at)*((1.0-bt)*(clim2%tsl)  + bt*clim3%tsl)   + at*clim1%tsl
-        clim_now%prcor  = (1.0-ap)*((1.0-bp)*(clim2%prcor)+ bp*clim3%prcor) + ap*clim1%prcor
+        ! needs checking
+        temp_now = aa*((1.0-bb)*(temp2) + bb*temp3)  + aa*temp1 
 
         return
 
-    end subroutine forclim_abs_2ind
-
-    subroutine forclim_hybrid(clim_now,clim0,dT,to_fac,f_p,is_south)
-
-        implicit none 
-
-        type(snapclim_state_class), intent(INOUT) :: clim_now
-        type(snapclim_state_class), intent(IN)    :: clim0
-        real(prec),                 intent(IN)    :: dT(:)
-        real(prec),                 intent(IN)    :: to_fac 
-        real(prec),                 intent(IN)    :: f_p    
-        logical,                    intent(IN)    :: is_south 
-
-        ! Local variables 
-        real(prec) :: dT_ann, dT_sum 
-        integer :: m 
-
-        dT_ann = sum(dT) / real(size(dT,1))
-
-        if (is_south) then 
-            dT_sum = sum(dT([1,2,12]))/3.0
-        else 
-            dT_sum = sum(dT([6,7,8]))/3.0 
-        end if 
-        
-        !write(*,*) "forclim_hybrid:: ", dT 
-
-        ! Get annual and summer anomalies
-        clim_now%tsl_ann = clim0%tsl_ann + dT_ann 
-        clim_now%tsl_sum = clim0%tsl_sum + dT_sum 
-
-        ! No change to oceanic temps and precip scaling 
-        clim_now%to_ann    = clim0%to_ann + dT_ann*to_fac 
-        
-        ! Clausius-Clapeyron scaling of precipitation based on temp change
-        clim_now%prcor_ann = clim0%prcor_ann*exp(f_p*dT_ann)
-
-        ! Monthly values 
-        do m = 1, 12 
-            clim_now%tsl(:,:,m)   = clim0%tsl(:,:,m) + dT(m) 
-            clim_now%prcor(:,:,m) = clim0%prcor(:,:,m)*exp(f_p*dT(m)) 
-        end do 
-
-        return 
-
-    end subroutine forclim_hybrid
-
-    subroutine snapclim_allocate(clim,nx,ny)
-
-        implicit none 
-
-        type(snapclim_state_class) :: clim 
-        integer :: nx, ny
-
-        ! Climatic variables
-        if (allocated(clim%tas))       deallocate(clim%tas)
-        if (allocated(clim%tsl))       deallocate(clim%tsl)
-        if (allocated(clim%pr))        deallocate(clim%pr)
-        if (allocated(clim%prcor))     deallocate(clim%prcor)
-        if (allocated(clim%sf))        deallocate(clim%sf)
+    end subroutine calc_temp_2ind_abs
 
 
-        if (allocated(clim%ta_ann))    deallocate(clim%ta_ann)
-        if (allocated(clim%tsl_ann))   deallocate(clim%tsl_ann)
-        if (allocated(clim%ta_sum))    deallocate(clim%ta_sum)
-        if (allocated(clim%tsl_sum))   deallocate(clim%tsl_sum)
-        if (allocated(clim%pr_ann))    deallocate(clim%pr_ann)
-        if (allocated(clim%prcor_ann)) deallocate(clim%prcor_ann)
-        if (allocated(clim%z_srf))     deallocate(clim%z_srf)
-        if (allocated(clim%mask))      deallocate(clim%mask)
-        
-        allocate(clim%tas(nx,ny,12))
-        allocate(clim%tsl(nx,ny,12))
-        allocate(clim%pr(nx,ny,12))
-        allocate(clim%prcor(nx,ny,12))
-        allocate(clim%sf(nx,ny,12))
-        
-        allocate(clim%ta_ann(nx,ny))
-        allocate(clim%tsl_ann(nx,ny))
-        allocate(clim%ta_sum(nx,ny))
-        allocate(clim%tsl_sum(nx,ny))
-        allocate(clim%pr_ann(nx,ny))
-        allocate(clim%prcor_ann(nx,ny))
-        allocate(clim%z_srf(nx,ny))
-        allocate(clim%mask(nx,ny))
-        
-        ! Initialize to zero
-        clim%tas   = 0.0
-        clim%tsl   = 0.0
-        clim%pr    = 0.0
-        clim%prcor = 0.0
-        clim%sf    = 0.0
-        
-        clim%ta_ann    = 0.0
-        clim%tsl_ann   = 0.0
-        clim%ta_sum    = 0.0
-        clim%tsl_sum   = 0.0
-        clim%pr_ann    = 0.0
-        clim%prcor_ann = 0.0
-        clim%z_srf     = 0.0
-        clim%mask      = 0.0
-        
-        
-        return 
 
-    end subroutine snapclim_allocate 
-    
+
     subroutine snapclim_par_load(par,hpar,filename,init)
         ! == Parameters from namelist file ==
 
@@ -673,12 +562,11 @@ contains
         if (present(init)) init_pars = .TRUE. 
 
         call nml_read(filename,"snapclim","clim_type",          par%clim_type,      init=init_pars)
-        call nml_read(filename,"snapclim","fname_at",           par%fname_at,      init=init_pars)
-        call nml_read(filename,"snapclim","fname_ap",           par%fname_ap,      init=init_pars)
-        call nml_read(filename,"snapclim","fname_ao",           par%fname_ao,      init=init_pars)
-        call nml_read(filename,"snapclim","fname_bt",           par%fname_bt,      init=init_pars)
-        call nml_read(filename,"snapclim","fname_bp",           par%fname_bp,      init=init_pars)
-        call nml_read(filename,"snapclim","fname_bo",           par%fname_bo,      init=init_pars)
+        call nml_read(filename,"snapclim","ocn_type",           par%ocn_type,       init=init_pars)
+        call nml_read(filename,"snapclim","fname_at",           par%fname_at,       init=init_pars)
+        call nml_read(filename,"snapclim","fname_ao",           par%fname_ao,       init=init_pars)
+        call nml_read(filename,"snapclim","fname_bt",           par%fname_bt,       init=init_pars)
+        call nml_read(filename,"snapclim","fname_bo",           par%fname_bo,       init=init_pars)
         call nml_read(filename,"snapclim","artificial_acc",     par%artificial_acc, init=init_pars)
         call nml_read(filename,"snapclim","acc_ross",           par%acc_ross,       init=init_pars)
         call nml_read(filename,"snapclim","acc_ronne",          par%acc_ronne,      init=init_pars)
@@ -714,11 +602,11 @@ contains
         call nml_read(filename,name,"clim_path",    par%clim_path,     init=init_pars)
         call nml_read(filename,name,"clim_names",   par%clim_names,    init=init_pars)
         call nml_read(filename,name,"clim_monthly", par%clim_monthly,  init=init_pars)
-        call nml_read(filename,name,"clim_year_bp", par%clim_year_bp,  init=init_pars)
+        call nml_read(filename,name,"clim_time", par%clim_time,  init=init_pars)
         call nml_read(filename,name,"ocn_path",     par%ocn_path,      init=init_pars)
         call nml_read(filename,name,"ocn_names",    par%ocn_names,     init=init_pars)
         call nml_read(filename,name,"ocn_monthly",  par%ocn_monthly,   init=init_pars)
-        call nml_read(filename,name,"ocn_year_bp",  par%ocn_year_bp,   init=init_pars)
+        call nml_read(filename,name,"ocn_time",  par%ocn_time,   init=init_pars)
         
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
@@ -763,7 +651,7 @@ contains
         if (trim(clim%par%clim_path) .eq. "None") then 
             ! Simply set fields to zero 
 
-            clim%par%clim_year_bp = 0.0 
+            clim%par%clim_time = 0.0 
 
             clim%z_srf     = 0.0 
             clim%mask      = 0.0 
@@ -907,7 +795,7 @@ contains
         write(*,"(4x,a,3f12.2)") "range: pr_ann     [mm/a] = ", minval(clim%pr_ann),    maxval(clim%pr_ann), sum(clim%pr_ann)/count(clim%pr_ann.gt.-999.9)
         write(*,"(4x,a,3f12.2)") "range: prcor_ann  [mm/a] = ", minval(clim%prcor_ann), maxval(clim%prcor_ann), sum(clim%prcor_ann)/count(clim%prcor_ann.gt.-999.9)
         write(*,"(4x,a,2f12.2)") "range: z_srf      [m]    = ", minval(clim%z_srf),     maxval(clim%z_srf)
-        write(*,"(a,f12.2)") "snapshot year_bp =", clim%par%clim_year_bp       
+        write(*,"(a,f12.2)") "snapshot time =", clim%par%clim_time       
  
         return 
 
@@ -949,7 +837,7 @@ contains
             ocn%to_ann   = 0.0 
             ocn%mask_ocn = 0.0 
 
-            ocn%par%ocn_year_bp = 0.0 
+            ocn%par%ocn_time = 0.0 
 
         else 
             ! Read data from parameters 
@@ -1031,7 +919,7 @@ contains
         write(*,"(a)") "read_ocean_snapshot:: Ocean snapshot loaded: "//trim(ocn%par%ocn_path)
         write(*,"(4x,a,2f12.2)") "depth  range = ", minval(ocn%depth),  maxval(ocn%depth)
         write(*,"(4x,a,2f12.2)") "to_ann range = ", minval(ocn%to_ann), maxval(ocn%to_ann)
-        write(*,"(a,f12.2)") "snapshot year_bp =", ocn%par%ocn_year_bp 
+        write(*,"(a,f12.2)") "snapshot time =", ocn%par%ocn_time 
 
         return 
 
@@ -1147,38 +1035,38 @@ contains
 
     end subroutine read_series_hybrid
 
-    function series_2D_interp(series,year_bp) result(var)
+    function series_2D_interp(series,time) result(var)
         ! Wrapper for simple `interp_linear` function
         ! for series_2D_types. 
         implicit none 
 
         type(series_2D_type) :: series 
-        real(prec) :: year_bp 
+        real(prec) :: time 
         real(prec) :: var(size(series%var,1))
         integer :: nt, nm, i 
 
         ! Interpolate series object
         nm = size(series%var,1)
         do i = 1, nm 
-            var(i) = interp_linear(series%time,series%var(i,:),xout=year_bp)
+            var(i) = interp_linear(series%time,series%var(i,:),xout=time)
         end do 
 
         return 
 
     end function series_2D_interp 
 
-    function series_interp(series,year_bp) result(var)
+    function series_interp(series,time) result(var)
         ! Wrapper for simple `interp_linear` function
         ! for series_types. 
         implicit none 
 
         type(series_type) :: series 
-        real(prec) :: year_bp 
+        real(prec) :: time 
         real(prec) :: var 
         integer :: nt, i 
 
         ! Interpolate series object
-        var = interp_linear(series%time,series%var,xout=year_bp)
+        var = interp_linear(series%time,series%var,xout=time)
 
         return 
 
@@ -1352,6 +1240,21 @@ contains
 
     end subroutine parse_path
     
+! ajr: to reimplement later...
+!             case("hybrid") 
+!                 ! Use hybrid input forcing curve (predetermined - no snapshots)
+!                 dT = series_2D_interp(snp%hybrid%dTmon, time)
+!                 call calc_temp_hybrid(snp%now,snp%clim0,dT,to_fac=snp%hybrid%f_to,f_p=snp%par%f_p,is_south=south)
+
+!                 ! No change to oceanic temps and precip scaling 
+!                 clim_now%to_ann    = clim0%to_ann + dT_ann*snp%hybrid%f_to 
+                
+!                 ! Clausius-Clapeyron scaling of precipitation based on temp change
+!                 clim_now%prcor_ann = clim0%prcor_ann*exp(f_p*dT_ann)
+
+!                 ! Update external indices 
+!                 at = sum(dT)/real(size(dT,1))   ! Annual mean 
+!                 ao = at*snp%hybrid%f_to 
 
 
 ! ajr: to move into its own forcing module
@@ -1364,7 +1267,7 @@ contains
 !                 end if 
 
 !                 ! Get constant climate from climatology 
-!                 call forclim_noforcing(clim_now,clim0)
+!                 call calc_temp_noforcing(clim_now,clim0)
 
 !                 ! Calculate current ice volume [m^3 ice] => [km^3] == [Gt]
 !                 Vtot     = sum(H_ice,mask=H_ice.gt.0.0)*dx*dy *(1e3/910.0) *1e-9
@@ -1372,14 +1275,14 @@ contains
 
 !                 ! Determine rate of forcing change and new forcing value
 !                 if (snp%hyst_atm%par%use_hyster) then 
-!                     call hyster_calc_rate(snp%hyst_atm,time=dble(year_bp),var=dble(Vtot),verbose=.TRUE.)
+!                     call hyster_calc_rate(snp%hyst_atm,time=dble(time),var=dble(Vtot),verbose=.TRUE.)
 !                     clim_now%tsl_ann = clim_now%tsl_ann + snp%hyst_atm%f_now
 !                     clim_now%tsl_sum = clim_now%tsl_sum + snp%hyst_atm%f_now
 !                     at = snp%hyst_atm%f_now 
 !                 end if
 
 !                 if (snp%hyst_ocn%par%use_hyster) then 
-!                     call hyster_calc_rate(snp%hyst_ocn,time=dble(year_bp),var=dble(Vtot),verbose=.TRUE.)
+!                     call hyster_calc_rate(snp%hyst_ocn,time=dble(time),var=dble(Vtot),verbose=.TRUE.)
 !                     clim_now%to_ann  = clim_now%to_ann  + snp%hyst_ocn%f_now  
 !                     ao = snp%hyst_ocn%f_now 
 !                 end if 
