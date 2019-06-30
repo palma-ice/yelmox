@@ -51,13 +51,14 @@
 /
 
 &ydyn
-    solver              = "hybrid-vel"    ! "fixed","hybrid-vel", "hybrid-shear", "hybrid-pd12"
+    solver              = "hybrid-adhoc"  ! "fixed", "hybrid-adhoc", "hybrid-pd12"    
+    sia_solver          = "vel"           ! "vel", "shear", "none"
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
+    beta_method         = 1               ! 0: constant beta; 1: linear law; 2: power law; 3: regularized Coulomb law, 4: pism power law
+    beta_with_neff      = True            ! Additionally scale beta by effective pressure? (beta=Neff*[beta_default])
     m_drag              = 1.0             ! Dragging law exponent
-    u_0                 = 300.0           ! [m/a] Coulomb friction regularization term (velocity threshold), or pism-style power law 
-    beta_max            = 1e15             ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
-    beta_method         = 2               ! 0: constant beta; 1: power law; 2: effective pressure; 3: regularized Coulomb law, 4: pism power law
+    u_0                 = 100.0           ! [m/a] Coulomb friction regularization term (velocity threshold), or pism-style power law 
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
     beta_gl_scale       = 1               !  0: No scaling, 1: beta*f_beta_gl, 2: H_grnd linear scaling, 3: Zstar scaling 
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
@@ -66,17 +67,19 @@
     C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen; 2: cf*f_zbed; 3: till strength; 4: cf linear with bed elevation
     C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1) (bed method 2) or at which C_bed = C_bed_min (bed method 4)
     C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
-    C_bed_min            = 1e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
-    C_bed_max            = 50e-5         ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
+    C_bed_min           = 1e-5            ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
+    C_bed_max           = 50e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 200e-5           ! [a m-1] Bed roughness coefficient, frozen (not used in cbed_method 4)
-    cf_stream           = 200e-5            ! [a m-1] Bed roughness coefficient, stream  (not used in cbed_method 4)
+    cf_frozen           = 200e-5          ! [a m-1] Bed roughness coefficient, frozen (not used in cbed_method 4)
+    cf_stream           = 200e-5          ! [a m-1] Bed roughness coefficient, stream  (not used in cbed_method 4)
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
-    cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
-    streaming_margin    = False            ! Impose cf_stream at the margin and grline independent of f_pmp
+    cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    streaming_margin    = False           ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
+    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
     ssa_iter_max        = 10              ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
@@ -120,21 +123,17 @@
 /
 
 &ytherm
-    method         = "active"           ! "fixed", "robin", "active"
-    cond_bed       = False              ! True for active conductive bedrock (ie, Q_geo)
+    method         = "temp"             ! "fixed", "robin", "temp", "enth"
     gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
-    nzr            = 11                 ! [-] Number of vertical grid points in bedrock 
-    H_rock         = 6000.0             ! [m] Vertical grid step in bedrock 
     use_strain_sia = False              ! True: calculate strain heating from SIA approx.
     n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
     use_const_cp   = False              ! Use specified constant value of heat capacity?
     const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt   = False              ! Use specified constant value of heat conductivity?
     const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    kt_m           = 1.0e8              ! [J a-1 m-1 K-1] Thermal conductivity of the mantle (lithosphere)
-    cp_m           = 1000.0             ! [J kg-1 K-1] Specific heat capacity of the mantle (lithosphere)
-    rho_m          = 2000.0             ! [kg m-3] Density of the mantle (lithosphere)
-
+    enth_cr        = 1e-2               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
+    omega_max      = 0.02               ! [--] Maximum allowed water content fraction 
 /
 
 &yelmo_masks
@@ -177,21 +176,21 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    sl_path            = "input/zeros.dat"
+    sl_path            = "input/lgm-120m-to-zero.dat"
 /
 
 &snapclim
-    atm_type           = "snap_2ind"
+    atm_type           = "anom"
     ocn_type           = "anom"
-    fname_at           = "input/alpha_triangle.dat"
-    fname_ao           = "input/alpha_triangle.dat"
-    fname_ap           = "input/alpha_triangle.dat"
+    fname_at           = "input/ramp_dwnup.dat"
+    fname_ao           = "input/ramp_dwnup.dat"
+    fname_ap           = "input/zeros.dat"
     fname_bt           = "input/ones.dat"
     fname_bo           = "input/ones.dat"
     fname_bp           = "input/ones.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = -10 
-    dTo_const          = -2
+    dTa_const          = 2.0  
+    dTo_const          = 0.5
     f_p                = 0.05 
 /
 
@@ -306,7 +305,7 @@
 &marine_shelf
     bmb_shlf_method    = "anom"
     T_shlf_method      = "mean"
-    use_obs            = True
+    use_obs            = False
     obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
     obs_name           = "bm_equil_ave"
     obs_f              = 1.0
