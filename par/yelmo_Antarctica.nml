@@ -1,13 +1,11 @@
 &control
-    
-    ! Timing parameters 
-    time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 80e3                 ! [yr] Ending time
-    time_equil   = 10.0                 ! [yr] Equilibration time 
-    dtt          = 2.0                  ! [yr] Main loop timestep 
-    dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 200.0                ! [yr] Frequency of writing 2D output files 
-    transient    = True                 ! Calculate transient climate? 
+    time_init       = 0.0               ! [yr] Starting time 
+    time_end        = 80e3              ! [yr] Ending time
+    time_equil      = 10.0              ! [yr] Equilibration time 
+    dtt             = 2.0               ! [yr] Main loop timestep 
+    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
+    transient       = True              ! Calculate transient climate? 
 /
 
 &yelmo
@@ -21,7 +19,7 @@
     nz_aa           = 21                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
     dtmax           = 2.0               ! [a] Maximum timestep
-    ntt             = 2                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
+    ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 
  
@@ -32,22 +30,25 @@
     init              = "presentday"    ! "icefree", "presentday"
     solver            = "impl-upwind"   ! "expl", "impl-upwind"
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
+    calv_method       = "simple"        ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     use_bmb           = True
     use_calv_subgrid  = False 
-    ocean_kill        = False 
     grline_fixed      = False 
     topo_fixed        = False
     topo_relax_dt     = 2000
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
-    calv_dt           = 1e-5            ! [a] Calving frequency 
-    H_calv            = 200.0 
-    H_min             = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau          = 1.0             ! [a] Characteristic calving time
+    H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
+    sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
+    calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf  = True           ! Allow bmb_shlf to permeate inland at the grounding line 
-    neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
+    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
 /
 
 &ydyn
@@ -87,22 +88,23 @@
 
 /
 
-&ydyn_neff
+&ydyn_neff 
     neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
     neff_p          = 1.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
-    neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
-    neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure
-    neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure
-    neff_delta      = 0.04              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
-    neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0
-    neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility
+    neff_use_water  = True              ! *neff_method=2* Use H_w field? If not, parameterize it.
+    neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure 
+    neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure 
+    neff_delta      = 0.02              ! [--] *neff_method=2* Fraction of overburden pressure for saturated till
+    neff_e0         = 0.69              ! [--] *neff_method=2* Reference void ratio at N0 
+    neff_Cc         = 0.12              ! [--] *neff_method=2* Till compressibility    
 /
 
 &ydyn_till
+    till_method     =  1                ! 0: phi = till_phi_min [const], 1: phi = f(z_bed) [linear]
     till_phi_min    =  5                ! [degrees] Till friction angle, minimum
-    till_phi_max    = 20                ! [degrees] Till friction angle, maximum
-    till_phi_zmin   = 0.0               ! [m] Bedrock elevation for till_phi_min
-    till_phi_zmax   = 500.0             ! [m] Bedrock elevation for phi_max
+    till_phi_max    = 40                ! [degrees] Till friction angle, maximum
+    till_phi_zmin   = -700.0            ! [m] Bedrock elevation for till_phi_min
+    till_phi_zmax   =  700.0            ! [m] Bedrock elevation for phi_max 
 /
 
 &ymat
@@ -110,6 +112,7 @@
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18     ! [Pa^-3 a^-1]
     rf_use_eismint2         = False     ! Only applied for rf_method=1
+    rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?n_glen                  = 3 
     n_glen                  = 3 
     visc_min                = 1e3 
     use_2D_enh              = False 
@@ -146,13 +149,13 @@
 /
 
 &yelmo_init_topo
-    H_ice_load = True 
-    H_ice_path = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
-    H_ice_nm   = "H_ice"            ! [m] Ice thickness 
-    z_bed_load = True 
-    z_bed_path = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
-    z_bed_nm   = "z_bed"            ! [m] Bedrock elevation 
-
+    H_ice_load      = True 
+    H_ice_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
+    H_ice_nm        = "H_ice"               ! [m] Ice thickness 
+    z_bed_load      = True 
+    z_bed_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
+    z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
+    z_bed_sd_nm     = ""            ! [m] Bedrock elevation standard deviation (if available) 
 /
 
 &yelmo_data 
@@ -168,8 +171,8 @@
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11.nc"
-    pd_vel_names      = "ux_srf" "uy_srf"                      ! Surface velocity 
+    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
+    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
 
 /
 
