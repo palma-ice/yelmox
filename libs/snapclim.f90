@@ -267,14 +267,15 @@ contains
                         snp%hybrid%f_eem,snp%hybrid%f_glac,snp%hybrid%f_hol,snp%hybrid%f_seas)
         end if 
 
-        ! Read in forcing time series 
+        ! Read in forcing time series
+        ! Make sure the time series files do not conatin empty lines at the end
         call read_series(snp%at, snp%par%fname_at)
         call read_series(snp%ap, snp%par%fname_ap)
         call read_series(snp%ao, snp%par%fname_ao)
         call read_series(snp%bt, snp%par%fname_bt)
         call read_series(snp%bp, snp%par%fname_bp)
         call read_series(snp%bo, snp%par%fname_bo)
-    
+   
         ! Also check consistency that in the case of absolute forcing clim0 = clim1,
         ! which is the reference climate 
         if (trim(snp%par%clim_type) .eq. "abs_1ind" .or. trim(snp%par%clim_type) .eq. "abs_2ind") then 
@@ -327,7 +328,6 @@ contains
             south = .FALSE.
         end if 
 
-
         ! Call the appropriate forcing subroutine to obtain anomalies 
         select case(trim(snp%par%clim_type))
             case("const") 
@@ -348,12 +348,12 @@ contains
 
                 ! First calculate the current anomaly 
                 dTa_now = at*snp%par%dTa_const
-                dTo_now = at*snp%par%dTo_const
+                dTo_now = ao*snp%par%dTo_const
 
                 ! Overwrite with input arguments if available
                 if (present(dTa)) dTa_now = dTa 
                 if (present(dTo)) dTo_now = dTo  
-                
+
                 call forclim_anom(snp%now,snp%clim0,dTa_now,dTo_now,snp%par%f_p)
 
             case("anom_1ind")
@@ -385,10 +385,10 @@ contains
         do m = 1, 12 
             if (south) then 
                 snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-30.0))/360.0)
+                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
             else 
                 snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-30.0))/360.0)
+                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
             end if 
         end do 
 
@@ -458,9 +458,6 @@ contains
         real(prec), intent(IN) :: dTa, dTo    ! Current anomaly value for atm and ocn
         real(prec), intent(IN) :: f_p         ! [frac/K] Precip scalar (eg f_p=5)
 
-        !        jablasco: modification of clim_now for adding global warming
-        !        Golledge et al (nature 2014)
-        
         clim_now = clim0 
         clim_now%tsl_ann   = clim0%tsl_ann + dTa 
         clim_now%tsl_sum   = clim0%tsl_sum + dTa
@@ -892,10 +889,11 @@ contains
                     ! Summer (July or Jan) temperature [degrees C]
                     if (south) then 
                         clim%tas(:,:,m) = clim%ta_ann + &
-                            (clim%ta_sum-clim%ta_ann)*cos(2*pi*(m*30.0-30.0))/360.0
+                            (clim%ta_sum-clim%ta_ann)*cos(2*pi*(m*30.0-30.0)/360.0)
                     else 
-                        clim%tas(:,:,m) = clim%ta_ann + &
-                            (clim%ta_ann-clim%ta_sum)*cos(2*pi*(m*30.0-30.0))/360.0
+                        clim%tas(:,:,m) = clim%ta_ann - &
+                            (clim%ta_sum-clim%ta_ann)*cos(2*pi*(m*30.0-30.0)/360.0)
+                    
                     end if 
 
                     ! Precip distributed evenly throughout the year 
@@ -923,10 +921,10 @@ contains
                 ! Monthly lapse rates from ann and sum (jan or jul)
                 if (south) then 
                     clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                        clim%z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0))/360.0)
+                        clim%z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
                 else 
                     clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                        clim%z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0))/360.0)
+                        clim%z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
                 end if 
 
                 ! Precip
@@ -1320,6 +1318,7 @@ contains
             else 
                 alph = (xout - x(j-1)) / (x(j) - x(j-1))
                 yout = y(j-1) + alph*(y(j) - y(j-1))
+
             end if 
         end if 
 

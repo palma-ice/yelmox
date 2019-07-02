@@ -2,17 +2,17 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 100.0                ! [yr] Ending time
-    time_equil   = 100.0                ! [yr] Equi;ibration time 
-    dtt          = 2.5                  ! [yr] Main loop timestep 
-    dt1D_out     = 5.0                  ! [yr] Frequency of writing 1D output files 
-    dt2D_out     = 10.0                 ! [yr] Frequency of writing 2D output files 
-    transient    = False                ! Calculate transient climate? 
+    time_end     = 80e3                ! [yr] Ending time
+    time_equil   = 50.0                ! [yr] Equi;ibration time 
+    dtt          = 2.0                  ! [yr] Main loop timestep 
+    dt1D_out     = 10.0                  ! [yr] Frequency of writing 1D output files 
+    dt2D_out     = 500.0                 ! [yr] Frequency of writing 2D output files 
+    transient    = True                ! Calculate transient climate? 
 /
 
 &yelmo
     domain          = "North"
-    grid_name       = "NH-40KM"
+    grid_name       = "NH-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "no"
@@ -20,7 +20,7 @@
     zeta_exp        = 2.0  
     nz_aa           = 21                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
-    dtmax           = 2.5               ! [a] Maximum timestep
+    dtmax           = 2.0               ! [a] Maximum timestep
     ntt             = 2                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 
@@ -55,6 +55,7 @@
     mix_method          = 1               ! -2: sia, -1: ssa, 0: sia|ssa, 1: sia+ssa 2: ssa vel. fraction
     calc_diffusivity    = False           ! Calculate 2D diffusivity term for diagnostics
     m_drag              = 1.0             ! Dragging law exponent 
+    u_0                 = 300.0           ! [m/a] Coulomb friction regularization term (velocity threshold), or pism-style power law
     beta_max            = 1e5             ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     beta_method         = 2               ! 0: constant beta; 1: power law; 2: effective pressure
     beta_gl_sep         = 0               !  -1: Apply subgrid treatment on ac-nodes (beta_gl_stag=2) 0: No subgrid treatment, 1: beta*f_grnd_aa        
@@ -62,12 +63,16 @@
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: f_grnd_ac scaling 
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
-    C_bed_method        = 1               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 
+    C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 2: cf*f_zbed; 3: till strength; 4: cf linear with bed elevation 
+    C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1) (bed method 2) or at which C_bed = C_bed_min (bed method 4)
+    C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
+    C_bed_min            = 1e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
+    C_bed_max            = 50e-5          ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     H_grnd_lim          = 500.0           ! [m] For beta_sep_method=2, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cf_frozen           = 100.0           ! [a m-1] Bed roughness coefficient, frozen 
-    cf_stream           = 20.0            ! [a m-1] Bed roughness coefficient, stream  
+    cf_frozen           = 200.0e-5        ! [a m-1] Bed roughness coefficient, frozen 
+    cf_stream           = 200.05-5        ! [a m-1] Bed roughness coefficient, stream  
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
@@ -80,8 +85,8 @@
 /
 
 &ydyn_neff
-    neff_method     = 2                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
-    neff_p          = 0.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
+    neff_method     = 1                 ! -1: external N_eff, 0: overburden pressure, 1: Leguy param., 2: Till pressure
+    neff_p          = 1.0               ! *neff_method=1* marine connectivity exponent (0: none, 1: full)
     neff_use_water  = False             ! *neff_method=2* Use H_w field or parameterize it?
     neff_w_max      = 2.0               ! [m]  *neff_method=2* Maximum allowed water layer thickness for Till pressure
     neff_N0         = 1000.0            ! [Pa] *neff_method=2* Reference effective pressure
@@ -95,8 +100,9 @@
     till_phi_max    = 20                ! [degrees] Till friction angle, maximum
     till_phi_zmin   = 0.0               ! [m] Bedrock elevation for till_phi_min
     till_phi_zmax   = 500.0             ! [m] Bedrock elevation for phi_max
-/
 
+/
+ 
 &ymat
     flow_law                = "glen"
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
@@ -172,28 +178,28 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    sl_path            = "input/zeros.dat"
+    sl_path            = "input/degla_sl.dat"
 /
 
 &snapclim
-    clim_type          = "const"
-    fname_at           = "input/zeros.dat"
+    clim_type          = "anom"
+    fname_at           = "input/anom_degla.dat"
     fname_ap           = "input/zeros.dat"
-    fname_ao           = "input/zeros.dat"
+    fname_ao           = "input/anom_degla.dat"
     fname_bt           = "input/zeros.dat"
     fname_bp           = "input/zeros.dat"
     fname_bo           = "input/zeros.dat"
-    spatial_const_clim = FALSE
-    ta_clim1           = 0.0 
-    ta_clim2           = -20.0 
-    ta_clim3           = -20.0
+    spatial_const_clim = TRUE
+    ta_clim1           = -11.0 
+    ta_clim2           = -10.0 
+    ta_clim3           = -10.0
     spatial_const_ocn  = TRUE 
     to_clim1           = 0.0 
     to_clim2           = -2.0
     to_clim3           = -2.0
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 0.0 
-    dTo_const          = 0.0
+    dTa_const          = 2.0 
+    dTo_const          = 1.0
     f_p                = 0.05 
 /
 
@@ -207,9 +213,11 @@
 /
 
 &snapclim_clim0
-    clim_path      = "ice_data/{domain}/{grid_name}/ERA-INT/{grid_name}_ERA-INT_1981-2010.nc"
-    clim_names     = "zs" "t2m" "pr" ""                                                   ! Default (if monthly = True) : "zs" "t2m" "pr" ""
-    clim_monthly   = True                                                                 ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
+    !clim_path      = "ice_data/{domain}/{grid_name}/ERA-INT/{grid_name}_ERA-INT_1981-2010.nc"
+    !clim_names     = "zs" "t2m" "pr" ""                                                  ! Default (if monthly = True) : "zs" "t2m" "pr" ""
+    clim_path      = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-MIS19_V18.nc"
+    clim_names     = "z_srf" "tas_ann" "tas_jja" "pr"                                     ! Default (if monthly = True) : "zs" "t2m" "pr" ""
+    clim_monthly   = False                                                                 ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
     clim_year_bp   = 0
     ocn_path      = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
     ocn_names     = "depth" "mask_ocn" "to"
@@ -301,8 +309,8 @@
     use_obs            = False
     obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
     obs_name           = "bm_actual_sm"
-    obs_f              = -1.0
-    obs_lim            = 100.0
+    obs_f              = 1.0
+    obs_lim            = 10.0
     basin_name         = "None"         !"northwest" "northeast" "east"
     basin_bmb          = 0.0            !        -1.0       -1.0   -1.0
     c_shlf             = 0.1 
