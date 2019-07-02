@@ -1,6 +1,6 @@
 &control
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 30e3              ! [yr] Ending time
+    time_end        = 1e3               ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
@@ -39,9 +39,9 @@
     topo_relax_dt     = 2000
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 5.0             ! [a] Characteristic calving time
+    calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt         = 0.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -77,7 +77,7 @@
     cf_stream           = 200e-5          ! [a m-1] Bed roughness coefficient, stream  (not used in cbed_method 4)
     cf_fac_sed          = 1.0             ! [-] Scaling of roughness for sediments 
     cf_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
-    streaming_margin    = True            ! Impose cf_stream at the margin and grline independent of f_pmp
+    streaming_margin    = False           ! Impose cf_stream at the margin and grline independent of f_pmp
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 

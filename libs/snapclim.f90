@@ -343,7 +343,7 @@ contains
                     dTa_now = dTa 
                 else 
                     ! Calculate the current anomaly from the index
-                    dTa_now = ap*snp%par%dTa_const
+                    dTa_now = at*snp%par%dTa_const
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
@@ -464,6 +464,8 @@ contains
         snp%now%bo = bo 
         snp%now%bp = bp
         
+        !write(*,"(a,6f12.2)") "snp: ", time, at, ao, dTa_now, dTo_now, snp%now%ta_ann(1,1) - snp%clim0%ta_ann(1,1) 
+
         return 
 
     end subroutine snapclim_update

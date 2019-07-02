@@ -214,7 +214,7 @@ program yelmox
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
+!         call yelmo_update(yelmo1,time)
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
