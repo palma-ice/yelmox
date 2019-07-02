@@ -343,7 +343,7 @@ contains
                     dTa_now = dTa 
                 else 
                     ! Calculate the current anomaly from the index
-                    dTa_now = ap*snp%par%dTa_const
+                    dTa_now = at*snp%par%dTa_const
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
