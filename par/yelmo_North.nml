@@ -46,7 +46,7 @@
     H_min             = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+    diffuse_bmb_shlf  = True           ! Allow bmb_shlf to permeate inland at the grounding line 
     neff_p            = 0.0             ! Effective pressure: connectivity to the ocean (0: none, 1: full)
 /
 
@@ -64,8 +64,8 @@
     f_beta_gl           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_method=1)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     C_bed_method        = 2               ! -1: set externally; 0: cf_stream everywhere; 1: cf_stream/cf_frozen 2: cf*f_zbed; 3: till strength; 4: cf linear with bed elevation 
-    C_bed_z0            = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1) (bed method 2) or at which C_bed = C_bed_min (bed method 4)
-    C_bed_z1            = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
+    C_bed_z0            = 0.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1) (bed method 2) or at which C_bed = C_bed_min (bed method 4)
+    C_bed_z1            = 100.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1  (bed_method 2) or at which C_bed = C_bed_max (bed method 4)
     C_bed_min            = 1e-5           ! [a m-1] Bed roughness at bedrock elevation C_bed_z0 or below (used for having a lower limit in cbedmethod2 (exp) and C_bed_method = 4)
     C_bed_max            = 50e-5          ! [a m-1] Bed roughness at bedrock elevation C_bed_z1 or above (only used for C_bed_method = 4)
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
@@ -102,7 +102,6 @@
     till_phi_zmax   = 500.0             ! [m] Bedrock elevation for phi_max
 
 /
- 
 &ymat
     flow_law                = "glen"
     rf_method               = 1         ! -1: set externally; 0: rf_const everywhere; 1: standard function 
