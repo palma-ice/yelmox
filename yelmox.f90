@@ -124,10 +124,10 @@ program yelmox
     if (use_hyster) then
         ! snapclim call using anomaly from the hyster package 
         call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,year_bp=time_init,domain=domain,dTa=hyst1%f_now)
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
     else
         ! Normal snapclim call 
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,year_bp=time_init,domain=domain)
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     end if 
 
     ! Equilibrate snowpack for itm
@@ -228,10 +228,10 @@ if (calc_transient_climate) then
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
                 write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
                                                         hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,year_bp=time_init,domain=domain,dTa=hyst1%f_now)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
             else
                 ! Normal snapclim call 
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,year_bp=time,domain=domain)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
             end if 
         end if 
 
