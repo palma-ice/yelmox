@@ -465,7 +465,8 @@ contains
         write(*,*) "smbpal_update_pdd"
         write(*,*) "sf:  ", minval(ann%sf), maxval(ann%sf)
         write(*,*) "t2m: ", minval(ann%t2m), maxval(ann%t2m)
-        
+
+
         ! Get ablation, runoff and refreezing [mm/a]
         call calc_ablation_pdd(ann%melt,ann%runoff,ann%refrz,ann%PDDs,ann%sf, &
                                 par%mm_snow,par%mm_ice,par%itm%Pmaxfrac)
