@@ -144,9 +144,10 @@ program yelmox
 
     yelmo1%bnd%H_sed = sed1%now%H 
     
+!mmr recheck this for H_w - is this an issue (2)?
    yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
 
-	print*,'holawat', time,sum(yelmo1%bnd%H_w)
+	print*,'holawatiniiii', time,sum(yelmo1%bnd%H_w)
 
 !mmr
 !mmr	yelmo1%bnd%bmb_shlf = 
@@ -265,11 +266,11 @@ program yelmox
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
-!mmr recheck        yelmo1%bnd%z_bed = isos1%now%z_bed
+!mmr recheck issue 1        yelmo1%bnd%z_bed = isos1%now%z_bed
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-!mmr        if (mod(time,10.0)==0) then
+!mmr   recheck issue 3    if (mod(time,10.0)==0) then
         if (mod(time,1.0)==0) then !mmr
             if (use_hyster) then
                 ! snapclim call using anomaly from the hyster package 
@@ -323,7 +324,7 @@ end if
         ! == BASAL HYDROLOGY ====================================================
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%z_srf,yelmo1%bnd%z_sl, &
                           yelmo1%tpo%now%bmb,yelmo1%tpo%now%f_grnd,yelmo1%tpo%par%dx,yelmo1%tpo%par%dx,time)
-        yelmo1%bnd%H_w   = 0. !!!mmr recheck hyd1%now%H_water 
+        yelmo1%bnd%H_w   = 0. !!!mmr- recheck!! issue 2  hyd1%now%H_water 
 
 !mmr
         print*,'holawat', time,sum(yelmo1%bnd%H_w),sum(hyd1%now%H_water)
