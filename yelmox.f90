@@ -148,6 +148,8 @@ program yelmox
 
 
 !mmr
+!mmr	yelmo1%bnd%bmb_shlf = 
+
 !mmr            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice !mmr as in yelmo_benchmark
 !mmr
 
@@ -197,6 +199,10 @@ program yelmox
     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+!mmr
+!mmr	print*,'holamarshelf',sum(yelmo1%tpo%now%H_ice),sum(yelmo1%bnd%z_bed),sum(yelmo1%tpo%now%f_grnd), &
+!mmr                         sum(yelmo1%bnd%z_sl),sum(yelmo1%bnd%regions)
+!mmr
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx)
@@ -258,7 +264,7 @@ program yelmox
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
-        yelmo1%bnd%z_bed = isos1%now%z_bed
+!mmr recheck        yelmo1%bnd%z_bed = isos1%now%z_bed
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -293,11 +299,19 @@ if (calc_transient_climate) then
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
+!mmr
+    print*,'holamarshelf',sum(yelmo1%tpo%now%H_ice),sum(yelmo1%bnd%z_bed),sum(yelmo1%tpo%now%f_grnd), &
+                         sum(yelmo1%bnd%z_sl),sum(yelmo1%bnd%regions)
+!mmr
+
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx*1e-3)
 
 end if 
 
+!mmr
+	print*,'holashlf', time, sum(yelmo1%bnd%bmb_shlf), sum(mshlf1%now%bmb_shlf)
+!mmr
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
