@@ -485,6 +485,12 @@ contains
         ! Make sure too small values are eliminated 
         where(abs(WE) .lt. 1e-12) WE = 0.0 
 
+!mmr
+	WE = 0.0 
+	print*,'hola', sum(WE)
+
+!mmr
+
         return
     
     end subroutine read_tab_litho

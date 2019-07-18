@@ -144,8 +144,9 @@ program yelmox
 
     yelmo1%bnd%H_sed = sed1%now%H 
     
-    yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
+   yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
 
+	print*,'holawat', time,sum(yelmo1%bnd%H_w)
 
 !mmr
 !mmr	yelmo1%bnd%bmb_shlf = 
@@ -315,10 +316,18 @@ end if
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+!mmr
+        print*,'holawat', time,sum(yelmo1%bnd%H_w)
+!mmr
+
         ! == BASAL HYDROLOGY ====================================================
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%z_srf,yelmo1%bnd%z_sl, &
                           yelmo1%tpo%now%bmb,yelmo1%tpo%now%f_grnd,yelmo1%tpo%par%dx,yelmo1%tpo%par%dx,time)
-        yelmo1%bnd%H_w   = hyd1%now%H_water 
+        yelmo1%bnd%H_w   = 0. !!!mmr recheck hyd1%now%H_water 
+
+!mmr
+        print*,'holawat', time,sum(yelmo1%bnd%H_w),sum(hyd1%now%H_water)
+!mmr
 
         ! == MODEL OUTPUT =======================================================
 
