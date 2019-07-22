@@ -114,9 +114,20 @@ contains
         allocate(is_grz(nx,ny))
         allocate(bmb_w(nx,ny))
 
+
+!mmr
+        print*,'holatimehyd', time, hyd%now%time
+!mmr
+
         ! Determine current time step and time 
         hyd%now%dt   = max(time - hyd%now%time,0.0)
         hyd%now%time = time 
+
+
+!mmr
+!mmr        hyd%now%dt = 1.0  !!! recheck - HEREIAM!!
+         print*,'hola_dthyd',  hyd%now%dt
+!mmr
 
         ! Determine basal water mass balance 
         bmb_w   = -bmb_ice*rho_water/rho_ice   
@@ -155,7 +166,10 @@ contains
 
             end do 
             end do 
-
+!mmr
+! mmr parmethod = 1
+            print*,'holahydro', sum(hyd%now%H_water),sum(H_ice),sum(H_ocean),sum(bmb_w)
+!mmr
             ! Update the hydro object depending on the method desired
             select case(hyd%par%method)
 
@@ -205,7 +219,7 @@ contains
 
     end subroutine hydro_update 
 
-    subroutine hydro_init(hyd,filename,nx,ny)
+    subroutine hydro_init(hyd,filename,nx,ny) 
 
         implicit none 
 

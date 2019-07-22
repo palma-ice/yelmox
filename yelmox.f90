@@ -111,7 +111,6 @@ program yelmox
 
     ! Initialize basal hydrology (bnd%H_w)
     call hydro_init(hyd1,path_par,yelmo1%grd%nx,yelmo1%grd%ny)
-
 !mmr
     print*,'hola called hydro'
 !mmr
@@ -145,16 +144,9 @@ program yelmox
     yelmo1%bnd%H_sed = sed1%now%H 
     
 !mmr recheck this for H_w - is this an issue (2)?
-   yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
-
-	print*,'holawatiniiii', time,sum(yelmo1%bnd%H_w)
-
-!mmr
-!mmr	yelmo1%bnd%bmb_shlf = 
-
-!mmr            yelmo1%tpo%now%z_srf  = yelmo1%bnd%z_bed + yelmo1%tpo%now%H_ice !mmr as in yelmo_benchmark
-!mmr
-
+!mmr   yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
+!mmr help!!       HEREIAM
+    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,time=time_init) !mmr (Restart stuff) RECHECK HEREIAM 
 
     if (use_hyster) then
         ! snapclim call using anomaly from the hyster package 
@@ -222,6 +214,13 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
+!mmr
+!mmr reckeck issue - suggested by alex
+       hyd1%now%H_water = yelmo1%bnd%H_w 
+       isos1%now%z_bed = yelmo1%bnd%z_bed
+!mmr
+
+
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=500.0)
@@ -266,7 +265,8 @@ program yelmox
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
-!mmr recheck issue 1        yelmo1%bnd%z_bed = isos1%now%z_bed
+!mmr recheck issue 1  - solved! 
+        yelmo1%bnd%z_bed = isos1%now%z_bed
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -318,13 +318,14 @@ end if
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
 !mmr
-        print*,'holawat', time,sum(yelmo1%bnd%H_w)
+        print*,'holawat1', time,sum(yelmo1%bnd%H_w)
 !mmr
 
         ! == BASAL HYDROLOGY ====================================================
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%z_srf,yelmo1%bnd%z_sl, &
                           yelmo1%tpo%now%bmb,yelmo1%tpo%now%f_grnd,yelmo1%tpo%par%dx,yelmo1%tpo%par%dx,time)
-        yelmo1%bnd%H_w   = 0. !!!mmr- recheck!! issue 2  hyd1%now%H_water 
+!mmr        0. !!!mmr- recheck!! issue 2 
+        yelmo1%bnd%H_w   = hyd1%now%H_water 
 
 !mmr
         print*,'holawat', time,sum(yelmo1%bnd%H_w),sum(hyd1%now%H_water)
