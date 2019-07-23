@@ -94,36 +94,17 @@ program yelmox
     conv_km3_Gt = rho_ice *1e-3
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
-!mmr
-    print*,'hola calling smbpali sf'
-!mmr
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
-!mmr
-    print*,'hola called smbpali sf'
-!mmr
     
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%basins)
     
-!mmr
-    print*,'hola called marshelf'
-!mmr
-
     ! Initialize basal hydrology (bnd%H_w)
     call hydro_init(hyd1,path_par,yelmo1%grd%nx,yelmo1%grd%ny)
-!mmr
-    print*,'hola called hydro'
-!mmr
 
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-!mmr
-    print*,'hola called sediments'
-!mmr
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-!mmr
-    print*,'hola called geotherm'
-!mmr
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
@@ -132,21 +113,11 @@ program yelmox
     call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed, &
                                H_ice_ref=yelmo1%tpo%now%H_ice,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
 
-!mmr
-    print*,'hola called isos'
-!mmr
     call sealevel_update(sealev,year_bp=time_init)
-!mmr
-    print*,'hola called sealev'
-!mmr
     yelmo1%bnd%z_sl  = sealev%z_sl 
-
     yelmo1%bnd%H_sed = sed1%now%H 
     
-!mmr recheck this for H_w - is this an issue (2)?
-!mmr   yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
-!mmr help!!       HEREIAM
-    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,time=time_init) !mmr (Restart stuff) RECHECK HEREIAM 
+    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,time=time_init) !mmr (restart stuff)  yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later 
 
     if (use_hyster) then
         ! snapclim call using anomaly from the hyster package 
@@ -155,9 +126,6 @@ program yelmox
     else
         ! Normal snapclim call 
         call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,year_bp=time_init,domain=domain)
-!mmr
-    print*,'hola calling snapclim_update', sum(snp1%now%tas),sum(yelmo1%tpo%now%z_srf) !sum(snp1%now%pr),sum(yelmo1%tpo%now%z_srf), sum(yelmo1%tpo%now%H_ice)
-!mmr
 
     end if 
 
@@ -176,27 +144,17 @@ program yelmox
 !                                file_out=trim(outfldr)//"smbpal.nc",write_now=.TRUE.,write_init=.TRUE.) 
 
 !     stop 
-!mmr
-    print*,'hola calling initmonthly', sum(snp1%now%tas),sum(snp1%now%pr),sum(yelmo1%tpo%now%z_srf), sum(yelmo1%tpo%now%H_ice)
-!mmr
     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-!mmr
-    print*,'hola called monthly'
-!mmr
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
-!mmr
-!mmr	print*,'holamarshelf',sum(yelmo1%tpo%now%H_ice),sum(yelmo1%bnd%z_bed),sum(yelmo1%tpo%now%f_grnd), &
-!mmr                         sum(yelmo1%bnd%z_sl),sum(yelmo1%bnd%regions)
-!mmr
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx)
@@ -214,12 +172,8 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
 
-!mmr
-!mmr reckeck issue - suggested by alex
-       hyd1%now%H_water = yelmo1%bnd%H_w 
-       isos1%now%z_bed = yelmo1%bnd%z_bed
-!mmr
-
+    hyd1%now%H_water = yelmo1%bnd%H_w  !mmr (restart stuff)
+    isos1%now%z_bed = yelmo1%bnd%z_bed !mmr (restart stuff)
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
@@ -265,13 +219,11 @@ program yelmox
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
-!mmr recheck issue 1  - solved! 
-        yelmo1%bnd%z_bed = isos1%now%z_bed
+        yelmo1%bnd%z_bed = isos1%now%z_bed ! mmr (restart stuff)
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-!mmr   recheck issue 3    if (mod(time,10.0)==0) then
-        if (mod(time,1.0)==0) then !mmr
+        if (mod(time,2.0)==0) then !mmr  (issue to recheck)    if (mod(time,10.0)==0) then
             if (use_hyster) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
@@ -285,9 +237,7 @@ if (calc_transient_climate) then
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
-!mmr
-        print*,'hola calling monthly', sum(snp1%now%tas)
-!mmr
+
         call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                    yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -301,35 +251,18 @@ if (calc_transient_climate) then
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
-!mmr
-    print*,'holamarshelf',sum(yelmo1%tpo%now%H_ice),sum(yelmo1%bnd%z_bed),sum(yelmo1%tpo%now%f_grnd), &
-                         sum(yelmo1%bnd%z_sl),sum(yelmo1%bnd%regions)
-!mmr
-
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx*1e-3)
 
 end if 
 
-!mmr
-	print*,'holashlf', time, sum(yelmo1%bnd%bmb_shlf), sum(mshlf1%now%bmb_shlf)
-!mmr
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-!mmr
-        print*,'holawat1', time,sum(yelmo1%bnd%H_w)
-!mmr
 
         ! == BASAL HYDROLOGY ====================================================
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%z_srf,yelmo1%bnd%z_sl, &
                           yelmo1%tpo%now%bmb,yelmo1%tpo%now%f_grnd,yelmo1%tpo%par%dx,yelmo1%tpo%par%dx,time)
-!mmr        0. !!!mmr- recheck!! issue 2 
-        yelmo1%bnd%H_w   = hyd1%now%H_water 
-
-!mmr
-        print*,'holawat', time,sum(yelmo1%bnd%H_w),sum(hyd1%now%H_water)
-!mmr
+        yelmo1%bnd%H_w   = hyd1%now%H_water !mmr (restart stuff) 
 
         ! == MODEL OUTPUT =======================================================
 
@@ -338,25 +271,16 @@ end if
 !             call yelmo_restart_write(yelmo1,file_restart,time=time)
              file_restart = trim(outfldr)//"yelmo_restart.nc"          !mmr (restart stuff)
              call yelmo_restart_write(yelmo1,file_restart,time=time)   !mmr (restart stuff)
-!mmr
-             print*,'hola: calling restart'
-!mmr
 !         end if 
         
         if (mod(time,dt2D_out)==0) then 
 !             call write_step_2D(yelmo1,file2D,time=time)
 !             call write_step_2D_small(yelmo1,file2D,time=time)
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,hyd1,file2D,time=time)
-!mmr
-            print*,'hola: calling 2D output'
-!mmr
         end if 
 
         if (mod(time,dt1D_out)==0) then 
             call write_yreg_step(yelmo1%reg,file1D,time=time) 
-!mmr
-            print*,'hola: calling 1D output'
-!mmr
         end if 
 
         if (mod(time,10.0)==0) then

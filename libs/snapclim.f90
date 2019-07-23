@@ -317,10 +317,7 @@ contains
         bp     = series_interp(snp%bp, year_bp)
         bo     = series_interp(snp%bo, year_bp)
 
-!mmr
-        print*,'holasnap', trim(snp%par%clim_type)
-!mmr
-        write(*,"(6f12.2)") year_bp, at, ap, ao, bt, bp, bo
+        !write(*,"(6f12.2)") year_bp, at, ap, ao, bt, bp, bo
 
         ! Determine whether the domain is in the south or not, by checking
         ! for the substrings ANT/ant in the domain name 
@@ -358,10 +355,6 @@ contains
                 if (present(dTo)) dTo_now = dTo  
                 
                 call forclim_anom(snp%now,snp%clim0,dTa_now,dTo_now,snp%par%f_p)
-
-!mmr
-                print*,'holaforclim',sum(snp%now%tsl_ann), sum(snp%now%tsl_sum), sum(z_srf)
-!mmr
 
             case("anom_1ind")
                 call forclim_anom_1ind(snp%now,snp%clim0,snp%clim1,snp%clim2,at,ap,ao)
