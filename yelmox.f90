@@ -223,7 +223,7 @@ program yelmox
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,2.0)==0) then !mmr  (issue to recheck)    if (mod(time,10.0)==0) then
+        if (mod(time,2.0)==0) then !mmr (restart stuff)    if (mod(time,10.0)==0) then
             if (use_hyster) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
