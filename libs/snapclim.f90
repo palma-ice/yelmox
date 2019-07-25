@@ -464,6 +464,8 @@ contains
         snp%now%bo = bo 
         snp%now%bp = bp
         
+        !write(*,"(a,6f12.2)") "snp: ", time, at, ao, dTa_now, dTo_now, snp%now%ta_ann(1,1) - snp%clim0%ta_ann(1,1) 
+
         return 
 
     end subroutine snapclim_update
