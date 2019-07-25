@@ -271,13 +271,6 @@ end if
 
         ! == MODEL OUTPUT =======================================================
 
-!         if (time == 30.0) then
-!             file_restart = trim(outfldr)//"yelmo_restart_yr30.0.nc" 
-!             call yelmo_restart_write(yelmo1,file_restart,time=time)
-             file_restart = trim(outfldr)//"yelmo_restart.nc"          
-             call yelmo_restart_write(yelmo1,file_restart,time=time)   
-!         end if 
-        
         if (mod(time,dt2D_out)==0) then 
 !             call write_step_2D(yelmo1,file2D,time=time)
 !             call write_step_2D_small(yelmo1,file2D,time=time)
@@ -298,6 +291,10 @@ end if
         end if 
 
     end do 
+
+    ! Write a restart file for the end of the simulation
+    file_restart = trim(outfldr)//"yelmo_restart.nc"          
+    call yelmo_restart_write(yelmo1,file_restart,time=time) 
 
 !     ! Let's see if we can read a restart file 
 !     call yelmo_restart_read(yelmo1,file_restart,time=time)
