@@ -105,7 +105,6 @@ program yelmox
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
@@ -116,10 +115,9 @@ program yelmox
 
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
-
     yelmo1%bnd%H_sed = sed1%now%H 
     
-    yelmo1%bnd%H_w   = 0.0   ! use hydro_init_state later
+    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,time=time_init)
 
     if (use_hyster) then
         ! snapclim call using anomaly from the hyster package 
@@ -128,6 +126,7 @@ program yelmox
     else
         ! Normal snapclim call 
         call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+
     end if 
 
     ! Equilibrate snowpack for itm
@@ -145,7 +144,6 @@ program yelmox
 !                                file_out=trim(outfldr)//"smbpal.nc",write_now=.TRUE.,write_init=.TRUE.) 
 
 !     stop 
-
     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
@@ -173,6 +171,14 @@ program yelmox
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+
+    if (yelmo1%par%use_restart) then 
+        ! If using restart file, set boundary module variables equal to restarted value 
+
+        hyd1%now%H_water = yelmo1%bnd%H_w 
+        isos1%now%z_bed = yelmo1%bnd%z_bed
+
+    end if 
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
@@ -222,7 +228,7 @@ program yelmox
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,10.0)==0) then
+        if (mod(time,2.0)==0) then
             if (use_hyster) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
@@ -236,6 +242,7 @@ if (calc_transient_climate) then
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
+
         call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                    yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -260,13 +267,15 @@ end if
         ! == BASAL HYDROLOGY ====================================================
         call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%z_srf,yelmo1%bnd%z_sl, &
                           yelmo1%tpo%now%bmb,yelmo1%tpo%now%f_grnd,yelmo1%tpo%par%dx,yelmo1%tpo%par%dx,time)
-        yelmo1%bnd%H_w   = hyd1%now%H_water 
+        yelmo1%bnd%H_w   = hyd1%now%H_water
 
         ! == MODEL OUTPUT =======================================================
 
 !         if (time == 30.0) then
 !             file_restart = trim(outfldr)//"yelmo_restart_yr30.0.nc" 
 !             call yelmo_restart_write(yelmo1,file_restart,time=time)
+             file_restart = trim(outfldr)//"yelmo_restart.nc"          
+             call yelmo_restart_write(yelmo1,file_restart,time=time)   
 !         end if 
         
         if (mod(time,dt2D_out)==0) then 
