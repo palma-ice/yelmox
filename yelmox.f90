@@ -167,12 +167,14 @@ program yelmox
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
+if (.FALSE.) then 
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
         yelmo1%bnd%z_bed = isos1%now%z_bed
+end if 
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
