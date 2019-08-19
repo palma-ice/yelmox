@@ -167,7 +167,7 @@ program yelmox
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
-if (.FALSE.) then 
+if (.TRUE.) then 
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
