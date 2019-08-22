@@ -1,8 +1,8 @@
 &control
-    time_init       = -250e3            ! [yr] Starting time 
+    time_init       = -160e3            ! [yr] Starting time 
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
-    dtt             = 1.0               ! [yr] Main loop timestep 
+    dtt             = 0.5               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
     transient       = True              ! Calculate transient climate? 
@@ -38,9 +38,9 @@
     topo_relax_dt     = 2000
     topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 1.0             ! [a] Characteristic calving time
+    calv_tau          = 5.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 10.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -199,7 +199,7 @@
 
 &snapclim_hybrid
     hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 0.3 
+    f_eem              = 0.4 
     f_glac             = 1.0 
     f_hol              = 0.5 
     f_seas             = 1.0 
