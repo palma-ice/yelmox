@@ -74,7 +74,7 @@
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream  
+    cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -118,7 +118,7 @@
     enh_shear               = 3.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
-    age_method              = "None"    ! "None", "expl", "impl"
+    age_method              = "expl"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
 
 /
