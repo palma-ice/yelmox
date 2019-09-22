@@ -162,6 +162,11 @@ initmip = libyelmox/bin/yelmo_initmip.x
     else:
         print("Warning: path does not exist {}".format(srcname))
 
+    # Write the current git revision information to output directory 
+    if os.path.isdir(".git"):
+        head       = get_git_revision_hash()
+        yelmo_info = open(os.path.join(rundir,"yelmo_git_revision"),'w').write(head)
+    
     # 2. Run the job
 
     # Generate the appropriate executable command to run job
@@ -316,6 +321,11 @@ def autofolder(params,outfldr0):
     outfldr  = outfldr0 + autofldr + '/'
 
     return outfldr
+
+def get_git_revision_hash():
+    #githash = subp.check_output(['git', 'describe', '--always', '--long', 'HEAD']).strip()
+    githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
+    return githash.decode("ascii") 
 
 def jobscript_slurm(cmd,rundir,username,usergroup,qos,wtime,useremail):
     '''Definition of the job script'''
