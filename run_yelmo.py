@@ -248,9 +248,12 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
     
     # Run the command (ie, change to output directory and submit job)
     #os.system(cmd_job)
-    proc = subp.Popen(cmd_job,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
+    #proc = subp.Popen(cmd_job,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
     #pid  = proc.pid+1   # This is not necessarily accurate - do not use for anything
     pid = 0
+
+    jobstatus = subp.check_output(cmd_job.split()).strip().decode("ascii") 
+    print(jobstatus)
 
     return pid 
 
