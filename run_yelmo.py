@@ -247,15 +247,11 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
     
     # Run the command (ie, change to output directory and submit job)
-    #os.system(cmd_job)
-    #proc = subp.Popen(cmd_job,shell=True,stdin=None,stdout=None,stderr=None,close_fds=True)
-    #pid  = proc.pid+1   # This is not necessarily accurate - do not use for anything
-    pid = 0
+    # Note: the argument `shell=True` can be a security hazard, but should
+    # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
+    jobstatus = subp.check_call(cmd_job,shell=True)
 
-    jobstatus = subp.check_output(cmd_job.split()).strip().decode("ascii") 
-    print(jobstatus)
-
-    return pid 
+    return jobstatus 
 
 def runner_param_write(par_path,rundir):
     '''Wrapper to perform parameter updates according to runner.json file 
