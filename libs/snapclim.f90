@@ -369,6 +369,23 @@ contains
                 call calc_temp_2ind_abs(snp%now%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt) 
                 call calc_precip_2ind_abs(snp%now%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,ap,bp) 
             
+            case("hybrid") 
+                ! Use hybrid input forcing curve (predetermined - no snapshots)
+
+                ! Determine spatially-constant monthly temp anomalies
+                dT = series_2D_interp(snp%hybrid%dTmon,time)
+
+                ! Apply anomaly separately to each month
+                do m = 1, 12
+                    call calc_temp_anom(snp%now%tsl(:,:,m),snp%clim0%tsl(:,:,m),dT(m))
+                end do 
+
+                ! Calculate monthly precip anomaly
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
+
+                ! Update external index
+                at = sum(dT)/real(size(dT,1))   ! Annual mean
+
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
                            "atm_type not recognized: "// trim(snp%par%atm_type) 
@@ -411,6 +428,17 @@ contains
             case("snap_2ind_abs")
                 call calc_temp_2ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo) 
             
+            case("hybrid") 
+                ! Use hybrid method 
+
+                ! Calculate current oceanic anomaly from scaled annual mean temp anomaly
+                dTo_now = sum(dT)/real(size(dT,1))*snp%hybrid%f_to 
+
+                call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
+                
+                ! Update external index 
+                ao = dTo_now 
+                
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
                            "atm_type not recognized: "// trim(snp%par%ocn_type) 
@@ -562,7 +590,6 @@ contains
         return
 
     end subroutine calc_temp_2ind_abs
-
 
     elemental subroutine calc_precip_anom(pr_now,pr0,dT,f_p)
         ! Calculate current precipitation value given 
@@ -1344,23 +1371,6 @@ contains
         return 
 
     end subroutine parse_path
-    
-! ajr: to reimplement later...
-!             case("hybrid") 
-!                 ! Use hybrid input forcing curve (predetermined - no snapshots)
-!                 dT = series_2D_interp(snp%hybrid%dTmon, time)
-!                 call calc_temp_hybrid(snp%now,snp%clim0,dT,to_fac=snp%hybrid%f_to,f_p=snp%par%f_p,is_south=south)
-
-!                 ! No change to oceanic temps and precip scaling 
-!                 clim_now%to_ann    = clim0%to_ann + dT_ann*snp%hybrid%f_to 
-                
-!                 ! Clausius-Clapeyron scaling of precipitation based on temp change
-!                 clim_now%prcor_ann = clim0%prcor_ann*exp(f_p*dT_ann)
-
-!                 ! Update external indices 
-!                 at = sum(dT)/real(size(dT,1))   ! Annual mean 
-!                 ao = at*snp%hybrid%f_to 
-
 
 ! ajr: to move into its own forcing module
 !             case("hyst")
