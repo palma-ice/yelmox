@@ -19,28 +19,25 @@
     nz_aa           = 21                ! Vertical resolution in ice
     dtmin           = 0.01              ! [a] Minimum timestep 
     dtmax           = 1.0               ! [a] Maximum timestep
-    ntt             = 2                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
+    ntt             = 1                 ! [--] Thermodynamics call frequency (how many dynamic timesteps to skip)
     cfl_max         = 1.0               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25 
     
 /
 
 &ytopo
-    method            = "dynamic"       ! "fixed", "relax", "dynamic"
     solver            = "impl-upwind"   ! "expl", "impl-upwind"
-    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    calv_method       = "simple"        ! "zero", "simple", "flux", "kill"
+    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
     surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
-    use_bmb           = True
-    use_calv_subgrid  = False 
-    grline_fixed      = False 
-    topo_fixed        = False
-    topo_relax_dt     = 2000
-    topo_fixed_dt     = -1              ! <= 0 for always fixed, positive value to 'unfix' topo after interval
+    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
+    use_bmb           = True            ! Use basal mass balance in mass conservation equation
+    topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl 
+    topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
     calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt         = 75.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -79,7 +76,7 @@
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
-    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
+    ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
@@ -147,13 +144,13 @@
 /
 
 &yelmo_init_topo
-    H_ice_load = True 
-    H_ice_path = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    H_ice_nm   = "H_ice"            ! [m] Ice thickness 
-    z_bed_load = True 
-    z_bed_path = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    z_bed_nm   = "z_bed"            ! [m] Bedrock elevation 
-
+    H_ice_load      = True 
+    H_ice_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    H_ice_nm        = "H_ice"               ! [m] Ice thickness 
+    z_bed_load      = True 
+    z_bed_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    z_bed_nm        = "z_bed"               ! [m] Bedrock elevation 
+    z_bed_sd_nm     = "z_bed_sd"            ! [m] Bedrock elevation standard deviation (if available) 
 /
 
 &yelmo_data 

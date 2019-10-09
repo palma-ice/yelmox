@@ -84,7 +84,7 @@ initmip = libyelmox/bin/yelmo_initmip.x
     # Expand executable path shortcut if defined
     if exe_path == "yelmox":
         exe_path = "libyelmox/bin/yelmox.x" 
-    elif exe_path == "yelmox_iso":
+    elif exe_path == "iso":
         exe_path = "libyelmox/bin/yelmox_iso.x" 
     elif exe_path == "benchmarks":
         exe_path = "libyelmox/bin/yelmo_benchmarks.x"
