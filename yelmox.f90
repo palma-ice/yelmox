@@ -108,10 +108,22 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Initialize isostasy - note this should use present-day topography values to 
-    ! calibrate the reference rebound!
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed, &
-                               H_ice_ref=yelmo1%tpo%now%H_ice,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
+
+
+!mmr    ! This was using as reference H_ref and z_bed the initial H_ref and z_bed, which 
+!mmr    ! is only correct when initializing from PD values; for a restart these were not
+!mmr    ! set, z_bed_ref was zero and the bedrock bounced instantaneously
+
+!mmr    ! Initialize isostasy - note this should use present-day topography values to 
+!mmr    ! calibrate the reference rebound   
+!mmr    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed, &
+!mmr          H_ice_ref=yelmo1%tpo%now%H_ice,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
+
+!mmr   ! Initialize isostasy using present-day topography values to 
+!mmr   ! calibrate the reference rebound
+       call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
+                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
+
 
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -223,12 +235,13 @@ program yelmox
         call yelmo_update(yelmo1,time)
 
         ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
+        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
+
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,2.0)==0) then
+        if (mod(time,dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
             if (use_hyster) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
