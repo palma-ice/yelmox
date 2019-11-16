@@ -7,7 +7,7 @@ LISROOT = ${HOME}/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-YELMOROOT = /Users/robinson/models/EURICE/yelmo_gmd
+YELMOROOT = ${CURDIR}/yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
