@@ -6,7 +6,7 @@ Example command to run an ensemble using 'job run' via the runner module:
 job run --shell -f -o output/run -p ydyn.beta_q=0.0,1.0 -- python run_yelmo.py -x -r {} par/yelmo_Greenland.nml
 '''
 import subprocess as subp 
-import sys, os, argparse, shutil, glob, datetime, json
+import sys, os, socket, argparse, shutil, glob, datetime, json
 
 try:
     from runner.ext.namelist import Namelist
