@@ -2,13 +2,23 @@
 # -*- coding: utf-8 -*-
 '''
 Script to run one yelmo simulation.
+Example command to run an ensemble using 'job run' via the runner module:
+job run -f -o output/run -p ydyn.beta_q=0.0,1.0 -- python run_yelmo.py -x -r {} par/yelmo_Greenland.nml
 '''
 import subprocess as subp 
-import sys, os, socket, argparse, shutil, glob, datetime, json
-#from runner.ext.namelist import Namelist
+import sys, os, argparse, shutil, glob, datetime, json
 
-# Shortcut to namelist fuctionality
-#nml = Namelist()  # you could use your own module for reading namelist
+try:
+    from runner.ext.namelist import Namelist
+
+    # Shortcut to namelist fuctionality
+    nml = Namelist()  # you could use your own module for reading namelist
+
+    runner_is_installed = True 
+
+except:
+
+    runner_is_installed = False 
 
 
 def run_yelmo():
@@ -70,10 +80,10 @@ initmip = libyelmox/bin/yelmo_initmip.x
 
     # Additional options, consistency checks
 
-    if with_runner:
-        print("run_yelmo.py is not currently configured to run with the runner module. Do not use option -x.")
+    if with_runner and not runner_is_installed:
+        print("The Python module 'runner' is not installed. Do not use option -x.")
         sys.exit()
-
+    
     # Copy the executable file to the output directory, or
     # call it from its compiled location?    
     copy_exec  = True 
