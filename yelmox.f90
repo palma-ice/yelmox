@@ -33,7 +33,7 @@ program yelmox
     
     type(hyster_class)     :: hyst1 
 
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart, domain
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out   
     integer    :: n
@@ -66,7 +66,7 @@ program yelmox
     path_const = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D     = trim(outfldr)//"yelmo1D.nc"
     file2D     = trim(outfldr)//"yelmo2D.nc"
-
+    
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -204,7 +204,7 @@ program yelmox
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+    call write_yreg_step(yelmo1%reg,file1D,time=time)
     
 
 !     ! Testing smb ======
@@ -291,7 +291,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+            call write_yreg_step(yelmo1%reg,file1D,time=time)
         end if 
 
         if (mod(time,10.0)==0) then

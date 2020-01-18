@@ -59,6 +59,14 @@ yelmox_iso : yelmo-static $(yelmox_libs)
 		@echo "    yelmox_iso.x is ready."
 		@echo " "
 
+yelmox_ais : yelmo-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_ais.x yelmox_ais.f90 \
+			$(LFLAGS) $(yelmox_libs) 
+		@echo " "
+		@echo "    yelmox_ais.x is ready."
+		@echo " "
+
+
 .PHONY : usage
 usage:
 	@echo ""

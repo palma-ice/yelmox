@@ -325,8 +325,10 @@ contains
         
         ! 2. Calculate current ice shelf bmb field (grounded-ice bmb is calculated in ice-sheet model separately) ========
  
-        ! Floating (or partially floating) ice
+        ! Floating (or partially floating) ice: also GRL
         where (f_grnd .lt. 1.0 .or. is_grline)
+        ! jablasco: no grl melting
+        !where (f_grnd .lt. 1.0)
             mshlf%now%bmb_shlf = calc_bmb_shelf(mshlf%now%bmb_ref,mshlf%now%dT_shlf,mshlf%par%c_shlf,mshlf%par%kappa_shlf)
             H_ocn              = max( (z_sl-z_bed)-(rho_ice_sw*H_ice), 0.0 ) 
         elsewhere 
@@ -338,13 +340,15 @@ contains
         ! variable used to scale mshlf%now%bmb_shlf at the grounding line)
         ! Scale grounding line points by grounding line melt factor
         ! accounting for the resolution dependence
+        
+        ! jablasco: no GRL melting
         where (is_grline)
             
             bmb_grline         = calc_bmb_shelf(mshlf%now%bmb_ref,mshlf%now%dT_shlf, &
                                                 mshlf%par%c_grz,mshlf%par%kappa_grz)
             
             mshlf%now%bmb_shlf = (1.0-grz_wt)*mshlf%now%bmb_shlf + grz_wt*bmb_grline
-
+        
         end where 
         
         ! Ensure that ice accretion is only 0% of melting
