@@ -96,6 +96,8 @@ initmip = libyelmox/bin/yelmo_initmip.x
         exe_path = "libyelmox/bin/yelmox.x" 
     elif exe_path == "iso":
         exe_path = "libyelmox/bin/yelmox_iso.x" 
+    elif exe_path == "hyst":
+        exe_path = "libyelmox/bin/yelmox_hyst.x" 
     elif exe_path == "benchmarks":
         exe_path = "libyelmox/bin/yelmo_benchmarks.x"
     elif exe_path == "mismip":
