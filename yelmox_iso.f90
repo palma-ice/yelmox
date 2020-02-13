@@ -11,8 +11,7 @@ program yelmox
     
     use snapclim
     use marine_shelf 
-    use smbpal   
-    use basal_hydrology 
+    use smbpal 
     use sediments 
     use geothermal
     
@@ -23,8 +22,7 @@ program yelmox
     type(sealevel_class)   :: sealev 
     type(snapclim_class)   :: snp1 
     type(marshelf_class)   :: mshlf1 
-    type(smbpal_class)     :: smbpal1 
-    type(hydro_class)      :: hyd1  
+    type(smbpal_class)     :: smbpal1  
     type(sediments_class)  :: sed1 
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
@@ -87,9 +85,6 @@ program yelmox
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%basins)
     
-    ! Initialize basal hydrology (bnd%H_w)
-    call hydro_init(hyd1,path_par,yelmo1%grd%nx,yelmo1%grd%ny)
-
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
@@ -105,8 +100,6 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
     
-    call hydro_init_state(hyd1,yelmo1%tpo%now%H_ice,time=time_init)
-
     ! Normal snapclim call 
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
 
@@ -151,7 +144,7 @@ program yelmox
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,hyd1,file2D,time=time)
+    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -206,15 +199,10 @@ end if
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-        ! == BASAL HYDROLOGY ====================================================
-        call hydro_update(hyd1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%z_srf,yelmo1%bnd%z_sl, &
-                          yelmo1%tpo%now%bmb,yelmo1%tpo%now%f_grnd,yelmo1%tpo%par%dx,yelmo1%tpo%par%dx,time)
-        yelmo1%bnd%H_w   = hyd1%now%H_water
-
         ! == MODEL OUTPUT =======================================================
 
         if (mod(time,dt2D_out)==0) then 
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,hyd1,file2D,time=time)
+            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if 
 
         if (mod(time,dt1D_out)==0) then 
@@ -302,7 +290,7 @@ contains
 
     end subroutine write_step_2D_small
 
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,hyd,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none 
         
@@ -310,8 +298,7 @@ contains
         type(isos_class),       intent(IN) :: isos 
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
-        type(smbpal_class),     intent(IN) :: srf 
-        type(hydro_class),      intent(IN) :: hyd  
+        type(smbpal_class),     intent(IN) :: srf  
         !type(sediments_class),  intent(IN) :: sed 
         !type(geothermal_class), intent(IN) :: gthrm
         !type(isos_class),       intent(IN) :: isos
@@ -395,7 +382,8 @@ contains
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+        call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
@@ -414,8 +402,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"H_w",ylmo%bnd%H_w,units="m",long_name="Basal water layer thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
