@@ -27,9 +27,9 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out   
+    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate
     real(4) :: cpu_start_time, cpu_end_time 
@@ -53,9 +53,13 @@ program yelmox
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const = trim(outfldr)//"yelmo_const_Earth.nml"
-    file1D     = trim(outfldr)//"yelmo1D.nc"
-    file2D     = trim(outfldr)//"yelmo2D.nc"
+    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
+    file1D       = trim(outfldr)//"yelmo1D.nc"
+    file2D       = trim(outfldr)//"yelmo2D.nc"
+    file_restart = trim(outfldr)//"yelmo_restart.nc"          
+    
+    ! How often to write a restart file 
+    dt_restart   = 20e3                 ! [yr] 
 
     ! === Initialize ice sheet model =====
 
@@ -209,11 +213,18 @@ end if
             call write_yreg_step(yelmo1%reg,file1D,time=time) 
         end if 
 
+        if (mod(time,dt_restart)==0) then 
+            call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        end if 
+
         if (mod(time,10.0)==0) then
             write(*,"(a,f14.4)") "yelmo::       time = ", time
         end if  
 
     end do 
+
+    ! Write the restart file for the end of the simulation
+    call yelmo_restart_write(yelmo1,file_restart,time=time) 
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -324,6 +335,10 @@ contains
         ! Write model speed 
         call nc_write(filename,"speed",ylmo%par%model_speed,units="kyr/hr",long_name="Model speed (Yelmo only)", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
@@ -348,9 +363,9 @@ contains
         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice fraction in grid cell", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
-                      long_name="Distance to nearest grounding-line point", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
+!                       long_name="Distance to nearest grounding-line point", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"C_bed",ylmo%dyn%now%C_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -410,11 +425,11 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
+                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+        
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
