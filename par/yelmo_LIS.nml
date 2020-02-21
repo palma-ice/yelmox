@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 &control
     time_init       = -200e3               ! [yr] Starting time 
     time_end        = 0             ! [yr] Ending time
