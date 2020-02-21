@@ -52,6 +52,13 @@ yelmox : yelmo-static $(yelmox_libs)
 		@echo "    yelmox.x is ready."
 		@echo " "
 
+yelmox_hyst : yelmo-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
+			$(LFLAGS) $(yelmox_libs) 
+		@echo " "
+		@echo "    yelmox_hyst.x is ready."
+		@echo " "
+
 yelmox_iso : yelmo-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
 			$(LFLAGS) $(yelmox_libs) 

@@ -2,13 +2,23 @@
 # -*- coding: utf-8 -*-
 '''
 Script to run one yelmo simulation.
+Example command to run an ensemble using 'job run' via the runner module:
+job run --shell -f -o output/run -p ydyn.beta_q=0.0,1.0 -- python run_yelmo.py -x -r {} par/yelmo_Greenland.nml
 '''
 import subprocess as subp 
-import sys, os, argparse, shutil, glob, datetime, json
-#from runner.ext.namelist import Namelist
+import sys, os, socket, argparse, shutil, glob, datetime, json
 
-# Shortcut to namelist fuctionality
-#nml = Namelist()  # you could use your own module for reading namelist
+try:
+    from runner.ext.namelist import Namelist
+
+    # Shortcut to namelist fuctionality
+    nml = Namelist()  # you could use your own module for reading namelist
+
+    runner_is_installed = True 
+
+except:
+
+    runner_is_installed = False 
 
 
 def run_yelmo():
@@ -70,8 +80,8 @@ initmip = libyelmox/bin/yelmo_initmip.x
 
     # Additional options, consistency checks
 
-    if with_runner:
-        print("run_yelmo.py is not currently configured to run with the runner module. Do not use option -x.")
+    if with_runner and not runner_is_installed:
+        print("The Python module 'runner' is not installed. Do not use option -x.")
         sys.exit()
 
     # Copy the executable file to the output directory, or
@@ -86,6 +96,8 @@ initmip = libyelmox/bin/yelmo_initmip.x
         exe_path = "libyelmox/bin/yelmox.x" 
     elif exe_path == "iso":
         exe_path = "libyelmox/bin/yelmox_iso.x" 
+    elif exe_path == "hyst":
+        exe_path = "libyelmox/bin/yelmox_hyst.x" 
     elif exe_path == "benchmarks":
         exe_path = "libyelmox/bin/yelmo_benchmarks.x"
     elif exe_path == "mismip":
@@ -223,7 +235,8 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
 
     # Get info about current system
     username  = os.environ.get('USER')
-    hostname  = os.environ.get('HOSTNAME')
+    #hostname  = os.environ.get('HOSTNAME')
+    hostname  = socket.getfqdn()             # Returns full domain name
 
     # Command to be called 
     cmd = "{} {}".format(executable,par_path) 
@@ -232,15 +245,23 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
     nm_jobscript   = 'job.submit'
     path_jobscript = "{}/{}".format(rundir,nm_jobscript)
     
-    if "cei" in hostname:
-        script = jobscript_qsub(cmd,rundir,username,usergroup,wtime,useremail)
-        jobfile = open(path_jobscript,'w').write(script)
-        cmd_job = "cd {} && qsub {}".format(rundir,nm_jobscript)
-        
-    else:
-        script  = jobscript_slurm(cmd,rundir,username,usergroup,qos,wtime,useremail)
+    if "brigit" in hostname:
+        # Host is the UCM brigit cluster, use the following submit script
+        script  = jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
+            
+    else:
+        # Host is the PIK 2015 cluster, use the following submit script
+        script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail)
+        jobfile = open(path_jobscript,'w').write(script)
+        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
+    
+    # Unused: host is the obsolete UCM eolo cluster, use the following submit script
+    # if "cei" in hostname:
+    #     script = jobscript_qsub(cmd,rundir,username,usergroup,wtime,useremail)
+    #     jobfile = open(path_jobscript,'w').write(script)
+    #     cmd_job = "cd {} && qsub {}".format(rundir,nm_jobscript)
     
     # Run the command (ie, change to output directory and submit job)
     # Note: the argument `shell=True` can be a security hazard, but should
@@ -324,7 +345,37 @@ def get_git_revision_hash():
     githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
     return githash.decode("ascii") 
 
-def jobscript_slurm(cmd,rundir,username,usergroup,qos,wtime,useremail):
+def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail):
+    '''Definition of the job script'''
+
+    jobname = "yelmo" 
+
+    # Check that wtime is consistent with qos
+    if qos == "short" and wtime > 24*7:
+        print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
+        sys.exit()
+            
+    script = """#! /bin/bash
+#SBATCH -p {}
+#SBATCH --time={}:00:00
+#SBATCH --job-name={}
+###SBATCH --account={}
+#SBATCH --mem=0 
+#SBATCH --mail-user={}
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=REQUEUE
+#SBATCH --output=./out.out
+#SBATCH --error=./out.err
+
+# Run the job
+{} 
+
+""".format(qos,wtime,jobname,usergroup,useremail,cmd)
+
+    return script
+
+def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
     '''Definition of the job script'''
 
     jobname = "yelmo" 

@@ -15,7 +15,7 @@
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "no"
     log_timestep    = False 
-    zeta_scale      = "tanh"            ! "linear", "exp", "tanh"
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     use_pc_thrm     = False             ! Use predictor step with thermodynamics too 
@@ -26,7 +26,7 @@
     pc_method       = "AB-SAM"          ! "FE-SBE" or "AB-SAM"
     pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 5.0               ! Predictor-corrector tolerance 
-
+    
 /
 
 &ytopo
@@ -36,9 +36,9 @@
     margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
     use_bmb           = True            ! Use basal mass balance in mass conservation equation
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl 
+    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
-    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_H_lim        = 150.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
@@ -74,8 +74,8 @@
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
-    cf_frozen           = 100e-3          ! [--] Bed critical stress factor, frozen 
-    cf_stream           =  20e-3          ! [--] Bed critical stress factor, stream  
+    cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 0.02            ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -83,6 +83,7 @@
     ssa_iter_max        = 2               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
+    taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     
 /
@@ -112,7 +113,7 @@
     rf_const                = 1e-18     ! [Pa^-3 a^-1]
     rf_use_eismint2         = False     ! Only applied for rf_method=1
     rf_with_water           = False     ! Only applied for rf_method=1, scale rf by water content?n_glen                  = 3 
-    n_glen                  = 3 
+    n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
     enh_shear               = 3.0
@@ -124,17 +125,19 @@
 /
 
 &ytherm
-    method         = "temp"             ! "fixed", "robin", "temp", "enth"
-    gamma          = 1.0                ! [K] Scalar for the pressure melting point decay function 
-    use_strain_sia = False              ! True: calculate strain heating from SIA approx.
-    n_sm_qstrn     = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
-    n_sm_qb        = 0                  ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
-    use_const_cp   = False              ! Use specified constant value of heat capacity?
-    const_cp       = 2009.0             ! [J kg-1 K-1] Specific heat capacity 
-    use_const_kt   = False              ! Use specified constant value of heat conductivity?
-    const_kt       = 6.62e7             ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
-    enth_cr        = 1e-2               ! [--] Conductivity ratio for temperate ice (kappa_temp = enth_cr*kappa_cold)
-    omega_max      = 0.02               ! [--] Maximum allowed water content fraction 
+    method          = "temp"            ! "fixed", "robin", "temp", "enth"
+    gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
+    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
+    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
+    use_const_cp    = False             ! Use specified constant value of heat capacity?
+    const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
+    use_const_kt    = False             ! Use specified constant value of heat conductivity?
+    const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
+    enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
+    omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
+    till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
+    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 
 &yelmo_masks
@@ -318,23 +321,6 @@
     depth_min          = 1100.0
     depth_max          = 1500.0
     
-/
-
-&basal_hydrology
-    init_method       = 0             ! 0: no water; 1: constant value; 2: f(H)
-    H0                = 100           ! [m] Spatially constant initial water pressure value
-    H0_ice_min        = 10            ! [m] Minimum ice thickness for initial water pressure 
-    H0_ice_max        = 2000          ! [m] Maximum ice thickness for initial water pressure
-    H0_min            = 0             ! [m] Minimum initial water pressure 
-    H0_max            = 500           ! [m] Maximum initial water pressure
-    
-    method            = 1             ! H_water method (0: const, 1: bucket (local); 2: diffusion)
-    H_water_max       = 1.0           ! [m] Maximum water height in bucket method
-    till_max          = 20.0          ! [m] Maximum till thickness
-    till_porosity     = 0.5           ! [1] Porosity of till
-    till_infiltr      = 1.0e-03       ! [m/a] Rate water can infiltrate till
-    kond              = 1.0e-06       ! [m/s] Till conductivity (diffusion constant)
-
 /
 
 &sediments
