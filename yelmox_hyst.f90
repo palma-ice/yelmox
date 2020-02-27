@@ -64,7 +64,7 @@ program yelmox
 
     ! Define input and output locations 
     path_const  = trim(outfldr)//"yelmo_const_Earth.nml"
-    file1D      = trim(outfldr)//"yelmo1D.nc"
+!mmr    file1D      = trim(outfldr)//"yelmo1D.nc"
     file2D      = trim(outfldr)//"yelmo2D.nc"
 
     file1D_hyst = trim(outfldr)//"yelmo1D_hyst.nc" 
@@ -203,8 +203,8 @@ program yelmox
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,hyd1,file2D,time=time)
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+!mmr    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+!mmr    call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
     ! 1D file hyst 
     call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -292,7 +292,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+!mmr            call write_yreg_step(yelmo1%reg,file1D,time=time) 
             call write_step_1D_combined(yelmo1%reg,hyst1,snp1,file1D_hyst,time=time)
         end if 
 
