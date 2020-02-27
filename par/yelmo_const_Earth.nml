@@ -1,5 +1,5 @@
 &yelmo_config 
-    write_log = True 
+    yelmo_log = True 
 
 /
 
