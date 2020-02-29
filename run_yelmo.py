@@ -79,10 +79,10 @@ initmip = libyelmox/bin/yelmo_initmip.x
     par_path    = args.par_path  # Path relative to current working directory (cwd)
     
     # Load simulation info from json configuration file 
-    if os.path.isfile("run_yelmo.json"):
-        info = json.load(open("run_yelmo.json"))
+    if os.path.isfile("run_config.json"):
+        info = json.load(open("run_config.json"))
     else: 
-        print("Required json file 'run_yelmo.json' containing run options not found.")
+        print("Required json file 'run_config.json' containing run options not found.")
         sys.exit()
 
     # Additional options, consistency checks
@@ -159,8 +159,8 @@ initmip = libyelmox/bin/yelmo_initmip.x
 
     # Write the current git revision information to output directory 
     if os.path.isdir(".git"):
-        head       = get_git_revision_hash()
-        yelmo_info = open(os.path.join(rundir,"git_revision"),'w').write(head)
+        head     = get_git_revision_hash()
+        git_info = open(os.path.join(rundir,"git_revision"),'w').write(head)
     
     # 2. Run the job
 
