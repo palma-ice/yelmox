@@ -1,0 +1,17 @@
+{
+    "exe_shortcuts" : 
+        {   "yelmox" : "libyelmox/bin/yelmox.x",
+            "iso"    : "libyelmox/bin/yelmox_iso.x",
+            "hyst"   : "libyelmox/bin/yelmox_hyst.x",
+            "rembo"  : "libyelmox/bin/yelmox_rembo.x"
+        },
+
+    "const_paths" : 
+        {   "EISMINT"  : "par/yelmo_const_EISMINT.nml",
+            "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml"   
+        },
+
+    "const_path_default" : "par/yelmo_const_Earth.nml",
+
+    "links" : ["input","ice_data"]
+}

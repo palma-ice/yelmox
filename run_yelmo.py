@@ -6,7 +6,8 @@ Example command to run an ensemble using 'job run' via the runner module:
 job run --shell -f -o output/run -p ydyn.beta_q=0.0,1.0 -- python run_yelmo.py -x -r {} par/yelmo_Greenland.nml
 '''
 import subprocess as subp 
-import sys, os, socket, argparse, shutil, glob, datetime, json
+import sys, os, socket, argparse, shutil, glob, datetime
+import json 
 
 try:
     from runner.ext.namelist import Namelist
@@ -77,6 +78,12 @@ initmip = libyelmox/bin/yelmo_initmip.x
     rundir      = args.rundir 
     par_path    = args.par_path  # Path relative to current working directory (cwd)
     
+    # Load simulation info from json configuration file 
+    if os.path.isfile("run_yelmo.json"):
+        info = json.load(open("run_yelmo.json"))
+    else: 
+        print("Required json file 'run_yelmo.json' containing run options not found.")
+        sys.exit()
 
     # Additional options, consistency checks
 
@@ -91,33 +98,20 @@ initmip = libyelmox/bin/yelmo_initmip.x
     # Submit overrides run 
     if submit: run = True 
 
-    # Expand executable path shortcut if defined
-    if exe_path == "yelmox":
-        exe_path = "libyelmox/bin/yelmox.x" 
-    elif exe_path == "iso":
-        exe_path = "libyelmox/bin/yelmox_iso.x" 
-    elif exe_path == "hyst":
-        exe_path = "libyelmox/bin/yelmox_hyst.x" 
-    elif exe_path == "benchmarks":
-        exe_path = "libyelmox/bin/yelmo_benchmarks.x"
-    elif exe_path == "mismip":
-        exe_path = "libyelmox/bin/yelmo_mismip.x" 
-    elif exe_path == "initmip":
-        exe_path = "libyelmox/bin/yelmo_initmip.x" 
+    # Expand executable path shortcut if defined, otherwise exe_path remains unchanged.
+    if exe_path in info["exe_shortcuts"]:
+        exe_path = info["exe_shortcuts"].get(exe_path)
 
     # Also extract executable and path filenames 
     exe_fname = os.path.basename(exe_path)
     par_fname = os.path.basename(par_path)
 
     # Get path of constants parameter file based on parameter name
-    # (EISMINT,MISMIP3D are special cases, otherwise use Earth constants)
-
-    if "EISMINT" in par_fname:
-        const_path = "par/yelmo_const_EISMINT.nml"
-    elif "MISMIP3D" in par_fname:
-        const_path = "par/yelmo_const_MISMIP3D.nml"
-    else:
-        const_path = "par/yelmo_const_Earth.nml"
+    # First set const_path to default, then see if it should be overwritten 
+    const_path = info["const_path_default"]
+    for key, value in info["const_paths"].items():
+        if key in par_fname: 
+            const_path = value 
 
     # Make sure input files exist 
     if not os.path.isfile(const_path):
@@ -151,35 +145,22 @@ initmip = libyelmox/bin/yelmo_initmip.x
     shutil.copy(const_path,rundir)
 
     ## Generate symbolic links to input data folders
-    srcname = "input"
-    dstname = os.path.join(rundir,srcname)
-    srcpath = os.path.abspath(srcname)
-    if os.path.islink(dstname): os.unlink(dstname)
-    os.symlink(srcpath,dstname)
-
-    # # Generate link to extra data folder for personal data files
-    # srcname = "extra_data"
-    # dstname = os.path.join(rundir,srcname)
-    # srcpath = os.path.abspath(srcname)
-    # if os.path.islink(dstname): os.unlink(dstname)
-    # os.symlink(srcpath,dstname)
-
-    srcname = "ice_data"
-    dstname = os.path.join(rundir,srcname)
-    if os.path.islink(dstname): os.unlink(dstname)
-    if os.path.islink(srcname):
-        linkto = os.readlink(srcname)
-        os.symlink(linkto, dstname)
-    elif os.path.isdir(srcname):
-        srcpath = os.path.abspath(srcname)
-        os.symlink(srcpath,dstname)
-    else:
-        print("Warning: path does not exist {}".format(srcname))
+    for srcname in info["links"]:
+        dstname = os.path.join(rundir,srcname)
+        if os.path.islink(dstname): os.unlink(dstname)
+        if os.path.islink(srcname):
+            linkto = os.readlink(srcname)
+            os.symlink(linkto, dstname)
+        elif os.path.isdir(srcname):
+            srcpath = os.path.abspath(srcname)
+            os.symlink(srcpath,dstname)
+        else:
+            print("Warning: path does not exist {}".format(srcname))
 
     # Write the current git revision information to output directory 
     if os.path.isdir(".git"):
         head       = get_git_revision_hash()
-        yelmo_info = open(os.path.join(rundir,"yelmo_git_revision"),'w').write(head)
+        yelmo_info = open(os.path.join(rundir,"git_revision"),'w').write(head)
     
     # 2. Run the job
 
@@ -323,22 +304,6 @@ def makedirs(dirname,remove):
             raise
 
     return
-
-def autofolder(params,outfldr0):
-    '''Given a list of parameters,
-       generate an appropriate folder name.
-    '''
-
-    parts = []
-
-    for p in params:
-        parts.append( p.short() )
-
-    # Join the parts together, combine with the base output dir
-    autofldr = '.'.join(parts)
-    outfldr  = outfldr0 + autofldr + '/'
-
-    return outfldr
 
 def get_git_revision_hash():
     #githash = subp.check_output(['git', 'describe', '--always', '--long', 'HEAD']).strip()
