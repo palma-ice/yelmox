@@ -77,7 +77,8 @@ initmip = libyelmox/bin/yelmo_initmip.x
     # Arguments
     rundir      = args.rundir 
     par_path    = args.par_path  # Path relative to current working directory (cwd)
-    
+    par_path_2  = "par/yelmo_Greenland_rembo.nml"
+
     # Load simulation info from json configuration file 
     if os.path.isfile("run_config.json"):
         info = json.load(open("run_config.json"))
@@ -105,6 +106,13 @@ initmip = libyelmox/bin/yelmo_initmip.x
     # Also extract executable and path filenames 
     exe_fname = os.path.basename(exe_path)
     par_fname = os.path.basename(par_path)
+    par_fname_2 = os.path.basename(par_path_2)
+
+    # Check if using rembo too
+    if exe_fname == "yelmox_rembo.x":
+        with_rembo = True 
+    else:
+        with_rembo = False 
 
     # Get path of constants parameter file based on parameter name
     # First set const_path to default, then see if it should be overwritten 
@@ -126,6 +134,11 @@ initmip = libyelmox/bin/yelmo_initmip.x
         print("Input file does not exist: {}".format(exe_path))
         sys.exit() 
     
+    if with_rembo:
+        if not os.path.isfile(par_path_2):
+            print("Input file does not exist: {}".format(par_path_2))
+            sys.exit() 
+
     ### Start the script to make the job, and then run it ############################
 
 
@@ -143,6 +156,13 @@ initmip = libyelmox/bin/yelmo_initmip.x
     
     # Copy the constants parameter file
     shutil.copy(const_path,rundir)
+
+    if with_rembo:
+        # Copy the 2nd parameter file
+        shutil.copy(par_path_2,rundir)
+
+        # Add an output directory for 'obs' from model
+        makedirs(rundir+"/obs",remove=True)
 
     ## Generate symbolic links to input data folders
     for srcname in info["links"]:
