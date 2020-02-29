@@ -12,6 +12,10 @@ YELMOROOT = yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
+REMBOROOT = /Users/robinson/models/EURICE/rembo1
+INC_REMBO = -I${REMBOROOT}/librembo/include 
+LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+
 FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
 LFLAGS  = $(LIB_NC) $(LIB_LIS) $(LIB_YELMO)
 

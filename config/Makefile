@@ -45,6 +45,11 @@ include config/Makefile_yelmox.mk
 yelmo-static: 
 		$(MAKE) -C $(YELMOROOT) yelmo-static 
 
+# Compile the static library libyelmo,
+# using Makefile located in $(YELMOROOT) directory 
+rembo-static: 
+		$(MAKE) -C $(REMBOROOT) rembo-static 
+
 yelmox : yelmo-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox.f90 \
 			$(LFLAGS) $(yelmox_libs) 
@@ -65,6 +70,13 @@ yelmox_iso : yelmo-static $(yelmox_libs)
 		@echo " "
 		@echo "    yelmox_iso.x is ready."
 		@echo " "
+
+yelmox_rembo: yelmo-static rembo-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) -o libyelmox/bin/yelmox_rembo.x \
+			yelmox_rembo.f90 $(LIB_REMBO) $(LFLAGS) $(yelmox_libs)
+	@echo " "
+	@echo "    librembo/bin/yelmox_rembo.x is ready."
+	@echo " "
 
 .PHONY : usage
 usage:
