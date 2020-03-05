@@ -1,7 +1,7 @@
 &control
     time_init       = -160e3            ! [yr] Starting time 
     time_end        = 0.0               ! [yr] Ending time
-    time_equil      = 0.0               ! [yr] Equilibration time 
+    time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
@@ -120,7 +120,7 @@
     enh_shear               = 3.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
-    age_method              = "None"    ! "None", "expl", "impl"
+    age_method              = "expl"    ! "None", "expl", "impl"
     age_impl_kappa          = 1.5       ! [m2 a-1] Artificial diffusion term for implicit age solving 
 
 /
@@ -137,7 +137,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 0.0               ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 0.001             ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 
