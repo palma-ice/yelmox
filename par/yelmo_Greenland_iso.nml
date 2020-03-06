@@ -13,7 +13,7 @@
     grid_name       = "GRL-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "no"      ! "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-iso.nc"
+    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-iso.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
