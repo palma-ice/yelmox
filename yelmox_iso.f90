@@ -159,6 +159,8 @@ program yelmox
 
     end if 
 
+    call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
