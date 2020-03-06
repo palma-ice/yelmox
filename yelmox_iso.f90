@@ -155,7 +155,7 @@ program yelmox
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart,time)
-        stop "**** Done ****"
+!         stop "**** Done ****"
 
     end if 
 
