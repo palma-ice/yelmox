@@ -121,6 +121,9 @@ program yelmox
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
+    ! Impose limit on positive smb 
+    where(yelmo1%bnd%smb .gt. 1.0_prec) yelmo1%bnd%smb = 1.0_prec 
+
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
@@ -571,10 +574,10 @@ contains
             if (trim(domain) .eq. "Greenland") then
 
                 ! Reduction
-                call scale_cf_gaussian(lambda1,0.02,x0= 560.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.02,x0= 560.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.02,x0= 560.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.02,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
             end if 
 
