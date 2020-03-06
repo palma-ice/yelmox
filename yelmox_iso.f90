@@ -241,70 +241,6 @@ end if
 
 contains
 
-    subroutine write_step_2D_small(ylmo,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class),      intent(IN) :: ylmo
-!         type(snapclim_class),   intent(IN) :: snp 
-!         type(marshelf_class),   intent(IN) :: mshlf 
-!         type(smbpal_class),     intent(IN) :: srf 
-!         type(hydro_class),      intent(IN) :: hyd  
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
-        
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
-
-        ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine write_step_2D_small
-
     subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none 
@@ -325,6 +261,13 @@ contains
         integer    :: ncid, n
         real(prec) :: time_prev 
 
+        real(prec) :: uxy_rmse, H_rmse, zsrf_rmse, loguxy_rmse 
+        real(prec), allocatable :: tmp(:,:) 
+        real(prec), allocatable :: tmp1(:,:) 
+        
+        allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(tmp1(ylmo%grd%nx,ylmo%grd%ny))
+
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -342,6 +285,49 @@ contains
         call nc_write(filename,"dt_avg",ylmo%par%dt_avg,units="yr",long_name="Average timestep", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         call nc_write(filename,"eta_avg",ylmo%par%eta_avg,units="m a-1",long_name="Average eta (maximum PC truncation error)", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        
+        ! initmip specific error metrics 
+        tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            H_rmse = mv 
+        end if 
+
+        ! surface elevation too 
+        tmp = ylmo%dta%pd%err_z_srf
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else 
+            zsrf_rmse = mv 
+        end if 
+
+        tmp = ylmo%dta%pd%err_uxy_s
+        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
+            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
+        else
+            uxy_rmse = mv
+        end if 
+
+        tmp = ylmo%dta%pd%uxy_s 
+        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
+        tmp1 = ylmo%dyn%now%uxy_s 
+        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
+        
+        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
+            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
+        else
+            loguxy_rmse = mv
+        end if 
+        
+        call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
+                      dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
                       dim1="time",start=[n],count=[1],ncid=ncid)
         
         ! == yelmo_topography ==
