@@ -144,9 +144,12 @@ program yelmox
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
-    
+!     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
+!     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+
+    call yelmo_update_equil(yelmo1,time,time_tot=20e3, topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
+    call yelmo_update_equil(yelmo1,time,time_tot=1000.0_prec,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0_prec)
+
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
