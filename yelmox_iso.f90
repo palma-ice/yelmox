@@ -570,11 +570,11 @@ contains
             ! Additionally modify cf_ref
             if (trim(domain) .eq. "Greenland") then
 
-                ! Reduction - feeding the Ross ice shelf from the East
-                call scale_cf_gaussian(lambda1,0.05,x0= 560.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.05,x0= 560.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.05,x0= 560.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                ! Reduction
+                call scale_cf_gaussian(lambda1,0.02,x0= 560.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.02,x0= 560.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.02,x0= 560.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.02,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
             end if 
 

@@ -117,7 +117,7 @@
     n_glen                  = 3.0 
     visc_min                = 1e3 
     use_2D_enh              = False 
-    enh_shear               = 1.0
+    enh_shear               = 3.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
     age_method              = "expl"    ! "None", "expl", "impl"
