@@ -4,7 +4,8 @@ program yelmox
 
     use ncio 
     use yelmo 
-    
+    use basal_dragging 
+
     ! External libraries
     use sealevel 
     use isostasy  
@@ -138,6 +139,11 @@ program yelmox
 
     time = time_init 
 
+    ! Define cf_ref if desired
+    if (yelmo1%dyn%par%cb_method .eq. -1) then 
+        call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+    end if 
+
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
@@ -179,7 +185,13 @@ program yelmox
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
-if (.TRUE.) then 
+if (.TRUE.) then
+        
+        ! Update cf_ref if desired
+        if (yelmo1%dyn%par%cb_method .eq. -1) then 
+            call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+        end if 
+ 
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
@@ -526,6 +538,126 @@ contains
         return 
 
     end subroutine write_step_2D_combined
+
+
+    subroutine set_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
+        ! Modify cf_ref [unitless] with location specific tuning 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+        
+        ! Local variables
+        integer :: i, j, nx, ny 
+        integer :: i1, i2, j1, j2 
+        real(prec) :: f_scale 
+        real(prec), allocatable :: lambda1(:,:) 
+        real(prec), allocatable :: lambda_bed(:,:)  
+
+        nx = grd%nx 
+        ny = grd%ny 
+
+        allocate(lambda1(nx,ny))
+        allocate(lambda_bed(nx,ny))
+        
+        lambda1 = 1.0_prec 
+
+            ! Additionally modify cf_ref
+            if (trim(domain) .eq. "Greenland") then
+
+                ! Reduction - feeding the Ross ice shelf from the East
+                call scale_cf_gaussian(lambda1,0.05,x0= 560.0, y0=-1800.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 560.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 560.0, y0=-2000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-2100.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+            end if 
+
+            ! =============================================================================
+            ! Step 2: calculate lambda functions to scale cf_ref from default value 
+            
+            !------------------------------------------------------------------------------
+            ! lambda_bed: scaling as a function of bedrock elevation
+
+            select case(trim(dyn%par%cb_scale))
+
+                case("lin_zb")
+                    ! Linear scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("exp_zb")
+                    ! Exponential scaling function with bedrock elevation
+                    
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+
+                case("till_const")
+                    ! Constant till friction angle
+
+                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
+
+                case("till_zb")
+                    ! Linear till friction angle versus elevation
+
+                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
+                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+
+                case DEFAULT
+                    ! No scaling
+
+                    lambda_bed = 1.0_prec
+
+            end select 
+            
+            ! Ensure lambda_bed is not below lower limit [default range 0:1] 
+            where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
+
+
+            ! =============================================================================
+            ! Step 3: calculate cf_ref [non-dimensional]
+            
+            dyn%now%cf_ref = dyn%par%cf_stream*lambda1*lambda_bed
+            
+        return 
+
+    end subroutine set_cf_ref
+
+    subroutine scale_cf_gaussian(cf_ref,cf_new,x0,y0,sigma,xx,yy)
+
+        implicit none 
+
+        real(prec), intent(INOUT) :: cf_ref(:,:)
+        real(prec), intent(IN) :: cf_new
+        real(prec), intent(IN) :: x0
+        real(prec), intent(IN) :: y0
+        real(prec), intent(IN) :: sigma
+        real(prec), intent(IN) :: xx(:,:)
+        real(prec), intent(IN) :: yy(:,:)
+
+        ! Local variables 
+        integer :: nx, ny 
+        real(prec), allocatable :: wts(:,:)
+        
+        nx = size(cf_ref,1)
+        ny = size(cf_ref,2)
+
+        allocate(wts(nx,ny))
+
+        ! Get Gaussian weights 
+        wts = 1.0/(2.0*pi*sigma**2)*exp(-((xx-x0)**2+(yy-y0)**2)/(2.0*sigma**2))
+        wts = wts / maxval(wts)
+
+        ! Scale cf_ref
+        cf_ref = cf_ref*(1.0-wts) + cf_new*wts
+
+        return 
+
+    end subroutine scale_cf_gaussian
 
 end program yelmox 
 
