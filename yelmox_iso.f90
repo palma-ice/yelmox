@@ -27,7 +27,7 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart, domain 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
@@ -57,6 +57,7 @@ program yelmox
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
+    file_restart_init = trim(outfldr)//"yelmo_restart_init.nc"          
     
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
@@ -131,7 +132,6 @@ program yelmox
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
     yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
     
     call yelmo_print_bound(yelmo1%bnd)
@@ -154,7 +154,7 @@ program yelmox
         call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
         ! Write a restart file 
-        call yelmo_restart_write(yelmo1,file_restart,time)
+        call yelmo_restart_write(yelmo1,file_restart_init,time)
 !         stop "**** Done ****"
 
     end if 
