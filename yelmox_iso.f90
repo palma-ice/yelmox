@@ -140,22 +140,31 @@ program yelmox
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
 
-    ! Run yelmo for several years with constant boundary conditions and topo
-    ! to equilibrate thermodynamics and dynamics
-!     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
-!     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+    if (.not. yelmo1%par%use_restart) then 
+        ! Run initialization steps 
 
-    call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
-    call yelmo_update_equil(yelmo1,time,time_tot=5e3, topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+        ! Run yelmo for several years with constant boundary conditions and topo
+        ! to equilibrate thermodynamics and dynamics
+!         call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
+!         call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+
+        call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
+        call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+
+        ! Write a restart file 
+        call yelmo_restart_write(yelmo1,file_restart,time)
+        stop "**** Done ****"
+
+    end if 
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
     ! Advance timesteps
@@ -229,7 +238,7 @@ end if
             ! At year==0, write some statistics 
             write(*,*) "PDstats:", yelmo1%dta%pd%rmse_H, yelmo1%dta%pd%rmse_uxy, yelmo1%dta%pd%rmse_loguxy 
         end if 
-        
+
     end do 
 
     ! Write the restart file for the end of the simulation
