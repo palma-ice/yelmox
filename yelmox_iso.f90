@@ -121,8 +121,8 @@ program yelmox
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-    ! Impose limit on positive smb 
-    where(yelmo1%bnd%smb .gt. 1.0_prec) yelmo1%bnd%smb = 1.0_prec 
+    ! Impose flux correction to smb 
+    call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -216,6 +216,9 @@ if (calc_transient_climate) then
                                    yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+
+        ! Impose flux correction to smb 
+        call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -542,6 +545,62 @@ contains
 
     end subroutine write_step_2D_combined
 
+    subroutine modify_smb(smb,grd,time)
+
+        implicit none 
+
+        real(prec),         intent(INOUT) :: smb(:,:) 
+        type(ygrid_class),  intent(IN)    :: grd
+        real(prec),         intent(IN)    :: time 
+
+        ! Local variables
+        real(prec), allocatable :: dsmb_0kyr(:,:) 
+        real(prec), allocatable :: dsmb_8kyr(:,:) 
+        real(prec), allocatable :: dsmb_10kyr(:,:) 
+        real(prec), allocatable :: dsmb_now(:,:) 
+        
+        real(prec) :: t0, t1, t2, wt 
+
+        allocate(dsmb_0kyr(grd%nx,grd%ny))
+        allocate(dsmb_8kyr(grd%nx,grd%ny))
+        allocate(dsmb_10kyr(grd%nx,grd%ny))
+        allocate(dsmb_now(grd%nx,grd%ny))
+        
+        dsmb_0kyr = 0.0_prec 
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        dsmb_8kyr = 0.0_prec 
+        call scale_cf_gaussian(dsmb_8kyr,-0.2,x0= 600.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_8kyr,-0.2,x0= 600.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_8kyr,-0.2,x0= 600.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_8kyr,-0.2,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        dsmb_10kyr = 0.0_prec
+
+        t0 = -10e3
+        t1 =  -8e3 
+        t2 =   0.0_prec
+
+        if (time .gt. t0 .and. time .lt. t1) then 
+            
+            wt       = (time - t0) / (t1-t0)
+            dsmb_now = (1.0-wt)*dsmb_10kyr + wt*dsmb_8kyr 
+            smb      = smb + dsmb_now 
+
+        else if (time .ge. t1 .and. time .le. t2) then 
+
+            wt       = (time - t1) / (t2-t1)
+            dsmb_now = (1.0-wt)*dsmb_8kyr + wt*dsmb_0kyr 
+            smb      = smb + dsmb_now 
+
+        end if 
+
+        return 
+
+    end subroutine modify_smb 
 
     subroutine set_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
         ! Modify cf_ref [unitless] with location specific tuning 
@@ -574,10 +633,10 @@ contains
             if (trim(domain) .eq. "Greenland") then
 
                 ! Reduction
-                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                call scale_cf_gaussian(lambda1,0.05,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.1,x0= 600.0, y0=-1800.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.1,x0= 600.0, y0=-1900.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.1,x0= 600.0, y0=-2000.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                call scale_cf_gaussian(lambda1,0.1,x0= 600.0, y0=-2100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                 
             end if 
 
