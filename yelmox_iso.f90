@@ -567,7 +567,8 @@ contains
         allocate(dsmb_now(grd%nx,grd%ny))
         
         dsmb_0kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -579,6 +580,7 @@ contains
         
         dsmb_6kyr = 0.0_prec 
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
