@@ -555,53 +555,55 @@ contains
 
         ! Local variables
         real(prec), allocatable :: dsmb_0kyr(:,:) 
-        real(prec), allocatable :: dsmb_8kyr(:,:) 
+        real(prec), allocatable :: dsmb_6kyr(:,:) 
         real(prec), allocatable :: dsmb_10kyr(:,:) 
         real(prec), allocatable :: dsmb_now(:,:) 
         
         real(prec) :: t0, t1, t2, wt 
 
         allocate(dsmb_0kyr(grd%nx,grd%ny))
-        allocate(dsmb_8kyr(grd%nx,grd%ny))
+        allocate(dsmb_6kyr(grd%nx,grd%ny))
         allocate(dsmb_10kyr(grd%nx,grd%ny))
         allocate(dsmb_now(grd%nx,grd%ny))
         
         dsmb_0kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dsmb_0kyr, 0.1,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr, 0.1,x0= 300.0, y0=-1100.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr, 0.1,x0= 400.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dsmb_0kyr, 0.1,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dsmb_0kyr, 0.1,x0= 300.0, y0=-1100.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dsmb_0kyr, 0.1,x0= 400.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        dsmb_8kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_8kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_8kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_8kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_8kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        dsmb_6kyr = 0.0_prec 
+        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dsmb_8kyr, 0.3,x0=-300.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_8kyr, 0.3,x0= 300.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_8kyr, 0.3,x0= 400.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr, 0.3,x0=-300.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr, 0.2,x0= 100.0, y0=-1000.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr, 0.3,x0= 300.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_6kyr, 0.5,x0= 400.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         dsmb_10kyr = 0.0_prec
 
         t0 = -10e3
-        t1 =  -8e3 
+        t1 =  -6e3 
         t2 =   0.0_prec
 
         if (time .gt. t0 .and. time .lt. t1) then 
             
             wt       = (time - t0) / (t1-t0)
-            dsmb_now = (1.0-wt)*dsmb_10kyr + wt*dsmb_8kyr 
+            dsmb_now = (1.0-wt)*dsmb_10kyr + wt*dsmb_6kyr 
             smb      = smb + dsmb_now 
 
         else if (time .ge. t1 .and. time .le. t2) then 
 
             wt       = (time - t1) / (t2-t1)
-            dsmb_now = (1.0-wt)*dsmb_8kyr + wt*dsmb_0kyr 
+            dsmb_now = (1.0-wt)*dsmb_6kyr + wt*dsmb_0kyr 
             smb      = smb + dsmb_now 
 
         end if 
