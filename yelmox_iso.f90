@@ -168,6 +168,9 @@ program yelmox
 
     end if 
 
+    ! Update geothermal boundary data again, in case it changed after generating restart file 
+    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
+    
     call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
     ! 2D file 
