@@ -160,6 +160,9 @@ program yelmox
             ! Load cf_ref from specified file 
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
+            ! Eliminate low values 
+            where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
+
         else
             ! Define cf_ref inline 
 
@@ -208,6 +211,9 @@ program yelmox
             ! Load cf_ref from specified file 
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
+            ! Eliminate low values 
+            where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
+            
         else
             ! Define cf_ref inline 
 
