@@ -162,9 +162,7 @@ program yelmox
 
             ! Eliminate extreme values 
             where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
-            where(yelmo1%dyn%now%cf_ref .lt. 0.05) yelmo1%dyn%now%cf_ref = 0.05
-            where(yelmo1%dyn%now%cf_ref .gt. 0.70) yelmo1%dyn%now%cf_ref = 0.70
-
+            
         else
             ! Define cf_ref inline 
 
@@ -215,9 +213,7 @@ program yelmox
 
             ! Eliminate extreme values 
             where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
-            where(yelmo1%dyn%now%cf_ref .lt. 0.05) yelmo1%dyn%now%cf_ref = 0.05
-            where(yelmo1%dyn%now%cf_ref .gt. 0.70) yelmo1%dyn%now%cf_ref = 0.70
-            
+
         else
             ! Define cf_ref inline 
 

@@ -41,8 +41,8 @@
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
-    calv_H_lim        = 150.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 1.0             ! [a] Characteristic calving time
+    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau          = 10.0            ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt         = 5.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
@@ -77,7 +77,7 @@
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = 0.0             ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 0.001           ! [Pa] Minimum allowed value of cb for grounded ice
+    cb_min              = 0.005           ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
     cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
@@ -95,7 +95,7 @@
 &ydyn_neff 
     neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
-    neff_p          = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
     neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
@@ -209,8 +209,8 @@
 &snapclim_hybrid
     hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
     f_eem              = 0.4 
-    f_glac             = 1.0 
-    f_hol              = 1.0 
+    f_glac             = 1.2 
+    f_hol              = 1.2 
     f_seas             = 1.0 
     f_to               = 0.4
 /
@@ -272,8 +272,8 @@
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     firn_fac    = 0.0266  ! Reduction in surface temp versus melting [K/mm w.e.]
 
-    mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
-    mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    mm_snow = 4.0         ! PDD snow melt factor [mm w.e./K-d]
+    mm_ice  = 7.0         ! PDD ice melt factor  [mm w.e./K-d]
     
 /
 
