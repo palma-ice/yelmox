@@ -242,7 +242,7 @@ program yelmox
 if (.TRUE.) then
         
         ! Update cf_ref if desired
-        if (yelmo1%dyn%par%cb_method .eq. -1) then 
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cf_ref) ) then
             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
         end if 
  
@@ -678,7 +678,7 @@ contains
     end subroutine modify_smb 
 
     subroutine set_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
-        ! Modify cf_ref [unitless] with location specific tuning 
+        ! Set cf_ref [unitless] with location specific tuning 
 
         implicit none
         
