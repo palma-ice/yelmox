@@ -29,10 +29,11 @@ program yelmox
     type(isos_class)       :: isos1
     
     character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart, domain 
+    character(len=256) :: file_cf_ref 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
-    logical    :: calc_transient_climate
+    logical    :: calc_transient_climate, load_cf_ref 
     real(4) :: cpu_start_time, cpu_end_time 
 
     ! Start timing 
@@ -49,6 +50,9 @@ program yelmox
     call nml_read(path_par,"control","dt1D_out",     dt1D_out)                  ! [yr] Frequency of 1D output 
     call nml_read(path_par,"control","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
     call nml_read(path_par,"control","transient",    calc_transient_climate)    ! Calculate transient climate? 
+
+    call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -142,10 +146,30 @@ program yelmox
 
     time = time_init 
 
-    ! Define cf_ref if desired
+
+    ! ============================================================
+    ! Load or define cf_ref (this will be overwritten if loading from restart file)
+
     if (yelmo1%dyn%par%cb_method .eq. -1) then 
-        call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+    
+        if (load_cf_ref) then 
+
+            ! Parse filename with grid information
+            call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
+
+            ! Load cf_ref from specified file 
+            call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
+
+        else
+            ! Define cf_ref inline 
+
+            call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+
+        end if 
+
     end if 
+
+    ! ============================================================
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -169,8 +193,32 @@ program yelmox
     end if 
 
     ! Update geothermal boundary data again, in case it changed after generating restart file 
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
+    ! ============================================================
+    ! Load or define cf_ref again, in case of restart file
+
+    if (yelmo1%dyn%par%cb_method .eq. -1) then 
+    
+        if (load_cf_ref) then 
+
+            ! Parse filename with grid information
+            call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
+
+            ! Load cf_ref from specified file 
+            call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
+
+        else
+            ! Define cf_ref inline 
+
+            call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+
+        end if 
+
+    end if 
+
+    ! ============================================================
+
     call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
     ! 2D file 
