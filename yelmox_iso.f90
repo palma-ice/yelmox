@@ -145,7 +145,7 @@ program yelmox
     call yelmo_print_bound(yelmo1%bnd)
 
     time = time_init 
-    
+
     ! ============================================================
     ! Load or define cf_ref (this will be overwritten if loading from restart file)
 
@@ -209,8 +209,8 @@ program yelmox
 
         ! Run yelmo for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
-        call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+        call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
+        call yelmo_update_equil(yelmo1,time,time_tot=10e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time)
@@ -221,7 +221,7 @@ program yelmox
     ! Update geothermal boundary data again, in case it changed after generating restart file 
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
-    call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+    call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
