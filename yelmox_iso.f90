@@ -177,6 +177,9 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
 
+    ! Update geothermal boundary data again, in case it changed after generating restart file 
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
+    
     ! ============================================================
     ! Load or define cf_ref again, in case of restart file
 
@@ -218,10 +221,10 @@ program yelmox
 
     end if 
 
-    ! Update geothermal boundary data again, in case it changed after generating restart file 
-    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
-    
     call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+
+    ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
+    yelmo1%mat%now%dep_time = time_init 
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
