@@ -210,7 +210,7 @@
     hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
     f_eem              = 0.4 
     f_glac             = 1.2 
-    f_hol              = 1.2 
+    f_hol              = 0.8 
     f_seas             = 1.0 
     f_to               = 0.4
 /
@@ -272,7 +272,7 @@
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     firn_fac    = 0.0266  ! Reduction in surface temp versus melting [K/mm w.e.]
 
-    mm_snow = 4.0         ! PDD snow melt factor [mm w.e./K-d]
+    mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 7.0         ! PDD ice melt factor  [mm w.e./K-d]
     
 /
