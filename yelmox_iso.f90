@@ -145,8 +145,7 @@ program yelmox
     call yelmo_print_bound(yelmo1%bnd)
 
     time = time_init 
-
-
+    
     ! ============================================================
     ! Load or define cf_ref (this will be overwritten if loading from restart file)
 
@@ -178,26 +177,6 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
 
-    if (.not. yelmo1%par%use_restart) then 
-        ! Run initialization steps 
-
-        ! Run yelmo for several years with constant boundary conditions and topo
-        ! to equilibrate thermodynamics and dynamics
-!         call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
-!         call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
-
-        call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
-        call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
-
-        ! Write a restart file 
-        call yelmo_restart_write(yelmo1,file_restart_init,time)
-!         stop "**** Done ****"
-
-    end if 
-
-    ! Update geothermal boundary data again, in case it changed after generating restart file 
-    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
-    
     ! ============================================================
     ! Load or define cf_ref again, in case of restart file
 
@@ -225,7 +204,24 @@ program yelmox
 
     ! ============================================================
 
-    call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+    if (.not. yelmo1%par%use_restart) then 
+        ! Run initialization steps 
+
+        ! Run yelmo for several years with constant boundary conditions and topo
+        ! to equilibrate thermodynamics and dynamics
+        call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
+        call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+
+        ! Write a restart file 
+        call yelmo_restart_write(yelmo1,file_restart_init,time)
+!         stop "**** Done ****"
+
+    end if 
+
+    ! Update geothermal boundary data again, in case it changed after generating restart file 
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
+    
+    call yelmo_update_equil(yelmo1,time,time_tot=100.0,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
@@ -446,9 +442,8 @@ contains
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        ! No time dimension
         call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
-                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -593,6 +588,9 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uy_s",ylmo%dyn%now%uy_s,units="m/a",long_name="Surface velocity (y)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"uz",ylmo%dyn%now%uy_s,units="m/a",long_name="Vertical velocity", &
+                      dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
 
 !         call nc_write(filename,"beta_acx",ylmo%dyn%now%beta_acx,units="Pa a m-1",long_name="Dragging coefficient (x)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
