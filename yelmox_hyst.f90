@@ -61,17 +61,11 @@ program yelmox
     outfldr = "./"
 
     ! Define input and output locations 
-<<<<<<< HEAD
-    path_const  = trim(outfldr)//"yelmo_const_Earth.nml"
-!mmr    file1D      = trim(outfldr)//"yelmo1D.nc"
-    file2D      = trim(outfldr)//"yelmo2D.nc"
-=======
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
     file1D_hyst  = trim(outfldr)//"yelmo1D_hyst.nc" 
->>>>>>> c6f7f39d4692b5af6bd03854d7c352d7d2d40b47
 
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
