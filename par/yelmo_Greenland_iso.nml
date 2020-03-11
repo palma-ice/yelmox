@@ -1,4 +1,4 @@
-&control
+&ctrl
     time_init       = -25e3             ! [yr] Starting time 
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 

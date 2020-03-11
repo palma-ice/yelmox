@@ -44,18 +44,18 @@ program yelmox
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
-    call nml_read(path_par,"control","time_init",    time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"control","time_equil",   time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"control","dtt",          dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt1D_out",     dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"control","transient",    calc_transient_climate)    ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","time_init",    time_init)                 ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",     time_end)                  ! [yr] Ending time
+    call nml_read(path_par,"ctrl","time_equil",   time_equil)                ! [yr] Years to equilibrate first
+    call nml_read(path_par,"ctrl","dtt",          dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt1D_out",     dt1D_out)                  ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","transient",    calc_transient_climate)    ! Calculate transient climate? 
 
-    call nml_read(path_par,"control","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    call nml_read(path_par,"control","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
+    call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"control","dsmb_hol",     dsmb_hol)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dsmb_hol",     dsmb_hol)                  ! Anomaly to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
     outfldr = "./"
