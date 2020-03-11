@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: fsmb_hol 
+    real(prec) :: dsmb_hol 
     real(4) :: cpu_start_time, cpu_end_time 
 
     ! Start timing 
@@ -55,7 +55,7 @@ program yelmox
     call nml_read(path_par,"control","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"control","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"control","fsmb_hol",     fsmb_hol)                  ! Scaling to apply to default climate during the Holocene
+    call nml_read(path_par,"control","dsmb_hol",     dsmb_hol)                  ! Anomaly to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -129,7 +129,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time_init)
+    call modify_smb(yelmo1%bnd%smb,yelmo1%grd,dsmb_hol,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -277,7 +277,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time)
+        call modify_smb(yelmo1%bnd%smb,yelmo1%grd,dsmb_hol,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -612,12 +612,13 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine modify_smb(smb,grd,time)
+    subroutine modify_smb(smb,grd,dsmb_hol,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: smb(:,:) 
         type(ygrid_class),  intent(IN)    :: grd
+        real(prec),         intent(IN)    :: dsmb_hol 
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
@@ -645,7 +646,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        dsmb_6kyr = 0.0_prec 
+        dsmb_6kyr = 0.0_prec + dsmb_hol 
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
