@@ -34,6 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
+    real(prec) :: fsmb_hol 
     real(4) :: cpu_start_time, cpu_end_time 
 
     ! Start timing 
@@ -51,8 +52,10 @@ program yelmox
     call nml_read(path_par,"control","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
     call nml_read(path_par,"control","transient",    calc_transient_climate)    ! Calculate transient climate? 
 
-    call nml_read(path_par,"control","load_cf_ref",     load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    call nml_read(path_par,"control","file_cf_ref",     file_cf_ref)               ! Filename holding cf_ref to load 
+    call nml_read(path_par,"control","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"control","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
+
+    call nml_read(path_par,"control","fsmb_hol",     fsmb_hol)                  ! Scaling to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
     outfldr = "./"
