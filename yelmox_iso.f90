@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: dsmb_hol 
+    real(prec) :: dsmb_hol, dpr_hol 
     real(4) :: cpu_start_time, cpu_end_time 
 
     ! Start timing 
@@ -56,6 +56,7 @@ program yelmox
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
     call nml_read(path_par,"ctrl","dsmb_hol",     dsmb_hol)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dpr_hol",      dpr_hol)                   ! Anomaly to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -115,6 +116,9 @@ program yelmox
     
     ! Normal snapclim call 
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+    
+    ! Modify precip
+    call modify_pr(snp1%now%pr,dpr_hol,time_init)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -267,6 +271,10 @@ if (calc_transient_climate) then
         if (mod(time,2.0)==0) then
             ! Normal snapclim call 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
+
+            ! Modify precip
+            call modify_pr(snp1%now%pr,dpr_hol,time)
+    
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
@@ -693,6 +701,54 @@ contains
         return 
 
     end subroutine modify_smb 
+
+    elemental subroutine modify_pr(pr,dpr_hol,time)
+
+        implicit none 
+
+        real(prec),         intent(INOUT) :: pr
+        real(prec),         intent(IN)    :: dpr_hol 
+        real(prec),         intent(IN)    :: time 
+
+        ! Local variables
+        real(prec) :: dpr_0kyr 
+        real(prec) :: dpr_6kyr 
+        real(prec) :: dpr_10kyr 
+        real(prec) :: dpr_now 
+        
+        real(prec) :: t0, t1, t2, t3, wt 
+
+        dpr_10kyr = 0.0_prec
+        dpr_6kyr  = 0.0_prec + dpr_hol 
+        dpr_0kyr  = 0.0_prec 
+
+        t0 = -10e3
+        t1 =  -8e3 
+        t2 =  -6e3
+        t3 =   0.0_prec
+
+        if (time .gt. t0 .and. time .lt. t1) then 
+            
+            wt      = (time - t0) / (t1-t0)
+            dpr_now = (1.0-wt)*dpr_10kyr + wt*dpr_6kyr 
+            pr      = pr + dpr_now 
+
+        else if (time .ge. t1 .and. time .le. t2) then 
+
+            dpr_now = dpr_6kyr
+            pr      = pr + dpr_now 
+
+        else if (time .ge. t2 .and. time .le. t3) then 
+
+            wt      = (time - t2) / (t3-t2)
+            dpr_now = (1.0-wt)*dpr_6kyr + wt*dpr_0kyr 
+            pr      = pr + dpr_now 
+
+        end if 
+
+        return 
+
+    end subroutine modify_pr 
 
     subroutine set_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
         ! Set cf_ref [unitless] with location specific tuning 
