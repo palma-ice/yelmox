@@ -169,9 +169,6 @@ program yelmox
             ! Additionally modify cf_ref 
             call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
             
-            ! Eliminate extreme values 
-            where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
-            
         else
             ! Define cf_ref inline 
 
@@ -206,9 +203,6 @@ program yelmox
             ! Additionally modify cf_ref 
             call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
             
-            ! Eliminate extreme values 
-            where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
-
         else
             ! Define cf_ref inline 
 
@@ -775,6 +769,12 @@ contains
             call scale_cf_gaussian(dyn%now%cf_ref,0.01,x0= 400.0, y0=-1274.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.01,x0= 464.0, y0=-1146.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.05,x0=-300.0, y0=-1652.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.20,x0= 100.0, y0=-1400.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+            
+            ! Eliminate extreme values 
+            where (bnd%H_ice_ref .eq. 0.0_prec)        dyn%now%cf_ref = max(dyn%now%cf_ref,0.01)
+            where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
             
         end if 
 
