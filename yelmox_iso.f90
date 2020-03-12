@@ -773,7 +773,6 @@ contains
             
             
             ! Eliminate extreme values 
-            where (bnd%H_ice_ref .eq. 0.0_prec)        dyn%now%cf_ref = max(dyn%now%cf_ref,0.01)
             where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
             
         end if 
