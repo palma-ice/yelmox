@@ -166,6 +166,9 @@ program yelmox
             ! Load cf_ref from specified file 
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
+            ! Additionally modify cf_ref 
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            
             ! Eliminate extreme values 
             where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
             
@@ -200,6 +203,9 @@ program yelmox
             ! Load cf_ref from specified file 
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
+            ! Additionally modify cf_ref 
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            
             ! Eliminate extreme values 
             where(yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
 
@@ -227,7 +233,7 @@ program yelmox
 !         stop "**** Done ****"
 
     end if 
-    
+
     call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
     ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
@@ -666,7 +672,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        ! Precip-scaling in the North
+        ! Precip-scaling in the North (not needed for pmip3-forced simulations)
 !         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-300.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 !         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 !         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0= 300.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -749,6 +755,32 @@ contains
         return 
 
     end subroutine modify_pr 
+
+    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
+        ! Set cf_ref [unitless] with location specific tuning 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+        
+        ! Modify cf_ref
+        if (trim(domain) .eq. "Greenland") then
+
+            ! Reduction
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01,x0= 400.0, y0=-1274.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01,x0= 464.0, y0=-1146.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.05,x0=-300.0, y0=-1652.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+        end if 
+
+        return 
+
+    end subroutine modify_cf_ref
 
     subroutine set_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
         ! Set cf_ref [unitless] with location specific tuning 
