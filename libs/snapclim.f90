@@ -431,6 +431,9 @@ contains
             case("hybrid") 
                 ! Use hybrid method 
 
+                ! Determine spatially-constant monthly temp anomalies
+                dT = series_2D_interp(snp%hybrid%dTmon,time)
+                
                 ! Calculate current oceanic anomaly from scaled annual mean temp anomaly
                 dTo_now = sum(dT)/real(size(dT,1))*snp%hybrid%f_to 
 

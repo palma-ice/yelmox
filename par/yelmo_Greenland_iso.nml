@@ -20,7 +20,7 @@
     grid_name       = "GRL-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-iso.nc"
+    restart         = "None"  ! "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-iso.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
@@ -195,11 +195,11 @@
 /
 
 &snapclim
-    atm_type           = "hybrid"
+    atm_type           = "snap_1ind"
     ocn_type           = "hybrid"
-    fname_at           = "input/zeros.dat"
-    fname_ao           = "input/zeros.dat"
-    fname_ap           = "input/zeros.dat"
+    fname_at           = "input/alpha_orbital_t2018.dat"
+    fname_ao           = "input/alpha_orbital_t2018.dat"
+    fname_ap           = "input/alpha_orbital_t2018.dat"
     fname_bt           = "input/ones.dat"
     fname_bo           = "input/ones.dat"
     fname_bp           = "input/ones.dat"
@@ -230,8 +230,8 @@
 /
 
 &snapclim_clim1
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_path     = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_names    = "z_srf" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
     clim_year_bp  = 0
     ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
@@ -241,8 +241,8 @@
 /
 
 &snapclim_clim2
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_path     = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_names    = "z_srf" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
     clim_year_bp  = -21000
     ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
