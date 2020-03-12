@@ -227,7 +227,7 @@ program yelmox
 !         stop "**** Done ****"
 
     end if 
-
+    
     call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
 
     ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
@@ -667,10 +667,10 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! Precip-scaling in the North
-        call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-300.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr, 0.5,x0= 300.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr, 0.5,x0= 400.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-300.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0= 300.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0= 400.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         dsmb_12kyr = 0.0_prec
 
