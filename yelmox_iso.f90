@@ -246,7 +246,7 @@ program yelmox
     stop 
 
 
-    
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 

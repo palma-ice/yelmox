@@ -161,7 +161,7 @@ contains
                 load_atm2 = .FALSE. 
                 load_atm3 = .FALSE. 
 
-            case("snap_1ind","snap_1ind_abs")
+            case("snap_1ind","snap_1ind_abs","snap_1ind_new")
                 load_atm1 = .TRUE.
                 load_atm2 = .TRUE. 
                 load_atm3 = .FALSE. 
@@ -186,7 +186,7 @@ contains
                 load_ocn2 = .FALSE. 
                 load_ocn3 = .FALSE. 
 
-            case("snap_1ind","snap_1ind_abs")
+            case("snap_1ind","snap_1ind_abs","snap_1ind_new")
                 load_ocn1 = .TRUE.
                 load_ocn2 = .TRUE. 
                 load_ocn3 = .FALSE. 
@@ -258,7 +258,7 @@ contains
 
 
         ! In case we are using the hybrid monthly anomaly time series to generate climate forcing
-        if (trim(snp%par%atm_type) .eq. "hybrid") then  
+        if (trim(snp%par%atm_type) .eq. "hybrid" .or. trim(snp%par%ocn_type) .eq. "hybrid") then  
             call read_series_hybrid(snp%hybrid%dTmon,snp%hybrid%hybrid_path, &
                         snp%hybrid%f_eem,snp%hybrid%f_glac,snp%hybrid%f_hol,snp%hybrid%f_seas)
         end if 
@@ -299,7 +299,7 @@ contains
         real(prec), intent(IN), optional :: dTo   ! For atm_type='anom'
         
         ! Local variables
-        real(prec) :: at, ao, ap, bt, bo, bp
+        real(prec) :: at, ao, ap, bt, bo, bp, a1, a2 
         real(prec) :: dTa_now, dTo_now  
         real(prec) :: dT(12) 
         logical :: south 
@@ -313,6 +313,26 @@ contains
         bt     = series_interp(snp%bt, time)
         bo     = series_interp(snp%bo, time)
         bp     = series_interp(snp%bp, time)
+
+        if (trim(snp%par%atm_type) .eq. "snap_1ind_new") then
+
+            a1 = series_interp(snp%at,snp%clim1%par%clim_time)
+            a2 = series_interp(snp%at,snp%clim2%par%clim_time)
+            at = (at-a1) / (a2-a1)
+
+            a1 = series_interp(snp%ap,snp%clim1%par%clim_time)
+            a2 = series_interp(snp%ap,snp%clim2%par%clim_time)
+            ap = (ap-a1) / (a2-a1)
+
+        end if 
+            
+        if (trim(snp%par%ocn_type) .eq. "snap_1ind_new") then 
+
+            a1 = series_interp(snp%ao,snp%clim1%par%clim_time)
+            a2 = series_interp(snp%ao,snp%clim2%par%clim_time)
+            ao = (ao-a1) / (a2-a1)
+
+        end if 
 
         !write(*,"(6f12.2)") time, at, ap, ao, bt, bp, bo
 
@@ -349,11 +369,11 @@ contains
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
                 call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
 
-            case("snap_1ind")
+            case("snap_1ind","snap_1ind_new")
 
                 call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
                 call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
-                     
+                  
             case("snap_2ind")
                 
                 call calc_temp_2ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt)
@@ -416,7 +436,7 @@ contains
 
                 call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
 
-            case("snap_1ind")
+            case("snap_1ind","snap_1ind_new")
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
                         
             case("snap_2ind")
@@ -433,7 +453,8 @@ contains
 
                 ! Determine spatially-constant monthly temp anomalies
                 dT = series_2D_interp(snp%hybrid%dTmon,time)
-                
+                write(*,*) "hybrid: ", size(dT,1) 
+
                 ! Calculate current oceanic anomaly from scaled annual mean temp anomaly
                 dTo_now = sum(dT)/real(size(dT,1))*snp%hybrid%f_to 
 
@@ -737,11 +758,11 @@ contains
         call nml_read(filename,name,"clim_path",    par%clim_path,     init=init_pars)
         call nml_read(filename,name,"clim_names",   par%clim_names,    init=init_pars)
         call nml_read(filename,name,"clim_monthly", par%clim_monthly,  init=init_pars)
-        call nml_read(filename,name,"clim_time", par%clim_time,  init=init_pars)
+        call nml_read(filename,name,"clim_time",    par%clim_time,     init=init_pars)
         call nml_read(filename,name,"ocn_path",     par%ocn_path,      init=init_pars)
         call nml_read(filename,name,"ocn_names",    par%ocn_names,     init=init_pars)
         call nml_read(filename,name,"ocn_monthly",  par%ocn_monthly,   init=init_pars)
-        call nml_read(filename,name,"ocn_time",  par%ocn_time,   init=init_pars)
+        call nml_read(filename,name,"ocn_time",     par%ocn_time,      init=init_pars)
         
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
@@ -1175,9 +1196,12 @@ contains
         ! for series_2D_types. 
         implicit none 
 
-        type(series_2D_type) :: series 
-        real(prec) :: time 
+        type(series_2D_type), intent(IN) :: series 
+        real(prec),           intent(IN) :: time 
+        
         real(prec) :: var(size(series%var,1))
+        
+        ! Local variables
         integer :: nt, nm, i 
 
         ! Interpolate series object

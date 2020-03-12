@@ -195,11 +195,11 @@
 /
 
 &snapclim
-    atm_type           = "snap_1ind"
+    atm_type           = "snap_1ind_new"
     ocn_type           = "hybrid"
-    fname_at           = "input/alpha_orbital_t2018.dat"
-    fname_ao           = "input/alpha_orbital_t2018.dat"
-    fname_ap           = "input/alpha_orbital_t2018.dat"
+    fname_at           = "input/alpha_orbital_r2020.dat"
+    fname_ao           = "input/alpha_orbital_r2020.dat"
+    fname_ap           = "input/alpha_orbital_r2020.dat"
     fname_bt           = "input/ones.dat"
     fname_bo           = "input/ones.dat"
     fname_bp           = "input/ones.dat"
@@ -222,44 +222,44 @@
     clim_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.5-ERA-30km-monthly_1981-2010.nc"
     clim_names     = "z_srf" "t3m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
     clim_monthly   = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_year_bp   = 0
+    clim_time      = 0
     ocn_path      = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
     ocn_names     = "depth" "mask_ocn" "to"
     ocn_monthly   = True
-    ocn_year_bp   = 0
+    ocn_time      = 0
 /
 
 &snapclim_clim1
     clim_path     = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
     clim_names    = "z_srf" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
-    clim_year_bp  = 0
+    clim_time     = 0
     ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
     ocn_names     = "depth" "mask_ocn" "to"
     ocn_monthly   = False
-    ocn_year_bp   = 0
+    ocn_time      = 0
 /
 
 &snapclim_clim2
     clim_path     = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
     clim_names    = "z_srf" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
-    clim_year_bp  = -21000
+    clim_time     = -21000
     ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
     ocn_names     = "depth" "mask_ocn" "to"
     ocn_monthly   = False
-    ocn_year_bp   = -21000
+    ocn_time      = -21000
 /
 
 &snapclim_clim3
     clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
-    clim_year_bp  = -21000
+    clim_time     = -21000
     ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
     ocn_names     = "depth" "mask_ocn" "to"
     ocn_monthly   = False
-    ocn_year_bp   = -21000
+    ocn_time      = -21000
 /
 
 &smbpal_par
