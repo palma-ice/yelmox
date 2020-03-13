@@ -598,14 +598,14 @@ contains
 
         ! Local variables
         real(prec), allocatable :: dsmb_0kyr(:,:) 
-        real(prec), allocatable :: dsmb_6kyr(:,:) 
+        real(prec), allocatable :: dsmb_hol(:,:) 
         real(prec), allocatable :: dsmb_12kyr(:,:) 
         real(prec), allocatable :: dsmb_now(:,:) 
         
         real(prec) :: t0, t1, t2, t3, wt 
 
         allocate(dsmb_0kyr(grd%nx,grd%ny))
-        allocate(dsmb_6kyr(grd%nx,grd%ny))
+        allocate(dsmb_hol(grd%nx,grd%ny))
         allocate(dsmb_12kyr(grd%nx,grd%ny))
         allocate(dsmb_now(grd%nx,grd%ny))
         
@@ -624,43 +624,43 @@ contains
         ! NEGIS
         call scale_cf_gaussian(dsmb_0kyr,-0.1,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
-        dsmb_6kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        dsmb_hol = 0.0_prec 
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_6kyr,-0.1,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-0.1,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_12kyr = 0.0_prec
 
         t0 = -12e3
-        t1 =  -8e3 
-        t2 =  -6e3
+        t1 =  -9e3 
+        t2 =  -7e3
         t3 =   0.0_prec
 
         if (time .gt. t0 .and. time .lt. t1) then 
             
             wt       = (time - t0) / (t1-t0)
-            dsmb_now = (1.0-wt)*dsmb_12kyr + wt*dsmb_6kyr 
+            dsmb_now = (1.0-wt)*dsmb_12kyr + wt*dsmb_hol 
             smb      = smb + dsmb_now 
 
         else if (time .ge. t1 .and. time .le. t2) then 
 
-            dsmb_now = dsmb_6kyr
+            dsmb_now = dsmb_hol
             smb      = smb + dsmb_now 
 
         else if (time .ge. t2 .and. time .le. t3) then 
 
             wt       = (time - t2) / (t3-t2)
-            dsmb_now = (1.0-wt)*dsmb_6kyr + wt*dsmb_0kyr 
+            dsmb_now = (1.0-wt)*dsmb_hol + wt*dsmb_0kyr 
             smb      = smb + dsmb_now 
 
         end if 
@@ -683,38 +683,38 @@ contains
 
         ! Local variables
         real(prec), allocatable :: dpr_0kyr(:,:) 
-        real(prec), allocatable :: dpr_6kyr(:,:) 
+        real(prec), allocatable :: dpr_hol(:,:) 
         real(prec), allocatable :: dpr_12kyr(:,:) 
         
         integer    :: k, nx, ny 
         real(prec) :: t0, t1, t2, t3, wt 
 
         allocate(dpr_0kyr(grd%nx,grd%ny))
-        allocate(dpr_6kyr(grd%nx,grd%ny))
+        allocate(dpr_hol(grd%nx,grd%ny))
         allocate(dpr_12kyr(grd%nx,grd%ny))
         
         dpr_12kyr = 0.0_prec
         dpr_0kyr  = 0.0_prec 
         
         ! Calculate mid-Holocene precip anomaly with a North-South gradient
-        dpr_6kyr  = 0.0_prec 
+        dpr_hol  = 0.0_prec 
         
         ! North 
-        !call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 100.0, y0=-1400.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 100.0, y0=-1400.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        !call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        !call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South 
-        call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0= 100.0, y0=-2100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         t0 = -12e3
-        t1 =  -8e3 
-        t2 =  -6e3
+        t1 =  -9e3 
+        t2 =  -7e3
         t3 =   0.0_prec
 
         dpr_now = 0.0_prec 
@@ -722,16 +722,16 @@ contains
         if (time .gt. t0 .and. time .lt. t1) then 
             
             wt      = (time - t0) / (t1-t0)
-            dpr_now = (1.0-wt)*dpr_12kyr + wt*dpr_6kyr 
+            dpr_now = (1.0-wt)*dpr_12kyr + wt*dpr_hol 
             
         else if (time .ge. t1 .and. time .le. t2) then 
 
-            dpr_now = dpr_6kyr
+            dpr_now = dpr_hol
             
         else if (time .ge. t2 .and. time .le. t3) then 
 
             wt      = (time - t2) / (t3-t2)
-            dpr_now = (1.0-wt)*dpr_6kyr + wt*dpr_0kyr 
+            dpr_now = (1.0-wt)*dpr_hol + wt*dpr_0kyr 
             
         end if 
 
