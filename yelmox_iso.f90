@@ -688,7 +688,6 @@ contains
         
         integer    :: k, nx, ny 
         real(prec) :: t0, t1, t2, t3, wt 
-        real(prec) :: ymid 
 
         allocate(dpr_0kyr(grd%nx,grd%ny))
         allocate(dpr_6kyr(grd%nx,grd%ny))
@@ -705,8 +704,8 @@ contains
         
         call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South 
         call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
