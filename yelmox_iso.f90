@@ -621,6 +621,9 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
+        ! NEGIS
+        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0=-430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
         dsmb_6kyr = 0.0_prec 
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -633,6 +636,9 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
+        ! NEGIS
+        call scale_cf_gaussian(dsmb_6kyr,-1.0,x0=-430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
         ! Precip-scaling in the North (not needed for pmip3-forced simulations)
 !         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-300.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 !         call scale_cf_gaussian(dsmb_6kyr, 0.5,x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
