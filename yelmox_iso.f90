@@ -706,9 +706,11 @@ contains
         ! Calculate mid-Holocene precip anomaly with a North-South gradient
         dpr_6kyr  = 0.0_prec 
         
-        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 100.0, y0=-1200.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        ! North 
+        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 100.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0= 100.0, y0=-2100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        ! South 
+        call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0= 100.0, y0=-2100.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0= 100.0, y0=-2450.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         t0 = -12e3
