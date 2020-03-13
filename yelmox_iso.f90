@@ -34,8 +34,10 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: dsmb_hol, dpr_hol 
+    real(prec) :: dpr_holn, dpr_hols  
     real(4) :: cpu_start_time, cpu_end_time 
+
+    real(prec), allocatable :: dpr_now(:,:) 
 
     ! Start timing 
     call cpu_time(cpu_start_time)
@@ -55,8 +57,8 @@ program yelmox
     call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"ctrl","dsmb_hol",     dsmb_hol)                  ! Anomaly to apply to default climate during the Holocene
-    call nml_read(path_par,"ctrl","dpr_hol",      dpr_hol)                   ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dpr_holn",     dpr_holn)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dpr_hols",     dpr_hols)                  ! Anomaly to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -78,6 +80,10 @@ program yelmox
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
+
+    ! Allocate precip anomaly field for writing 
+    allocate(dpr_now(yelmo1%grd%nx,yelmo1%grd%ny))
+    dpr_now = 0.0_prec 
 
     ! === Initialize external models (forcing for ice sheet) ======
 
@@ -118,7 +124,7 @@ program yelmox
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
     ! Modify precip
-    call modify_pr(snp1%now%pr,dpr_hol,time_init)
+    call modify_pr(snp1%now%pr,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time_init)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -133,7 +139,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,yelmo1%grd,dsmb_hol,time_init)
+    call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -235,7 +241,7 @@ program yelmox
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dpr_now,file2D,time=time)
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -273,7 +279,7 @@ if (calc_transient_climate) then
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
             ! Modify precip
-            call modify_pr(snp1%now%pr,dpr_hol,time)
+            call modify_pr(snp1%now%pr,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time)
     
         end if 
 
@@ -285,7 +291,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,yelmo1%grd,dsmb_hol,time)
+        call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -306,7 +312,7 @@ end if
         ! == MODEL OUTPUT =======================================================
 
         if (mod(time,dt2D_out)==0) then 
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dpr_now,file2D,time=time)
         end if 
 
         if (mod(time,dt1D_out)==0) then 
@@ -342,7 +348,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,dpr_now,filename,time)
 
         implicit none 
         
@@ -350,7 +356,8 @@ contains
         type(isos_class),       intent(IN) :: isos 
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
-        type(smbpal_class),     intent(IN) :: srf  
+        type(smbpal_class),     intent(IN) :: srf 
+        real(prec),             intent(IN) :: dpr_now(:,:)  
         !type(sediments_class),  intent(IN) :: sed 
         !type(geothermal_class), intent(IN) :: gthrm
         !type(isos_class),       intent(IN) :: isos
@@ -386,49 +393,10 @@ contains
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
-        ! initmip specific error metrics 
-        tmp = ylmo%tpo%now%H_ice-ylmo%dta%pd%H_ice
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            H_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            H_rmse = mv 
-        end if 
+        ! Write precip anomaly field 
+        call nc_write(filename,"dpr_now",dpr_now,units="m/a",long_name="Precip scaling field", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        ! surface elevation too 
-        tmp = ylmo%dta%pd%err_z_srf
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            zsrf_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else 
-            zsrf_rmse = mv 
-        end if 
-
-        tmp = ylmo%dta%pd%err_uxy_s
-        if (n .gt. 1 .or. count(tmp .ne. 0.0) .gt. 0) then 
-            uxy_rmse = sqrt(sum(tmp**2)/count(tmp .ne. 0.0))
-        else
-            uxy_rmse = mv
-        end if 
-
-        tmp = ylmo%dta%pd%uxy_s 
-        where(ylmo%dta%pd%uxy_s .gt. 0.0) tmp = log(tmp)
-        tmp1 = ylmo%dyn%now%uxy_s 
-        where(ylmo%dyn%now%uxy_s .gt. 0.0) tmp1 = log(tmp1)
-        
-        if (n .gt. 1 .or. count(tmp1-tmp .ne. 0.0) .gt. 0) then 
-            loguxy_rmse = sqrt(sum((tmp1-tmp)**2)/count(tmp1-tmp .ne. 0.0))
-        else
-            loguxy_rmse = mv
-        end if 
-        
-        call nc_write(filename,"rmse_H",H_rmse,units="m",long_name="RMSE - Ice thickness", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_zsrf",zsrf_rmse,units="m",long_name="RMSE - Surface elevation", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy",uxy_rmse,units="m/a",long_name="RMSE - Surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        call nc_write(filename,"rmse_uxy_log",loguxy_rmse,units="log(m/a)",long_name="RMSE - Log surface velocity", &
-                      dim1="time",start=[n],count=[1],ncid=ncid)
-        
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -620,13 +588,12 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine modify_smb(smb,grd,dsmb_hol,time)
+    subroutine modify_smb(smb,grd,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: smb(:,:) 
-        type(ygrid_class),  intent(IN)    :: grd
-        real(prec),         intent(IN)    :: dsmb_hol 
+        type(ygrid_class),  intent(IN)    :: grd 
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
@@ -654,7 +621,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        dsmb_6kyr = 0.0_prec + dsmb_hol 
+        dsmb_6kyr = 0.0_prec 
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_6kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -702,49 +669,64 @@ contains
 
     end subroutine modify_smb 
 
-    elemental subroutine modify_pr(pr,dpr_hol,time)
+    subroutine modify_pr(pr,dpr_now,dpr_holn,dpr_hols,grd,time)
 
         implicit none 
 
-        real(prec),         intent(INOUT) :: pr
-        real(prec),         intent(IN)    :: dpr_hol 
+        real(prec),         intent(INOUT) :: pr(:,:,:)
+        real(prec),         intent(OUT)   :: dpr_now(:,:)
+        real(prec),         intent(IN)    :: dpr_holn    ! [m/a] Northern precip anomaly 
+        real(prec),         intent(IN)    :: dpr_hols    ! [m/a] Southern precip anomaly
+        type(ygrid_class),  intent(IN)    :: grd
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
-        real(prec) :: dpr_0kyr 
-        real(prec) :: dpr_6kyr 
-        real(prec) :: dpr_12kyr 
-        real(prec) :: dpr_now 
+        real(prec), allocatable :: dpr_0kyr(:,:) 
+        real(prec), allocatable :: dpr_6kyr(:,:) 
+        real(prec), allocatable :: dpr_12kyr(:,:) 
         
+        integer    :: k, nx, ny 
         real(prec) :: t0, t1, t2, t3, wt 
+        real(prec) :: ymid 
 
+        allocate(dpr_0kyr(grd%nx,grd%ny))
+        allocate(dpr_6kyr(grd%nx,grd%ny))
+        allocate(dpr_12kyr(grd%nx,grd%ny))
+        
         dpr_12kyr = 0.0_prec
-        dpr_6kyr  = 0.0_prec + dpr_hol 
         dpr_0kyr  = 0.0_prec 
-
+        
+        ! Calculate mid-Holocene precip anomaly with a North-South gradient
+        dpr_6kyr  = 0.0_prec 
+        call scale_cf_gaussian(dpr_6kyr,dpr_holn,x0= 100.0, y0=-1200.0,sigma=500.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_6kyr,dpr_hols,x0= 100.0, y0=-2100.0,sigma=500.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
         t0 = -12e3
         t1 =  -8e3 
         t2 =  -6e3
         t3 =   0.0_prec
 
+        dpr_now = 0.0_prec 
+
         if (time .gt. t0 .and. time .lt. t1) then 
             
             wt      = (time - t0) / (t1-t0)
             dpr_now = (1.0-wt)*dpr_12kyr + wt*dpr_6kyr 
-            pr      = pr + dpr_now 
-
+            
         else if (time .ge. t1 .and. time .le. t2) then 
 
             dpr_now = dpr_6kyr
-            pr      = pr + dpr_now 
-
+            
         else if (time .ge. t2 .and. time .le. t3) then 
 
             wt      = (time - t2) / (t3-t2)
             dpr_now = (1.0-wt)*dpr_6kyr + wt*dpr_0kyr 
-            pr      = pr + dpr_now 
-
+            
         end if 
+
+        do k = 1, size(pr,3)
+            pr(:,:,k) = pr(:,:,k) + dpr_now 
+        end do 
 
         return 
 
