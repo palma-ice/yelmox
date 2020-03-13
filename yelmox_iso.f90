@@ -124,8 +124,8 @@ program yelmox
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
     ! Modify precip
-    call modify_pr(snp1%now%pr,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time_init)
-
+    call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time_init)
+    
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -279,7 +279,7 @@ if (calc_transient_climate) then
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
             ! Modify precip
-            call modify_pr(snp1%now%pr,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time)
+            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time)
     
         end if 
 
@@ -507,7 +507,7 @@ contains
         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
        
-        call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        call nc_write(filename,"pr",snp%now%pr*1e-3*365.0_prec,units="m/a water equiv.",long_name="Precipitation (monthly mean)", &
                       dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
               
         call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
@@ -669,14 +669,15 @@ contains
 
     end subroutine modify_smb 
 
-    subroutine modify_pr(pr,dpr_now,dpr_holn,dpr_hols,grd,time)
+    subroutine modify_pr(pr,pr_ann,dpr_now,dpr_holn,dpr_hols,grd,time)
 
         implicit none 
 
-        real(prec),         intent(INOUT) :: pr(:,:,:)
-        real(prec),         intent(OUT)   :: dpr_now(:,:)
-        real(prec),         intent(IN)    :: dpr_holn    ! [m/a] Northern precip anomaly 
-        real(prec),         intent(IN)    :: dpr_hols    ! [m/a] Southern precip anomaly
+        real(prec),         intent(INOUT) :: pr(:,:,:)      ! [mm/d]
+        real(prec),         intent(INOUT) :: pr_ann(:,:)    ! [mm/a]
+        real(prec),         intent(OUT)   :: dpr_now(:,:)   ! [m/a]
+        real(prec),         intent(IN)    :: dpr_holn       ! [m/a] Northern precip anomaly 
+        real(prec),         intent(IN)    :: dpr_hols       ! [m/a] Southern precip anomaly
         type(ygrid_class),  intent(IN)    :: grd
         real(prec),         intent(IN)    :: time 
 
@@ -725,9 +726,12 @@ contains
         end if 
 
         do k = 1, size(pr,3)
-            pr(:,:,k) = pr(:,:,k) + dpr_now 
+            pr(:,:,k) = pr(:,:,k) + dpr_now * (1e3/365.0_prec)      ! dpr [m/a] => [mm/d] 
         end do 
 
+        ! Update annual mean too for consistency
+        pr_ann = sum(pr,dim=3)/12.0_prec * 365.0_prec               ! [mm/d] => [mm/a]
+        
         return 
 
     end subroutine modify_pr 
