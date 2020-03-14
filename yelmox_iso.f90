@@ -706,7 +706,7 @@ contains
         dpr_hol = 0.0_prec 
 
         ! North 
-        call scale_cf_gaussian(dpr_hol(:,:,1),dpr_holn,x0= 200.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        !call scale_cf_gaussian(dpr_hol(:,:,1),dpr_holn,x0= 200.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
 !         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 !         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -714,8 +714,8 @@ contains
         !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South
-        call scale_cf_gaussian(dpr_hol(:,:,2),dpr_hols,x0=-150.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol(:,:,3),dpr_hols,x0=   0.0, y0=-1700.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol(:,:,2),dpr_holn,x0=-150.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol(:,:,3),dpr_holn,x0=   0.0, y0=-1700.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol(:,:,4),dpr_hols,x0= 100.0, y0=-2100.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol(:,:,5),dpr_hols,x0=  50.0, y0=-2200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol(:,:,6),dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
