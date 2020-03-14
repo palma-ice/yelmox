@@ -700,7 +700,7 @@ contains
         dpr_hol  = 0.0_prec 
         
         ! North 
-        call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 100.0, y0=-1400.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-100.0, y0=-1300.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
 !         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 !         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -715,24 +715,32 @@ contains
         t0 = -12e3
         t1 =  -9e3 
         t2 =  -7e3
-        t3 =   0.0_prec
+        t3 =  -2e3
 
         dpr_now = 0.0_prec 
 
-        if (time .gt. t0 .and. time .lt. t1) then 
+        if (time .lt. t0) then 
+
+            dpr_now = 0.0_prec 
+
+        else if (time .ge. t0 .and. time .lt. t1) then 
             
             wt      = (time - t0) / (t1-t0)
             dpr_now = (1.0-wt)*dpr_12kyr + wt*dpr_hol 
             
-        else if (time .ge. t1 .and. time .le. t2) then 
+        else if (time .ge. t1 .and. time .lt. t2) then 
 
             dpr_now = dpr_hol
             
-        else if (time .ge. t2 .and. time .le. t3) then 
+        else if (time .ge. t2 .and. time .lt. t3) then 
 
             wt      = (time - t2) / (t3-t2)
             dpr_now = (1.0-wt)*dpr_hol + wt*dpr_0kyr 
-            
+        
+        else 
+
+            dpr_now = 0.0_prec 
+
         end if 
 
         do k = 1, size(pr,3)
