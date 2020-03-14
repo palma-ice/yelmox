@@ -624,7 +624,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_hol = 0.0_prec 
         call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -639,7 +639,7 @@ contains
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_12kyr = 0.0_prec
 
@@ -714,12 +714,12 @@ contains
         !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South
-        call scale_cf_gaussian(dpr_hol(:,:,2),dpr_hols,x0=-100.0, y0=-1300.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol(:,:,3),dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol(:,:,4),dpr_hols,x0= 100.0, y0=-2100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol(:,:,5),dpr_hols,x0=  50.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol(:,:,2),dpr_hols,x0=-150.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol(:,:,3),dpr_hols,x0=   0.0, y0=-1700.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol(:,:,4),dpr_hols,x0= 100.0, y0=-2100.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol(:,:,5),dpr_hols,x0=  50.0, y0=-2200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol(:,:,6),dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol(:,:,7),dpr_hols,x0= 100.0, y0=-2600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol(:,:,7),dpr_hols,x0= 100.0, y0=-2600.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dpr_hol_mean = sum(dpr_hol,dim=3)/real(nslice,prec)
 
