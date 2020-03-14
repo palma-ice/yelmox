@@ -719,9 +719,12 @@ contains
         !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! North
-        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=-100.0, y0=-1400.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0= -50.0, y0=-1530.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=   0.0, y0=-1700.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0= 100.0, y0=-1100.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0= -50.0, y0=-1150.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=-200.0, y0=-1300.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=-100.0, y0=-1400.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0= -50.0, y0=-1530.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=   0.0, y0=-1700.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South
         call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0= 100.0, y0=-2100.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
