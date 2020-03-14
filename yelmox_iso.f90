@@ -622,7 +622,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_0kyr,-0.1,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-0.2,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_hol = 0.0_prec 
         call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -637,7 +637,7 @@ contains
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_hol,-0.1,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-0.2,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_12kyr = 0.0_prec
 
@@ -711,6 +711,8 @@ contains
         call scale_cf_gaussian(dpr_hol,dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2100.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol,dpr_hols,x0=   0.0, y0=-3000.0,sigma= 60.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         t0 = -12e3
         t1 =  -9e3 
