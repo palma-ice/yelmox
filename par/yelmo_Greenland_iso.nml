@@ -1,5 +1,5 @@
 &ctrl
-    time_init       = -25e3             ! [yr] Starting time 
+    time_init       = -21e3             ! [yr] Starting time 
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
@@ -11,8 +11,8 @@
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 
     dpr_holn        = -0.2              ! [m/yr] Precip anomaly scaling for the Mid-Holocene, in the North
-    dpr_hols        = 0.5               ! [m/yr] Precip anomaly scaling for the Mid-Holocene, in the South 
-       
+    dpr_hols        =  0.5              ! [m/yr] Precip anomaly scaling for the Mid-Holocene, in the South 
+    dsmb_negis      = -0.1              ! [m/yr] SMB anomaly scaling for the NEGIS outlet
 /
 
 &yelmo

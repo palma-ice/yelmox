@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: dpr_holn, dpr_hols  
+    real(prec) :: dpr_holn, dpr_hols, dsmb_negis   
     real(4) :: cpu_start_time, cpu_end_time 
 
     real(prec), allocatable :: dpr_now(:,:) 
@@ -59,6 +59,7 @@ program yelmox
 
     call nml_read(path_par,"ctrl","dpr_holn",     dpr_holn)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hols",     dpr_hols)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -139,7 +140,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time_init)
+    call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -291,7 +292,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,yelmo1%grd,time)
+        call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -588,11 +589,12 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine modify_smb(smb,grd,time)
+    subroutine modify_smb(smb,dsmb_negis,grd,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: smb(:,:) 
+        real(prec),         intent(IN)    :: dsmb_negis
         type(ygrid_class),  intent(IN)    :: grd 
         real(prec),         intent(IN)    :: time 
 
@@ -622,7 +624,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_0kyr,-0.2,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_hol = 0.0_prec 
         call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -637,7 +639,7 @@ contains
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_hol,-0.2,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 430.0, y0=-1100.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_12kyr = 0.0_prec
 
@@ -704,7 +706,7 @@ contains
         dpr_hol = 0.0_prec 
 
         ! North 
-        call scale_cf_gaussian(dpr_hol(:,:,1),dpr_holn,x0= 200.0, y0=-1600.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol(:,:,1),dpr_holn,x0= 200.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
 !         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 !         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
