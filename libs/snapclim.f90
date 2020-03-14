@@ -324,6 +324,10 @@ contains
             a2 = series_interp(snp%ap,snp%clim2%par%clim_time)
             ap = (ap-a1) / (a2-a1)
 
+            ! Additionally scale Holocene and Eemian anomalies using hybrid%f_hol parameter 
+            if (at .gt. 1.0 .and. time .gt. -12e3 .and. time .lt. -1e3) at = at * snp%hybrid%f_hol
+            if (ap .gt. 1.0 .and. time .gt. -12e3 .and. time .lt. -1e3) ap = ap * snp%hybrid%f_hol
+            
         end if 
             
         if (trim(snp%par%ocn_type) .eq. "snap_1ind_new") then 

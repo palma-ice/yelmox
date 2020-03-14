@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: fpr_holn, dpr_hols, dsmb_negis   
+    real(prec) :: f_hol, fpr_holn, dpr_hols, dsmb_negis   
     real(4) :: cpu_start_time, cpu_end_time 
 
     real(prec), allocatable :: dpr_now(:,:) 
@@ -57,6 +57,7 @@ program yelmox
     call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
+    call nml_read(path_par,"ctrl","f_hol",        f_hol)                     ! Holocene index scaling parameter 
     call nml_read(path_par,"ctrl","fpr_holn",     fpr_holn)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hols",     dpr_hols)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
@@ -99,6 +100,9 @@ program yelmox
 
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+
+    ! Ensure that global f_hol is used if running with 1ind_new method 
+    if (trim(snp1%par%atm_type) .ne. "hybrid") snp1%hybrid%f_hol = f_hol 
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
@@ -716,13 +720,14 @@ contains
         
         ! North
         call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=-100.0, y0=-1400.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0= -50.0, y0=-1530.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=   0.0, y0=-1700.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South
-        call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0= 100.0, y0=-2100.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0=  50.0, y0=-2200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0= 100.0, y0=-2100.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0=  50.0, y0=-2200.0,sigma=175.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0= 100.0, y0=-2600.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0=  50.0, y0=-2600.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
 !         dpr_hol_mean = sum(dpr_hol,dim=3)/real(nslice,prec)
 !         dpr_hol_mean = sum(dpr_hol,dim=3)/real(count(dpr_hol.ne.0.0,dim=3),prec)
