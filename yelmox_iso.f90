@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: dpr_holn, dpr_hols, dsmb_negis   
+    real(prec) :: fpr_holn, dpr_hols, dsmb_negis   
     real(4) :: cpu_start_time, cpu_end_time 
 
     real(prec), allocatable :: dpr_now(:,:) 
@@ -57,7 +57,7 @@ program yelmox
     call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
-    call nml_read(path_par,"ctrl","dpr_holn",     dpr_holn)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","fpr_holn",     fpr_holn)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hols",     dpr_hols)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
 
@@ -125,7 +125,7 @@ program yelmox
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
     ! Modify precip
-    call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time_init)
+    call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,fpr_holn,dpr_hols,yelmo1%grd,time_init)
     
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -247,7 +247,7 @@ program yelmox
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
-    
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -280,7 +280,7 @@ if (calc_transient_climate) then
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
             ! Modify precip
-            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_holn,dpr_hols,yelmo1%grd,time)
+            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,fpr_holn,dpr_hols,yelmo1%grd,time)
     
         end if 
 
@@ -671,14 +671,14 @@ contains
 
     end subroutine modify_smb 
 
-    subroutine modify_pr(pr,pr_ann,dpr_now,dpr_holn,dpr_hols,grd,time)
+    subroutine modify_pr(pr,pr_ann,dpr_now,fpr_holn,dpr_hols,grd,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: pr(:,:,:)      ! [mm/d]
         real(prec),         intent(INOUT) :: pr_ann(:,:)    ! [mm/a]
         real(prec),         intent(OUT)   :: dpr_now(:,:)   ! [m/a]
-        real(prec),         intent(IN)    :: dpr_holn       ! [m/a] Northern precip anomaly 
+        real(prec),         intent(IN)    :: fpr_holn       ! [m/a] Northern precip anomaly 
         real(prec),         intent(IN)    :: dpr_hols       ! [m/a] Southern precip anomaly
         type(ygrid_class),  intent(IN)    :: grd
         real(prec),         intent(IN)    :: time 
@@ -715,8 +715,8 @@ contains
         !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! North
-        call scale_cf_gaussian(dpr_hol_mean,dpr_holn,x0=-150.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol_mean,dpr_holn,x0=   0.0, y0=-1700.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=-100.0, y0=-1400.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dpr_hol_mean,fpr_holn*dpr_hols,x0=   0.0, y0=-1700.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! South
         call scale_cf_gaussian(dpr_hol_mean,dpr_hols,x0= 100.0, y0=-2100.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
