@@ -35,8 +35,10 @@ program yelmox
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
     real(prec) :: f_hol, fpr_holn, dpr_hols, dsmb_negis   
+    real(prec) :: dtas_holn, dtas_hols 
     real(4) :: cpu_start_time, cpu_end_time 
 
+    real(prec), allocatable :: dtas_now(:,:) 
     real(prec), allocatable :: dpr_now(:,:) 
 
     ! Start timing 
@@ -58,6 +60,8 @@ program yelmox
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
     call nml_read(path_par,"ctrl","f_hol",        f_hol)                     ! Holocene index scaling parameter 
+    call nml_read(path_par,"ctrl","dtas_holn",    dtas_holn)                 ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dtas_hols",    dtas_hols)                 ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","fpr_holn",     fpr_holn)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hols",     dpr_hols)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
@@ -83,7 +87,10 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    ! Allocate precip anomaly field for writing 
+    ! Allocate temp and precip anomaly field for writing 
+    allocate(dtas_now(yelmo1%grd%nx,yelmo1%grd%ny))
+    dtas_now = 0.0_prec 
+
     allocate(dpr_now(yelmo1%grd%nx,yelmo1%grd%ny))
     dpr_now = 0.0_prec 
 
@@ -128,7 +135,8 @@ program yelmox
     ! Normal snapclim call 
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
-    ! Modify precip
+    ! Modify tas and precip
+    call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_holn,dtas_hols,yelmo1%grd,time_init)
     call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,fpr_holn,dpr_hols,yelmo1%grd,time_init)
     
     ! Equilibrate snowpack for itm
@@ -246,12 +254,12 @@ program yelmox
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dpr_now,file2D,time=time)
+    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dtas_now,dpr_now,file2D,time=time)
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
-
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -283,7 +291,8 @@ if (calc_transient_climate) then
             ! Normal snapclim call 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
-            ! Modify precip
+            ! Modify tas and precip
+            call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_holn,dtas_hols,yelmo1%grd,time)
             call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,fpr_holn,dpr_hols,yelmo1%grd,time)
     
         end if 
@@ -317,7 +326,7 @@ end if
         ! == MODEL OUTPUT =======================================================
 
         if (mod(time,dt2D_out)==0) then 
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dpr_now,file2D,time=time)
+            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dtas_now,dpr_now,file2D,time=time)
         end if 
 
         if (mod(time,dt1D_out)==0) then 
@@ -353,7 +362,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,dpr_now,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,dtas_now,dpr_now,filename,time)
 
         implicit none 
         
@@ -362,6 +371,7 @@ contains
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
         type(smbpal_class),     intent(IN) :: srf 
+        real(prec),             intent(IN) :: dtas_now(:,:)  
         real(prec),             intent(IN) :: dpr_now(:,:)  
         !type(sediments_class),  intent(IN) :: sed 
         !type(geothermal_class), intent(IN) :: gthrm
@@ -398,7 +408,9 @@ contains
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
-        ! Write precip anomaly field 
+        ! Write temp and precip anomaly field
+        call nc_write(filename,"dtas_now",dtas_now,units="K",long_name="Temp. scaling field", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
         call nc_write(filename,"dpr_now",dpr_now,units="m/a",long_name="Precip scaling field", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -674,6 +686,83 @@ contains
         return 
 
     end subroutine modify_smb 
+
+    subroutine modify_tas(tas,tas_ann,tas_sum,dtas_now,dtas_holn,dtas_hols,grd,time)
+
+        implicit none 
+
+        real(prec),         intent(INOUT) :: tas(:,:,:)     ! [K]
+        real(prec),         intent(INOUT) :: tas_ann(:,:)   ! [K]
+        real(prec),         intent(INOUT) :: tas_sum(:,:)   ! [K]
+        real(prec),         intent(OUT)   :: dtas_now(:,:)  ! [K]
+        real(prec),         intent(IN)    :: dtas_holn      ! [K] Northern temp anomaly 
+        real(prec),         intent(IN)    :: dtas_hols      ! [K] Southern temp anomaly
+        type(ygrid_class),  intent(IN)    :: grd
+        real(prec),         intent(IN)    :: time 
+
+        ! Local variables
+        real(prec), allocatable :: dtas_0kyr(:,:) 
+        real(prec), allocatable :: dtas_hol(:,:) 
+        real(prec), allocatable :: dtas_12kyr(:,:) 
+        
+        integer    :: k, nx, ny
+        real(prec) :: t0, t1, t2, t3, wt 
+
+        allocate(dtas_0kyr(grd%nx,grd%ny))
+        allocate(dtas_hol(grd%nx,grd%ny))
+        allocate(dtas_12kyr(grd%nx,grd%ny))
+        
+        dtas_12kyr = 0.0_prec
+        dtas_0kyr  = 0.0_prec 
+        
+        ! Calculate mid-Holocene precip anomaly
+        dtas_hol = 0.0_prec 
+
+        call scale_cf_gaussian(dtas_hol,dtas_holn,x0= 150.0, y0=-1400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        call scale_cf_gaussian(dtas_hol,dtas_hols,x0= 150.0, y0=-2400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
+        
+        t0 = -12e3
+        t1 =  -9e3 
+        t2 =  -7e3
+        t3 =  -2e3
+
+        dtas_now = 0.0_prec 
+
+        if (time .lt. t0) then 
+
+            dtas_now = 0.0_prec 
+
+        else if (time .ge. t0 .and. time .lt. t1) then 
+            
+            wt      = (time - t0) / (t1-t0)
+            dtas_now = (1.0-wt)*dtas_12kyr + wt*dtas_hol 
+            
+        else if (time .ge. t1 .and. time .lt. t2) then 
+
+            dtas_now = dtas_hol
+            
+        else if (time .ge. t2 .and. time .lt. t3) then 
+
+            wt      = (time - t2) / (t3-t2)
+            dtas_now = (1.0-wt)*dtas_hol + wt*dtas_0kyr 
+        
+        else 
+
+            dtas_now = 0.0_prec 
+
+        end if 
+
+        do k = 1, size(tas,3)
+            tas(:,:,k) = tas(:,:,k) + dtas_now
+        end do 
+
+        ! Update annual and summer mean too for consistency
+        tas_ann = tas_ann + dtas_now 
+        tas_sum = tas_sum + dtas_now 
+
+        return 
+
+    end subroutine modify_tas 
 
     subroutine modify_pr(pr,pr_ann,dpr_now,fpr_holn,dpr_hols,grd,time)
 
