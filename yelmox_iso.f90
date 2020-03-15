@@ -259,7 +259,7 @@ program yelmox
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
-    
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -660,8 +660,8 @@ contains
         dsmb_12kyr = 0.0_prec
 
         t0 = -12e3
-        t1 =  -9e3 
-        t2 =  -7e3
+        t1 =  -8e3 
+        t2 =  -6e3
         t3 =   0.0_prec
 
         if (time .gt. t0 .and. time .lt. t1) then 
@@ -722,8 +722,8 @@ contains
         call scale_cf_gaussian(dtas_hol,dtas_hols,x0= 150.0, y0=-2400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
         
         t0 = -12e3
-        t1 =  -9e3 
-        t2 =  -7e3
+        t1 =  -8e3 
+        t2 =  -6e3
         t3 =  -2e3
 
         dtas_now = 0.0_prec 
@@ -819,8 +819,8 @@ if (.FALSE.) then
 end if 
 
         t0 = -12e3
-        t1 =  -9e3 
-        t2 =  -7e3
+        t1 =  -8e3 
+        t2 =  -6e3
         t3 =  -2e3
 
         dpr_now = 0.0_prec 
