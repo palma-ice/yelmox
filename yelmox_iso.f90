@@ -152,7 +152,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%grd,time_init)
+    call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -305,7 +305,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%grd,time)
+        call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -605,13 +605,14 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine modify_smb(smb,dsmb_negis,grd,time)
+    subroutine modify_smb(smb,dsmb_negis,bnd,grd,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: smb(:,:) 
         real(prec),         intent(IN)    :: dsmb_negis
         type(ygrid_class),  intent(IN)    :: grd 
+        type(ybound_class), intent(IN)    :: bnd 
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
@@ -639,6 +640,12 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
+        ! Ensure more negative mass balance for ice-free points during Holocene
+        ! (helps avoid too much growth out of NEGIS)
+        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
+            dsmb_0kyr = -1.0_prec 
+        end where 
+
         ! NEGIS
         call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
@@ -656,6 +663,12 @@ contains
         
         ! NEGIS
         call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+        ! Ensure more negative mass balance for ice-free points during Holocene
+        ! (helps avoid too much growth out of NEGIS)
+        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
+            dsmb_hol = -1.0_prec 
+        end where 
 
         dsmb_12kyr = 0.0_prec
 
