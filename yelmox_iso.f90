@@ -910,10 +910,13 @@ end if
         if (trim(domain) .eq. "Greenland") then
 
             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1652.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1274.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 464.0, y0=-1146.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+            call scale_cf_gaussian(dyn%now%cf_ref,0.25, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             ! Eliminate extreme values 
             where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
