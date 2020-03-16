@@ -635,33 +635,33 @@ contains
         allocate(dsmb_12kyr(grd%nx,grd%ny))
 
         dsmb_0kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
+        ! NEGIS
+        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
         ! Ensure more negative mass balance for ice-free points during Holocene
         ! (helps avoid too much growth out of NEGIS)
         where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
             dsmb_0kyr = -2.0_prec 
         end where 
 
-        ! NEGIS
-        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-
         dsmb_hol = 0.0_prec 
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
