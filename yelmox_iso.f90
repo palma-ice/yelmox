@@ -207,8 +207,17 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time,thrm_method="robin-cold")
 
-    ! Update geothermal boundary data again, in case it changed after generating restart file 
+    ! Update boundary conditions again as necessary, in case of change after generating restart file 
+    
+    ! GHF 
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
+    
+    ! SMB and T_srf
+    yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+    yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+
+    ! Impose flux correction to smb 
+    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
     
     ! ============================================================
     ! Load or define cf_ref again, in case of restart file
@@ -262,7 +271,7 @@ program yelmox
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+    call write_yreg_step(yelmo1%reg,file1D,time=time)  
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -628,7 +637,8 @@ contains
         real(prec), allocatable :: dsmb_hol(:,:) 
         real(prec), allocatable :: dsmb_12kyr(:,:) 
         
-        real(prec) :: t0, t1, t2, t3, wt 
+        real(prec) :: t0, t1, t2, t3, t4, t5, t6 
+        real(prec) :: wt 
 
         allocate(dsmb_0kyr(grd%nx,grd%ny))
         allocate(dsmb_hol(grd%nx,grd%ny))
@@ -678,34 +688,51 @@ contains
 
         dsmb_12kyr = 0.0_prec
 
-        t0 = -12e3
-        t1 =  -8e3 
-        t2 =  -6e3
-        t3 =  -2e3
+        t0 =  0e3 
+        t1 = -2e3 
+        t2 = -6e3 
+        t3 = -8e3 
+        t4 = -12e3 
+        t5 = -18e3 
+        t6 = -100e3 
 
-        if (time .lt. t0) then 
+        if (time .lt. t6) then 
 
             dsmb_now = 0.0_prec 
 
-        else if (time .ge. t0 .and. time .lt. t1) then 
-            
-            wt       = (time - t0) / (t1-t0)
+        else if (time .ge. t6 .and. time .lt. t5) then 
+
+            ! For 'glacial times', reduce negative smb by eg 80%
+            dsmb_now = 0.0_prec 
+            where (smb .lt. 0.0_prec) dsmb_now = -smb !*0.80_prec 
+
+        else if (time .ge. t5 .and. time .lt. t4) then
+
+            dsmb_now = 0.0_prec 
+
+            ! For 'deglacial times', reduce negative smb by eg 50%
+            where (smb .lt. 0.0_prec) dsmb_now = -smb*0.5_prec 
+
+        else if (time .ge. t4 .and. time .lt. t3) then
+
+            wt       = (time - t4) / (t3-t4)
             dsmb_now = (1.0-wt)*dsmb_12kyr + wt*dsmb_hol 
 
-        else if (time .ge. t1 .and. time .lt. t2) then 
+        else if (time .ge. t3 .and. time .lt. t2) then 
 
             dsmb_now = dsmb_hol
 
-        else if (time .ge. t2 .and. time .lt. t3) then 
-
-            wt       = (time - t2) / (t3-t2)
+        else if (time .ge. t2 .and. time .lt. t1) then 
+   
+            wt = (time - t2) / (t1-t2)
             dsmb_now = (1.0-wt)*dsmb_hol + wt*dsmb_0kyr 
         
-        else ! time == t3 
+        else 
 
-            dsmb_now = dsmb_0kyr 
+            dsmb_now = 0.0_prec 
 
         end if 
+
 
         ! Apply to smb field
         smb = smb + dsmb_now 
@@ -911,13 +938,23 @@ end if
 
             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1652.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-1000.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1652.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1274.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 464.0, y0=-1146.0,sigma=50.0, xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 464.0, y0=-1146.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
+            call scale_cf_gaussian(dyn%now%cf_ref,0.001,x0= 464.0, y0=-2874.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+            call scale_cf_gaussian(dyn%now%cf_ref,0.25, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.25, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.25, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
+            ! Ensure minimum value for PD ice-free points 
+            where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
             ! Eliminate extreme values 
             where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
             
