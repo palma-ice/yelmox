@@ -38,6 +38,7 @@ program yelmox
     real(prec) :: dtas_holn, dtas_hols 
     real(4) :: cpu_start_time, cpu_end_time 
 
+    real(prec), allocatable :: dsmb_now(:,:) 
     real(prec), allocatable :: dtas_now(:,:) 
     real(prec), allocatable :: dpr_now(:,:) 
 
@@ -87,7 +88,10 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    ! Allocate temp and precip anomaly field for writing 
+    ! Allocate smb, temp and precip anomaly field for writing 
+    allocate(dsmb_now(yelmo1%grd%nx,yelmo1%grd%ny))
+    dsmb_now = 0.0_prec 
+
     allocate(dtas_now(yelmo1%grd%nx,yelmo1%grd%ny))
     dtas_now = 0.0_prec 
 
@@ -152,7 +156,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
+    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -254,7 +258,7 @@ program yelmox
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dtas_now,dpr_now,file2D,time=time)
+    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dsmb_now,dtas_now,dpr_now,file2D,time=time)
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -305,7 +309,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
+        call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -326,7 +330,7 @@ end if
         ! == MODEL OUTPUT =======================================================
 
         if (mod(time,dt2D_out)==0) then 
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dtas_now,dpr_now,file2D,time=time)
+            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dsmb_now,dtas_now,dpr_now,file2D,time=time)
         end if 
 
         if (mod(time,dt1D_out)==0) then 
@@ -362,7 +366,7 @@ end if
 
 contains
 
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,dtas_now,dpr_now,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,dsmb_now,dtas_now,dpr_now,filename,time)
 
         implicit none 
         
@@ -371,6 +375,7 @@ contains
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
         type(smbpal_class),     intent(IN) :: srf 
+        real(prec),             intent(IN) :: dsmb_now(:,:) 
         real(prec),             intent(IN) :: dtas_now(:,:)  
         real(prec),             intent(IN) :: dpr_now(:,:)  
         !type(sediments_class),  intent(IN) :: sed 
@@ -409,6 +414,8 @@ contains
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
         ! Write temp and precip anomaly field
+        call nc_write(filename,"dsmb_now",dsmb_now,units="m/a",long_name="smb scaling field", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
         call nc_write(filename,"dtas_now",dtas_now,units="K",long_name="Temp. scaling field", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
         call nc_write(filename,"dpr_now",dpr_now,units="m/a",long_name="Precip scaling field", &
@@ -605,11 +612,12 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine modify_smb(smb,dsmb_negis,bnd,grd,time)
+    subroutine modify_smb(smb,dsmb_now,dsmb_negis,bnd,grd,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: smb(:,:) 
+        real(prec),         intent(OUT)   :: dsmb_now(:,:) 
         real(prec),         intent(IN)    :: dsmb_negis
         type(ygrid_class),  intent(IN)    :: grd 
         type(ybound_class), intent(IN)    :: bnd 
@@ -619,22 +627,20 @@ contains
         real(prec), allocatable :: dsmb_0kyr(:,:) 
         real(prec), allocatable :: dsmb_hol(:,:) 
         real(prec), allocatable :: dsmb_12kyr(:,:) 
-        real(prec), allocatable :: dsmb_now(:,:) 
         
         real(prec) :: t0, t1, t2, t3, wt 
 
         allocate(dsmb_0kyr(grd%nx,grd%ny))
         allocate(dsmb_hol(grd%nx,grd%ny))
         allocate(dsmb_12kyr(grd%nx,grd%ny))
-        allocate(dsmb_now(grd%nx,grd%ny))
-        
+
         dsmb_0kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -643,19 +649,19 @@ contains
         ! Ensure more negative mass balance for ice-free points during Holocene
         ! (helps avoid too much growth out of NEGIS)
         where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
-            dsmb_0kyr = -1.0_prec 
+            dsmb_0kyr = -2.0_prec 
         end where 
 
         ! NEGIS
         call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_hol = 0.0_prec 
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -667,7 +673,7 @@ contains
         ! Ensure more negative mass balance for ice-free points during Holocene
         ! (helps avoid too much growth out of NEGIS)
         where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
-            dsmb_hol = -1.0_prec 
+            dsmb_hol = -2.0_prec 
         end where 
 
         dsmb_12kyr = 0.0_prec
@@ -677,24 +683,32 @@ contains
         t2 =  -6e3
         t3 =   0.0_prec
 
-        if (time .gt. t0 .and. time .lt. t1) then 
+        if (time .lt. t0) then 
+
+            dsmb_now = 0.0_prec 
+
+        else if (time .ge. t0 .and. time .lt. t1) then 
             
             wt       = (time - t0) / (t1-t0)
             dsmb_now = (1.0-wt)*dsmb_12kyr + wt*dsmb_hol 
-            smb      = smb + dsmb_now 
 
-        else if (time .ge. t1 .and. time .le. t2) then 
+        else if (time .ge. t1 .and. time .lt. t2) then 
 
             dsmb_now = dsmb_hol
-            smb      = smb + dsmb_now 
 
-        else if (time .ge. t2 .and. time .le. t3) then 
+        else if (time .ge. t2 .and. time .lt. t3) then 
 
             wt       = (time - t2) / (t3-t2)
             dsmb_now = (1.0-wt)*dsmb_hol + wt*dsmb_0kyr 
-            smb      = smb + dsmb_now 
+        
+        else ! time == t3 
+
+            dsmb_now = dsmb_0kyr 
 
         end if 
+
+        ! Apply to smb field
+        smb = smb + dsmb_now 
 
         return 
 
@@ -766,9 +780,9 @@ end if
             wt      = (time - t2) / (t3-t2)
             dtas_now = (1.0-wt)*dtas_hol + wt*dtas_0kyr 
         
-        else 
+        else ! time==t3 
 
-            dtas_now = 0.0_prec 
+            dtas_now = dtas_0kyr 
 
         end if 
 
@@ -863,9 +877,9 @@ end if
             wt      = (time - t2) / (t3-t2)
             dpr_now = (1.0-wt)*dpr_hol + wt*dpr_0kyr 
         
-        else 
+        else ! time==t3 
 
-            dpr_now = 0.0_prec 
+            dpr_now = dpr_0kyr 
 
         end if 
 
