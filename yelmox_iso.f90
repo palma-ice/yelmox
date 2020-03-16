@@ -640,7 +640,7 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_hol = 0.0_prec 
         call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -655,7 +655,7 @@ contains
         call scale_cf_gaussian(dsmb_hol,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         dsmb_12kyr = 0.0_prec
 
@@ -715,12 +715,19 @@ contains
         dtas_12kyr = 0.0_prec
         dtas_0kyr  = 0.0_prec 
         
+        dtas_hol = dtas_hols
+
+
+if (.FALSE.) then 
+
         ! Calculate mid-Holocene precip anomaly
         dtas_hol = 0.0_prec 
 
         call scale_cf_gaussian(dtas_hol,dtas_holn,x0= 150.0, y0=-1400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
         call scale_cf_gaussian(dtas_hol,dtas_hols,x0= 150.0, y0=-2400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        
+    
+end if 
+
         t0 = -12e3
         t1 =  -8e3 
         t2 =  -6e3
