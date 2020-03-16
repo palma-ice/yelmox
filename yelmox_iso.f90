@@ -665,10 +665,10 @@ contains
         dsmb_0kyr = 0.0_prec 
         call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 500.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -957,7 +957,7 @@ end if
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  80.0, y0=-2400.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  50.0, y0=-2550.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
