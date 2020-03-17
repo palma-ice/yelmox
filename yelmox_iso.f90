@@ -920,8 +920,8 @@ contains
         dyn%now%cf_ref = 0.4 
         where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.4
         where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.2
-        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.1
-        where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
+        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.08
+        where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.002
         where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.001
         where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
 
@@ -932,7 +932,11 @@ contains
         call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0= -50.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dyn%now%cf_ref,0.1  ,x0=-250.0, y0=-2000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-
+        call scale_cf_gaussian(dyn%now%cf_ref,0.2,  x0=-150.0, y0=-2850.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        call scale_cf_gaussian(dyn%now%cf_ref,0.1,  x0= -50.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
         call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 330.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 300.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
