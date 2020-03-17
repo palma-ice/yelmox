@@ -1066,9 +1066,9 @@ contains
 
         ! Initial value everywhere 
         dyn%now%cf_ref = 0.30 
-        where (uxy_srf .gt.   5.0) dyn%now%cf_ref = 0.1
-        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.03
-        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.01
+        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.1
+        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.05
+        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.03
         where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
         where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.002
         where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
