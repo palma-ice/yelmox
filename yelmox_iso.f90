@@ -295,7 +295,8 @@ if (.TRUE.) then
         
         ! Update cf_ref if desired
         if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cf_ref) ) then
-            call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+!             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
         end if 
  
         ! == Yelmo ice sheet ===================================================
