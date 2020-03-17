@@ -34,8 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: f_cf, f_hol, fpr_holn, dpr_hols, dsmb_negis   
-    real(prec) :: dtas_holn, dtas_hols 
+    real(prec) :: f_cf, f_hol, dtas_hol, dpr_hol, dsmb_negis   
     real(4) :: cpu_start_time, cpu_end_time 
 
     real(prec), allocatable :: dsmb_now(:,:) 
@@ -64,10 +63,8 @@ program yelmox
 
     call nml_read(path_par,"ctrl","f_cf",         f_cf)                      ! Friction scaling parameter 
     call nml_read(path_par,"ctrl","f_hol",        f_hol)                     ! Holocene index scaling parameter 
-    call nml_read(path_par,"ctrl","dtas_holn",    dtas_holn)                 ! Anomaly to apply to default climate during the Holocene
-    call nml_read(path_par,"ctrl","dtas_hols",    dtas_hols)                 ! Anomaly to apply to default climate during the Holocene
-    call nml_read(path_par,"ctrl","fpr_holn",     fpr_holn)                  ! Anomaly to apply to default climate during the Holocene
-    call nml_read(path_par,"ctrl","dpr_hols",     dpr_hols)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dtas_hol",     dtas_hol)                  ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","dpr_hol",      dpr_hol)                   ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
 
     ! Assume program is running from the output folder
@@ -143,8 +140,8 @@ program yelmox
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
     ! Modify tas and precip
-    call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_holn,dtas_hols,yelmo1%grd,time_init)
-    call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,fpr_holn,dpr_hols,yelmo1%grd,time_init)
+    call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time_init)
+    call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time_init)
     
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -312,8 +309,8 @@ if (calc_transient_climate) then
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
             ! Modify tas and precip
-            call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_holn,dtas_hols,yelmo1%grd,time)
-            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,fpr_holn,dpr_hols,yelmo1%grd,time)
+            call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
+            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
     
         end if 
 
@@ -752,7 +749,7 @@ contains
 
     end subroutine modify_smb 
 
-    subroutine modify_tas(tas,tas_ann,tas_sum,dtas_now,dtas_holn,dtas_hols,grd,time)
+    subroutine modify_tas(tas,tas_ann,tas_sum,dtas_now,dtas_hol,grd,time)
 
         implicit none 
 
@@ -760,39 +757,23 @@ contains
         real(prec),         intent(INOUT) :: tas_ann(:,:)   ! [K]
         real(prec),         intent(INOUT) :: tas_sum(:,:)   ! [K]
         real(prec),         intent(OUT)   :: dtas_now(:,:)  ! [K]
-        real(prec),         intent(IN)    :: dtas_holn      ! [K] Northern temp anomaly 
-        real(prec),         intent(IN)    :: dtas_hols      ! [K] Southern temp anomaly
+        real(prec),         intent(IN)    :: dtas_hol       ! [K] Holocene temp anomaly
         type(ygrid_class),  intent(IN)    :: grd
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
-        real(prec), allocatable :: dtas_0kyr(:,:) 
-        real(prec), allocatable :: dtas_hol(:,:) 
+        real(prec), allocatable :: dtas_0kyr(:,:)
         real(prec), allocatable :: dtas_12kyr(:,:) 
         
         integer    :: k, nx, ny
         real(prec) :: t0, t1, t2, t3, wt 
 
         allocate(dtas_0kyr(grd%nx,grd%ny))
-        allocate(dtas_hol(grd%nx,grd%ny))
         allocate(dtas_12kyr(grd%nx,grd%ny))
         
         dtas_12kyr = 0.0_prec
         dtas_0kyr  = 0.0_prec 
         
-        dtas_hol = dtas_hols
-
-
-if (.FALSE.) then 
-
-        ! Calculate mid-Holocene precip anomaly
-        dtas_hol = 0.0_prec 
-
-        call scale_cf_gaussian(dtas_hol,dtas_holn,x0= 150.0, y0=-1400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dtas_hol,dtas_hols,x0= 150.0, y0=-2400.0,sigma=600.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-    
-end if 
-
         t0 = -12e3
         t1 =  -8e3 
         t2 =  -6e3
@@ -836,60 +817,30 @@ end if
 
     end subroutine modify_tas 
 
-    subroutine modify_pr(pr,pr_ann,dpr_now,fpr_holn,dpr_hols,grd,time)
+    subroutine modify_pr(pr,pr_ann,dpr_now,dpr_hol,grd,time)
 
         implicit none 
 
         real(prec),         intent(INOUT) :: pr(:,:,:)      ! [mm/d]
         real(prec),         intent(INOUT) :: pr_ann(:,:)    ! [mm/a]
         real(prec),         intent(OUT)   :: dpr_now(:,:)   ! [m/a]
-        real(prec),         intent(IN)    :: fpr_holn       ! [m/a] Northern precip anomaly 
-        real(prec),         intent(IN)    :: dpr_hols       ! [m/a] Southern precip anomaly
+        real(prec),         intent(IN)    :: dpr_hol        ! [m/a] Holocene precip anomaly
         type(ygrid_class),  intent(IN)    :: grd
         real(prec),         intent(IN)    :: time 
 
         ! Local variables
         real(prec), allocatable :: dpr_0kyr(:,:) 
-        real(prec), allocatable :: dpr_hol(:,:) 
         real(prec), allocatable :: dpr_12kyr(:,:) 
         
         integer    :: k, nx, ny, nslice
         real(prec) :: t0, t1, t2, t3, wt 
 
         allocate(dpr_0kyr(grd%nx,grd%ny))
-        allocate(dpr_hol(grd%nx,grd%ny))
         allocate(dpr_12kyr(grd%nx,grd%ny))
         
         dpr_12kyr = 0.0_prec
         dpr_0kyr  = 0.0_prec 
         
-        ! Calculate mid-Holocene precip anomaly
-        dpr_hol = dpr_hols 
-
-        ! North 
-        !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 200.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-!         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!         call scale_cf_gaussian(dpr_hol,dpr_holn,x0=-200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 200.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        !call scale_cf_gaussian(dpr_hol,dpr_holn,x0= 300.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-
-if (.FALSE.) then  
-        ! North
-        call scale_cf_gaussian(dpr_hol,fpr_holn*dpr_hols,x0= 100.0, y0=-1100.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol,fpr_holn*dpr_hols,x0= -50.0, y0=-1150.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol,fpr_holn*dpr_hols,x0=-200.0, y0=-1300.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol,fpr_holn*dpr_hols,x0=-100.0, y0=-1400.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3) 
-        call scale_cf_gaussian(dpr_hol,fpr_holn*dpr_hols,x0= -50.0, y0=-1530.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol,fpr_holn*dpr_hols,x0=   0.0, y0=-1700.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-        ! South
-        call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2100.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol,dpr_hols,x0=  50.0, y0=-2200.0,sigma=175.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol,dpr_hols,x0= 100.0, y0=-2450.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dpr_hol,dpr_hols,x0=  50.0, y0=-2600.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-end if 
-
         t0 = -12e3
         t1 =  -8e3 
         t2 =  -6e3
@@ -953,6 +904,7 @@ end if
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1700.0,sigma= 70.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-1800.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
@@ -968,16 +920,18 @@ end if
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1950.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 450.0, y0=-1950.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-2250.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+            call scale_cf_gaussian(dyn%now%cf_ref,0.002,x0= 500.0, y0=-2300.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             ! Finally multiply the whole thing by f_cf to scale field up or down 
             dyn%now%cf_ref = f_cf * dyn%now%cf_ref 

@@ -12,12 +12,9 @@
 
     f_cf            =  1.0              ! Friction scaling parameter f_cf=1 by default
     f_hol           =  1.0              ! f_hol parameter for when not using hybrid forcing (to avoid misusing hybrid%f_hol)
-    dtas_hols       =  0.0              ! [K] Temp anomaly scaling for Mid-Holocene, in the South
-    dpr_hols        =  0.4              ! [m/yr] Precip anomaly scaling for the Mid-Holocene, in the South 
+    dtas_hol        =  0.0              ! [K] Temp anomaly scaling for Mid-Holocene
+    dpr_hol         =  0.3              ! [m/yr] Precip anomaly scaling for the Mid-Holocene
     dsmb_negis      = -0.25             ! [m/yr] SMB anomaly scaling for the NEGIS outlet
-
-    dtas_holn       =  0.0              ! [K] Temp anomaly scaling for Mid-Holocene, in the North
-    fpr_holn        =  1.0              ! [fraction] Precip anomaly scaling for the Mid-Holocene, in the North
     
 /
 
