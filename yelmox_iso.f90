@@ -80,6 +80,9 @@ program yelmox
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
 
+
+    if (check_init) time_init = -7e3
+
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -630,130 +633,6 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine modify_smb(smb,dsmb_now,dsmb_negis,bnd,grd,time)
-
-        implicit none 
-
-        real(prec),         intent(INOUT) :: smb(:,:) 
-        real(prec),         intent(OUT)   :: dsmb_now(:,:) 
-        real(prec),         intent(IN)    :: dsmb_negis
-        type(ygrid_class),  intent(IN)    :: grd 
-        type(ybound_class), intent(IN)    :: bnd 
-        real(prec),         intent(IN)    :: time 
-
-        ! Local variables
-        real(prec), allocatable :: dsmb_0kyr(:,:) 
-        real(prec), allocatable :: dsmb_hol(:,:) 
-        real(prec), allocatable :: dsmb_12kyr(:,:) 
-        
-        real(prec) :: t0, t1, t2, t3, t4, t5, t6 
-        real(prec) :: wt 
-
-        allocate(dsmb_12kyr(grd%nx,grd%ny))
-        allocate(dsmb_hol(grd%nx,grd%ny))
-        allocate(dsmb_0kyr(grd%nx,grd%ny))
-        
-        dsmb_12kyr = 0.0_prec
-
-        dsmb_hol = 0.0_prec 
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 500.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-        call scale_cf_gaussian(dsmb_hol,-5.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-5.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_hol,-5.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-        ! NEGIS
-        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-
-
-        dsmb_0kyr = 0.0_prec 
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 500.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-0.5,x0= 500.0, y0=-1700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 550.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-1.5,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-        call scale_cf_gaussian(dsmb_0kyr,-0.5,x0=-300.0, y0=-2650.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-        ! NEGIS
-        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-
-        ! Ensure more negative mass balance for ice-free points during Holocene
-        ! (helps avoid too much growth out of NEGIS)
-        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
-            dsmb_0kyr = -2.0_prec 
-        end where 
-
-        ! Ensure more negative mass balance for ice-free points during Holocene
-        ! (helps avoid too much growth out of NEGIS)
-        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
-            dsmb_hol = -2.0_prec 
-        end where 
-
-        t0 =  0e3 
-        t1 = -2e3 
-        t2 = -6e3 
-        t3 = -8e3 
-        t4 = -12e3 
-        t5 = -18e3 
-        t6 = -100e3 
-
-        if (time .lt. t6) then 
-
-            dsmb_now = 0.0_prec 
-
-        else if (time .ge. t6 .and. time .lt. t5) then 
-
-            ! For 'glacial times', reduce negative smb by eg 80%
-            dsmb_now = 0.0_prec 
-            where (smb .lt. 0.0_prec) dsmb_now = -smb !*0.80_prec 
-
-        else if (time .ge. t5 .and. time .lt. t4) then
-
-            dsmb_now = 0.0_prec 
-
-            ! For 'deglacial times', reduce negative smb by eg 50%
-            where (smb .lt. 0.0_prec) dsmb_now = -smb*0.5_prec 
-
-        else if (time .ge. t4 .and. time .lt. t3) then
-
-            wt       = (time - t4) / (t3-t4)
-            dsmb_now = (1.0-wt)*dsmb_12kyr + wt*dsmb_hol 
-
-        else if (time .ge. t3 .and. time .lt. t2) then 
-
-            dsmb_now = dsmb_hol
-
-        else if (time .ge. t2 .and. time .lt. t1) then 
-   
-            wt = (time - t2) / (t1-t2)
-            dsmb_now = (1.0-wt)*dsmb_hol + wt*dsmb_0kyr 
-        
-        else 
-
-            dsmb_now = dsmb_0kyr
-
-        end if 
-
-
-        ! Apply to smb field
-        smb = smb + dsmb_now 
-
-        return 
-
-    end subroutine modify_smb 
-
     subroutine modify_tas(tas,tas_ann,tas_sum,dtas_now,dtas_hol,grd,time)
 
         implicit none 
@@ -887,6 +766,183 @@ contains
         return 
 
     end subroutine modify_pr 
+
+        subroutine modify_smb(smb,dsmb_now,dsmb_negis,bnd,grd,time)
+
+        implicit none 
+
+        real(prec),         intent(INOUT) :: smb(:,:) 
+        real(prec),         intent(OUT)   :: dsmb_now(:,:) 
+        real(prec),         intent(IN)    :: dsmb_negis
+        type(ygrid_class),  intent(IN)    :: grd 
+        type(ybound_class), intent(IN)    :: bnd 
+        real(prec),         intent(IN)    :: time 
+
+        ! Local variables
+        real(prec), allocatable :: dsmb_0kyr(:,:) 
+        real(prec), allocatable :: dsmb_hol(:,:) 
+        real(prec), allocatable :: dsmb_12kyr(:,:) 
+        
+        real(prec) :: t0, t1, t2, t3, t4, t5, t6 
+        real(prec) :: wt 
+
+        allocate(dsmb_12kyr(grd%nx,grd%ny))
+        allocate(dsmb_hol(grd%nx,grd%ny))
+        allocate(dsmb_0kyr(grd%nx,grd%ny))
+        
+        dsmb_12kyr = 0.0_prec
+
+        dsmb_hol = 0.0_prec 
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 500.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-2.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        call scale_cf_gaussian(dsmb_hol,-5.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-5.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,-5.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        ! NEGIS
+        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+
+        dsmb_0kyr = 0.0_prec 
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 500.0, y0=-1300.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1500.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-0.5,x0= 500.0, y0=-1700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-1800.0,sigma=80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 550.0, y0=-1900.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2000.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-1.0,x0= 600.0, y0=-2100.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 500.0, y0=-2300.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 330.0, y0=-2600.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,-2.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        call scale_cf_gaussian(dsmb_0kyr,-0.5,x0=-300.0, y0=-2650.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+        ! NEGIS
+        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+        ! Ensure more negative mass balance for ice-free points during Holocene
+        ! (helps avoid too much growth out of NEGIS)
+        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
+            dsmb_0kyr = -2.0_prec 
+        end where 
+
+        ! Ensure more negative mass balance for ice-free points during Holocene
+        ! (helps avoid too much growth out of NEGIS)
+        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
+            dsmb_hol = -2.0_prec 
+        end where 
+
+        t0 =  0e3 
+        t1 = -2e3 
+        t2 = -6e3 
+        t3 = -8e3 
+        t4 = -12e3 
+        t5 = -18e3 
+        t6 = -100e3 
+
+        if (time .lt. t6) then 
+
+            dsmb_now = 0.0_prec 
+
+        else if (time .ge. t6 .and. time .lt. t5) then 
+
+            ! For 'glacial times', reduce negative smb by eg 80%
+            dsmb_now = 0.0_prec 
+            where (smb .lt. 0.0_prec) dsmb_now = -smb !*0.80_prec 
+
+        else if (time .ge. t5 .and. time .lt. t4) then
+
+            dsmb_now = 0.0_prec 
+
+            ! For 'deglacial times', reduce negative smb by eg 50%
+            where (smb .lt. 0.0_prec) dsmb_now = -smb*0.5_prec 
+
+        else if (time .ge. t4 .and. time .lt. t3) then
+
+            wt       = (time - t4) / (t3-t4)
+            dsmb_now = (1.0-wt)*dsmb_12kyr + wt*dsmb_hol 
+
+        else if (time .ge. t3 .and. time .lt. t2) then 
+
+            dsmb_now = dsmb_hol
+
+        else if (time .ge. t2 .and. time .lt. t1) then 
+   
+            wt = (time - t2) / (t1-t2)
+            dsmb_now = (1.0-wt)*dsmb_hol + wt*dsmb_0kyr 
+        
+        else 
+
+            dsmb_now = dsmb_0kyr
+
+        end if 
+
+
+        ! Apply to smb field
+        smb = smb + dsmb_now 
+
+        return 
+
+    end subroutine modify_smb 
+
+        subroutine set_cf_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
+        ! Set cf_ref [unitless] with location specific tuning 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+        character(len=*),   intent(IN)    :: grid_name 
+        real(prec),         intent(IN)    :: f_cf 
+
+        ! Local variables 
+        character(len=512) :: file_vel 
+        real(prec), allocatable :: uxy_srf(:,:) 
+
+        allocate(uxy_srf(grd%nx,grd%ny))
+
+        call nml_read(path_par,"ctrl","file_vel",  file_vel)               ! Filename holding PD uxy_srf field
+        call yelmo_parse_path(file_vel,domain,grid_name)
+
+        call nc_read(file_vel,"uxy_srf",uxy_srf,missing_value=MV)
+
+        ! Initial value everywhere 
+        dyn%now%cf_ref = 0.30 
+        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.2
+        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.1
+        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.01
+        where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
+        where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.001
+        where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
+
+
+        ! Additional tuning 
+        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 330.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                
+
+        ! Finally multiply the whole thing by f_cf to scale field up or down 
+        dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
+
+        ! Ensure minimum value for PD ice-free points 
+        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+        
+        ! Eliminate extreme values 
+        where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
+
+        return 
+
+    end subroutine set_cf_ref_new
 
     subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,f_cf)
         ! Set cf_ref [unitless] with location specific tuning 
@@ -1038,58 +1094,6 @@ contains
         return 
 
     end subroutine set_cf_ref
-
-    subroutine set_cf_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
-        ! Set cf_ref [unitless] with location specific tuning 
-
-        implicit none
-        
-        type(ydyn_class),   intent(INOUT) :: dyn
-        type(ytopo_class),  intent(IN)    :: tpo 
-        type(ytherm_class), intent(IN)    :: thrm
-        type(ybound_class), intent(IN)    :: bnd  
-        type(ygrid_class),  intent(IN)    :: grd
-        character(len=*),   intent(IN)    :: domain 
-        character(len=*),   intent(IN)    :: grid_name 
-        real(prec),         intent(IN)    :: f_cf 
-
-        ! Local variables 
-        character(len=512) :: file_vel 
-        real(prec), allocatable :: uxy_srf(:,:) 
-
-        allocate(uxy_srf(grd%nx,grd%ny))
-
-        call nml_read(path_par,"ctrl","file_vel",  file_vel)               ! Filename holding PD uxy_srf field
-        call yelmo_parse_path(file_vel,domain,grid_name)
-
-        call nc_read(file_vel,"uxy_srf",uxy_srf,missing_value=MV)
-
-        ! Initial value everywhere 
-        dyn%now%cf_ref = 0.30 
-        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.1
-        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.05
-        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.03
-        where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
-        where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.002
-        where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
-
-
-        ! Additional tuning 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        
-
-        ! Finally multiply the whole thing by f_cf to scale field up or down 
-        dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
-
-        ! Ensure minimum value for PD ice-free points 
-        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
-        
-        ! Eliminate extreme values 
-        where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
-
-        return 
-
-    end subroutine set_cf_ref_new
 
     subroutine scale_cf_gaussian(cf_ref,cf_new,x0,y0,sigma,xx,yy)
 
