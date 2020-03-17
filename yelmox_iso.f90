@@ -918,8 +918,8 @@ contains
 
         ! Initial value everywhere 
         dyn%now%cf_ref = 0.30 
-        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.2
-        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.15
+        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.3
+        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.1
         where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.05
         where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
         where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.001
