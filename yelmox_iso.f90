@@ -195,7 +195,9 @@ program yelmox
         else
             ! Define cf_ref inline 
 
-            call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+
+            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
 
         end if 
 
@@ -238,8 +240,10 @@ program yelmox
         else
             ! Define cf_ref inline 
 
-            call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
 
+            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
+            
         end if 
 
     end if 
@@ -917,6 +921,7 @@ contains
             call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -925,7 +930,6 @@ contains
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -1033,6 +1037,58 @@ contains
         return 
 
     end subroutine set_cf_ref
+
+    subroutine set_cf_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
+        ! Set cf_ref [unitless] with location specific tuning 
+
+        implicit none
+        
+        type(ydyn_class),   intent(INOUT) :: dyn
+        type(ytopo_class),  intent(IN)    :: tpo 
+        type(ytherm_class), intent(IN)    :: thrm
+        type(ybound_class), intent(IN)    :: bnd  
+        type(ygrid_class),  intent(IN)    :: grd
+        character(len=*),   intent(IN)    :: domain 
+        character(len=*),   intent(IN)    :: grid_name 
+        real(prec),         intent(IN)    :: f_cf 
+
+        ! Local variables 
+        character(len=512) :: file_vel 
+        real(prec), allocatable :: uxy_srf(:,:) 
+
+        allocate(uxy_srf(grd%nx,grd%ny))
+
+        call nml_read(path_par,"ctrl","file_vel",  file_vel)               ! Filename holding PD uxy_srf field
+        call yelmo_parse_path(file_vel,domain,grid_name)
+
+        call nc_read(file_vel,"uxy_srf",uxy_srf,missing_value=MV)
+
+        ! Initial value everywhere 
+        dyn%now%cf_ref = 0.30 
+        where (uxy_srf .gt.   5.0) dyn%now%cf_ref = 0.1
+        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.03
+        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.01
+        where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
+        where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.002
+        where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
+
+
+        ! Additional tuning 
+        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+
+        ! Finally multiply the whole thing by f_cf to scale field up or down 
+        dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
+
+        ! Ensure minimum value for PD ice-free points 
+        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+        
+        ! Eliminate extreme values 
+        where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
+
+        return 
+
+    end subroutine set_cf_ref_new
 
     subroutine scale_cf_gaussian(cf_ref,cf_new,x0,y0,sigma,xx,yy)
 
