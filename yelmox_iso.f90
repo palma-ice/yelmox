@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: f_hol, fpr_holn, dpr_hols, dsmb_negis   
+    real(prec) :: f_cf, f_hol, fpr_holn, dpr_hols, dsmb_negis   
     real(prec) :: dtas_holn, dtas_hols 
     real(4) :: cpu_start_time, cpu_end_time 
 
@@ -60,6 +60,7 @@ program yelmox
     call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
+    call nml_read(path_par,"ctrl","f_cf",         f_cf)                      ! Friction scaling parameter 
     call nml_read(path_par,"ctrl","f_hol",        f_hol)                     ! Holocene index scaling parameter 
     call nml_read(path_par,"ctrl","dtas_holn",    dtas_holn)                 ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dtas_hols",    dtas_hols)                 ! Anomaly to apply to default climate during the Holocene
@@ -190,7 +191,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
             
         else
             ! Define cf_ref inline 
@@ -233,7 +234,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
             
         else
             ! Define cf_ref inline 
@@ -922,7 +923,7 @@ end if
 
     end subroutine modify_pr 
 
-    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
+    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,f_cf)
         ! Set cf_ref [unitless] with location specific tuning 
 
         implicit none
@@ -933,7 +934,8 @@ end if
         type(ybound_class), intent(IN)    :: bnd  
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
-        
+        real(prec),         intent(IN)    :: f_cf 
+
         ! Modify cf_ref
         if (trim(domain) .eq. "Greenland") then
 
@@ -944,9 +946,13 @@ end if
             
             call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-1000.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1652.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1274.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 464.0, y0=-1146.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 450.0, y0=-1950.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 450.0, y0=-2250.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             !call scale_cf_gaussian(dyn%now%cf_ref,0.001,x0= 464.0, y0=-2874.0,sigma=400.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
@@ -964,6 +970,10 @@ end if
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= -50.0, y0=-2800.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
+
+            ! Finally multiply the whole thing by f_cf to scale field up or down 
+            dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
+
             ! Ensure minimum value for PD ice-free points 
             where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
             ! Eliminate extreme values 

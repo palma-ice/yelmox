@@ -10,6 +10,7 @@
     load_cf_ref     = True              ! Load cf_ref from file?
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
 
+    f_cf            =  1.0              ! Friction scaling parameter f_cf=1 by default
     f_hol           =  1.0              ! f_hol parameter for when not using hybrid forcing (to avoid misusing hybrid%f_hol)
     dtas_hols       =  0.0              ! [K] Temp anomaly scaling for Mid-Holocene, in the South
     dpr_hols        =  0.4              ! [m/yr] Precip anomaly scaling for the Mid-Holocene, in the South 
