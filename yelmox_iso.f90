@@ -917,19 +917,26 @@ contains
         call nc_read(file_vel,"uxy_srf",uxy_srf,missing_value=MV)
 
         ! Initial value everywhere 
-        dyn%now%cf_ref = 0.30 
-        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.3
-        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.1
-        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.05
+        dyn%now%cf_ref = 0.4 
+        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.4
+        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.2
+        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.1
         where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.005
         where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.001
         where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
 
 
         ! Additional tuning 
+        call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0=-350.0, y0=-1450.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0=-250.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0= -50.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.1  ,x0=-250.0, y0=-2000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        
+
         call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 330.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-                
+        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 300.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+                     
 
         ! Finally multiply the whole thing by f_cf to scale field up or down 
         dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
