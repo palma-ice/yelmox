@@ -968,8 +968,14 @@ contains
         ! First reduce maximum value everywhere 
         where (dyn%now%cf_ref .gt. 0.3) dyn%now%cf_ref = 0.3 
 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-150.0, y0=-1700.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0= -50.0, y0=-1800.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
+        call scale_cf_gaussian(dyn%now%cf_ref,0.1,  x0=   0.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+        call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-150.0, y0= -950.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 300.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+    
         call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-100.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-240.0, y0=-2400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
     
