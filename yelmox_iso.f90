@@ -34,7 +34,7 @@ program yelmox
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
-    real(prec) :: f_cf, f_hol, dtas_hol, dpr_hol, dsmb_negis   
+    real(prec) :: f_cf, f_cf_lim, f_hol, dtas_hol, dpr_hol, dsmb_negis   
     real(4) :: cpu_start_time, cpu_end_time 
 
     real(prec), allocatable :: dsmb_now(:,:) 
@@ -62,6 +62,7 @@ program yelmox
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
 
     call nml_read(path_par,"ctrl","f_cf",         f_cf)                      ! Friction scaling parameter 
+    call nml_read(path_par,"ctrl","f_cf_lim",     f_cf_lim)                  ! Friction scaling parameter limit
     call nml_read(path_par,"ctrl","f_hol",        f_hol)                     ! Holocene index scaling parameter 
     call nml_read(path_par,"ctrl","dtas_hol",     dtas_hol)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hol",      dpr_hol)                   ! Anomaly to apply to default climate during the Holocene
@@ -193,7 +194,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
         else
             ! Define cf_ref inline 
@@ -238,7 +239,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
         else
             ! Define cf_ref inline 
@@ -950,7 +951,7 @@ contains
 
     end subroutine set_cf_ref_new
 
-    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,f_cf)
+    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,f_cf,f_cf_lim)
         ! Set cf_ref [unitless] with location specific tuning 
 
         implicit none
@@ -962,11 +963,12 @@ contains
         type(ygrid_class),  intent(IN)    :: grd
         character(len=*),   intent(IN)    :: domain 
         real(prec),         intent(IN)    :: f_cf 
+        real(prec),         intent(IN)    :: f_cf_lim 
 
         ! First reduce maximum value everywhere 
         where (dyn%now%cf_ref .gt. 0.3) dyn%now%cf_ref = 0.3 
 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0=   0.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-100.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-240.0, y0=-2400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
@@ -1009,17 +1011,18 @@ contains
             
 !             call scale_cf_gaussian(dyn%now%cf_ref,0.002,x0= 500.0, y0=-2300.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            ! Finally multiply the whole thing by f_cf to scale field up or down 
-            dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
-
-            ! Ensure minimum value for PD ice-free points 
-            !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
-            
-            ! Eliminate extreme values 
-            where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
-            
         end if 
 
+        ! Finally multiply the whole thing by f_cf to scale field up or down, for 
+        ! cf_ref values above a threshold 
+        where (dyn%now%cf_ref .gt. f_cf_lim) dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
+
+        ! Ensure minimum value for PD ice-free points 
+        !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+        
+        ! Eliminate extreme values 
+        where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
+        
         return 
 
     end subroutine modify_cf_ref
