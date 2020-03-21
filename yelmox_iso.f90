@@ -143,8 +143,8 @@ program yelmox
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
     ! Modify tas and precip
-    call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time_init)
-    call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time_init)
+    !call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time_init)
+    !call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time_init)
     
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -159,7 +159,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
+    !call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -193,7 +193,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
+            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
             
         else
             ! Define cf_ref inline 
@@ -222,7 +222,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
+    !call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
     
     ! ============================================================
     ! Load or define cf_ref again, in case of restart file
@@ -238,7 +238,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
+            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
             
         else
             ! Define cf_ref inline 
@@ -317,8 +317,8 @@ if (calc_transient_climate) then
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
             ! Modify tas and precip
-            call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
-            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
+            !call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
+            !call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
     
         end if 
 
@@ -330,7 +330,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
+        !call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
