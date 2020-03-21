@@ -805,7 +805,7 @@ contains
         call scale_cf_gaussian(dsmb_hol,-5.0,x0= 240.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        !call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_hol,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
 
         dsmb_0kyr = 0.0_prec 
@@ -824,14 +824,14 @@ contains
         call scale_cf_gaussian(dsmb_0kyr,-0.5,x0=-300.0, y0=-2650.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
         ! NEGIS
-        !call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dsmb_0kyr,dsmb_negis,x0= 420.0, y0=-1150.0,sigma=150.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
         ! Ensure more negative mass balance for ice-free points during Holocene
         ! (helps avoid too much growth out of NEGIS)
-!         where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
-!             dsmb_0kyr = -2.0_prec
-!             dsmb_hol = -2.0_prec 
-!         end where 
+        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
+            dsmb_0kyr = -2.0_prec
+            dsmb_hol  = -2.0_prec 
+        end where 
         
         t0 =  0e3 
         t1 = -2e3 
@@ -963,42 +963,51 @@ contains
         character(len=*),   intent(IN)    :: domain 
         real(prec),         intent(IN)    :: f_cf 
 
+        ! First reduce maximum value everywhere 
+        where (dyn%now%cf_ref .gt. 0.3) dyn%now%cf_ref = 0.3 
+
+        call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0=   0.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+
+        call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-100.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-240.0, y0=-2400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+    
+
         ! Modify cf_ref
         if (trim(domain) .eq. "Greenland") then
 
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=-100.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1500.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1700.0,sigma= 70.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-1800.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=-100.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1500.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1700.0,sigma= 70.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-1800.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  80.0, y0=-2400.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  50.0, y0=-2550.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= -50.0, y0=-2800.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  80.0, y0=-2400.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  50.0, y0=-2550.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= -50.0, y0=-2800.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-1000.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-1000.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1950.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1950.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-            call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-2250.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-2250.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-            call scale_cf_gaussian(dyn%now%cf_ref,0.002,x0= 500.0, y0=-2300.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cf_ref,0.002,x0= 500.0, y0=-2300.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
             ! Finally multiply the whole thing by f_cf to scale field up or down 
             dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
