@@ -193,7 +193,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
             
         else
             ! Define cf_ref inline 
@@ -238,7 +238,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
+            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf)
             
         else
             ! Define cf_ref inline 
@@ -1013,7 +1013,8 @@ contains
             dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
 
             ! Ensure minimum value for PD ice-free points 
-            where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+            !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+            
             ! Eliminate extreme values 
             where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
             
