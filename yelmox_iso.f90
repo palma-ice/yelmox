@@ -16,6 +16,8 @@ program yelmox
     use sediments 
     use geothermal
     
+    use ice_optimization 
+
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
@@ -41,7 +43,16 @@ program yelmox
     real(prec), allocatable :: dtas_now(:,:) 
     real(prec), allocatable :: dpr_now(:,:) 
 
-    logical :: check_init = .FALSE. 
+    logical, parameter :: check_init = .FALSE. 
+
+! === optimization ===
+    
+    logical, parameter      :: optimize = .TRUE. 
+    type(yelmo_class)       :: yelmo2
+    real(prec), allocatable :: cf_ref_dot(:,:) 
+
+! ====================
+
 
     ! Start timing 
     call cpu_time(cpu_start_time)
@@ -102,6 +113,10 @@ program yelmox
     allocate(dpr_now(yelmo1%grd%nx,yelmo1%grd%ny))
     dpr_now = 0.0_prec 
 
+    ! Define cf_ref_dot for later use 
+    allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
+    cf_ref_dot = 0.0 
+    
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
@@ -194,7 +209,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
+            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
         else
             ! Define cf_ref inline 
@@ -239,7 +254,7 @@ program yelmox
             call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
 
             ! Additionally modify cf_ref 
-            call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
+            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
         else
             ! Define cf_ref inline 
@@ -302,7 +317,25 @@ if (.TRUE.) then
 !             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
             call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
         end if 
- 
+        
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. optimize ) then
+            ! If using tuned cf, perform additional optimization here 
+
+            if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
+                ! Update cf_ref every 500yr for the last 2000 yrs, except for year 0.
+
+                call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                                                yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                                yelmo1%grd%dx,cf_min=1e-4,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
+                                                err_scale=500.0,optvar="ice")
+
+            end if 
+
+
+        end if 
+
+
         ! == Yelmo ice sheet ===================================================
         call yelmo_update(yelmo1,time)
 
