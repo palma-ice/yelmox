@@ -43,15 +43,19 @@ program yelmox
     real(prec), allocatable :: dtas_now(:,:) 
     real(prec), allocatable :: dpr_now(:,:) 
 
-    logical, parameter :: check_init = .FALSE. 
+    logical, parameter :: check_init     = .FALSE. 
+    logical, parameter :: calc_ice_sheet = .TRUE. 
 
 ! === optimization ===
     
     logical, parameter      :: optimize = .TRUE. 
-    type(yelmo_class)       :: yelmo2
+    type(yelmo_class)       :: yelmo0
     real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
-
+    integer, parameter      :: n_iter = 10 
+    character(len=12)       :: iter_str
+    integer                 :: iter 
+    
 ! ====================
 
 
@@ -291,6 +295,24 @@ end if
     ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
     yelmo1%mat%now%dep_time = time_init 
 
+!=== opt ===
+
+    yelmo0 = yelmo1 
+
+do iter = 1, n_iter
+
+    yelmo0%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
+    yelmo1 = yelmo0 
+
+    write(iter_str,*) iter 
+    iter_str = adjustl(iter_str)
+
+    file1D = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
+    file2D = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
+    file_restart = trim(outfldr)//"yelmo_restart-"//trim(iter_str)//".nc"         
+
+!=== opt ===
+
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dsmb_now,dtas_now,dpr_now,file2D,time=time)
@@ -311,8 +333,8 @@ if (check_init) stop
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
-if (.TRUE.) then
-        
+if (calc_ice_sheet) then 
+
         ! Update cf_ref if desired
         if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cf_ref) ) then
 !             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
@@ -322,11 +344,16 @@ if (.TRUE.) then
         if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. optimize ) then
             ! If using tuned cf, perform additional optimization here 
 
-            if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
+            !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
                 ! Update cf_ref every 500yr for the last 2000 yrs, except for year 0.
 
-                err_scale = get_opt_param(time,time1=-2e3,time2=0.0,p1=2000.0,p2=500.0,m=1.0)
-        
+                !err_scale = get_opt_param(time,time1=-2e3,time2=0.0,p1=2000.0,p2=500.0,m=1.0)
+            
+            if (time .eq. 0.0) then 
+                ! Update cf_ref at present day 
+
+                err_scale = 1e3 
+
                 call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
@@ -345,6 +372,7 @@ if (.TRUE.) then
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time)
         yelmo1%bnd%z_bed = isos1%now%z_bed
+
 end if 
 
 if (calc_transient_climate) then 
@@ -412,6 +440,9 @@ end if
 
     ! Write the restart file for the end of the simulation
     call yelmo_restart_write(yelmo1,file_restart,time=time) 
+
+end do ! end iter 
+
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
