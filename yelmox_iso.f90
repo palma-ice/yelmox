@@ -49,6 +49,7 @@ program yelmox
     
     logical, parameter      :: optimize = .TRUE. 
     type(yelmo_class)       :: yelmo2
+    real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
 
 ! ====================
@@ -324,11 +325,13 @@ if (.TRUE.) then
             if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
                 ! Update cf_ref every 500yr for the last 2000 yrs, except for year 0.
 
+                err_scale = get_opt_param(time,time1=-2e3,time2=0.0,p1=2000.0,p2=500.0,m=1.0)
+        
                 call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                                 yelmo1%grd%dx,cf_min=1e-4,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
-                                                err_scale=500.0,optvar="ice")
+                                                err_scale=err_scale,optvar="ice")
 
             end if 
 
