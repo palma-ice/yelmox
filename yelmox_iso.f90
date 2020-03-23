@@ -51,7 +51,7 @@ program yelmox
     logical, parameter      :: optimize = .TRUE. 
     real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
-    integer, parameter      :: n_iter = 10 
+    integer, parameter      :: n_iter = 20 
     character(len=12)       :: iter_str
     integer                 :: iter 
 
