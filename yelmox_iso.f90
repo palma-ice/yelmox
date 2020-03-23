@@ -363,7 +363,7 @@ if (calc_ice_sheet) then
             if (time .eq. 0.0) then 
                 ! Update cf_ref at present day 
 
-                err_scale = 1e3 
+                err_scale = 500.0 
 
                 call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &

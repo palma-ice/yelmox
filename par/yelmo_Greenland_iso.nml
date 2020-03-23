@@ -15,7 +15,7 @@
     f_cf_lim        =  0.05             ! Limit of cf_ref above which to apply f_cf scaling parameter
     f_hol           =  1.0              ! f_hol parameter for when not using hybrid forcing (to avoid misusing hybrid%f_hol)
     dtas_hol        =  0.0              ! [K] Temp anomaly scaling for Mid-Holocene
-    dpr_hol         =  0.3              ! [m/yr] Precip anomaly scaling for the Mid-Holocene
+    dpr_hol         =  0.0              ! [m/yr] Precip anomaly scaling for the Mid-Holocene
     dsmb_negis      = -0.0              ! [m/yr] SMB anomaly scaling for the NEGIS outlet
 
 /
