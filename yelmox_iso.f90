@@ -49,12 +49,15 @@ program yelmox
 ! === optimization ===
     
     logical, parameter      :: optimize = .TRUE. 
-    type(yelmo_class)       :: yelmo0
     real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
     integer, parameter      :: n_iter = 10 
     character(len=12)       :: iter_str
     integer                 :: iter 
+
+    type(yelmo_class)       :: yelmo0
+    type(smbpal_class)      :: smbpal0  
+    type(isos_class)        :: isos0
     
 ! ====================
 
@@ -297,12 +300,20 @@ end if
 
 !=== opt ===
 
-    yelmo0 = yelmo1 
+    yelmo0  = yelmo1 
+    smbpal0 = smbpal1 
+    isos0   = isos1 
 
 do iter = 1, n_iter
 
+    time    = time_init 
+
+    smbpal1 = smbpal0 
+    isos1   = isos0 
+
     yelmo0%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
-    yelmo1 = yelmo0 
+    yelmo1  = yelmo0 
+    call yelmo_set_time(yelmo1,time)   ! For safety
 
     write(iter_str,*) iter 
     iter_str = adjustl(iter_str)
