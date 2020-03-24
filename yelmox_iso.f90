@@ -51,7 +51,7 @@ program yelmox
     logical, parameter      :: optimize = .TRUE. 
     real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
-    integer, parameter      :: n_iter = 20 
+    integer                 :: n_iter 
     character(len=12)       :: iter_str
     integer                 :: iter 
 
@@ -60,8 +60,7 @@ program yelmox
     type(isos_class)        :: isos0
     
 ! ====================
-
-
+    
     ! Start timing 
     call cpu_time(cpu_start_time)
 
@@ -102,6 +101,13 @@ program yelmox
 
 
     if (check_init) time_init = -7e3
+
+    ! === opt ======
+    n_iter = 1
+    if (optimize) n_iter = 10
+
+    err_scale = 1000.0 
+    ! === opt ======
 
     ! === Initialize ice sheet model =====
 
@@ -318,9 +324,11 @@ do iter = 1, n_iter
     write(iter_str,*) iter 
     iter_str = adjustl(iter_str)
 
-    file1D = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
-    file2D = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
-    file_restart = trim(outfldr)//"yelmo_restart-"//trim(iter_str)//".nc"         
+    if (optimize) then 
+        file1D = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
+        file2D = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
+        file_restart = trim(outfldr)//"yelmo_restart-"//trim(iter_str)//".nc"         
+    end if 
 
 !=== opt ===
 
@@ -352,7 +360,7 @@ if (calc_ice_sheet) then
             call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
         end if 
         
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. optimize ) then
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. optimize) then
             ! If using tuned cf, perform additional optimization here 
 
             !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
@@ -362,8 +370,6 @@ if (calc_ice_sheet) then
             
             if (time .eq. 0.0) then 
                 ! Update cf_ref at present day 
-
-                err_scale = 500.0 
 
                 call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
                                                 yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
