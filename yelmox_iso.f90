@@ -33,7 +33,8 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart, domain 
     character(len=256) :: file_cf_ref 
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
+    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart 
+    real(prec) :: time_init_final   
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
     real(prec) :: f_cf, f_cf_lim, f_hol, dtas_hol, dpr_hol, dsmb_negis   
@@ -69,6 +70,7 @@ program yelmox
 
     ! Timing and other parameters 
     call nml_read(path_par,"ctrl","time_init",    time_init)                 ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_init_final",time_init_final)         ! [yr] Starting time for final iteration after optimization
     call nml_read(path_par,"ctrl","time_end",     time_end)                  ! [yr] Ending time
     call nml_read(path_par,"ctrl","time_equil",   time_equil)                ! [yr] Years to equilibrate first
     call nml_read(path_par,"ctrl","dtt",          dtt)                       ! [yr] Main loop time step 
@@ -104,7 +106,7 @@ program yelmox
 
     ! === opt ======
     n_iter = 1
-    if (optimize) n_iter = 10
+    if (optimize) n_iter = 10 
 
     err_scale = 1000.0 
     ! === opt ======
@@ -312,22 +314,36 @@ end if
 
 do iter = 1, n_iter
 
-    time    = time_init 
+    if (optimize .and. iter .eq. n_iter) then 
+        ! Set time_init to production run value 
+        time_init = time_init_final 
+    end if 
 
     smbpal1 = smbpal0 
     isos1   = isos0 
+    isos1%par%time = time_init 
 
     yelmo0%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
     yelmo1  = yelmo0 
-    call yelmo_set_time(yelmo1,time)   ! For safety
+    call yelmo_set_time(yelmo1,time_init)   ! For safety
+
+    ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
+    yelmo1%mat%now%dep_time = time_init 
+
+    ! Now set current time to initial time 
+    time    = time_init 
 
     write(iter_str,*) iter 
     iter_str = adjustl(iter_str)
 
-    if (optimize) then 
-        file1D = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
-        file2D = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
-        file_restart = trim(outfldr)//"yelmo_restart-"//trim(iter_str)//".nc"         
+    if (optimize .and. iter .lt. n_iter) then 
+        file1D       = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
+        file2D       = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
+        file_restart = trim(outfldr)//"yelmo_restart-"//trim(iter_str)//".nc"  
+    else
+        file1D       = trim(outfldr)//"yelmo1D.nc"
+        file2D       = trim(outfldr)//"yelmo2D.nc"
+        file_restart = trim(outfldr)//"yelmo_restart.nc" 
     end if 
 
 !=== opt ===
@@ -360,7 +376,8 @@ if (calc_ice_sheet) then
             call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
         end if 
         
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. optimize) then
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref &
+            .and. optimize .and. iter .lt. n_iter) then
             ! If using tuned cf, perform additional optimization here 
 
             !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then

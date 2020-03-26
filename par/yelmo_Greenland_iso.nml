@@ -1,5 +1,6 @@
 &ctrl
     time_init       = -21e3             ! [yr] Starting time 
+    time_init_final = -160e3            ! [yr] Starting time for final iteration
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
