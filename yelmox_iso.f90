@@ -106,7 +106,7 @@ program yelmox
 
     ! === opt ======
     n_iter = 1
-    if (optimize) n_iter = 10 
+    if (optimize) n_iter = 3 
 
     err_scale = 1000.0 
     ! === opt ======
@@ -449,7 +449,8 @@ end if
 
         ! == MODEL OUTPUT =======================================================
 
-        if (mod(time,dt2D_out)==0) then 
+        !if (mod(time,dt2D_out)==0) then
+        if (check_out2D_time(time)) then  
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dsmb_now,dtas_now,dpr_now,file2D,time=time)
         end if 
 
@@ -564,8 +565,8 @@ contains
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice fraction in grid cell", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice fraction in grid cell", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
 !         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
 !                       long_name="Distance to nearest grounding-line point", &
@@ -574,8 +575,8 @@ contains
         call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
@@ -632,8 +633,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         
@@ -654,8 +653,8 @@ contains
         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
        
-        call nc_write(filename,"pr",snp%now%pr*1e-3*365.0_prec,units="m/a water equiv.",long_name="Precipitation (monthly mean)", &
-                      dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
+!         call nc_write(filename,"pr",snp%now%pr*1e-3*365.0_prec,units="m/a water equiv.",long_name="Precipitation (monthly mean)", &
+!                       dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
               
         call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -670,16 +669,16 @@ contains
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf_pd_err",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"z_srf_pd_err",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error wrt present day", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"depth_iso_pd_err",ylmo%dta%pd%err_depth_iso,units="m", &
                       long_name="Isochronal layer depth error wrt present day", &
                       dim1="xc",dim2="yc",dim3="age_iso",dim4="time",start=[1,1,1,n],ncid=ncid)
 
-        call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
 !         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1253,6 +1252,36 @@ contains
         return 
 
     end subroutine scale_cf_gaussian
+
+    function check_out2D_time(time) result(write_now)
+
+        implicit none 
+
+        real(prec), intent(IN) :: time 
+        logical :: write_now 
+
+        if (time .le. -130e3) then 
+            dt2D_out = 2e3 
+        else if (time .gt. -130e3 .and. time .le. -118e3) then 
+            dt2D_out = 500.0 
+        else if (time .gt. -118e3 .and. time .le. -22e3) then
+            dt2D_out = 2e3 
+        else if (time .gt. -118e3 .and. time .le. -22e3) then
+            dt2D_out = 2e3 
+        else ! time .gt. -22e3 
+            dt2D_out = 500.0 
+        end if 
+        
+        if (mod(time,dt2D_out)==0) then
+            write_now = .TRUE. 
+        else
+            write_now = .FALSE. 
+        end if 
+
+        return 
+
+    end function check_out2D_time
+
 
 end program yelmox 
 
