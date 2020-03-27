@@ -519,7 +519,7 @@ contains
         real(prec)         :: sf_a, sf_b, firn_fac 
         real(prec)         :: mm_snow, mm_ice 
 
-        namelist /smbpal_par/ insol_fldr, const_insol, const_kabp, &
+        namelist /smbpal/ insol_fldr, const_insol, const_kabp, &
             abl_method, sigma_snow, sigma_melt, sigma_land, &
             sf_a, sf_b, firn_fac, mm_snow, mm_ice 
                 
@@ -540,10 +540,10 @@ contains
         ! Read parameters from input namelist file
         inquire(file=trim(filename),NUMBER=file_unit)
         if (file_unit .gt. 0) then 
-            read(file_unit,nml=smbpal_par)
+            read(file_unit,nml=smbpal)
         else
             open(7,file=trim(filename))
-            read(7,nml=smbpal_par)
+            read(7,nml=smbpal)
             close(7)
         end if 
 

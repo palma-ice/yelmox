@@ -51,7 +51,7 @@ program yelmox
 ! === optimization ===
     
     logical                 :: optimize_cf
-    logical                 :: overwrite_opt_files
+    logical                 :: overwrite_files
     real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
     integer                 :: n_iter 
@@ -83,6 +83,7 @@ program yelmox
     call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
     call nml_read(path_par,"ctrl","optimize_cf",  optimize_cf)               ! Run optimization iterations on cf_ref?
+    call nml_read(path_par,"ctrl","overwrite_files",overwrite_files)         ! Overwrite files from optimization iterations?
     call nml_read(path_par,"ctrl","n_iter",       n_iter)                    ! Number of optimization iterations
     
     call nml_read(path_par,"ctrl","f_cf",         f_cf)                      ! Friction scaling parameter 
@@ -111,7 +112,7 @@ program yelmox
     ! === opt ======
 
     ! Default option for whether to overwrite files from each iteration
-    overwrite_opt_files = .FALSE.
+    overwrite_files = .TRUE.
 
     ! Optimization ice-thickness scaling parameter (higher value=>slower but more stable optimization)
     err_scale = 1000.0 
@@ -119,8 +120,8 @@ program yelmox
     ! If not optimizing set iterations to 1, and eliminate optimization related choices
     if (.not. optimize_cf) then 
         n_iter = 1 
-        time_init_final     = time_init 
-        overwrite_opt_files = .TRUE. 
+        time_init_final = time_init 
+        overwrite_files = .TRUE. 
     end if 
 
     ! === opt ======
@@ -348,7 +349,7 @@ do iter = 1, n_iter
     write(iter_str,*) iter 
     iter_str = adjustl(iter_str)
 
-    if ( iter .lt. n_iter .and. (.not. overwrite_opt_files) ) then
+    if ( iter .lt. n_iter .and. (.not. overwrite_files) ) then
         ! Optimization filenames 
         file1D       = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
         file2D       = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
@@ -485,8 +486,8 @@ end if
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
 
-        if (mod(time,10.0)==0) then
-            write(*,"(a,f14.4)") "yelmo:: iter, time = ", iter, time
+        if (mod(time,100.0)==0) then
+            write(*,"(a,i5,f14.4)") "yelmo:: iter, time = ", iter, time
         end if  
 
         if (abs(time).lt.1e-5) then 

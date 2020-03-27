@@ -50,7 +50,7 @@ contains
         real(prec) :: alb_ocean, alb_land, alb_forest, alb_ice 
         real(prec) :: alb_snow_dry, alb_snow_wet 
 
-        namelist /itm_par/ trans_a, trans_b, trans_c, itm_c, itm_t, itm_b, itm_lat0, &
+        namelist /itm/ trans_a, trans_b, trans_c, itm_c, itm_t, itm_b, itm_lat0, &
         H_snow_max, Pmaxfrac, &
         H_snow_crit_desert, H_snow_crit_forest, melt_crit, alb_ocean, alb_land, &
         alb_forest, alb_ice, alb_snow_dry, alb_snow_wet 
@@ -79,10 +79,10 @@ contains
         ! Read parameters from input namelist file
         inquire(file=trim(filename),NUMBER=file_unit)
         if (file_unit .gt. 0) then 
-            read(file_unit,nml=itm_par)
+            read(file_unit,nml=itm)
         else
             open(7,file=trim(filename))
-            read(7,nml=itm_par)
+            read(7,nml=itm)
             close(7)
         end if 
 
