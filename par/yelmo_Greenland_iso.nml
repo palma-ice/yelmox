@@ -10,7 +10,8 @@
 
     load_cf_ref     = TRUE              ! Load cf_ref from file?
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
-    file_vel        = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
+    optimize_cf     = TRUE              ! Run optimization iterations on cf_ref?
+    n_iter          =  6                ! Number of optimization iterations
 
     f_cf            =  1.0              ! Friction scaling parameter f_cf=1 by default
     f_cf_lim        =  0.05             ! Limit of cf_ref above which to apply f_cf scaling parameter
@@ -19,6 +20,8 @@
     dpr_hol         =  0.0              ! [m/yr] Precip anomaly scaling for the Mid-Holocene
     dsmb_negis      =  0.0              ! [m/yr] SMB anomaly scaling for the NEGIS outlet
 
+    file_vel        = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
+    
 /
 
 &yelmo
