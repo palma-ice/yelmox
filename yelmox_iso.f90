@@ -38,7 +38,8 @@ program yelmox
     integer    :: n
     logical    :: calc_transient_climate, load_cf_ref 
     real(prec) :: f_cf, f_cf_lim, f_hol, dtas_hol, dpr_hol, dsmb_negis   
-    real(4) :: cpu_start_time, cpu_end_time 
+    real(4)    :: cpu_start_time, cpu_end_time 
+    logical    :: write2D_now 
 
     real(prec), allocatable :: dsmb_now(:,:) 
     real(prec), allocatable :: dtas_now(:,:) 
@@ -49,7 +50,8 @@ program yelmox
 
 ! === optimization ===
     
-    logical, parameter      :: optimize = .TRUE. 
+    logical                 :: optimize_cf
+    logical                 :: overwrite_opt_files
     real(prec)              :: err_scale 
     real(prec), allocatable :: cf_ref_dot(:,:) 
     integer                 :: n_iter 
@@ -80,7 +82,9 @@ program yelmox
 
     call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
     call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
-
+    call nml_read(path_par,"ctrl","optimize_cf",  optimize_cf)               ! Run optimization iterations on cf_ref?
+    call nml_read(path_par,"ctrl","n_iter",       n_iter)                    ! Number of optimization iterations
+    
     call nml_read(path_par,"ctrl","f_cf",         f_cf)                      ! Friction scaling parameter 
     call nml_read(path_par,"ctrl","f_cf_lim",     f_cf_lim)                  ! Friction scaling parameter limit
     call nml_read(path_par,"ctrl","f_hol",        f_hol)                     ! Holocene index scaling parameter 
@@ -105,10 +109,20 @@ program yelmox
     if (check_init) time_init = -7e3
 
     ! === opt ======
-    n_iter = 1
-    if (optimize) n_iter = 3 
 
+    ! Default option for whether to overwrite files from each iteration
+    overwrite_opt_files = .FALSE.
+
+    ! Optimization ice-thickness scaling parameter (higher value=>slower but more stable optimization)
     err_scale = 1000.0 
+
+    ! If not optimizing set iterations to 1, and eliminate optimization related choices
+    if (.not. optimize_cf) then 
+        n_iter = 1 
+        time_init_final     = time_init 
+        overwrite_opt_files = .TRUE. 
+    end if 
+
     ! === opt ======
 
     ! === Initialize ice sheet model =====
@@ -314,10 +328,8 @@ end if
 
 do iter = 1, n_iter
 
-    if (optimize .and. iter .eq. n_iter) then 
-        ! Set time_init to production run value 
-        time_init = time_init_final 
-    end if 
+    ! Set time_init to production run value for last iteration
+    if (iter .eq. n_iter) time_init = time_init_final  
 
     smbpal1 = smbpal0 
     isos1   = isos0 
@@ -336,11 +348,13 @@ do iter = 1, n_iter
     write(iter_str,*) iter 
     iter_str = adjustl(iter_str)
 
-    if (optimize .and. iter .lt. n_iter) then 
+    if ( iter .lt. n_iter .and. (.not. overwrite_opt_files) ) then
+        ! Optimization filenames 
         file1D       = trim(outfldr)//"yelmo1D-"//trim(iter_str)//".nc"
         file2D       = trim(outfldr)//"yelmo2D-"//trim(iter_str)//".nc"
         file_restart = trim(outfldr)//"yelmo_restart-"//trim(iter_str)//".nc"  
     else
+        ! Production run filenames
         file1D       = trim(outfldr)//"yelmo1D.nc"
         file2D       = trim(outfldr)//"yelmo2D.nc"
         file_restart = trim(outfldr)//"yelmo_restart.nc" 
@@ -376,8 +390,7 @@ if (calc_ice_sheet) then
             call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
         end if 
         
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref &
-            .and. optimize .and. iter .lt. n_iter) then
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. iter .lt. n_iter) then
             ! If using tuned cf, perform additional optimization here 
 
             !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
@@ -411,7 +424,7 @@ end if
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,2.0)==0) then
+        if (mod(time,5.0)==0) then
             ! Normal snapclim call 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
@@ -449,8 +462,18 @@ end if
 
         ! == MODEL OUTPUT =======================================================
 
-        !if (mod(time,dt2D_out)==0) then
-        if (check_out2D_time(time)) then  
+        write2D_now = .FALSE. 
+        if (iter .lt. n_iter) then
+            ! If inside of optimization iterations, then write output with constant frequency as
+            ! defined by dt2D_out  
+            if (mod(time,dt2D_out)==0) write2D_now = .TRUE. 
+        else 
+            ! For final transient simulation use variable 2D output writing 
+            ! via function check_out2D_time (to reduce output when not needed)
+            write2D_now = check_out2D_time(time)
+        end if 
+
+        if (write2D_now) then  
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,dsmb_now,dtas_now,dpr_now,file2D,time=time)
         end if 
 
@@ -463,12 +486,12 @@ end if
         end if 
 
         if (mod(time,10.0)==0) then
-            write(*,"(a,f14.4)") "yelmo::       time = ", time
+            write(*,"(a,f14.4)") "yelmo:: iter, time = ", iter, time
         end if  
 
         if (abs(time).lt.1e-5) then 
             ! At year==0, write some statistics 
-            write(*,*) "PDstats:", yelmo1%dta%pd%rmse_H, yelmo1%dta%pd%rmse_uxy, yelmo1%dta%pd%rmse_loguxy 
+            write(*,*) "PDstats:", iter, yelmo1%dta%pd%rmse_H, yelmo1%dta%pd%rmse_uxy, yelmo1%dta%pd%rmse_loguxy 
         end if 
         
     end do 
@@ -1261,14 +1284,14 @@ contains
         logical :: write_now 
 
         if (time .le. -130e3) then 
-            dt2D_out = 2e3 
+            dt2D_out = 5e3 
         else if (time .gt. -130e3 .and. time .le. -118e3) then 
             dt2D_out = 500.0 
         else if (time .gt. -118e3 .and. time .le. -22e3) then
-            dt2D_out = 2e3 
-        else if (time .gt. -118e3 .and. time .le. -22e3) then
-            dt2D_out = 2e3 
-        else ! time .gt. -22e3 
+            dt2D_out = 5e3 
+        else if (time .gt.  -22e3 .and. time .le. -12e3) then
+            dt2D_out = 1e3 
+        else ! time .gt. -12e3 
             dt2D_out = 500.0 
         end if 
         
