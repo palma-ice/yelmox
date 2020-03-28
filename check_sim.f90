@@ -17,9 +17,10 @@ program check_sim
     real(wp), parameter :: MISSING_VALUE = MISSING_VALUE_DEFAULT
     real(wp), parameter :: MV = MISSING_VALUE_DEFAULT
     
-    integer :: narg, n
+    integer :: narg, n, n_iso
     character(len=256) :: fldr_path, file_path  
-    real(wp) :: time, rmse_H, rmse_uxy, rmse_uxy_log 
+    real(wp) :: time, rmse_H, rmse_uxy, rmse_uxy_log
+    real(wp), allocatable :: rmse_iso(:) 
     character(len=256) :: fldr_path_root, fldr_sim 
 
     ! Get command line arguments 
@@ -45,7 +46,11 @@ program check_sim
     call nc_read(file_path,"rmse_uxy",    rmse_uxy,    start=[n],count=[1])
     call nc_read(file_path,"rmse_uxy_log",rmse_uxy_log,start=[n],count=[1])
     
-    write(*,*) trim(fldr_sim), time, rmse_H, rmse_uxy, rmse_uxy_log 
+    n_iso = nc_size(file_path,"age_iso") 
+    allocate(rmse_iso(n_iso))
+    call nc_read(file_path,"rmse_iso",rmse_iso,start=[1,n],count=[n_iso,1])
+
+    write(*,"(a,f10.2,2f8.1,f8.2,50f8.1)") trim(fldr_sim), time, rmse_H, rmse_uxy, rmse_uxy_log, rmse_iso 
 
 contains 
 
