@@ -112,10 +112,7 @@ program yelmox
     if (check_init) time_init = -7e3
 
     ! === opt ======
-
-    ! Default option for whether to overwrite files from each iteration
-    overwrite_files = .TRUE.
-
+    
     ! Optimization ice-thickness scaling parameter (higher value=>slower but more stable optimization)
     err_scale = 1000.0 
 
