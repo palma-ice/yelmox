@@ -17,12 +17,14 @@ program yelmox
     use geothermal
     
     use ice_optimization 
+    use ice_enhancement 
 
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
     
     type(sealevel_class)   :: sealev 
+    type(ice_enh_class)    :: ice_enh  
     type(snapclim_class)   :: snp1 
     type(marshelf_class)   :: mshlf1 
     type(smbpal_class)     :: smbpal1  
@@ -156,6 +158,9 @@ program yelmox
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
 
+    ! Initialize paleo enhancement factor time series (input to bnd%enh_srf)
+    call ice_enh_init(ice_enh,path_par)
+
     ! Initialize bedrock model 
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
@@ -186,6 +191,10 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
     
+    ! Get initial boundary enhancement factor value
+    call ice_enh_update(ice_enh,time=time_init)
+    yelmo1%bnd%enh_srf = ice_enh%enh 
+
     ! Normal snapclim call 
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
     
@@ -383,6 +392,10 @@ if (check_init) stop
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
+        ! Update boundary enhancement factor 
+        call ice_enh_update(ice_enh,time=time)
+        yelmo1%bnd%enh_srf = ice_enh%enh 
+        
 if (calc_ice_sheet) then 
 
         ! Update cf_ref if desired
