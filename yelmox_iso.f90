@@ -112,7 +112,7 @@ program yelmox
     if (check_init) time_init = -7e3
 
     ! === opt ======
-    
+
     ! Optimization ice-thickness scaling parameter (higher value=>slower but more stable optimization)
     err_scale = 1000.0 
 
@@ -267,6 +267,10 @@ program yelmox
 
     ! Update boundary conditions again as necessary, in case of change after generating restart file 
     
+    ! Get initial boundary enhancement factor value
+    call ice_enh_update(ice_enh,time=time)
+    yelmo1%bnd%enh_srf = ice_enh%enh 
+    
     ! GHF 
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
@@ -275,7 +279,7 @@ program yelmox
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
+    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
     
     ! ============================================================
     ! Load or define cf_ref again, in case of restart file
