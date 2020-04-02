@@ -10,7 +10,7 @@
 
     load_cf_ref     = TRUE              ! Load cf_ref from file?
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
-    optimize_cf     = FALSE             ! Run optimization iterations on cf_ref?
+    optimize_cf     = TRUE              ! Run optimization iterations on cf_ref?
     overwrite_files = TRUE              ! Overwrite files from optimization iterations?
     n_iter          =  10               ! Number of optimization iterations
 
@@ -140,7 +140,7 @@
     enh_shlf                = 0.7
     tracer_method           = "expl"    ! "expl", "impl"
     tracer_impl_kappa       = 1.5       ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
-    calc_enh_bnd            = False     ! Calculate enh tracer field? 
+    calc_enh_bnd            = True      ! Calculate enh tracer field? 
     calc_age                = True      ! Calculate age tracer field?
     age_iso                 = 11.7, 29.0, 57.0, 115.0
 /
