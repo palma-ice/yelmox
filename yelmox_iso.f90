@@ -248,6 +248,9 @@ program yelmox
             ! Additionally modify cf_ref 
             !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
+            ! Make sure minimum is consistent with parameter settings
+            where (yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
+
         else
             ! Define cf_ref inline 
 
@@ -296,6 +299,9 @@ program yelmox
 
             ! Additionally modify cf_ref 
             !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
+            
+            ! Make sure minimum is consistent with parameter settings
+            where (yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
             
         else
             ! Define cf_ref inline 
