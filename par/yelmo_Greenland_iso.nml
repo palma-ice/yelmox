@@ -10,7 +10,7 @@
 
     load_cf_ref     = TRUE              ! Load cf_ref from file?
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
-    optimize_cf     = TRUE              ! Run optimization iterations on cf_ref?
+    optimize_cf     = FALSE             ! Run optimization iterations on cf_ref?
     overwrite_files = TRUE              ! Overwrite files from optimization iterations?
     n_iter          =  10               ! Number of optimization iterations
 
@@ -30,7 +30,7 @@
     grid_name       = "GRL-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "None"  !"input/{domain}/{grid_name}/{grid_name}_yelmo_restart-iso.nc"
+    restart         = "input/{domain}/{grid_name}/{grid_name}_yelmo_restart-iso.nc"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
@@ -87,7 +87,7 @@
     cb_method           = -1              ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
     cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
-    cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
+    cb_scale            = "none"          ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = 0.0             ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.001           ! [Pa] Minimum allowed value of cb for grounded ice
@@ -106,7 +106,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 1                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
@@ -140,7 +140,7 @@
     enh_shlf                = 0.7
     tracer_method           = "expl"    ! "expl", "impl"
     tracer_impl_kappa       = 1.5       ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
-    calc_enh_bnd            = True      ! Calculate enh tracer field? 
+    calc_enh_bnd            = False     ! Calculate enh tracer field? 
     calc_age                = True      ! Calculate age tracer field?
     age_iso                 = 11.7, 29.0, 57.0, 115.0
 /
