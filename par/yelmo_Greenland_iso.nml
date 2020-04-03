@@ -21,7 +21,7 @@
     dpr_hol         =  0.0              ! [m/yr] Precip anomaly scaling for the Mid-Holocene
     dsmb_negis      =  0.0              ! [m/yr] SMB anomaly scaling for the NEGIS outlet
 
-    fill_dist       = 80.0              ! [km] Distance to fill cf_ref with minimum value instead of neighborhood mean
+    fill_dist       = 120.0             ! [km] Distance to fill cf_ref with minimum value instead of neighborhood mean
 
     file_vel        = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     
