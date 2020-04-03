@@ -4,6 +4,7 @@ program yelmox
 
     use ncio 
     use yelmo 
+    use yelmo_boundaries
     use basal_dragging 
 
     ! External libraries
@@ -272,6 +273,9 @@ program yelmox
 
     ! Update boundary conditions again as necessary, in case of change after generating restart file 
     
+    ! Update the ice_allowed mask based on domain definition 
+    call ybound_define_ice_allowed(yelmo1%bnd,yelmo1%par%domain)
+        
     ! Get initial boundary enhancement factor value
     call ice_enh_update(ice_enh,time=time)
     yelmo1%bnd%enh_srf = ice_enh%enh 
