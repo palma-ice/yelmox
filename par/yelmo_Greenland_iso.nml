@@ -21,6 +21,8 @@
     dpr_hol         =  0.0              ! [m/yr] Precip anomaly scaling for the Mid-Holocene
     dsmb_negis      =  0.0              ! [m/yr] SMB anomaly scaling for the NEGIS outlet
 
+    fill_dist       = 80.0              ! [km] Distance to fill cf_ref with minimum value instead of neighborhood mean
+
     file_vel        = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     
 /
@@ -90,7 +92,7 @@
     cb_scale            = "none"          ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = 0.0             ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 0.01            ! [Pa] Minimum allowed value of cb for grounded ice
+    cb_min              = 0.001           ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
     cf_stream           = 0.2             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)

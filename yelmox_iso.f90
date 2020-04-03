@@ -55,6 +55,7 @@ program yelmox
     logical                 :: optimize_cf
     logical                 :: overwrite_files
     real(prec)              :: err_scale 
+    real(prec)              :: fill_dist 
     real(prec), allocatable :: cf_ref_dot(:,:) 
     integer                 :: n_iter 
     character(len=12)       :: iter_str
@@ -94,6 +95,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dtas_hol",     dtas_hol)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hol",      dpr_hol)                   ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
+    call nml_read(path_par,"ctrl","fill_dist",    fill_dist)                 ! [km] Distance to fill cf_ref with minimum value instead of neighborhood mean
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -426,7 +428,7 @@ if (calc_ice_sheet) then
                                         yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s,yelmo1%dta%pd%H_ice, &
                                             yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%grd%dx, &
                                             cf_min=yelmo1%dyn%par%cb_min,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
-                                            err_scale=err_scale,optvar="ice")
+                                            err_scale=err_scale,fill_dist=fill_dist,optvar="ice")
 
             end if 
 
@@ -881,7 +883,7 @@ contains
         t0 = -12e3
         t1 =  -8e3 
         t2 =  -6e3
-        t3 =  -2e3
+        t3 =   0e3
 
         dpr_now = 0.0_prec 
 
