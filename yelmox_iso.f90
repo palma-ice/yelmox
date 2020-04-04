@@ -38,7 +38,7 @@ program yelmox
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart 
     real(prec) :: time_init_final   
-    integer    :: n
+    integer    :: k, n
     logical    :: calc_transient_climate, load_cf_ref 
     real(prec) :: f_cf, f_cf_lim, f_hol, dtas_hol, dpr_hol, dsmb_negis   
     real(4)    :: cpu_start_time, cpu_end_time 
@@ -280,6 +280,11 @@ program yelmox
     call ice_enh_update(ice_enh,time=time)
     yelmo1%bnd%enh_srf = ice_enh%enh 
     
+    ! Prescribe initial enhancement factor everywhere too 
+    do k = 1, yelmo1%mat%par%nz_aa 
+        yelmo1%mat%now%enh(:,:,k) = yelmo1%bnd%enh_srf
+    end do 
+
     ! GHF 
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
@@ -670,11 +675,9 @@ contains
 !         call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Vertically integrated viscosity", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-!         call nc_write(filename,"enh_bnd",ylmo%mat%now%enh_bnd,units="",long_name="Enhancement factor tracer field", &
-!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"enh",ylmo%mat%now%enh,units="",long_name="Enhancement factor", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"enh_bnd_srf",ylmo%bnd%enh_srf,units="",long_name="Enhancement factor boundary condition", &
+        call nc_write(filename,"enh_srf",ylmo%bnd%enh_srf,units="",long_name="Enhancement factor boundary condition", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Boundaries
