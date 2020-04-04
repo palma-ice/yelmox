@@ -630,8 +630,8 @@ contains
         call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
@@ -990,13 +990,13 @@ contains
 
         ! Ensure more negative mass balance for ice-free points during Holocene
         ! (helps avoid too much growth out of NEGIS)
-        where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
-            dsmb_0kyr = -2.0_prec
-            dsmb_hol  = -2.0_prec 
-        end where 
+!         where(bnd%H_ice_ref .eq. 0.0_prec .and. bnd%z_bed_ref .lt. 0.0_prec) 
+!             dsmb_0kyr = -2.0_prec
+!             dsmb_hol  = -2.0_prec 
+!         end where 
         
         t0 =  0e3 
-        t1 = -2e3 
+        t1 =  0e3 
         t2 = -6e3 
         t3 = -8e3 
         t4 = -12e3 
