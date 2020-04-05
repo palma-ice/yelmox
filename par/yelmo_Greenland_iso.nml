@@ -66,7 +66,7 @@
     grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+    diffuse_bmb_shlf  = True            ! Allow bmb_shlf to permeate inland at the grounding line 
 /
 
 &ydyn
