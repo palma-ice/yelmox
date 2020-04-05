@@ -135,12 +135,12 @@
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0 
     visc_min                = 1e3 
-    enh_method              = "paleo-shear" ! "simple","shear2D", "shear3D", "paleo-shear" 
+    enh_method              = "shear3D-tracer"  ! "simple","shear2D", "shear3D", "*-tracer"
     enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
-    enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
+    enh_umax                = 100.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
     calc_age                = True          ! Calculate age tracer field?
     age_iso                 = 11.7, 29.0, 57.0, 115.0
     tracer_method           = "expl"        ! "expl", "impl": used for age and 'paleo-shear' enh fields
