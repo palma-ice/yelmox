@@ -59,6 +59,7 @@ module snapclim
         real(prec) :: lapse(2)
         real(prec) :: dTa_const 
         real(prec) :: dTo_const 
+        real(prec) :: f_to 
         real(prec) :: f_p
         real(prec) :: f_stdev
 
@@ -446,6 +447,20 @@ contains
 
                 call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
 
+            case("fraction")
+                ! Scale oceanic temperature (anomaly) as a fraction of the atmospheric
+                ! temperature anomaly using parameter f_to 
+
+                ! ajr: untested!! 
+
+                dTo_now = snp%par%f_to * &
+                        sum(snp%now%ta_ann-snp%clim0%ta_ann) / real(snp%par%nx*snp%par%ny,prec)
+
+                call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
+                
+                ! Update external index 
+                ao = dTo_now 
+                
             case("snap_1ind","snap_1ind_new")
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
                         
@@ -739,6 +754,7 @@ contains
         call nml_read(filename,"snap","lapse",              par%lapse,          init=init_pars)
         call nml_read(filename,"snap","dTa_const",          par%dTa_const,      init=init_pars)
         call nml_read(filename,"snap","dTo_const",          par%dTo_const,      init=init_pars)
+        call nml_read(filename,"snap","f_to",               par%f_to,           init=init_pars)
         call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
         call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
         

@@ -10,7 +10,7 @@
 
     load_cf_ref     = TRUE              ! Load cf_ref from file?
     file_cf_ref     = "input/{domain}/{grid_name}/{grid_name}_cf_ref_opt.nc"  ! Filename holding cf_ref to load 
-    optimize_cf     = TRUE              ! Run optimization iterations on cf_ref?
+    optimize_cf     = FALSE              ! Run optimization iterations on cf_ref?
     overwrite_files = TRUE              ! Overwrite files from optimization iterations?
     n_iter          =  10               ! Number of optimization iterations
 
@@ -222,7 +222,7 @@
 
 &snap
     atm_type           = "snap_1ind_new"
-    ocn_type           = "hybrid"
+    ocn_type           = "fraction"
     fname_at           = "input/alpha_orbital_r2020.dat"
     fname_ao           = "input/alpha_orbital_r2020.dat"
     fname_ap           = "input/alpha_orbital_r2020.dat"
@@ -232,6 +232,7 @@
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = 2.0  
     dTo_const          = 0.5
+    f_to               = 0.25 
     f_p                = 0.06
     f_stdev            = 0.0 
 /
