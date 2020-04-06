@@ -187,7 +187,7 @@ contains
         ! Determine which snapshots should be loaded (atm)
         select case(trim(snp%par%ocn_type))
 
-            case("const","hybrid","anom")
+            case("const","hybrid","anom","fraction")
 
                 load_ocn1 = .FALSE.
                 load_ocn2 = .FALSE. 
@@ -204,7 +204,7 @@ contains
                 load_ocn3 = .TRUE. 
     
             case DEFAULT 
-                write(*,*) "snapclim_init:: Error: atm_type not recognized: "//trim(snp%par%ocn_type)
+                write(*,*) "snapclim_init:: Error: ocn_type not recognized: "//trim(snp%par%ocn_type)
                 stop 
  
         end select 
@@ -490,7 +490,7 @@ contains
                 
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
-                           "atm_type not recognized: "// trim(snp%par%ocn_type) 
+                           "ocn_type not recognized: "// trim(snp%par%ocn_type) 
                 stop 
 
         end select 
