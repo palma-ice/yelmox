@@ -24,6 +24,7 @@ program check_sim
     character(len=256) :: fldr_path_root, fldr_sim 
 
     real(wp), allocatable :: H_ice(:,:) 
+    real(wp), allocatable :: H_ice_pd_err(:,:) 
     logical,  allocatable :: mask(:,:) 
     
     ! Get command line arguments 
@@ -53,14 +54,16 @@ program check_sim
     
     ! Allocate variables 
     allocate(H_ice(nx,ny))
+    allocate(H_ice_pd_err(nx,ny))
     allocate(mask(nx,ny)) 
 
-    ! Read in H_ice at nt 
+    ! Read in H_ice and error at nt 
     call nc_read(file_path,"H_ice",H_ice,start=[1,1,nt],count=[nx,ny,1])
+    call nc_read(file_path,"H_ice_pd_err",H_ice_pd_err,start=[1,1,nt],count=[nx,ny,1])
 
     ! Define mask as points with ice thickness above 2000m 
     mask = H_ice .ge. 2000.0 
-    call calc_rmse(rmse_H2000,H_ice,mask,missing_value)
+    call calc_rmse(rmse_H2000,H_ice_pd_err,mask,missing_value)
 
     n_iso = nc_size(file_path,"age_iso") 
     allocate(rmse_iso(n_iso))
@@ -95,12 +98,12 @@ contains
 
     end subroutine split_string
 
-    subroutine calc_rmse(rmse,var,mask,missing_value)
+    subroutine calc_rmse(rmse,err,mask,missing_value)
 
         implicit none 
 
         real(wp), intent(OUT) :: rmse 
-        real(wp), intent(IN)  :: var(:,:) 
+        real(wp), intent(IN)  :: err(:,:) 
         logical,  intent(IN)  :: mask(:,:) 
         real(wp), intent(IN)  :: missing_value
 
@@ -117,7 +120,7 @@ contains
         else 
             ! Calculate masked rmse 
 
-            rmse = sqrt( sum(var**2,mask=mask) / real(npts,wp) )
+            rmse = sqrt( sum(err**2,mask=mask) / real(npts,wp) )
 
         end if 
 
