@@ -589,7 +589,9 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
-
+        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
+                      dim1="time",start=[n],ncid=ncid)
+        
         call nc_write(filename,"uxy_bar",reg%uxy_bar,units="m/a",long_name="Mean depth-ave velocity", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"uxy_s",reg%uxy_s,units="m/a",long_name="Mean surface velocity", &
