@@ -201,7 +201,9 @@
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = -25.0  
     dTo_const          = 0.0            !(-2.5)
-    f_p                = 0.05 
+    f_to               = 0.25 
+    f_p                = 0.05
+    f_stdev            = 0.0 
 /
 
 &snap_hybrid
