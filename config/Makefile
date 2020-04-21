@@ -99,3 +99,5 @@ clean:
 	rm -f $(bindir)/*.x
 	rm -f  *.x gmon.out $(objdir)/*.o $(objdir)/*.mod $(objdir)/*.a $(objdir)/*.so
 	rm -rf *.x.dSYM
+	rm -f ${YELMOROOT}/libyelmo/include/*.a ${YELMOROOT}/libyelmo/include/*.o 
+
