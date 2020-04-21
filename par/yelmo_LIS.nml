@@ -189,7 +189,7 @@
     sl_path            = "input/lgm-120m.dat"
 /
 
-&snapclim
+&snap
     atm_type           = "snap_1ind"
     ocn_type           = "anom"
     fname_at           = "input/ones.dat"          !"input/alpha_orbital_t2018_new.dat"
@@ -204,7 +204,7 @@
     f_p                = 0.05 
 /
 
-&snapclim_hybrid
+&snap_hybrid
     hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
     f_eem              = 1.0 
     f_glac             = 1.0 
@@ -213,7 +213,7 @@
     f_to               = 0.2
 /
 
-&snapclim_clim0
+&snap_clim0
     clim_path      = "ice_data/{domain}/{grid_name}/ERA-INT/{grid_name}_ERA-INT_1981-2010.nc"
     clim_names     = "zs" "t2m" "pr" ""                                                   ! Default (if monthly = True) : "zs" "t2m" "pr" ""
     clim_monthly   = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
@@ -224,7 +224,7 @@
     ocn_year_bp   = 0
 /
 ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-&snapclim_clim1
+&snap_clim1
     clim_path     = "ice_data/{domain}/{grid_name}/PMIP3/LIS-20KM_mean/LIS_TOPO-20KM_MEAN-PD.nc"
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
@@ -235,7 +235,7 @@
     ocn_year_bp   = 0
 /
 ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-&snapclim_clim2
+&snap_clim2
     clim_path     = "ice_data/{domain}/{grid_name}/PMIP3/LIS-20KM_mean/LIS_TOPO-20KM_MEAN-LGM.nc"
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
@@ -246,7 +246,7 @@
     ocn_year_bp   = -21000
 /
 
-&snapclim_clim3
+&snap_clim3
     clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
@@ -257,7 +257,7 @@
     ocn_year_bp   = -21000
 /
 
-&smbpal_par
+&smbpal
     const_insol = True
     const_kabp  = 0.0
     insol_fldr  = "input"
@@ -275,7 +275,7 @@
     
 /
 
-&itm_par
+&itm
         
     H_snow_max      =  5.0e3         ! Maximum allowed snowpack thickness [mm w.e.]
     Pmaxfrac        =  0.6           ! Refreezing factor 
