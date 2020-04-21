@@ -10,7 +10,7 @@
 
 &yelmo
     domain          = "Laurentide"
-    grid_name       = "LIS-20KM"
+    grid_name       = "LIS-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "None"            !"/home/dmoren07/yelmo-model/yelmox/output/PMIP3/ensembles/exp_convergence/btmthd.2.cfstrm.20.sstrcnv.0.01.sstrmx.5"
@@ -191,7 +191,7 @@
 
 &snap
     atm_type           = "snap_1ind"
-    ocn_type           = "anom"
+    ocn_type           = "fraction"
     fname_at           = "input/ones.dat"          !"input/alpha_orbital_t2018_new.dat"
     fname_ao           = "input/ones.dat"
     fname_ap           = "input/ones.dat"          !"input/alpha_orbital_t2018_new.dat"
@@ -332,7 +332,7 @@
     c_grz              = 1.0 
     kappa_grz          = 10.0 
     grz_length         = 32.0           ! [km]   
-    c_deep             = -1.0           ! [m/a] Melt rate in deep ocean, should be negative but not huge
+    c_deep             = -10.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep         = 2000.0
     T_fp               = -1.8
     depth_min          = 1100.0
