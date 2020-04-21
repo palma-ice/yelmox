@@ -223,9 +223,11 @@
     ocn_monthly   = True                                                                  ! Default (=True)
     ocn_year_bp   = 0
 /
-! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
+
 &snap_clim1
-    clim_path     = "ice_data/{domain}/{grid_name}/PMIP3/LIS-20KM_mean/LIS_TOPO-20KM_MEAN-PD.nc"
+    ! clim_path    = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
+    !clim_path     = "ice_data/{domain}/{grid_name}/PMIP3/LIS-20KM_mean/LIS_TOPO-20KM_MEAN-PD.nc"
+    clim_path     = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
     clim_year_bp  = 0
@@ -234,9 +236,11 @@
     ocn_monthly   = False
     ocn_year_bp   = 0
 /
-! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
+
 &snap_clim2
-    clim_path     = "ice_data/{domain}/{grid_name}/PMIP3/LIS-20KM_mean/LIS_TOPO-20KM_MEAN-LGM.nc"
+    ! clim_path    = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
+    !clim_path     = "ice_data/{domain}/{grid_name}/PMIP3/LIS-20KM_mean/LIS_TOPO-20KM_MEAN-LGM.nc"
+    clim_path     = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
     clim_year_bp  = -21000
