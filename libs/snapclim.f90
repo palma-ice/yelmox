@@ -800,13 +800,8 @@ contains
         call parse_path(par%ocn_path,domain,grid_name)
         
         write(*,*) "snapshot_par_load:: "//trim(name) 
-        write(*,*) "  clim_path: "//trim(par%clim_path)
-        write(*,*) "  ocn_path:  "//trim(par%ocn_path)
-        
-        write(*,*) "====="
-        write(*,*) trim(par%ocn_path) 
-        write(*,*) "====="
-        write(*,*) par%ocn_path 
+        write(*,*) "  clim_path: ", trim(par%clim_path)
+        write(*,*) "  ocn_path:  ", trim(par%ocn_path)
         
         return 
 
