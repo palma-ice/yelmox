@@ -41,6 +41,7 @@ program yelmox
     logical, parameter :: use_hyster = .TRUE. 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
+    real(4) :: dTo !mmr
 
     ! Start timing 
     call cpu_time(cpu_start_time)
@@ -132,9 +133,11 @@ program yelmox
     yelmo1%bnd%H_sed = sed1%now%H 
     
     if (use_hyster) then
+
         ! snapclim call using anomaly from the hyster package 
         call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
+!mmr        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now,dTo=hyst1%f_now*0.25) !mmr
     else
         ! Normal snapclim call 
         call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
@@ -167,6 +170,10 @@ program yelmox
     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+
+ !mmr
+         print*,'holahyst',snp1%now%to_ann(1,1,1) - snp1%clim0%to_ann(1,1,1)
+ !mmr
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx)
@@ -205,8 +212,8 @@ program yelmox
     call write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=time)
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+!mmr    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+!mmr    call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
     ! 1D file hyst 
     call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -247,12 +254,14 @@ program yelmox
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         if (mod(time,dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-            if (use_hyster) then
+!mmr            if (use_hyster) then
+                if (use_hyster.and.time.gt.100000) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
                 write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
                                                         hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
+!mmr                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now,dTo=hyst1%f_now*0.25) !mmr
             else
                 ! Normal snapclim call 
                 call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
@@ -273,6 +282,10 @@ if (calc_transient_climate) then
         call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+!mmr
+         print*,'holahyst',snp1%now%to_ann(1,1,1) - snp1%clim0%to_ann(1,1,1)
+!mmr
+
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx*1e-3)
@@ -293,7 +306,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+!mmr            call write_yreg_step(yelmo1%reg,file1D,time=time) 
             call write_step_1D_combined(yelmo1%reg,hyst1,snp1,file1D_hyst,time=time)
         end if 
 

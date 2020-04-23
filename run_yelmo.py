@@ -37,6 +37,7 @@ yelmox = libyelmox/bin/yelmox.x;
 benchmarks = libyelmox/bin/yelmo_benchmarks.x;
 mismip = libyelmox/bin/yelmo_mismip.x;
 initmip = libyelmox/bin/yelmo_initmip.x
+hyst= libyelmox/bin/yelmox_hyst.x
 ''')
     parser.add_argument('-r','--run',action="store_true",
         help='Run the executable after preparing the job?')
