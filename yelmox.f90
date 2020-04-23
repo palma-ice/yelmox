@@ -174,10 +174,10 @@ program yelmox
     else 
 
         if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
-            ! Start with some ice thickness 
-            yelmo1%tpo%now%H_ice = 2000.0 
+            ! Start with some ice thickness for testing
+!             yelmo1%tpo%now%H_ice = 2000.0 
         end if 
-        
+
     end if 
 
     ! Run yelmo for several years with constant boundary conditions and topo
