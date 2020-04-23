@@ -452,7 +452,7 @@ contains
                 ! temperature anomaly using parameter f_to 
 
                 ! ajr: untested!! 
-
+                
                 dTo_now = snp%par%f_to * &
                         sum(snp%now%ta_ann-snp%clim0%ta_ann) / real(snp%par%nx*snp%par%ny,prec)
 
