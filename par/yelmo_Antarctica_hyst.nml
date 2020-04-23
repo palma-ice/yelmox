@@ -4,7 +4,8 @@
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 10000.0           ! [yr] Frequency of writing 2D output files 
+    dt2D_small_out  = 500.0             ! [yr] Frequency of writing 2D small output files 
     transient       = True              ! Calculate transient climate? 
 /
 
