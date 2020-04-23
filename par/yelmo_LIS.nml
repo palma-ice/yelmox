@@ -73,7 +73,7 @@
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = 0.0             ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 100.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
+    cb_min              = 0.001           ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
     cf_stream           = 0.1             ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
