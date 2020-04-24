@@ -175,7 +175,16 @@ program yelmox
 
         if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
             ! Start with some ice thickness for testing
-            where (yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
+            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
+
+            ! Update snapclim to reflect new topography 
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+
+            ! Update smbpal
+            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
+            yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
             ! Run with SIA only to smooth things out at first
             call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=0.0)
