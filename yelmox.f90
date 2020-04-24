@@ -175,7 +175,10 @@ program yelmox
 
         if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
             ! Start with some ice thickness for testing
-!             yelmo1%tpo%now%H_ice = 2000.0 
+            where (yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
+
+            ! Run with SIA only to smooth things out at first
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=0.0)
         end if 
 
     end if 
