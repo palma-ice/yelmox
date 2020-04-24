@@ -189,6 +189,11 @@ program yelmox
             yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
+            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
+            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
+            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
+                        yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+
             ! Run with SIA only to smooth things out at first
             call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=0.0)
         end if 
