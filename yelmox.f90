@@ -177,6 +177,9 @@ program yelmox
             ! Start with some ice thickness for testing
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
 
+            ! Run Yelmo once to update surface topography 
+            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+            
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
 
