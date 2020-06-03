@@ -8,7 +8,8 @@ bindir = libyelmox/bin
 libdir = libs
 
 # Command-line options at make call
-debug ?= 0
+debug    ?= 0
+parallel ?= 0 
 
 ## COMPILER CONFIGURATION ##
 # (should be loaded from config directory)
@@ -43,7 +44,7 @@ include config/Makefile_yelmox.mk
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
 yelmo-static: 
-		$(MAKE) -C $(YELMOROOT) yelmo-static 
+		$(MAKE) -C $(YELMOROOT) yelmo-static parallel=$(parallel)
 
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
@@ -78,6 +79,13 @@ yelmox_rembo: yelmo-static rembo-static $(yelmox_libs)
 	@echo "    librembo/bin/yelmox_rembo.x is ready."
 	@echo " "
 
+check_sim : $(objdir)/ncio.o
+		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
+			$(LFLAGS) $(objdir)/ncio.o
+		@echo " "
+		@echo "    check_sim.x is ready."
+		@echo " "
+
 .PHONY : usage
 usage:
 	@echo ""
@@ -91,3 +99,5 @@ clean:
 	rm -f $(bindir)/*.x
 	rm -f  *.x gmon.out $(objdir)/*.o $(objdir)/*.mod $(objdir)/*.a $(objdir)/*.so
 	rm -rf *.x.dSYM
+	rm -f ${YELMOROOT}/libyelmo/include/*.a ${YELMOROOT}/libyelmo/include/*.o 
+

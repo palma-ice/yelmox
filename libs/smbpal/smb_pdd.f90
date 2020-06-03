@@ -53,8 +53,7 @@ contains
 
     end subroutine calc_ablation_pdd
 
-
-    elemental function calc_temp_effective(temp, sigma) result(teff)
+        elemental function calc_temp_effective(temp, sigma) result(teff)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         ! Subroutine : e f f e c t i v e T
         ! Author     : Reinhard Calov
@@ -77,6 +76,55 @@ contains
         real(prec), parameter :: inv_sqrt2   = 1.0/sqrt(2.0)
         real(prec), parameter :: inv_sqrt2pi = 1.0/sqrt(2.0*pi)
 
+        real(8) :: val_in, val_out 
+
+        inv_sigma   = 1.0/sigma
+        
+        ! Perform calculation of erfc at real(8) precision to
+        ! avoid potential underflow errors at very low temperatures
+        val_in  = -temp*inv_sigma*inv_sqrt2
+        val_out = erfc(val_in)
+        if (dabs(val_out) .lt. 1e-10) val_out = 0.0_dp 
+
+        teff = sigma*inv_sqrt2pi*exp(-0.5*(temp*inv_sigma)**2)  &
+                  + temp*0.5*val_out 
+
+        ! Result is the assumed/felt/effective positive degrees, 
+        ! given the actual temperature (accounting for fluctuations in day/month/etc, 
+        ! based on the sigma chosen)
+                     
+        return
+
+    end function calc_temp_effective 
+
+    elemental function calc_temp_effective_old(temp, sigma) result(teff)
+        ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ! Subroutine : e f f e c t i v e T
+        ! Author     : Reinhard Calov
+        ! Purpose    : Computation of the positive degree days (PDD) with
+        !              statistical temperature fluctuations;
+        !              based on semi-analytical solution by Reinhard Calov.
+        !              This subroutine uses days as time unit, each day
+        !              is added individually
+        !              (the same sigma as for pdd monthly can be used)
+        ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        ! temp = [degrees Celcius] !!! 
+
+        ! ajr: Note: this version can apparently produce an arithmetic
+        ! error due to an underflow when a very negative temperature is
+        ! fed into the erfc equation, then -temp*inv_sigma*inv_sqrt2 >> 0,
+        ! and the output is a very tiny number, causing a crash. 
+
+        implicit none
+
+        real(prec), intent(IN) :: temp, sigma
+        real(prec) :: teff
+        
+        real(prec) :: temp_c, inv_sigma
+        real(prec), parameter :: inv_sqrt2   = 1.0/sqrt(2.0)
+        real(prec), parameter :: inv_sqrt2pi = 1.0/sqrt(2.0*pi)
+
         inv_sigma   = 1.0/sigma
 
         teff = sigma*inv_sqrt2pi*exp(-0.5*(temp*inv_sigma)**2)  &
@@ -88,6 +136,6 @@ contains
                      
         return
 
-    end function calc_temp_effective 
+    end function calc_temp_effective_old 
 
 end module smb_pdd 

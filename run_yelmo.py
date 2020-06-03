@@ -47,6 +47,8 @@ hyst= libyelmox/bin/yelmox_hyst.x
         help='Name of the qos the job should be submitted to (priority,short,medium,long)')
     parser.add_argument('-w','--wall', type=int, default=12,
         help='Maximum wall time to allow for job (only for jobs submitted to queue)')
+    parser.add_argument('--omp', type=int, default=0,
+        help='Specify number of threads for omp job submission (default = 0 implies no omp specification)')
     parser.add_argument('--email', type=str, default='None',
         help='Email address to send job notifications from cluster')
     parser.add_argument('--group', type=str, default='anthroia',
@@ -70,7 +72,8 @@ hyst= libyelmox/bin/yelmox_hyst.x
     run         = args.run 
     submit      = args.submit 
     qos         = args.qos  
-    wtime       = args.wall 
+    wtime       = args.wall
+    omp         = args.omp  
     useremail   = args.email 
     usergroup   = args.group
     with_runner = args.x  
@@ -203,7 +206,7 @@ hyst= libyelmox/bin/yelmox_hyst.x
 
         if submit:
             # Submit job to queue 
-            pid = submitjob(rundir,executable,par_fname,qos,wtime,usergroup,useremail) 
+            pid = submitjob(rundir,executable,par_fname,qos,wtime,usergroup,useremail,omp) 
 
         else:
             # Run job in background 
@@ -216,8 +219,12 @@ hyst= libyelmox/bin/yelmox_hyst.x
 def runjob(rundir,executable,par_path):
     '''Run a job generated with makejob.'''
 
-    cmd = "cd {} && exec {} {} > {} &".format(rundir,executable,par_path,"out.out")
-
+    env_cmd = ""
+    #env_cmd = "&& export OMP_NUM_THREADS=2" # && export OMP_THREAD_LIMIT=2"
+    
+    cmd = "cd {} {} && exec {} {} > {} &".format(rundir,env_cmd,executable,par_path,"out.out")
+    #cmd = "cd {} {} && mpiexec -n 2 {} {} > {} &".format(rundir,env_cmd,executable,par_path,"out.out")
+    
     print("Running job in background: {}".format(cmd))
 
     #os.system(cmd)
@@ -232,7 +239,7 @@ def runjob(rundir,executable,par_path):
 
     return jobstatus
 
-def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
+def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail,omp):
     '''Submit a job to a HPC queue (qsub,sbatch)'''
 
     # Get info about current system
@@ -249,28 +256,22 @@ def submitjob(rundir,executable,par_path,qos,wtime,usergroup,useremail):
     
     if "brigit" in hostname:
         # Host is the UCM brigit cluster, use the following submit script
-        script  = jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail)
+        script  = jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail,omp)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
             
     else:
         # Host is the PIK 2015 cluster, use the following submit script
-        script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail)
+        script  = jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp)
         jobfile = open(path_jobscript,'w').write(script)
         cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
-    
-    # Unused: host is the obsolete UCM eolo cluster, use the following submit script
-    # if "cei" in hostname:
-    #     script = jobscript_qsub(cmd,rundir,username,usergroup,wtime,useremail)
-    #     jobfile = open(path_jobscript,'w').write(script)
-    #     cmd_job = "cd {} && qsub {}".format(rundir,nm_jobscript)
     
     # Run the command (ie, change to output directory and submit job)
     # Note: the argument `shell=True` can be a security hazard, but should
     # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
     jobstatus = subp.check_call(cmd_job,shell=True)
 
-    return jobstatus 
+    return jobstatus
 
 def runner_param_write(par_path,rundir):
     '''Wrapper to perform parameter updates according to runner.json file 
@@ -331,7 +332,7 @@ def get_git_revision_hash():
     githash = subp.check_output(['git', 'rev-parse', 'HEAD']).strip()
     return githash.decode("ascii") 
 
-def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail):
+def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail,omp):
     '''Definition of the job script'''
 
     jobname = "yelmo" 
@@ -340,7 +341,26 @@ def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail):
     if qos == "short" and wtime > 24*7:
         print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
         sys.exit()
-            
+    
+    if omp > 0:
+        # Use openmp settings 
+        omp_script = """
+#SBATCH --mem=50000 
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task={} 
+
+export OMP_PROC_BIND=true  # make sure our threads stick to cores
+export OMP_NUM_THREADS={}  # matches how many cpus-per-task we asked for
+export OMP_NESTED=false
+export OMP_STACKSIZE=64M
+""".format(omp,omp)
+
+    else: 
+        # No openmp 
+        omp_script = "" 
+
+
     script = """#! /bin/bash
 #SBATCH -p {}
 #SBATCH --time={}:00:00
@@ -353,15 +373,16 @@ def jobscript_slurm_brigit(cmd,rundir,username,usergroup,qos,wtime,useremail):
 #SBATCH --mail-type=REQUEUE
 #SBATCH --output=./out.out
 #SBATCH --error=./out.err
+{}
 
 # Run the job
 {} 
 
-""".format(qos,wtime,jobname,usergroup,useremail,cmd)
+""".format(qos,wtime,jobname,usergroup,useremail,omp_script,cmd)
 
     return script
 
-def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
+def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail,omp):
     '''Definition of the job script'''
 
     jobname = "yelmo" 
@@ -378,7 +399,26 @@ def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
     if qos == "medium" and wtime > 24*7:
         print("Error in wtime for '{}'' queue, wtime = {}".format(qos,wtime))
         sys.exit()
-            
+    
+    if omp > 0:
+        # Use openmp settings 
+        omp_script = """
+#SBATCH --mem=50000 
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task={} 
+
+export OMP_PROC_BIND=true  # make sure our threads stick to cores
+export OMP_NUM_THREADS={}  # matches how many cpus-per-task we asked for
+export OMP_NESTED=false
+export OMP_STACKSIZE=64M
+""".format(omp,omp)
+
+    else: 
+        # No openmp 
+        omp_script = "" 
+
+
     script = """#! /bin/bash
 #SBATCH --qos={}
 #SBATCH --time={}:00:00
@@ -390,11 +430,12 @@ def jobscript_slurm_pik(cmd,rundir,username,usergroup,qos,wtime,useremail):
 #SBATCH --mail-type=REQUEUE
 #SBATCH --output=./out.out
 #SBATCH --error=./out.err
+{}
 
 # Run the job
 {} 
 
-""".format(qos,wtime,jobname,usergroup,useremail,cmd)
+""".format(qos,wtime,jobname,usergroup,useremail,omp_script,cmd)
 
     return script
 
