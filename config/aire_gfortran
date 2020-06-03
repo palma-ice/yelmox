@@ -8,8 +8,8 @@ REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include 
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
-#YELMOROOT = yelmo
-YELMOROOT = /Users/robinson/models/EURICE/yelmo_gmd
+YELMOROOT = yelmo
+#YELMOROOT = /Users/robinson/models/EURICE/yelmo_gmd
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
