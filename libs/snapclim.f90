@@ -945,7 +945,8 @@ contains
             
 
                 if ( (.not.  trim(clim%par%clim_stdev_path) .eq. "None") .and. &
-                     (.not.  trim(clim%par%clim_stdev_path) .eq. "none") ) then 
+                     (.not.  trim(clim%par%clim_stdev_path) .eq. "none") .and. &    
+                     (.not.  trim(clim%par%clim_stdev_path) .eq. "") ) then 
                     ! Load stdev field for precipitation too [initially mm/d]
 
                     call nc_read(clim%par%clim_stdev_path,clim%par%clim_stdev_name,clim%pr_ann_stdev_frac)
