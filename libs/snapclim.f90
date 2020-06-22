@@ -1029,7 +1029,7 @@ contains
         !
         ! ====================================
 
-        write(*,"(a)") "read_climate_snapshot:: Climate snapshot loaded: "//trim(clim%par%clim_path)
+        write(*,"(a)") "read_climate_snapshot:: loaded: "//trim(clim%par%clim_path)
         write(*,"(4x,a,2f12.2)") "range: ta_ann     [K]    = ", minval(clim%ta_ann),    maxval(clim%ta_ann)
         write(*,"(4x,a,2f12.2)") "range: tsl_ann    [K]    = ", minval(clim%tsl_ann),   maxval(clim%tsl_ann)
         write(*,"(4x,a,2f12.2)") "range: ta_sum     [K]    = ", minval(clim%ta_sum),    maxval(clim%ta_sum)
@@ -1070,8 +1070,27 @@ contains
         integer :: nz, nz0, m 
         integer :: i, j, k 
 
-        if (trim(ocn%par%ocn_path) .eq. "None") then 
-            ! Set all fields to zero 
+        logical :: is_monthly 
+        logical :: is_2D_ocn    
+
+        if (ocn%par%ocn_monthly) then 
+            is_monthly = .TRUE. 
+        else 
+            is_monthly = .FALSE. 
+        end if 
+
+        if (trim(ocn%par%ocn_names(1)) .eq. "None" .or. & 
+            trim(ocn%par%ocn_names(1)) .eq. "none" .or. & 
+            trim(ocn%par%ocn_names(1)) .eq. "") then 
+            is_2D_ocn = .TRUE. 
+        else 
+            is_2D_ocn = .FALSE. 
+        end if 
+
+        if (trim(ocn%par%ocn_path) .eq. "None" .or. & 
+            trim(ocn%par%ocn_path) .eq. "none" .or. & 
+            trim(ocn%par%ocn_path) .eq. "") then 
+            ! No filename given, set all fields to zero 
 
             ocn%nzo      = size(depth)
             call ocn_allocate(ocn,nx,ny,ocn%nzo)
@@ -1086,20 +1105,47 @@ contains
             ! Read data from parameters 
 
             ! Determine the length of the input depth dimension 
-            nz0 = nc_size(ocn%par%ocn_path,ocn%par%ocn_names(1))
-            allocate(depth0(nz0))
-            allocate(mask3D(nx,ny,nz0))
-            allocate(tocn3D(nx,ny,nz0))
+            ! and define the input depth dimension vector
+            if (is_2D_ocn) then 
+                ! Ocean will be a 2D field, set nz0 to 1 layer 
+                nz0 = 1
+                allocate(depth0(nz0))
+                depth0 = 0.0_prec 
 
-            ! Read in the input ocean mask and depth
-            call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(1),depth0)
-            call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
+                ! Allocate additional arrays
+                allocate(mask3D(nx,ny,nz0))
+                allocate(tocn3D(nx,ny,nz0))
 
-            if (ocn%par%ocn_monthly) then 
-                ! Read in monthly climate fields, then get the averages
+                ! Read in the 2D ocean mask 
+                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D(:,:,1))
+
+            else 
+                ! Ocean includes a depth dimension 
+
+                ! Read in depth dimension size from file
+                nz0 = nc_size(ocn%par%ocn_path,ocn%par%ocn_names(1))
+                allocate(depth0(nz0))
+                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(1),depth0)
+
+                ! Allocate additional arrays
+                allocate(mask3D(nx,ny,nz0))
+                allocate(tocn3D(nx,ny,nz0))
+
+                ! Read in the ocean mask 
+                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
+
+            end if 
+             
+            if (is_monthly) then 
+                ! Read in monthly field(s), then get the averages
 
                 allocate(tocn4D(nx,ny,nz0,12))
-                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D)
+                
+                if (is_2D_ocn) then
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D(:,:,1,:))
+                else 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D)
+                end if 
 
                 ! Calculate annual mean temperature [degrees C]
                 tocn3D = sum(tocn4D,dim=4)
@@ -1109,10 +1155,14 @@ contains
                 deallocate(tocn4D) 
 
             else
-                ! Read in specific climate fields 
+                ! Read in specific field(s)
 
-                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D)
-        
+                if (is_2D_ocn) then 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D(:,:,1))
+                else 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D)
+                end if 
+
             end if 
 
             ! Ensure units are in Kelvin
@@ -1159,9 +1209,9 @@ contains
         !
         ! ====================================
 
-        write(*,"(a)") "read_ocean_snapshot:: Ocean snapshot loaded: "//trim(ocn%par%ocn_path)
-        write(*,"(4x,a,2f12.2)") "depth  range = ", minval(ocn%depth),  maxval(ocn%depth)
-        write(*,"(4x,a,2f12.2)") "to_ann range = ", minval(ocn%to_ann), maxval(ocn%to_ann)
+        write(*,"(a)") "read_ocean_snapshot:: loaded: "//trim(ocn%par%ocn_path)
+        write(*,"(4x,a,2f12.2)") "range: depth      [m]    = ", minval(ocn%depth),  maxval(ocn%depth)
+        write(*,"(4x,a,2f12.2)") "range: to_ann     [K]    = ", minval(ocn%to_ann), maxval(ocn%to_ann)
         write(*,"(a,f12.2)") "snapshot time =", ocn%par%ocn_time 
 
         return 
