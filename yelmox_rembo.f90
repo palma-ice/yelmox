@@ -144,7 +144,7 @@ program yelmox
 !                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -241,7 +241,7 @@ if (calc_transient_climate) then
 !                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx*1e-3)
+                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx*1e-3)
 
 end if 
 
