@@ -331,6 +331,7 @@
     T_fp               = -1.8
     depth_min          = 1100.0
     depth_max          = 1500.0
+    find_ocean         = True 
     
 /
 
