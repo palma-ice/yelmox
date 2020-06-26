@@ -38,6 +38,8 @@ program yelmox
     logical    :: calc_transient_climate
 
     logical, parameter :: use_hyster = .TRUE. 
+    logical, parameter :: init_no_ice = .FALSE.
+
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
     real(4) :: dTo !mmr
@@ -81,6 +83,19 @@ program yelmox
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
+
+
+!mmr ! ensure your initial state is for an ice-free, isostatically rebounded bedrock
+
+
+    if (init_no_ice) then          !mmr
+        yelmo1%bnd%z_bed = yelmo1%bnd%z_bed_ref + (rho_ice/rho_w)*yelmo1%tpo%now%H_ice !mmr
+        yelmo1%tpo%now%H_ice = 0.0
+!mmr
+        yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed
+!mmr
+        where(yelmo1%tpo%now%z_srf .lt. yelmo1%bnd%z_sl) yelmo1%tpo%now%z_srf = 0.0    !mmr
+    endif !mmr
 
     ! === Initialize external models (forcing for ice sheet) ======
 
@@ -172,10 +187,6 @@ program yelmox
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
- !mmr
-         print*,'holahyst',snp1%now%to_ann(1,1,1) - snp1%clim0%to_ann(1,1,1)
- !mmr
-
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx)
 
@@ -255,8 +266,8 @@ program yelmox
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         if (mod(time,dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-!mmr            if (use_hyster) then
-                if (use_hyster.and.time.gt.100000) then
+!mmr        if (use_hyster) then
+            if ( (use_hyster.and.time.gt.100000).or.(use_hyster.and.init_no_ice)) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
                 write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
@@ -283,10 +294,6 @@ if (calc_transient_climate) then
         call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
-!mmr
-         print*,'holahyst',snp1%now%to_ann(1,1,1) - snp1%clim0%to_ann(1,1,1)
-!mmr
-
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%z_sl,regions=yelmo1%bnd%regions,dx=yelmo1%grd%dx*1e-3)
