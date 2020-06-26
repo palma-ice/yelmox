@@ -43,6 +43,8 @@ module marine_shelf
         real(prec) :: T_fp 
         real(prec) :: depth_min, depth_max
 
+        logical :: find_ocean 
+
         character(len=512) :: domain   
         real(prec) :: rho_ice, rho_sw
 
@@ -55,6 +57,9 @@ module marine_shelf
         real(prec), allocatable   :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
         real(prec), allocatable   :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
         real(prec), allocatable   :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
+        
+        integer,    allocatable   :: mask_ocn_ref(:,:) 
+        integer,    allocatable   :: mask_ocn(:,:) 
         
     end type 
 
@@ -73,7 +78,7 @@ module marine_shelf
 
 contains 
 
-    subroutine marshelf_init(mshlf,filename,nx,ny,domain,grid_name,basins)
+    subroutine marshelf_init(mshlf,filename,nx,ny,domain,grid_name,regions,basins)
 
         implicit none 
 
@@ -81,7 +86,8 @@ contains
         character(len=*), intent(IN)      :: filename
         integer, intent(IN)               :: nx, ny 
         character(len=*), intent(IN)      :: domain, grid_name
-        real(prec), intent(IN)               :: basins(:,:)
+        real(prec), intent(IN)            :: regions(:,:)
+        real(prec), intent(IN)            :: basins(:,:)
         
         ! Local variables
         integer :: j 
@@ -116,12 +122,12 @@ contains
 
         end if 
 
-        ! Make domain specific modifications 
+        ! Make domain specific initializations
         select case(trim(mshlf%par%domain))
 
             case("Antarctica")
 
-                ! Modify specific basins according to parameter values 
+                ! Modify bmb_obs in specific basins according to parameter values 
                 do j = 1, size(mshlf%par%basin_name)
                     
                     select case(trim(mshlf%par%basin_name(j)))
@@ -161,7 +167,11 @@ contains
                     end select 
 
                 end do 
-            
+                
+                ! Define mask_ocn_ref based on regions mask 
+                mshlf%now%mask_ocn_ref = 0 
+                where (regions .eq. 2.0_prec) mshlf%now%mask_ocn_ref = 1 
+
             case("Greenland") 
 
                 ! Modify specific basins according to parameter values 
@@ -188,10 +198,21 @@ contains
                     end select 
 
                 end do 
-             
+                
+                ! Define mask_ocn_ref based on regions mask 
+                mshlf%now%mask_ocn_ref = 0 
+                where (regions .ne. 1.3_prec .and. &
+                       regions .ne. 1.11_prec)   mshlf%now%mask_ocn_ref = 1 
+                
             case DEFAULT 
 
                 ! Pass - no basins defined for other domains yet 
+
+                ! Define mask_ocn_ref based on regions mask 
+                ! (these definitions should work for North and Antarctica domains)
+                mshlf%now%mask_ocn_ref = 0 
+                where (regions .eq. 1.0_prec) mshlf%now%mask_ocn_ref = 1   
+                where (regions .eq. 2.0_prec) mshlf%now%mask_ocn_ref = 1 
 
         end select 
 
@@ -201,8 +222,9 @@ contains
         !
         ! ====================================
         
-        write(*,*) "range bmb_obs: ", minval(mshlf%now%bmb_obs), maxval(mshlf%now%bmb_obs)
-            
+        write(*,*) "range bmb_obs:      ", minval(mshlf%now%bmb_obs), maxval(mshlf%now%bmb_obs)
+        write(*,*) "range mask_ocn_ref: ", minval(mshlf%now%mask_ocn_ref), maxval(mshlf%now%mask_ocn_ref)
+        
         ! Initialize variables 
         mshlf%now%bmb_shlf     = 0.0  
         mshlf%now%bmb_ref      = 0.0 
@@ -306,6 +328,20 @@ contains
         grz_wt = min( (mshlf%par%grz_length*1e3) / dx, 1.0) 
         
 
+        if (mshlf%par%find_ocean) then 
+            ! Determine which floating or partially floating points
+            ! are connected to the open-ocean
+
+            call find_ocean(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref)
+
+        else 
+            ! Set any floating or partially floating points to ocean points
+
+            mshlf%now%mask_ocn = 0 
+            where (f_grnd .lt. 1.0) mshlf%now%mask_ocn = 1
+
+        end if 
+
         ! 1. Define the reference bmb field for floating ice =================
         
         if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
@@ -326,7 +362,7 @@ contains
         ! 2. Calculate current ice shelf bmb field (grounded-ice bmb is calculated in ice-sheet model separately) ========
  
         ! Floating (or partially floating) ice
-        where (f_grnd .lt. 1.0 .or. is_grline)
+        where (mshlf%now%mask_ocn .eq. 1)
             mshlf%now%bmb_shlf = calc_bmb_shelf(mshlf%now%bmb_ref,mshlf%now%dT_shlf,mshlf%par%c_shlf,mshlf%par%kappa_shlf)
             H_ocn              = max( (z_sl-z_bed)-(rho_ice_sw*H_ice), 0.0 ) 
         elsewhere 
@@ -338,7 +374,7 @@ contains
         ! variable used to scale mshlf%now%bmb_shlf at the grounding line)
         ! Scale grounding line points by grounding line melt factor
         ! accounting for the resolution dependence
-        where (is_grline)
+        where (mshlf%now%mask_ocn .eq. 1 .and. is_grline)
             
             bmb_grline         = calc_bmb_shelf(mshlf%now%bmb_ref,mshlf%now%dT_shlf, &
                                                 mshlf%par%c_grz,mshlf%par%kappa_grz)
@@ -395,28 +431,29 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"marine_shelf","bmb_shlf_method", par%bmb_shlf_method, init=init_pars)
-        call nml_read(filename,"marine_shelf","T_shlf_method", par%T_shlf_method, init=init_pars)
-        call nml_read(filename,"marine_shelf","use_obs", par%use_obs, init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_path", par%obs_path, init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_name", par%obs_name, init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_f", par%obs_f, init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_lim", par%obs_lim, init=init_pars)
-        call nml_read(filename,"marine_shelf","basin_name", par%basin_name, init=init_pars)
-        call nml_read(filename,"marine_shelf","basin_bmb", par%basin_bmb, init=init_pars)
-        call nml_read(filename,"marine_shelf","c_shlf", par%c_shlf, init=init_pars)
-        call nml_read(filename,"marine_shelf","kappa_shlf", par%kappa_shlf, init=init_pars)
-        call nml_read(filename,"marine_shelf","f_grz_shlf", par%f_grz_shlf, init=init_pars)
-        call nml_read(filename,"marine_shelf","c_grz", par%c_grz, init=init_pars)
-        call nml_read(filename,"marine_shelf","kappa_grz", par%kappa_grz, init=init_pars)
-        call nml_read(filename,"marine_shelf","grz_length", par%grz_length, init=init_pars)
-        call nml_read(filename,"marine_shelf","c_deep", par%c_deep, init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_deep", par%depth_deep, init=init_pars)
-        call nml_read(filename,"marine_shelf","T_fp", par%T_fp, init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_min", par%depth_min, init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_max", par%depth_max, init=init_pars)   
+        call nml_read(filename,"marine_shelf","bmb_shlf_method",par%bmb_shlf_method,init=init_pars)
+        call nml_read(filename,"marine_shelf","T_shlf_method",  par%T_shlf_method,  init=init_pars)
+        call nml_read(filename,"marine_shelf","use_obs",        par%use_obs,        init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_path",       par%obs_path,       init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_name",       par%obs_name,       init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_f",          par%obs_f,          init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_lim",        par%obs_lim,        init=init_pars)
+        call nml_read(filename,"marine_shelf","basin_name",     par%basin_name,     init=init_pars)
+        call nml_read(filename,"marine_shelf","basin_bmb",      par%basin_bmb,      init=init_pars)
+        call nml_read(filename,"marine_shelf","c_shlf",         par%c_shlf,         init=init_pars)
+        call nml_read(filename,"marine_shelf","kappa_shlf",     par%kappa_shlf,     init=init_pars)
+        call nml_read(filename,"marine_shelf","f_grz_shlf",     par%f_grz_shlf,     init=init_pars)
+        call nml_read(filename,"marine_shelf","c_grz",          par%c_grz,          init=init_pars)
+        call nml_read(filename,"marine_shelf","kappa_grz",      par%kappa_grz,      init=init_pars)
+        call nml_read(filename,"marine_shelf","grz_length",     par%grz_length,     init=init_pars)
+        call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
+        call nml_read(filename,"marine_shelf","T_fp",           par%T_fp,           init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_min",      par%depth_min,      init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_max",      par%depth_max,      init=init_pars)   
         
-
+        call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
+        
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
         par%domain = trim(domain)
@@ -706,6 +743,9 @@ contains
         allocate(now%dT_shlf(nx,ny))
         allocate(now%kappa(nx,ny))
         
+        allocate(now%mask_ocn_ref(nx,ny))
+        allocate(now%mask_ocn(nx,ny))
+
         ! Initialize variables 
         now%bmb_shlf     = 0.0  
         now%bmb_obs      = 0.0 
@@ -714,6 +754,10 @@ contains
         now%dT_shlf      = 0.0
         now%kappa        = 0.0
         
+        ! By default set ocean points everywhere
+        now%mask_ocn_ref = 1
+        now%mask_ocn     = 1
+
         return
 
     end subroutine marshelf_allocate
@@ -785,7 +829,94 @@ contains
         return 
 
     end function interp_linear
-        
+    
+    subroutine find_ocean(mask,f_grnd,mask_ref)
+        ! Brute-force routine to find all ocean points 
+        ! (ie, when f_grnd < 1) connected to
+        ! the open ocean as defined in mask_ref. 
+
+        implicit none 
+
+        integer,    intent(OUT) :: mask(:,:) 
+        real(prec), intent(IN)  :: f_grnd(:,:)
+        integer,    intent(IN)  :: mask_ref(:,:) 
+
+        ! Local variables 
+        integer :: i, j, q, nx, ny
+        integer :: im1, ip1, jm1, jp1 
+        integer :: n_unfilled 
+
+        integer    :: mask_neighb(4) 
+
+        integer, parameter :: qmax = 1000 
+
+        nx = size(mask,1)
+        ny = size(mask,2) 
+
+        ! First specify land points (mask==0)
+        ! and assume all floating points are 'closed ocean' points (mask==-1)
+        mask = 0 
+        where (f_grnd .lt. 1.0) mask = -1 
+
+        ! Now populate our ocean mask to be consistent 
+        ! with known open ocean points 
+        where (mask .eq. -1 .and. mask_ref .eq. 1) mask = 1 
+         
+        ! Iteratively fill in open-ocean points that are found
+        ! next to known open-ocean points
+        do q = 1, qmax 
+
+            n_unfilled = 0 
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! Get neighbor indices 
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
+                jm1 = max(j-1,1)
+                jp1 = min(j+1,ny)
+                
+                if (mask(i,j) .eq. 1) then 
+                    ! This is an open-ocean point 
+                    ! Define any neighbor ocean points as open-ocean points
+                    
+                    if (mask(im1,j) .eq. -1) then 
+                        mask(im1,j) = 1
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                    if (mask(ip1,j) .eq. -1) then 
+                        mask(ip1,j) = 1 
+                        n_unfilled = n_unfilled + 1
+                    end if
+
+                    if (mask(i,jm1) .eq. -1) then 
+                        mask(i,jm1) = 1 
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                    if (mask(i,jp1) .eq. -1) then 
+                        mask(i,jp1) = 1 
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                end if
+                    
+            end do 
+            end do  
+
+            !write(*,*) q, n_unfilled, count(mask .eq. -1) 
+
+            ! Exit loop if no more open-ocean points are found 
+            if (n_unfilled .eq. 0) exit 
+
+        end do 
+
+        return 
+
+    end subroutine find_ocean
+
 end module marine_shelf
 
 
