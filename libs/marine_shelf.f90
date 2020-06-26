@@ -375,7 +375,8 @@ contains
 
             mshlf%now%mask_ocn = 0 
             where (f_grnd .lt. 1.0) mshlf%now%mask_ocn = 1
-
+            where (f_grnd .lt. 1.0 .and. mshlf%now%mask_ocn_ref .eq. 2) mshlf%now%mask_ocn = 2
+            
         end if 
 
         ! 1. Define the reference bmb field for floating ice =================
@@ -593,7 +594,7 @@ contains
         elsewhere 
 
             is_c_deep = .FALSE. 
-            
+
         end where 
 
 
