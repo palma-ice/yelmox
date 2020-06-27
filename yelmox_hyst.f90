@@ -199,7 +199,7 @@ program yelmox
 
     end if 
 
-if (.FALSE.) then 
+if (.TRUE.) then 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
@@ -221,9 +221,7 @@ end if
     ! 1D file hyst 
     call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_step_1D_combined(yelmo1%reg,hyst1,snp1,file1D_hyst,time=time)
-
-    stop 
-
+    
 !     ! Testing smb ======
 !     stop "Done."
 
