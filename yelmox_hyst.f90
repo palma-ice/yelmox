@@ -38,7 +38,7 @@ program yelmox
     logical    :: calc_transient_climate
 
     logical, parameter :: use_hyster = .TRUE. 
-    logical, parameter :: init_no_ice = .FALSE.
+    logical, parameter :: init_no_ice = .TRUE.
 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
