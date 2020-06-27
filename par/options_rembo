@@ -8,7 +8,7 @@
     
 ## File options
     --   :  restart_file                : ../../eem-tracer-10_250ka/dTfctr.1.0.CSLD0.15.0/restart.bp135.nc
-    --   :  topo_file                   : ice_data/Greenland/GRL-20KM/GRL-20KM_TOPO-B13.nc
+    --   :  topo_file                   : ice_data/Greenland/GRL-20KM/GRL-20KM_TOPO-RTOPO-2.0.1.nc
     --   :  forcing_file                : in_rembo/forcing/mis11.climber_paleo.dat
 #   --   :  forcing_file                : in_rembo/forcing/paleo300ka_hybrid_aicc2012.nc
     --   :  emb_clim_file               : ice_data/Greenland/GRL-80KM/ERA-40/GRL-80KM_ERA-40_195801-200112.nc
