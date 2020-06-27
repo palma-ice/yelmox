@@ -168,10 +168,6 @@ contains
 
                 end do 
                 
-                ! Define mask_ocn_ref based on regions mask 
-                mshlf%now%mask_ocn_ref = 0 
-                where (regions .eq. 2.0_prec) mshlf%now%mask_ocn_ref = 1 
-
             case("Greenland") 
 
                 ! Modify specific basins according to parameter values 
@@ -199,22 +195,64 @@ contains
 
                 end do 
                 
-                ! Define mask_ocn_ref based on regions mask 
-                mshlf%now%mask_ocn_ref = 0 
-                where (regions .ne. 1.3_prec .and. &
-                       regions .ne. 1.11_prec)   mshlf%now%mask_ocn_ref = 1 
-                
             case DEFAULT 
 
                 ! Pass - no basins defined for other domains yet 
 
-                ! Define mask_ocn_ref based on regions mask 
-                ! (these definitions should work for North and Antarctica domains)
-                mshlf%now%mask_ocn_ref = 0 
-                where (regions .eq. 1.0_prec) mshlf%now%mask_ocn_ref = 1   
-                where (regions .eq. 2.0_prec) mshlf%now%mask_ocn_ref = 1 
+        end select 
+
+        ! ==============================================
+        ! Generate reference ocean mask 
+        ! (0: land, 1: open ocean, 2: deep ocean) 
+
+        ! Define mask_ocn_ref based on regions mask 
+        ! (these definitions should work for all North and Antarctica domains)
+        mshlf%now%mask_ocn_ref = 0 
+        where (regions .eq. 1.0_prec) mshlf%now%mask_ocn_ref = 1   
+        where (regions .eq. 2.0_prec) mshlf%now%mask_ocn_ref = 1 
+
+
+        select case(trim(mshlf%par%domain))
+
+            case("Greenland") 
+                ! Greenland specific ocean kill regions
+
+                where (regions .ne. 1.3) mshlf%now%mask_ocn_ref = 2 
+
+                ! ajr: not used anymore now with mask_ocn_ref formulation,
+                ! keeping code here just to see if Greenland domain still calculated well.
+                ! ! Kill regions that should not be calculated (for now)
+                ! ! North America and Ellesmere Island (1.1,1.11)
+                ! ! Svalbard (1.2,1.23)
+                ! ! Iceland (1.31)
+                ! ! open sea (1.0)
+                ! where (regions .eq. 1.1 .or. regions .eq. 1.11) is_c_deep = .TRUE.
+                ! where (regions .eq. 1.2 .or. regions .eq. 1.23) is_c_deep = .TRUE.
+                ! where (regions .eq. 1.31) is_c_deep = .TRUE.
+                ! where (regions .eq. 1.0)  is_c_deep = .TRUE.
+
+            case("Antarctica") 
+                ! Antarctica specific ocean kill regions
+
+                ! Omit regions==2.11 which means c_deep is not applied to deep points within continental shelf
+                where (regions .ne. 2.11) mshlf%now%mask_ocn_ref = 2 
+
+            ! case("North") 
+            !     ! North specific ocean kill regions
+
+            !     ! Apply only in purely open-ocean regions  
+            !     where (regions .eq. 1.0) mshlf%now%mask_ocn_ref = 2 
+
+            case DEFAULT 
+                ! Other domains: c_deep potentially applied everywhere 
+                ! with deep ocean points 
+
+                mshlf%now%mask_ocn_ref = 2 
 
         end select 
+
+        ! ==============================================
+
 
         ! ====================================
         !
@@ -293,7 +331,7 @@ contains
 
     end subroutine marshelf_set_Tshlf 
 
-    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,z_sl,regions,dx)
+    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,z_sl,dx)
         
         implicit none
         
@@ -303,12 +341,12 @@ contains
         real(prec), intent(IN) :: f_grnd(:,:) 
         real(prec), intent(IN) :: z_sl(:,:) 
         !real(prec), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
-        real(prec), intent(IN) :: regions(:,:) 
         real(prec), intent(IN) :: dx   ! grid resolution [m]
 
         ! Local variables
         integer :: i, j, nx, ny, ngr 
-        real(prec), allocatable :: bmb_floating(:,:), bmb_grline(:,:) 
+
+        real(prec) :: bmb_floating, bmb_grline
         real(prec), allocatable :: H_ocn(:,:)
         logical,    allocatable :: is_grline(:,:)   
         real(prec) :: grz_wt
@@ -316,8 +354,6 @@ contains
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
-        allocate(bmb_floating(nx,ny))
-        allocate(bmb_grline(nx,ny))
         allocate(H_ocn(nx,ny)) 
         allocate(is_grline(nx,ny))
 
@@ -332,14 +368,15 @@ contains
             ! Determine which floating or partially floating points
             ! are connected to the open-ocean
 
-            call find_ocean(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref)
+            call find_open_ocean(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref)
 
         else 
             ! Set any floating or partially floating points to ocean points
 
             mshlf%now%mask_ocn = 0 
             where (f_grnd .lt. 1.0) mshlf%now%mask_ocn = 1
-
+            where (f_grnd .lt. 1.0 .and. mshlf%now%mask_ocn_ref .eq. 2) mshlf%now%mask_ocn = 2
+            
         end if 
 
         ! 1. Define the reference bmb field for floating ice =================
@@ -360,46 +397,65 @@ contains
         end if
         
         ! 2. Calculate current ice shelf bmb field (grounded-ice bmb is calculated in ice-sheet model separately) ========
- 
-        ! Floating (or partially floating) ice
-        where (mshlf%now%mask_ocn .eq. 1)
-            mshlf%now%bmb_shlf = calc_bmb_shelf(mshlf%now%bmb_ref,mshlf%now%dT_shlf,mshlf%par%c_shlf,mshlf%par%kappa_shlf)
-            H_ocn              = max( (z_sl-z_bed)-(rho_ice_sw*H_ice), 0.0 ) 
-        elsewhere 
-            mshlf%now%bmb_shlf = 0.0
-            H_ocn              = 0.0 
-        end where
-
-        ! Grounding line specific melt (bmb_grline is an intermediate  
-        ! variable used to scale mshlf%now%bmb_shlf at the grounding line)
-        ! Scale grounding line points by grounding line melt factor
-        ! accounting for the resolution dependence
-        where (mshlf%now%mask_ocn .eq. 1 .and. is_grline)
-            
-            bmb_grline         = calc_bmb_shelf(mshlf%now%bmb_ref,mshlf%now%dT_shlf, &
-                                                mshlf%par%c_grz,mshlf%par%kappa_grz)
-            
-            mshlf%now%bmb_shlf = (1.0-grz_wt)*mshlf%now%bmb_shlf + grz_wt*bmb_grline
-
-        end where 
         
-        ! Ensure that ice accretion is only 0% of melting
-        ! Note: ajr: this should be a parameter!! 
-        where (mshlf%now%bmb_shlf .gt. 0.0) mshlf%now%bmb_shlf = mshlf%now%bmb_shlf*0.0 
+        do j = 1, ny 
+        do i = 1, nx 
 
-        ! Ensure that ice accretion only occurs where ice exists 
-        where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0 
+            ! Calculate ocean depth
+            H_ocn(i,j) = max( (z_sl(i,j)-z_bed(i,j))-(rho_ice_sw*H_ice(i,j)), 0.0 ) 
+                
+            if (mshlf%now%mask_ocn(i,j) .gt. 0) then 
+                ! Floating ice points, including deep ocean (mask_ocn==2)
 
-        ! Note: the following condition is a good idea, but in grisli-ucm the grounding line
-        ! is defined as the last *grounded* point, so this limit sets bmb at grounding line to zero
-!         ! Ensure that refreezing rate is less than the available water depth within one time step 
-!         mshlf%now%bmb_shlf = max(mshlf%now%bmb_shlf,-H_ocn/dt)
+                ! Calculate the default floating bmb value
+                bmb_floating = calc_bmb_shelf(mshlf%now%bmb_ref(i,j),mshlf%now%dT_shlf(i,j), &
+                                                    mshlf%par%c_shlf,mshlf%par%kappa_shlf)
+                
+                if (is_grline(i,j)) then 
+                    ! Scale grounding line points by grounding line melt factor
+                    ! accounting for the resolution dependence
+
+                    bmb_grline = calc_bmb_shelf(mshlf%now%bmb_ref(i,j),mshlf%now%dT_shlf(i,j), &
+                                                    mshlf%par%c_grz,mshlf%par%kappa_grz)
+                    
+                    mshlf%now%bmb_shlf(i,j) = (1.0-grz_wt)*bmb_floating + grz_wt*bmb_grline
+
+                else 
+                    ! Only apply floating bmb value 
+
+                    mshlf%now%bmb_shlf(i,j) = bmb_floating
+
+                end if 
         
+
+                ! Ensure that ice accretion is only 0% of melting
+                ! Note: ajr: this should be a parameter!! 
+                if (mshlf%now%bmb_shlf(i,j) .gt. 0.0) mshlf%now%bmb_shlf(i,j) = mshlf%now%bmb_shlf(i,j)*0.0 
+
+                ! Ensure that ice accretion only occurs where ice exists 
+                if (mshlf%now%bmb_shlf(i,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) mshlf%now%bmb_shlf(i,j) = 0.0 
+
+                ! Note: the following condition is a good idea, but in grisli-ucm the grounding line
+                ! is defined as the last *grounded* point, so this limit sets bmb at grounding line to zero
+                ! ! Ensure that refreezing rate is less than the available water depth within one time step 
+                ! mshlf%now%bmb_shlf = max(mshlf%now%bmb_shlf,-H_ocn/dt)
+                
+            else 
+                ! Grounded point, or floating point not connected to the ocean 
+                ! Set bmb_shlf to zero 
+
+                mshlf%now%bmb_shlf(i,j) = 0.0
+                
+            end if 
+
+        end do 
+        end do  
+
         ! Apply c_deep melt value to deep ocean points
         ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
         ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
         ! high melt rates. 
-        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,z_bed,z_sl,f_grnd,regions,n_smth=0) 
+        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl,n_smth=0) 
 
         return
         
@@ -497,33 +553,29 @@ contains
 
     end function calc_bmb_shelf
 
-    subroutine apply_c_deep(par,bmb,z_bed,z_sl,f_grnd,regions,n_smth)
+    subroutine apply_c_deep(par,bmb,mask_ocn,z_bed,z_sl,n_smth)
         ! Apply c_deep for killing ice in the deep ocean 
         
         implicit none 
 
         type(marshelf_param_class) :: par 
         real(prec), intent(INOUT)  :: bmb(:,:)  
+        integer,    intent(IN)     :: mask_ocn(:,:) 
         real(prec), intent(IN)     :: z_bed(:,:) 
         real(prec), intent(IN)     :: z_sl(:,:)
-        real(prec), intent(IN)     :: f_grnd(:,:) 
-        real(prec), intent(IN)     :: regions(:,:) 
         integer,    intent(IN)     :: n_smth       ! Smoothing neighborhood radius in grid points
 
         ! Local variables 
         integer :: i, j, nx, ny 
         real(prec) :: n_pts 
+        logical,    allocatable :: is_c_deep(:,:) 
         real(prec), allocatable :: bmb_tmp(:,:) 
-        logical, allocatable :: is_c_deep(:,:) 
 
         nx = size(bmb,1)
         ny = size(bmb,2) 
 
+        allocate(is_c_deep(nx,ny))
         allocate(bmb_tmp(nx,ny))
-        allocate(is_c_deep(nx,ny)) 
-
-        ! Assign all points not equal to c_deep 
-        is_c_deep = .FALSE. 
 
         if (n_smth .lt. 0 .or. n_smth .gt. 2) then 
             write(*,*) "apply_c_deep:: Error: n_smth should be 0, 1, or 2."
@@ -531,41 +583,20 @@ contains
             stop 
         end if 
 
-        ! 1. Diagnose all c_deep regions for this domain 
+        ! Apply c_deep to appropriate regions or keep bmb, whichever is more negative
 
-        if (trim(par%domain) .eq. "Greenland") then 
-            ! Greenland specific ocean kill regions
+        where(mask_ocn .eq. 2 .and. z_sl-z_bed .ge. par%depth_deep) 
 
-            ! Omit regions==3.2 which means c_deep is not applied to deep points within continental shelf
-            where (z_sl-z_bed .ge. par%depth_deep .and. regions .ne. 1.3) is_c_deep = .TRUE. 
+            bmb = min(bmb,par%c_deep)
 
-            ! Kill regions that should not be calculated (for now)
-            ! North America and Ellesmere Island (1.1,1.11)
-            ! Svalbard (1.2,1.23)
-            ! Iceland (1.31)
-            ! open sea (1.0)
-            where (regions .eq. 1.1 .or. regions .eq. 1.11) is_c_deep = .TRUE.
-            where (regions .eq. 1.2 .or. regions .eq. 1.23) is_c_deep = .TRUE.
-            where (regions .eq. 1.31) is_c_deep = .TRUE.
-            where (regions .eq. 1.0)  is_c_deep = .TRUE.
+            is_c_deep = .TRUE. 
 
-        else if (trim(par%domain) .eq. "Antarctica") then 
-            ! Antarctica specific ocean kill regions
+        elsewhere 
 
-            ! Omit regions==2.11 which means c_deep is not applied to deep points within continental shelf
-            where (z_sl-z_bed .ge. par%depth_deep .and. regions .ne. 2.11) is_c_deep = .TRUE.
+            is_c_deep = .FALSE. 
 
-        else 
-            ! Other domains 
-            ! (Apply to floating ice only)
+        end where 
 
-            where (z_sl-z_bed .ge. par%depth_deep .and. f_grnd .lt. 1.0) is_c_deep = .TRUE.
-
-        end if 
-
-        ! 2. Apply c_deep to appropriate regions (or bmb, whichever is more negative)
-
-        where(is_c_deep) bmb = min(bmb,par%c_deep)
 
         ! Make sure bmb transitions smoothly to c_deep value from neighbors 
         
@@ -830,7 +861,7 @@ contains
 
     end function interp_linear
     
-    subroutine find_ocean(mask,f_grnd,mask_ref)
+    subroutine find_open_ocean(mask,f_grnd,mask_ref)
         ! Brute-force routine to find all ocean points 
         ! (ie, when f_grnd < 1) connected to
         ! the open ocean as defined in mask_ref. 
@@ -846,8 +877,6 @@ contains
         integer :: im1, ip1, jm1, jp1 
         integer :: n_unfilled 
 
-        integer    :: mask_neighb(4) 
-
         integer, parameter :: qmax = 1000 
 
         nx = size(mask,1)
@@ -859,8 +888,10 @@ contains
         where (f_grnd .lt. 1.0) mask = -1 
 
         ! Now populate our ocean mask to be consistent 
-        ! with known open ocean points 
-        where (mask .eq. -1 .and. mask_ref .eq. 1) mask = 1 
+        ! with known open ocean points that can be 
+        ! normal open ocean (1) or deep ocean (2) 
+        ! For now set all points to 1 for easier looping
+        where (mask .eq. -1 .and. mask_ref .gt. 0) mask = 1 
          
         ! Iteratively fill in open-ocean points that are found
         ! next to known open-ocean points
@@ -913,9 +944,12 @@ contains
 
         end do 
 
+        ! Finally populate deep ocean points 
+        where (mask .gt. 0 .and. mask_ref .eq. 2) mask = 2 
+        
         return 
 
-    end subroutine find_ocean
+    end subroutine find_open_ocean
 
 end module marine_shelf
 
