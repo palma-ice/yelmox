@@ -81,7 +81,8 @@ hyst= libyelmox/bin/yelmox_hyst.x
     # Arguments
     rundir      = args.rundir 
     par_path    = args.par_path  # Path relative to current working directory (cwd)
-    par_path_2  = "par/yelmo_Greenland_rembo.nml"
+    #par_path_2  = "par/yelmo_Greenland_rembo.nml"
+    par_path_2  = "par/options_rembo"
 
     # Load simulation info from json configuration file 
     if os.path.isfile("run_config.json"):
