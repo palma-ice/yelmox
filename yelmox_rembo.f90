@@ -262,7 +262,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+            ! call write_yreg_step(yelmo1%reg,file1D,time=time) 
             call write_step_1D_combined(yelmo1%reg,hyst1,file1D_hyst,time=time)
         end if 
 
@@ -601,7 +601,7 @@ contains
 
 !         return 
 
-!     end subroutine write_step_2D_combined_small
+! !     end subroutine write_step_2D_combined_small
 
     subroutine write_step_1D_combined(reg,hyst,filename,time)
 
@@ -638,11 +638,11 @@ contains
         call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/a",long_name="hyst: volume rate of change", &
                       dim1="time",start=[n],ncid=ncid)
 
-        ! ! Write volume in volume-dT phase space
-        ! call nc_read(filename,"dT_axis",dT_axis) 
-        ! k = minloc(abs(dT_axis-hyst%f_now),dim=1)
-        ! call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
-        !               dim1="time",start=[k],ncid=ncid)
+        ! Write volume in volume-dT phase space
+        call nc_read(filename,"dT_axis",dT_axis) 
+        k = minloc(abs(dT_axis-hyst%f_now),dim=1)
+        call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
+                      dim1="time",start=[k],ncid=ncid)
          
         ! ===== Total ice variables =====
 
@@ -762,18 +762,18 @@ contains
         call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,      units="1")
         call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
         
-        ! !============================================================
-        ! ! Add temperature axis to 1D hysteresis file 
-        ! allocate(dT_axis(1000))
-        ! do n = 1, 1000 
-        !     dT_axis(n) = dT_min + (dT_max-dT_min)*(n-1)/real(1000-1,prec)
-        ! end do 
-        ! call nc_write_dim(file1D_hyst,"dT_axis",x=dT_axis,units="degC")
+        !============================================================
+        ! Add temperature axis to 1D hysteresis file 
+        allocate(dT_axis(1000))
+        do n = 1, 1000 
+            dT_axis(n) = dT_min + (dT_max-dT_min)*(n-1)/real(1000-1,prec)
+        end do 
+        call nc_write_dim(filename,"dT_axis",x=dT_axis,units="degC")
         
-        ! ! Populate variable with missing values for now to initialize it
-        ! dT_axis = missing_value 
-        ! call nc_write(file1D_hyst,"V_dT",dT_axis,dim1="dT_axis")
-        ! !============================================================
+        ! Populate variable with missing values for now to initialize it
+        dT_axis = missing_value 
+        call nc_write(filename,"V_dT",dT_axis,dim1="dT_axis")
+        !============================================================
         
         ! Static information
         call nc_write(filename,"mask", mask,  units="1",long_name="Region mask",dim1="xc",dim2="yc")

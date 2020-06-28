@@ -128,7 +128,7 @@ contains
             hyst%var(hyst%n)  = var 
 
             hyst%df_dt        = 0.0 
-            
+
         else 
             ! Keep a running average removing oldest point and adding current one
             hyst%time = eoshift(hyst%time,1,boundary=time)
@@ -150,6 +150,9 @@ contains
             ! Convert [f/1e6 a] => [f/a]
             hyst%df_dt = hyst%df_dt *1e-6 
             
+            ! Avoid underflow errors 
+            if (abs(hyst%df_dt) .lt. 1e-10) hyst%df_dt = 0.0 
+
             ! Once the rate is available, update the current forcing value 
             hyst%f_now = hyst%f_now + hyst%df_dt * (time - hyst%time(hyst%n-1))
             
