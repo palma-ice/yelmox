@@ -100,7 +100,7 @@ contains
 
         return 
 
-    end subroutine hyster_init 
+    end subroutine hyster_init
 
   
     subroutine hyster_calc_forcing (hyst,time,var)
@@ -127,6 +127,8 @@ contains
             hyst%time(hyst%n) = time 
             hyst%var(hyst%n)  = var 
 
+            hyst%df_dt        = 0.0 
+            
         else 
             ! Keep a running average removing oldest point and adding current one
             hyst%time = eoshift(hyst%time,1,boundary=time)
@@ -148,10 +150,10 @@ contains
             ! Convert [f/1e6 a] => [f/a]
             hyst%df_dt = hyst%df_dt *1e-6 
             
+            ! Once the rate is available, update the current forcing value 
+            hyst%f_now = hyst%f_now + hyst%df_dt * (time - hyst%time(hyst%n-1))
+            
         end if 
-
-        ! Once the rate is available, update the current forcing value 
-        hyst%f_now = hyst%f_now + hyst%df_dt * (time - hyst%time(hyst%n-1))
 
         ! Check if kill should be activated 
         if (hyst%f_now .lt. hyst%par%f_min .or. hyst%f_now .gt. hyst%par%f_max) then 

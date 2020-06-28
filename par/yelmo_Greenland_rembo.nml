@@ -3,7 +3,7 @@
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
     time_end     = 300e3                ! [yr] Ending time
-    time_equil   = 1000.0               ! [yr] Equiibration time 
+    time_equil   = 10.0               ! [yr] Equiibration time 
     dtt          = 5.0                  ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
     dt2D_out     = 5000.0               ! [yr] Frequency of writing 2D output files 
@@ -13,7 +13,7 @@
 /
 
 &hyster
-    ntot        =  10                 ! [steps] Number of time steps for averaging
+    ntot        =  5                  ! [steps] Number of time steps for averaging
     df_sign     =  1                  ! [-1/1] Determines direction of hysteresis
     dv_dt_scale =  15.0               ! [Gt/a] 30 Gt/a, more or less...
     df_dt_min   =   0.0               ! [f/1e6 a]
@@ -197,7 +197,7 @@
     pd_smb_monthly    = False 
     pd_vel_load       = True 
     pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
-    pd_vel_names      = "Ux_srf" "Uy_srf"            ! Surface velocity 
+    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
