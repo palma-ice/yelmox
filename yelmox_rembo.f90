@@ -235,7 +235,7 @@ if (calc_transient_climate) then
          
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        write(*,*) "To do...."
+        ! To do: currently no anomalies are calculated for the ocean with rembo active
 !         call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
 !                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
 !                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
