@@ -15,7 +15,7 @@
 &hyster
     ntot        =  10                 ! [steps] Number of time steps for averaging
     df_sign     =  1                  ! [-1/1] Determines direction of hysteresis
-    dv_dt_scale =   5.0               ! [Gt/a] 30 Gt/a, more or less...
+    dv_dt_scale =  15.0               ! [Gt/a] 30 Gt/a, more or less...
     df_dt_min   =   0.0               ! [f/1e6 a]
     df_dt_max   = 200.0               ! [f/1e6 a]
     f_min       =   0.0               ! [K]
@@ -100,7 +100,7 @@
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
-    cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    cb_sia              = 15.0            ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     
 /
 
@@ -333,7 +333,7 @@
     use_obs            = False
     obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
     obs_name           = "bm_actual_sm"
-    obs_f              = 10.0
+    obs_f              = 20.0
     obs_lim            = 100.0
     basin_name         = "None"         !"northwest" "northeast" "east"
     basin_bmb          = 0.0            !        -1.0       -1.0   -1.0
