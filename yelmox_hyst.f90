@@ -700,7 +700,7 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 a)",long_name="hyst: forcing rate of change", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_dv_dt",hyst%df_dt,units="Gt/a",long_name="hyst: volume rate of change", &
+        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/a",long_name="hyst: volume rate of change", &
                       dim1="time",start=[n],ncid=ncid)
 
         ! ===== Total ice variables =====

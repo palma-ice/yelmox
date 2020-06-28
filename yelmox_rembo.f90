@@ -39,6 +39,8 @@ program yelmox
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa, T_summer
 
+    real(prec), allocatable :: dT_axis(:) 
+
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
@@ -175,13 +177,27 @@ program yelmox
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
     call write_step_2D_combined(yelmo1,isos1,mshlf1,file2D,time=time)
     
+    ! 2D small file 
+    ! call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
+    ! call write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=time)
+    
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+    ! call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    ! call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
     ! 1D file hyst 
     call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_step_1D_combined(yelmo1%reg,hyst1,file1D_hyst,time=time)
+
+    ! Add temperature axis to 1D hysteresis file 
+    allocate(dT_axis(1000))
+    do n = 1, 1000 
+        dT_axis(n) = hyst1%par%f_min + (hyst1%par%f_max-hyst1%par%f_min)*(n-1)/real(1000-1,prec)
+    end do 
+    call nc_write_dim(file1D_hyst,"dT_axis",x=dT_axis,units="degC")
+    dT_axis = missing_value 
+    call nc_write(file1D_hyst,"V_dT",dT_axis,dim1="dT_axis")
+
 
 !     ! Testing smb ======
 !     stop "Done."
@@ -504,6 +520,98 @@ contains
 
     end subroutine write_step_2D_combined
 
+!     subroutine write_step_2D_combined_small(ylmo,isos,snp,mshlf,srf,filename,time)
+
+!         implicit none 
+        
+!         type(yelmo_class),      intent(IN) :: ylmo
+!         type(isos_class),       intent(IN) :: isos 
+!         type(snapclim_class),   intent(IN) :: snp 
+!         type(marshelf_class),   intent(IN) :: mshlf 
+!         type(smbpal_class),     intent(IN) :: srf  
+!         !type(sediments_class),  intent(IN) :: sed 
+!         !type(geothermal_class), intent(IN) :: gthrm
+!         !type(isos_class),       intent(IN) :: isos
+        
+!         character(len=*),  intent(IN) :: filename
+!         real(prec), intent(IN) :: time
+
+!         ! Local variables
+!         integer    :: ncid, n
+!         real(prec) :: time_prev 
+
+!         ! Open the file for writing
+!         call nc_open(filename,ncid,writable=.TRUE.)
+
+!         ! Determine current writing time step 
+!         n = nc_size(filename,"time",ncid)
+!         call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+!         if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+!         ! Update the time step
+!         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+!         ! Write model metrics (model speed, dt, eta)
+!         call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+
+!         ! Write present-day data metrics (rmse[H],etc)
+!         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        
+!         ! == yelmo_topography ==
+!         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+! !         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
+! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
+!                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
+!                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+!         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+!         ! Boundaries
+!         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
+! !         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
+! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+!         ! External data
+! !         call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
+! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+! !         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
+! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+! !         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
+! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+! !         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+!         call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+!         ! Close the netcdf file
+!         call nc_close(ncid)
+
+!         return 
+
+!     end subroutine write_step_2D_combined_small
+
     subroutine write_step_1D_combined(reg,hyst,filename,time)
 
         implicit none 
@@ -514,8 +622,9 @@ contains
         real(prec),           intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n
+        integer    :: ncid, n, k 
         real(prec) :: time_prev 
+        real(prec) :: dT_axis(1000) 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -535,9 +644,15 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 a)",long_name="hyst: forcing rate of change", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_dv_dt",hyst%df_dt,units="Gt/a",long_name="hyst: volume rate of change", &
+        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/a",long_name="hyst: volume rate of change", &
                       dim1="time",start=[n],ncid=ncid)
 
+        ! Write volume in volume-dT phase space
+        call nc_read(filename,"dT_axis",dT_axis) 
+        k = minloc(abs(dT_axis-hyst%f_now),dim=1)
+        call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
+                      dim1="time",start=[k],ncid=ncid)
+         
         ! ===== Total ice variables =====
 
         call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &
