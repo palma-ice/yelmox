@@ -647,7 +647,7 @@ contains
         k = minloc(abs(dT_axis-hyst%f_now),dim=1)
         call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
                       dim1="time",start=[k],ncid=ncid)
-         
+        
         ! ===== Total ice variables =====
 
         call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &

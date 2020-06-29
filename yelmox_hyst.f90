@@ -230,7 +230,9 @@ end if
 !mmr    call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
     ! 1D file hyst 
-    call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    ! call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    call write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
+                    mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
     call write_step_1D_combined(yelmo1%reg,hyst1,snp1,file1D_hyst,time=time)
     
 !     ! Testing smb ======
@@ -679,8 +681,9 @@ contains
         real(prec),           intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n
+        integer    :: ncid, n, k
         real(prec) :: time_prev 
+        real(prec) :: dT_axis(1000) 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -703,6 +706,12 @@ contains
         call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/a",long_name="hyst: volume rate of change", &
                       dim1="time",start=[n],ncid=ncid)
 
+        ! Write volume in volume-dT phase space
+        call nc_read(filename,"dT_axis",dT_axis) 
+        k = minloc(abs(dT_axis-hyst%f_now),dim=1)
+        call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
+                      dim1="time",start=[k],ncid=ncid)
+        
         ! ===== Total ice variables =====
 
         call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &
@@ -801,6 +810,47 @@ contains
         return 
 
     end subroutine write_step_1D_combined
+
+    subroutine write_yelmo_init_1D_combined(dom,filename,time_init,units,mask,dT_min,dT_max)
+
+        implicit none 
+
+        type(yelmo_class), intent(IN) :: dom 
+        character(len=*),  intent(IN) :: filename, units 
+        real(prec),        intent(IN) :: time_init
+        logical,           intent(IN) :: mask(:,:) 
+        real(prec),        intent(IN) :: dT_min 
+        real(prec),        intent(IN) :: dT_max
+
+        ! Local variables
+        real(prec), allocatable :: dT_axis(:) 
+
+        ! Initialize netcdf file and dimensions
+        call nc_create(filename)
+        call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,      units="kilometers")
+        call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,      units="kilometers")
+        call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,      units="1")
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
+        
+        !============================================================
+        ! Add temperature axis to 1D hysteresis file 
+        allocate(dT_axis(1000))
+        do n = 1, 1000 
+            dT_axis(n) = dT_min + (dT_max-dT_min)*(n-1)/real(1000-1,prec)
+        end do 
+        call nc_write_dim(filename,"dT_axis",x=dT_axis,units="degC")
+        
+        ! Populate variable with missing values for now to initialize it
+        dT_axis = missing_value 
+        call nc_write(filename,"V_dT",dT_axis,dim1="dT_axis")
+        !============================================================
+        
+        ! Static information
+        call nc_write(filename,"mask", mask,  units="1",long_name="Region mask",dim1="xc",dim2="yc")
+        
+        return
+
+    end subroutine write_yelmo_init_1D_combined
 
 end program yelmox 
 
