@@ -37,7 +37,7 @@ program yelmox
     
     logical, parameter :: use_hyster = .TRUE. 
     real(4) :: conv_km3_Gt, var 
-    real(4) :: dTa, T_summer
+    real(4) :: dTa, dT_summer
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -52,14 +52,15 @@ program yelmox
     path_par = trim(outfldr)//"yelmo_Greenland_rembo.nml"
     
     ! Timing and other parameters 
-    call nml_read(path_par,"control","time_init",    time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",     time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"control","time_equil",   time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"control","dtt",          dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt1D_out",     dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"control","transient",    calc_transient_climate)    ! Calculate transient climate? 
-
+    call nml_read(path_par,"control","time_init",   time_init)                  ! [yr] Starting time
+    call nml_read(path_par,"control","time_end",    time_end)                   ! [yr] Ending time
+    call nml_read(path_par,"control","time_equil",  time_equil)                 ! [yr] Years to equilibrate first
+    call nml_read(path_par,"control","dtt",         dtt)                        ! [yr] Main loop time step 
+    call nml_read(path_par,"control","dt1D_out",    dt1D_out)                   ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"control","dt2D_out",    dt2D_out)                   ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"control","transient",   calc_transient_climate)     ! Calculate transient climate? 
+    call nml_read(path_par,"control","dT",          dT_summer)                  ! Initial summer temperature anomaly
+    
     ! Define input and output locations 
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
@@ -129,16 +130,17 @@ program yelmox
     if (use_hyster) then
         ! Update hysteresis variable 
         call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+        dT_summer = hyst1%f_now 
     end if 
 
     ! Update REMBO, with ice sheet topography    
-    call rembo_update(0,real(T_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    call rembo_update(0,real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
             
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = rembo_ann%T_srf
     
-    write(*,*) "To do..."
+    ! write(*,*) "To do..."
 !     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
 !                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
 !                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
@@ -230,11 +232,13 @@ if (calc_transient_climate) then
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
                 write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
                                                         hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
+            
+                dT_summer = hyst1%f_now 
             end if 
         end if 
 
         ! call REMBO1     
-        call rembo_update(n,real(T_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+        call rembo_update(n,real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
         
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
