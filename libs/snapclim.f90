@@ -43,6 +43,14 @@ module snapclim
         
     end type 
 
+    type recon_param_class 
+        character(len=512)      :: clim_path 
+        character(len=56)       :: clim_names(2)
+        logical                 :: clim_monthly 
+        real(prec), allocatable :: clim_times(:) 
+
+    end type 
+
     type hybrid_class 
         character(len=512)   :: hybrid_path 
         real(prec)           :: f_eem, f_glac, f_hol, f_seas, f_to
@@ -111,6 +119,9 @@ module snapclim
         type(series_type)          :: bt, bo, bp 
         
         type(hybrid_class)         :: hybrid 
+
+        type(recon_param_class)    :: recon
+
     end type 
 
     private
@@ -155,14 +166,21 @@ contains
         real(prec), allocatable :: depth(:) 
 
         ! Load parameters 
-        call snapclim_par_load(snp%par,snp%hybrid,filename)
+        call snapclim_par_load(snp%par,snp%hybrid,snp%recon,filename)
         snp%par%nx = nx 
         snp%par%ny = ny 
+
+        ! If using recon method load parameters 
+        if (trim(snp%par%atm_type) .eq. "recon") then 
+            call recon_par_load(snp%recon,filename,domain,grid_name)
+            stop
+        end if 
+
 
         ! Determine which snapshots should be loaded (atm)
         select case(trim(snp%par%atm_type))
 
-            case("const","hybrid","anom")
+            case("const","hybrid","anom","recon")
 
                 load_atm1 = .FALSE.
                 load_atm2 = .FALSE. 
@@ -417,6 +435,11 @@ contains
                 ! Update external index
                 at = sum(dT)/real(size(dT,1))   ! Annual mean
 
+            case("reconstruction")
+                ! Use reconstructed input data 
+                ! (predetermined N snapshots with linear interpolation between)
+
+
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
                            "atm_type not recognized: "// trim(snp%par%atm_type) 
@@ -570,7 +593,7 @@ contains
         real(prec), intent(OUT) :: temp_now 
         real(prec), intent(IN)  :: temp0 
         real(prec), intent(IN)  :: dT            ! Current anomaly value to impose
-         
+        
         temp_now = temp0 + dT 
         
         return
@@ -657,6 +680,22 @@ contains
          
     end subroutine calc_precip_anom
 
+    elemental subroutine calc_precip_anom_frac(pr_now,pr0,frac)
+        ! Calculate current precipitation value given 
+        ! the reference precip and a fractional value to scale it 
+
+        implicit none 
+
+        real(prec), intent(OUT) :: pr_now 
+        real(prec), intent(IN)  :: pr0 
+        real(prec), intent(IN)  :: frac 
+
+        pr_now = pr0*frac
+        
+        return
+         
+    end subroutine calc_precip_anom_frac
+    
     elemental subroutine calc_precip_1ind(pr_now,pr0,pr1,pr2,aa)
 
         implicit none
@@ -729,13 +768,41 @@ contains
     end subroutine calc_precip_2ind_abs
 
 
-    subroutine snapclim_par_load(par,hpar,filename,init)
+
+    subroutine read_climate_snapshot_reconstruction(clim,lapse,time,domain)
+        ! Given a predefined climate snapshot clim (already allocated),
+        ! repopulate it with new snapshot based on current time 
+
+        implicit none 
+
+        type(snapclim_state_class), intent(INOUT) :: clim 
+        real(prec),       intent(IN) :: lapse(2)
+        real(prec),       intent(IN) :: time 
+        character(len=*), intent(IN) :: domain   
+        
+        ! Local variables 
+        real(prec) :: t0, t1, alpha 
+        real(prec), allocatable :: times(:) 
+
+
+        ! Determine the linear interpolation weight 
+        !alpha = 
+
+
+
+        return 
+
+    end subroutine read_climate_snapshot_reconstruction
+
+
+    subroutine snapclim_par_load(par,hpar,rpar,filename,init)
         ! == Parameters from namelist file ==
 
         implicit none 
 
         type(snapclim_param_class), intent(OUT) :: par
         type(hybrid_class),         intent(OUT) :: hpar 
+        type(recon_param_class),    intent(OUT) :: rpar
         character(len=*), intent(IN) :: filename 
         logical, optional :: init 
         logical :: init_pars 
@@ -768,6 +835,60 @@ contains
         return 
 
     end subroutine snapclim_par_load
+
+    subroutine recon_par_load(par,filename,domain,grid_name,init)
+
+        implicit none 
+
+        type(recon_param_class), intent(OUT) :: par
+        character(len=*), intent(IN) :: filename
+        character(len=*), intent(IN) :: domain, grid_name
+        logical, optional :: init 
+        logical :: init_pars 
+
+        ! Local variables 
+        integer    :: k, nt
+        real(prec) :: times(1000) 
+
+        init_pars = .FALSE.
+        if (present(init)) init_pars = .TRUE. 
+
+        times = real(-1e8,prec)
+
+        call nml_read(filename,"snap_recon","clim_path",    par%clim_path,    init=init_pars)
+        call nml_read(filename,"snap_recon","clim_names",   par%clim_names,   init=init_pars)
+        call nml_read(filename,"snap_recon","clim_monthly", par%clim_monthly, init=init_pars)
+        !call nml_read(filename,"snap_recon","clim_times",   times,            init=init_pars)
+        
+        ! ! Determine how long times is
+        ! nt = 0 
+        ! do k = 1, 1000
+        !     if (times(k) .ne. real(-1e8,prec)) then 
+        !         nt = nt+1
+        !     else 
+        !         exit 
+        !     end if 
+        ! end do 
+
+        ! if (nt .eq. 0) then 
+        !     write(*,*) "recon_par_load:: Error: no times found!"
+        !     stop 
+        ! end if 
+
+        ! if (allocated(par%clim_times)) deallocate(par%clim_times)
+        ! allocate(par%clim_times(nt))
+        ! par%clim_times = times(1:nt) 
+
+        ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
+        call parse_path(par%clim_path,domain,grid_name)
+
+        write(*,*) "recon_par_load:: "//trim(par%clim_path) 
+        write(*,"(a,a)")         "  recon_path:  ", trim(par%clim_path)
+        !write(*,"(a,1000f10.3)") "  recon_times: ", par%clim_times 
+
+        return 
+
+    end subroutine recon_par_load
 
     subroutine snapshot_par_load(par,filename,name,domain,grid_name,init)
 
@@ -1279,7 +1400,7 @@ contains
         
         return 
 
-    end subroutine read_series 
+    end subroutine read_series
 
     subroutine read_series_hybrid(series,filename,f_eem,f_glac,f_hol,f_seas)
 
@@ -1366,7 +1487,7 @@ contains
 
         return 
 
-    end function series_interp 
+    end function series_interp
 
     function interp_linear(x,y,xout) result(yout)
         ! Simple linear interpolation of a point
@@ -1456,7 +1577,7 @@ contains
 
         return 
 
-    end subroutine clim_allocate 
+    end subroutine clim_allocate
 
     subroutine ocn_allocate(ocn,nx,ny,nz)
 
@@ -1486,7 +1607,7 @@ contains
 
         return 
 
-    end subroutine ocn_allocate 
+    end subroutine ocn_allocate
 
     subroutine series_allocate(series,nt)
 

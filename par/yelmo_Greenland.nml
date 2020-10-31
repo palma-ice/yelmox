@@ -197,7 +197,7 @@
 /
 
 &snap
-    atm_type           = "anom"
+    atm_type           = "recon"
     ocn_type           = "anom"
     fname_at           = "input/zeros.dat"
     fname_ao           = "input/zeros.dat"
@@ -220,6 +220,12 @@
     f_hol              = 0.5 
     f_seas             = 1.0 
     f_to               = 0.2
+/
+
+&snap_recon
+    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-RECON-B20.nc"
+    clim_names      = "time" "z_srf" "tas" "pr"
+    clim_monthly    = False
 /
 
 &snap_clim0
