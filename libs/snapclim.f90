@@ -45,7 +45,8 @@ module snapclim
 
     type recon_param_class 
         character(len=512)      :: clim_path 
-        character(len=56)       :: clim_names(2)
+        character(len=56)       :: clim_names(3)
+        character(len=56)       :: clim_type 
         logical                 :: clim_monthly 
         real(prec), allocatable :: clim_times(:) 
 
@@ -166,7 +167,7 @@ contains
         real(prec), allocatable :: depth(:) 
 
         ! Load parameters 
-        call snapclim_par_load(snp%par,snp%hybrid,snp%recon,filename)
+        call snapclim_par_load(snp%par,snp%hybrid,filename)
         snp%par%nx = nx 
         snp%par%ny = ny 
 
@@ -435,10 +436,19 @@ contains
                 ! Update external index
                 at = sum(dT)/real(size(dT,1))   ! Annual mean
 
-            case("reconstruction")
+            case("recon")
                 ! Use reconstructed input data 
                 ! (predetermined N snapshots with linear interpolation between)
 
+                ! Set clim1 = clim0 to ensure fields are available with present-day topo 
+                snp%clim1 = snp%clim0 
+
+                ! Assumes reconstruction consists of a temp. anomaly field 
+                ! and a precip fraction field. 
+
+                ! Load reconstruction fields of tas and pr for the current time 
+                call read_climate_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%z_srf, &
+                                                                        snp%par%lapse,time,domain) 
 
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
@@ -769,40 +779,154 @@ contains
 
 
 
-    subroutine read_climate_snapshot_reconstruction(clim,lapse,time,domain)
+    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,time,domain)
         ! Given a predefined climate snapshot clim (already allocated),
         ! repopulate it with new snapshot based on current time 
 
         implicit none 
 
         type(snapclim_state_class), intent(INOUT) :: clim 
-        real(prec),       intent(IN) :: lapse(2)
+        type(recon_param_class), intent(IN)       :: par 
+        real(prec),       intent(IN) :: z_srf(:,:) 
+        real(prec),       intent(IN) :: lapse(2) 
         real(prec),       intent(IN) :: time 
-        character(len=*), intent(IN) :: domain   
-        
+        character(len=*), intent(IN) :: domain 
+
         ! Local variables 
-        real(prec) :: t0, t1, alpha 
-        real(prec), allocatable :: times(:) 
+        integer    :: k0, k1, k, q, m, nt, nx, ny, nm   
+        real(prec) :: t0, t1, alpha
+        character(len=56) :: varnm  
+        real(prec), allocatable :: var0(:,:,:)
+        real(prec), allocatable :: var1(:,:,:)
+        real(prec), allocatable :: var(:,:,:)
+        
+        real(prec) :: lapse_mon(12)   
+        logical :: south 
+
+        south = .FALSE. 
+        if (trim(domain).eq."Antarctica") south = .TRUE. 
+
+        nt = size(par%clim_times,1) 
+        nx = size(clim%z_srf,1)
+        ny = size(clim%z_srf,2)
+        nm = 12 
+
+        ! Allocate temporary arrays 
+        allocate(var0(nx,ny,nm))
+        allocate(var1(nx,ny,nm))
+        allocate(var(nx,ny,nm))
+        
+        ! Determine the indices of reconstruction time slices 
+        ! bracketing the current time 
+        if (time .lt. minval(par%clim_times)) then 
+            ! Current time is less than the minimum reconstruction range 
+
+            k0 = 1
+            k1 = 1 
+
+        else if (time .gt. maxval(par%clim_times)) then 
+            ! Current time is greater than the maximum reconstruction range 
+            
+            k0 = nt
+            k1 = nt 
+
+        else 
+            ! Current time is somewhere inside reconstruction range 
+
+            k1 = 0 
+            do k = 1, nt 
+                k1 = k + 1
+                if (par%clim_times(k) .gt. time) exit 
+            end do 
+
+            k0 = k1-1 
+
+        end if 
+
+        ! Calculate linear interpolation weight
+        t0 = par%clim_times(k0)
+        t1 = par%clim_times(k1) 
+
+        if (t0 .ne. t1) then 
+            alpha = (time-t0)/(t1-t0)
+        else 
+            alpha = 0.0_prec 
+        end if 
 
 
-        ! Determine the linear interpolation weight 
-        !alpha = 
+        ! Step 2: load fields and interpolate 
+        ! Assumes: var = var0*(1-alpha) + var1*alpha 
+
+        do q = 2, 3 
+
+            ! Get current variable name
+            varnm = trim(par%clim_names(q))
+
+            if (par%clim_monthly) then 
+
+                ! Read monthly values directly 
+                call nc_read(par%clim_path,varnm,var0,start=[1,1,1,k0],count=[nx,ny,nm,1])
+                call nc_read(par%clim_path,varnm,var1,start=[1,1,1,k1],count=[nx,ny,nm,1])
+
+            else 
+
+                ! Read annual values 
+                call nc_read(par%clim_path,varnm,var0(:,:,1),start=[1,1,k0],count=[nx,ny,1])
+                call nc_read(par%clim_path,varnm,var1(:,:,1),start=[1,1,k1],count=[nx,ny,1])
+
+                ! Populate remaining months 
+                do k = 2, nm 
+                    var0(:,:,k) = var0(:,:,1)
+                    var1(:,:,k) = var1(:,:,1)
+                end do 
+
+            end if 
+
+            ! Calculate current snapshot value
+            var = var0*(1-alpha) + var1*alpha 
+
+            if (q .eq. 2) then 
+                ! Save temperature field 
+                clim%tas = var 
+            else 
+                ! Save precip field 
+                clim%pr  = var 
+            end if 
+
+        end do  
 
 
+        ! Step 3: Calculate sea-level temps and precip 
+
+        do m = 1, 12
+
+            ! Monthly lapse rates from ann and sum (jan or jul)
+            if (south) then 
+                clim%tsl(:,:,m) = clim%tas(:,:,m) + &
+                    z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+            else 
+                clim%tsl(:,:,m) = clim%tas(:,:,m) + &
+                    z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
+            end if 
+
+            ! Precip
+            !clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
+
+        end do 
+    
 
         return 
 
     end subroutine read_climate_snapshot_reconstruction
 
 
-    subroutine snapclim_par_load(par,hpar,rpar,filename,init)
+    subroutine snapclim_par_load(par,hpar,filename,init)
         ! == Parameters from namelist file ==
 
         implicit none 
 
         type(snapclim_param_class), intent(OUT) :: par
         type(hybrid_class),         intent(OUT) :: hpar 
-        type(recon_param_class),    intent(OUT) :: rpar
         character(len=*), intent(IN) :: filename 
         logical, optional :: init 
         logical :: init_pars 
@@ -848,44 +972,28 @@ contains
 
         ! Local variables 
         integer    :: k, nt
-        real(prec) :: times(1000) 
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        times = real(-1e8,prec)
-
         call nml_read(filename,"snap_recon","clim_path",    par%clim_path,    init=init_pars)
         call nml_read(filename,"snap_recon","clim_names",   par%clim_names,   init=init_pars)
         call nml_read(filename,"snap_recon","clim_monthly", par%clim_monthly, init=init_pars)
-        !call nml_read(filename,"snap_recon","clim_times",   times,            init=init_pars)
-        
-        ! ! Determine how long times is
-        ! nt = 0 
-        ! do k = 1, 1000
-        !     if (times(k) .ne. real(-1e8,prec)) then 
-        !         nt = nt+1
-        !     else 
-        !         exit 
-        !     end if 
-        ! end do 
-
-        ! if (nt .eq. 0) then 
-        !     write(*,*) "recon_par_load:: Error: no times found!"
-        !     stop 
-        ! end if 
-
-        ! if (allocated(par%clim_times)) deallocate(par%clim_times)
-        ! allocate(par%clim_times(nt))
-        ! par%clim_times = times(1:nt) 
 
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
 
+        ! Load clim times 
+        nt = nc_size(par%clim_path,trim(par%clim_names(1)))
+        if (allocated(par%clim_times)) deallocate(par%clim_times)
+        allocate(par%clim_times(nt))
+        call nc_read(par%clim_path,trim(par%clim_names(1)),par%clim_times)
+
         write(*,*) "recon_par_load:: "//trim(par%clim_path) 
         write(*,"(a,a)")         "  recon_path:  ", trim(par%clim_path)
-        !write(*,"(a,1000f10.3)") "  recon_times: ", par%clim_times 
-
+        write(*,"(a,2f10.3)")    "  range(clim_times): ", minval(par%clim_times), &
+                                                          maxval(par%clim_times)
+        
         return 
 
     end subroutine recon_par_load
