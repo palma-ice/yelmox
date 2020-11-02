@@ -223,10 +223,8 @@
 /
 
 &snap_recon
-    clim_path       = "/Users/robinson/data/Greenland/Badgeley2020_TempPrecipReconstruction/tas_main_Badgeley_etal_2020.nc"
+    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-RECON-B20.nc"
     clim_names      = "time" "tas" "pr"
-    !clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-RECON-B20.nc"
-    !clim_names      = "time" "tas" "pr"
     clim_monthly    = False
 
 /
