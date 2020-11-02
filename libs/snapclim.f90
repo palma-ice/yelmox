@@ -174,7 +174,6 @@ contains
         ! If using recon method load parameters 
         if (trim(snp%par%atm_type) .eq. "recon") then 
             call recon_par_load(snp%recon,filename,domain,grid_name)
-            stop
         end if 
 
 
@@ -448,8 +447,22 @@ contains
 
                 ! Load reconstruction fields of tas and pr for the current time 
                 call read_climate_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%z_srf, &
-                                                                        snp%par%lapse,time,domain) 
+                                                                    snp%par%lapse,snp%par%f_p,time,domain) 
 
+                ! We  have loaded dT and pr/pr_0 fields, apply to reference climate  
+                ! to get current climate snapshot 
+
+                call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl)
+
+                ! Calculate monthly precip anomaly as the reference climate field
+                ! multiplied with the reconstruction fractional field (although they have the same name 'prcor')
+                
+                snp%now%prcor = snp%clim0%prcor * snp%clim1%prcor 
+
+                ! Update external index
+                at = sum(snp%now%tsl)    &
+                    / real(size(snp%now%tsl,1)*size(snp%now%tsl,2)*size(snp%now%tsl,3))
+            
             case DEFAULT 
                 write(*,*) "snapclim_update:: error: "// &
                            "atm_type not recognized: "// trim(snp%par%atm_type) 
@@ -779,7 +792,7 @@ contains
 
 
 
-    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,time,domain)
+    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,time,domain)
         ! Given a predefined climate snapshot clim (already allocated),
         ! repopulate it with new snapshot based on current time 
 
@@ -789,6 +802,7 @@ contains
         type(recon_param_class), intent(IN)       :: par 
         real(prec),       intent(IN) :: z_srf(:,:) 
         real(prec),       intent(IN) :: lapse(2) 
+        real(prec),       intent(IN) :: f_p 
         real(prec),       intent(IN) :: time 
         character(len=*), intent(IN) :: domain 
 
@@ -897,6 +911,10 @@ contains
 
 
         ! Step 3: Calculate sea-level temps and precip 
+        ! ajr: not currently used because reconstruction files 
+        ! are already anomalies with somewhat inconsistent z_srf 
+        ! definitions in each case. Cleanest is to ignore elevation effects here.
+if (.FALSE.) then 
 
         do m = 1, 12
 
@@ -909,11 +927,18 @@ contains
                     z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
             end if 
 
-            ! Precip
-            !clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
+            ! Precip (scale by a fraction)
+            clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
         end do 
-    
+        
+else 
+        ! Simply set sea-level fields equal to surface fields 
+        
+        clim%tsl   = clim%tas 
+        clim%prcor = clim%pr 
+
+end if
 
         return 
 
