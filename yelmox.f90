@@ -198,7 +198,7 @@ program yelmox
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             ! Run with low maximum velocities only to smooth things out at first
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=1000.0)
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=5000.0)
 
         end if  
 
