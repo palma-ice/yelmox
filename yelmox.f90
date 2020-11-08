@@ -174,13 +174,14 @@ program yelmox
 
     else 
 
-if (.FALSE.) then
         if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
             ! Start with some ice thickness for testing
+
+            yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
 
-            ! Run Yelmo once to update surface topography 
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=0.0)
+            ! Run Yelmo for briefly to update surface topography 
+            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
             
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
@@ -197,12 +198,9 @@ if (.FALSE.) then
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             ! Run with low maximum velocities only to smooth things out at first
-            yelmo1%dyn%par%solver = "sia"
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=200.0)
-            yelmo1%dyn%par%solver = "diva" 
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=1000.0)
 
-        end if 
-end if 
+        end if  
 
     end if 
 
