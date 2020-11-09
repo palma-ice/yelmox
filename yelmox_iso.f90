@@ -333,8 +333,8 @@ program yelmox
 
         ! Run yelmo for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=20e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=0.0_prec)
-        call yelmo_update_equil(yelmo1,time,time_tot=10e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+        call yelmo_update_equil(yelmo1,time,time_tot=20e3,dt=dtt,topo_fixed=.FALSE.,dyn_solver="sia")
+        call yelmo_update_equil(yelmo1,time,time_tot=10e3,dt=dtt,topo_fixed=.FALSE.)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time)
@@ -343,7 +343,7 @@ program yelmox
     end if 
 
 if (.not. check_init) then 
-    call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=dtt,ssa_vel_max=5000.0_prec)
+    call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=dtt,topo_fixed=.FALSE.)
 end if 
 
     ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
