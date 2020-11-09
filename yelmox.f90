@@ -181,7 +181,7 @@ program yelmox
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
 
             ! Run Yelmo for briefly to update surface topography 
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.,dyn_solver="sia")
             
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
@@ -198,7 +198,7 @@ program yelmox
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             ! Run with low maximum velocities only to smooth things out at first
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,topo_fixed=.FALSE.,dt=2.0,ssa_vel_max=5000.0)
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
 
         end if  
 
@@ -206,8 +206,8 @@ program yelmox
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,topo_fixed=.FALSE.,dt=1.0,ssa_vel_max=5000.0)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,topo_fixed=.TRUE.,dt=1.0,ssa_vel_max=5000.0)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
