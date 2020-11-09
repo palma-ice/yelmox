@@ -53,14 +53,14 @@ program yelmox
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
-    call nml_read(path_par,"control","time_init",       time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"control","time_end",        time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"control","time_equil",      time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"control","dtt",             dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"control","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"control","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"control","dt2D_small_out",  dt2D_small_out)            ! [yr] Frequency of 2D small output 
-    call nml_read(path_par,"control","transient",       calc_transient_climate)    ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","time_init",       time_init)                 ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",        time_end)                  ! [yr] Ending time
+    call nml_read(path_par,"ctrl","time_equil",      time_equil)                ! [yr] Years to equilibrate first
+    call nml_read(path_par,"ctrl","dtt",             dtt)                       ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt1D_out",        dt1D_out)                  ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",        dt2D_out)                  ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","dt2D_small_out",  dt2D_small_out)            ! [yr] Frequency of 2D small output 
+    call nml_read(path_par,"ctrl","transient",       calc_transient_climate)    ! Calculate transient climate? 
 
     ! Assume program is running from the output folder
     outfldr = "./"

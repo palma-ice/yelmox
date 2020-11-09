@@ -1,4 +1,4 @@
-&control
+&ctrl
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 30e3              ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
@@ -58,18 +58,18 @@
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
-    beta_method         = 1               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
+    beta_method         = 3               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
-    beta_q              = 1.0             ! Dragging law exponent 
+    beta_q              = 0.2             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
-    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
-    cb_with_pmp         = True            ! Weighted cb_frozen/cb_stream as a function of f_pmp 
+    cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
@@ -147,7 +147,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 0.001             ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 
@@ -225,36 +225,44 @@
 /
 
 &snap_clim0
-    clim_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
-    clim_names     = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
-    clim_monthly   = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_year_bp   = 0
-    ocn_path      = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = True
-    ocn_year_bp   = 0
+    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    clim_names      = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
+    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
+    clim_year_bp    = 0
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = True
+    ocn_year_bp     = 0
 /
 
 &snap_clim1
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly  = False
-    clim_year_bp  = 0
-    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = False
-    ocn_year_bp   = 0
+    ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
+    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_monthly    = False
+    clim_year_bp    = 0
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = False
+    ocn_year_bp     = 0
 /
 
 &snap_clim2
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly  = False
-    clim_year_bp  = -21000
-    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = False
-    ocn_year_bp   = -21000
+    ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
+    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_monthly    = False
+    clim_year_bp    = -21000
+    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
+    clim_stdev_name = "pr_ann" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = False
+    ocn_year_bp     = -21000
 /
 
 &snap_clim3
@@ -262,6 +270,8 @@
     clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
     clim_monthly  = False
     clim_year_bp  = -21000
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr" 
     ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
     ocn_names     = "depth" "mask_ocn" "to"
     ocn_monthly   = False
@@ -346,23 +356,6 @@
     depth_max          = 1500.0
     find_ocean         = True 
     
-/
-
-&basal_hydrology
-    init_method       = 0             ! 0: no water; 1: constant value; 2: f(H)
-    H0                = 100           ! [m] Spatially constant initial water pressure value
-    H0_ice_min        = 10            ! [m] Minimum ice thickness for initial water pressure 
-    H0_ice_max        = 2000          ! [m] Maximum ice thickness for initial water pressure
-    H0_min            = 0             ! [m] Minimum initial water pressure 
-    H0_max            = 500           ! [m] Maximum initial water pressure
-    
-    method            = 1             ! H_water method (0: const, 1: bucket (local); 2: diffusion)
-    H_water_max       = 1.0           ! [m] Maximum water height in bucket method
-    till_max          = 20.0          ! [m] Maximum till thickness
-    till_porosity     = 0.5           ! [1] Porosity of till
-    till_infiltr      = 1.0e-03       ! [m/a] Rate water can infiltrate till
-    kond              = 1.0e-06       ! [m/s] Till conductivity (diffusion constant)
-
 /
 
 &sediments

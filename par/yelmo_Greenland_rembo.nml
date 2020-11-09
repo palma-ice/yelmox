@@ -1,4 +1,4 @@
-&control
+&ctrl
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
