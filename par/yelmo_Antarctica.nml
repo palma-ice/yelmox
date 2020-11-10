@@ -278,16 +278,6 @@
     ocn_year_bp   = -21000
 /
 
-&hyster
-    ntot        =  5                  ! [steps] Number of time steps for averaging 
-    df_sign     =  1                  ! [-1/1] Determines direction of hysteresis
-    dv_dt_scale =  20.0               ! [Gt/a] 30 Gt/a, more or less...
-    df_dt_min   =   0.0               ! [f/1e6 a]
-    df_dt_max   =  200.0              ! [f/1e6 a]
-    f_min       =  -1.0               ! [K]
-    f_max       =   6.0               ! [K] 
-/
-
 &smbpal
     const_insol = True
     const_kabp  = 0.0

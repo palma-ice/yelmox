@@ -33,7 +33,6 @@ program yelmox
     integer    :: n
     logical    :: calc_transient_climate
 
-    logical, parameter :: use_hyster = .FALSE. 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
 
