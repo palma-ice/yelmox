@@ -27,7 +27,7 @@
     grid_name       = "GRL-20KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "no"
+    restart         = "None"
     log_timestep    = False 
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
@@ -77,7 +77,7 @@
     beta_q              = 1.0             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 2: H_grnd linear scaling, 3: Zstar scaling 
-    beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
@@ -161,7 +161,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 0.001             ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 /
 
@@ -240,47 +240,55 @@
 /
 
 &snap_clim0
-    clim_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.5-ERA-30km-monthly_1981-2010.nc"
-    clim_names     = "z_srf" "t3m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
-    clim_monthly   = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_year_bp   = 0
-    ocn_path      = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = True
-    ocn_year_bp   = 0
+    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.5-ERA-30km-monthly_1981-2010.nc"
+    clim_names      = "z_srf" "t3m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
+    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
+    clim_time       = 0
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = True
+    ocn_time        = 0
 /
 
 &snap_clim1
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly  = False
-    clim_year_bp  = 0
-    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = False
-    ocn_year_bp   = 0
+    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_monthly    = False
+    clim_time       = 0
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    ocn_names       = "none" "mask" "sst_ann"
+    ocn_monthly     = False
+    ocn_time        = 0
 /
 
 &snap_clim2
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly  = False
-    clim_year_bp  = -21000
-    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = False
-    ocn_year_bp   = -21000
+    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_monthly    = False
+    clim_time       = -21000
+    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
+    clim_stdev_name = "pr_ann" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    ocn_names       = "none" "mask" "sst_ann"
+    ocn_monthly     = False
+    ocn_time        = -21000
 /
 
 &snap_clim3
-    clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names    = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly  = False
-    clim_year_bp  = -21000
-    ocn_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names     = "depth" "mask_ocn" "to"
-    ocn_monthly   = False
-    ocn_year_bp   = -21000
+    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
+    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_monthly    = False
+    clim_time       = -21000
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr" 
+    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = False
+    ocn_time        = -21000
 /
 
 &smbpal
