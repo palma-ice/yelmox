@@ -161,7 +161,7 @@ program yelmox
     call yelmo_print_bound(yelmo1%bnd)
 
     time = time_init 
-
+    
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")

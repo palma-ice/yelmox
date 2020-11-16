@@ -94,7 +94,7 @@ contains
 
         ! Load parameters
         call isos_par_load(isos%par,filename,init=.TRUE.)
-
+        
         ! LBLOC, 400 km on each side
         ! ajr: 400km set internally, since the radius should be smaller.
         ! This needs thorough revision and code refactoring. 
@@ -125,7 +125,7 @@ contains
 
         return 
 
-    end subroutine isos_init 
+    end subroutine isos_init
 
     subroutine isos_init_state(isos,z_bed,z_bed_ref,H_ice_ref,z_sl,time)
 
