@@ -45,7 +45,7 @@ module snapclim
 
     type recon_param_class 
         character(len=512)      :: clim_path 
-        character(len=56)       :: clim_names(3)
+        character(len=56)       :: clim_names(4)
         character(len=56)       :: clim_type 
         logical                 :: clim_monthly 
         real(prec), allocatable :: clim_times(:) 
@@ -807,13 +807,15 @@ contains
         character(len=*), intent(IN) :: domain 
 
         ! Local variables 
-        integer    :: k0, k1, k, q, m, nt, nx, ny, nm   
+        integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j   
         real(prec) :: t0, t1, alpha
-        character(len=56) :: varnm  
+        character(len=56) :: varnm
+        real(prec) :: lapse_now_south, lapse_now_north  
         real(prec), allocatable :: var0(:,:,:)
         real(prec), allocatable :: var1(:,:,:)
-        real(prec), allocatable :: var(:,:,:)
-        
+        real(prec), allocatable :: var(:,:,:)      
+        real(prec), allocatable :: z_srf_pd(:,:)  
+
         real(prec) :: lapse_mon(12)   
         logical :: south 
 
@@ -829,7 +831,8 @@ contains
         allocate(var0(nx,ny,nm))
         allocate(var1(nx,ny,nm))
         allocate(var(nx,ny,nm))
-        
+        allocate(z_srf_pd(nx,ny))        
+
         ! Determine the indices of reconstruction time slices 
         ! bracketing the current time 
         if (time .lt. minval(par%clim_times)) then 
@@ -849,7 +852,7 @@ contains
 
             k1 = 0 
             do k = 1, nt 
-                k1 = k + 1
+                k1 = k1 + 1
                 if (par%clim_times(k) .gt. time) exit 
             end do 
 
@@ -881,7 +884,7 @@ contains
                 ! Read monthly values directly 
                 call nc_read(par%clim_path,varnm,var0,start=[1,1,1,k0],count=[nx,ny,nm,1])
                 call nc_read(par%clim_path,varnm,var1,start=[1,1,1,k1],count=[nx,ny,nm,1])
-
+                write(*,*) "Dimension of var0, tas:", size(var0)
             else 
 
                 ! Read annual values 
@@ -910,35 +913,70 @@ contains
         end do  
 
 
-        ! Step 3: Calculate sea-level temps and precip 
-        ! ajr: not currently used because reconstruction files 
-        ! are already anomalies with somewhat inconsistent z_srf 
-        ! definitions in each case. Cleanest is to ignore elevation effects here.
-if (.FALSE.) then 
+        ! Read in the elevation
+        
+        if (trim(clim%par%clim_names(4)) .eq. "zs") then 
+
+             ! Read in the elevation from the climatology reconstruction file
+ 
+             ! Get current variable name
+             varnm = trim(par%clim_names(4))
+
+             ! Read annual values
+             call nc_read(par%clim_path,varnm,var0(:,:,1),start=[1,1,k0],count=[nx,ny,1])
+             call nc_read(par%clim_path,varnm,var1(:,:,1),start=[1,1,k1],count=[nx,ny,1])
+
+             ! Calculate current elevation values from interpolation
+             var = var0*(1-alpha) + var1*alpha
+
+             ! Fill in the elevation values in a 2d array
+             do j = 1, ny
+             do i = 1, nx
+
+                 clim%z_srf(i,j) = var(i,j,1)
+
+             end do
+             end do
+
+             ! Read in the present day elevation from the climatology reconstruction file
+             call nc_read(par%clim_path,varnm,var(:,:,1),start=[1,1,nt],count=[nx,ny,1])
+
+             ! Fill in the elevation values in a 2d array
+             do j = 1, ny
+             do i = 1, nx
+
+                 z_srf_pd(i,j) = var(i,j,1)
+
+             end do
+             end do
+
+
+        else
+             clim%z_srf = z_srf
+             z_srf_pd = z_srf
+
+        end if 
+
+
+        ! Step 3: Calculate sea-level temps and precip (corrected to the elevation anomaly)
+        
+        lapse_now_south = (lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+        lapse_now_north = (lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
 
         do m = 1, 12
 
             ! Monthly lapse rates from ann and sum (jan or jul)
             if (south) then 
-                clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                    z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+                clim%tsl(:,:,m) = clim%tas(:,:,m) + (clim%z_srf-z_srf_pd)*lapse_now_south
             else 
-                clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                    z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
+                clim%tsl(:,:,m) = clim%tas(:,:,m) + (clim%z_srf-z_srf_pd)*lapse_now_north
             end if 
 
             ! Precip (scale by a fraction)
             clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
-        end do 
-        
-else 
-        ! Simply set sea-level fields equal to surface fields 
-        
-        clim%tsl   = clim%tas 
-        clim%prcor = clim%pr 
+        end do
 
-end if
 
         return 
 
