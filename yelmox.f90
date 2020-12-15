@@ -45,11 +45,6 @@ program yelmox
     character(len=56)  :: reg1_nm 
     character(len=512) :: reg1_fnm
 
-    reg1_write = .TRUE. 
-    reg1_val   = 1.12     ! 1.12 == Hudson region 
-    reg1_nm    = "Hudson"
-    reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
-
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -76,6 +71,17 @@ program yelmox
     
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
+
+    
+    ! Options for writing a specific region ====================
+
+    reg1_write = .TRUE. 
+    reg1_val   = 1.12     ! 1.12 == Hudson region 
+    reg1_nm    = "Hudson"
+    reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
+
+    !  =========================================================
+
 
     ! === Initialize ice sheet model =====
 
