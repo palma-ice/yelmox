@@ -38,6 +38,18 @@ program yelmox
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
+
+    ! Define whether to write some additional 1D files from Yelmo 
+    logical :: reg1_write 
+    real(prec) :: reg1_val
+    character(len=56)  :: reg1_nm 
+    character(len=512) :: reg1_fnm
+
+    reg1_write = .TRUE. 
+    reg1_val   = 1.12     ! 1.12 == Hudson region 
+    reg1_nm    = "Hudson"
+    reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
+
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -217,6 +229,11 @@ program yelmox
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yreg_step(yelmo1%reg,file1D,time=time) 
     
+    if (reg1_write) then 
+        call write_yreg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=yelmo1%bnd%regions .eq. reg1_val)
+        call write_yreg_step(yelmo1%reg,reg1_fnm,time=time) 
+    end if 
+
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -272,9 +289,13 @@ end if
         end if
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
-        end if 
+            call write_yreg_step(yelmo1%reg,file1D,time=time)
 
+            if (reg1_write) then 
+                call write_yreg_step(yelmo1%reg,reg1_fnm,time=time) 
+            end if  
+        end if 
+        
         if (mod(nint(time*100),nint(dt_restart*100))==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
