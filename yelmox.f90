@@ -213,7 +213,7 @@ program yelmox
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             ! Run with low maximum velocities only to smooth things out at first
-            call yelmo_update_equil(yelmo1,time,time_tot=10.0,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
 
         end if  
 
@@ -237,8 +237,6 @@ program yelmox
         call write_yreg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=reg1_mask)
         call write_yreg_step(yelmo1,reg1_fnm,time,mask=reg1_mask)
     end if 
-
-    stop 
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
