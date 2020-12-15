@@ -44,6 +44,7 @@ program yelmox
     real(prec) :: reg1_val
     character(len=56)  :: reg1_nm 
     character(len=512) :: reg1_fnm
+    logical, allocatable :: reg1_mask(:,:) 
 
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
@@ -72,7 +73,7 @@ program yelmox
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
 
-    
+
     ! Options for writing a specific region ====================
 
     reg1_write = .TRUE. 
@@ -91,6 +92,13 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
+    if (reg1_write) then 
+        ! If writing a region, define a mask for it here to use later 
+        allocate(reg1_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+        reg1_mask = .FALSE. 
+        where(abs(yelmo1%bnd%regions - reg1_val) .lt. 1e-3) reg1_mask = .TRUE. 
+    end if 
+    
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
@@ -118,20 +126,10 @@ program yelmox
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
 
-
-!mmr    ! This was using as reference H_ref and z_bed the initial H_ref and z_bed, which 
-!mmr    ! is only correct when initializing from PD values; for a restart these were not
-!mmr    ! set, z_bed_ref was zero and the bedrock bounced instantaneously
-
-!mmr    ! Initialize isostasy - note this should use present-day topography values to 
-!mmr    ! calibrate the reference rebound   
-!mmr    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed, &
-!mmr          H_ice_ref=yelmo1%tpo%now%H_ice,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
-
-!mmr   ! Initialize isostasy using present-day topography values to 
-!mmr   ! calibrate the reference rebound
-       call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
+    ! Initialize isostasy using present-day topography 
+    ! values to calibrate the reference rebound
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
+                           H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
 
 
     call sealevel_update(sealev,year_bp=time_init)
@@ -236,8 +234,8 @@ program yelmox
     call write_yreg_step(yelmo1,file1D,time=time) 
     
     if (reg1_write) then 
-        call write_yreg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=yelmo1%bnd%regions .eq. reg1_val)
-        call write_yreg_step(yelmo1,reg1_fnm,time,mask=yelmo1%bnd%regions .eq. reg1_val)
+        call write_yreg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=reg1_mask)
+        call write_yreg_step(yelmo1,reg1_fnm,time,mask=reg1_mask)
     end if 
 
     stop 
@@ -300,7 +298,7 @@ end if
             call write_yreg_step(yelmo1,file1D,time=time)
 
             if (reg1_write) then 
-                call write_yreg_step(yelmo1,reg1_fnm,time=time,mask=yelmo1%bnd%regions .eq. reg1_val) 
+                call write_yreg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
             end if  
         end if 
 
