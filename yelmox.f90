@@ -209,7 +209,7 @@ program yelmox
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             ! Run with low maximum velocities only to smooth things out at first
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
+            call yelmo_update_equil(yelmo1,time,time_tot=10.0,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
 
         end if  
 
@@ -227,12 +227,14 @@ program yelmox
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+    call write_yreg_step(yelmo1,file1D,time=time) 
     
     if (reg1_write) then 
         call write_yreg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=yelmo1%bnd%regions .eq. reg1_val)
-        call write_yreg_step(yelmo1%reg,reg1_fnm,time=time) 
+        call write_yreg_step(yelmo1,reg1_fnm,time,mask=yelmo1%bnd%regions .eq. reg1_val)
     end if 
+
+    stop 
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -289,13 +291,13 @@ end if
         end if
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then
-            call write_yreg_step(yelmo1%reg,file1D,time=time)
+            call write_yreg_step(yelmo1,file1D,time=time)
 
             if (reg1_write) then 
-                call write_yreg_step(yelmo1%reg,reg1_fnm,time=time) 
+                call write_yreg_step(yelmo1,reg1_fnm,time=time,mask=yelmo1%bnd%regions .eq. reg1_val) 
             end if  
         end if 
-        
+
         if (mod(nint(time*100),nint(dt_restart*100))==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
