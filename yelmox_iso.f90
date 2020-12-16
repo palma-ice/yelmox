@@ -397,7 +397,7 @@ do iter = 1, n_iter
     
     ! 1D file 
     call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1%reg,file1D,time=time)  
+    call write_yreg_step(yelmo1,file1D,time=time)  
 
 if (check_init) stop 
 
@@ -511,7 +511,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-            call write_yreg_step(yelmo1%reg,file1D,time=time) 
+            call write_yreg_step(yelmo1,file1D,time=time) 
         end if 
 
         if (mod(time,dt_restart)==0) then 

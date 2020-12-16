@@ -227,13 +227,13 @@ end if
     
     ! 1D file 
 !mmr    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-!mmr    call write_yreg_step(yelmo1%reg,file1D,time=time) 
+!mmr    call write_yreg_step(yelmo1,file1D,time=time) 
     
     ! 1D file hyst 
     ! call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
-    call write_step_1D_combined(yelmo1%reg,hyst1,snp1,file1D_hyst,time=time)
+    call write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
     
 !     ! Testing smb ======
 !     stop "Done."
@@ -318,8 +318,8 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-!mmr            call write_yreg_step(yelmo1%reg,file1D,time=time) 
-            call write_step_1D_combined(yelmo1%reg,hyst1,snp1,file1D_hyst,time=time)
+!mmr            call write_yreg_step(yelmo1,file1D,time=time) 
+            call write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
         end if 
 
         if (mod(time,dt_restart)==0) then 
@@ -670,11 +670,11 @@ contains
 
     end subroutine write_step_2D_combined_small
 
-    subroutine write_step_1D_combined(reg,hyst,snp,filename,time)
+    subroutine write_step_1D_combined(ylm,hyst,snp,filename,time)
 
         implicit none 
         
-        type(yregions_class), intent(IN) :: reg
+        type(yelmo_class),    intent(IN) :: ylm
         type(hyster_class),   intent(IN) :: hyst
         type(snapclim_class), intent(IN) :: snp 
         character(len=*),     intent(IN) :: filename
@@ -684,6 +684,10 @@ contains
         integer    :: ncid, n, k
         real(prec) :: time_prev 
         real(prec) :: dT_axis(1000) 
+        type(yregions_class) :: reg 
+
+        ! Assume region to write is the global region of yelmo 
+        reg = ylm%reg 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
