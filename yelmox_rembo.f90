@@ -111,21 +111,10 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-
-
-!mmr    ! This was using as reference H_ref and z_bed the initial H_ref and z_bed, which 
-!mmr    ! is only correct when initializing from PD values; for a restart these were not
-!mmr    ! set, z_bed_ref was zero and the bedrock bounced instantaneously
-
-!mmr    ! Initialize isostasy - note this should use present-day topography values to 
-!mmr    ! calibrate the reference rebound   
-!mmr    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed, &
-!mmr          H_ice_ref=yelmo1%tpo%now%H_ice,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
-
-!mmr   ! Initialize isostasy using present-day topography values to 
-!mmr   ! calibrate the reference rebound
-       call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
+    ! Initialize isostasy using present-day topography values to 
+    ! calibrate the reference rebound
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
+                         H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
 
 
     call sealevel_update(sealev,year_bp=time_init)
@@ -188,8 +177,11 @@ program yelmox
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,dt=1.0_prec,topo_fixed=.FALSE.)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+    call yelmo_update_equil(yelmo1,time,time_tot=500.0_prec,dt=dtt,topo_fixed=.TRUE.)
+    
+    ! Now run steady-state for several thousand years
+    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.FALSE.)
     
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
