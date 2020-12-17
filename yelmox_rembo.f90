@@ -39,6 +39,10 @@ program yelmox
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa, dT_summer
 
+    ! No-ice mask (to impose additional melting)
+    logical, allocatable :: mask_noice(:,:)  
+    logical :: lim_pd_ice 
+
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
@@ -60,6 +64,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dt2D_out",    dt2D_out)                   ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","transient",   calc_transient_climate)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
+    call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
     
     ! Define input and output locations 
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
@@ -140,6 +145,19 @@ program yelmox
     yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = rembo_ann%T_srf
     
+    ! Define no-ice mask from present-day data
+    allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
+    mask_noice = .FALSE. 
+    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+
+    ! Special treatment for Greenland
+    if (lim_pd_ice) then 
+        
+        ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+        where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 2.0 
+
+    end if 
+
     ! write(*,*) "To do..."
 !     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
 !                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
@@ -244,6 +262,13 @@ if (calc_transient_climate) then
         yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = rembo_ann%T_srf
          
+        ! Special treatment for Greenland
+        if (lim_pd_ice) then 
+        
+            ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
+            where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 2.0 
+
+        end if 
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         ! To do: currently no anomalies are calculated for the ocean with rembo active

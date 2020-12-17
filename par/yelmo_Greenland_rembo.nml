@@ -10,6 +10,7 @@
     transient    = True                 ! Calculate transient climate? 
     use_hyster   = True                 ! Use hysteresis module? 
     dT           = 0.0                  ! [K]  Summer warming anomaly 
+    lim_pd_ice   = True 
 /
 
 &hyster
