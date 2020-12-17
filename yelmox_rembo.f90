@@ -647,6 +647,9 @@ contains
         real(prec) :: dT_axis(1000) 
         type(yregions_class) :: reg
 
+        ! Assume region to write is the global region of yelmo 
+        reg = ylm%reg 
+        
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
