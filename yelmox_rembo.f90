@@ -236,15 +236,14 @@ program yelmox
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-            if (use_hyster) then
-                ! snapclim call using anomaly from the hyster package 
-                call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-                write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
-                                                        hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-            
-                dT_summer = hyst1%f_now 
-            end if 
+        
+        if (use_hyster) then
+            ! Update forcing based on hysteresis module
+            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+            write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
+                                                    hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
+        
+            dT_summer = hyst1%f_now 
         end if 
 
         ! call REMBO1     
