@@ -27,7 +27,6 @@ module hyster
         type(hyster_par_class) :: par 
 
         ! variables 
-        integer :: n
         real(wp), allocatable :: time(:)
         real(wp), allocatable :: var(:)
         real(wp) :: dv_dt
@@ -86,7 +85,6 @@ contains
         ! Initialize variable values
         hyst%time  = MV
         hyst%var   = MV 
-        hyst%n     = 0   
         hyst%dv_dt = 0.0_wp 
         hyst%df_dt = 0.0_wp
 
@@ -118,29 +116,32 @@ contains
         real(wp),           intent(IN)    :: var 
 
         ! Local variables 
-        real(wp) :: dv_dt(size(hyst%time,1)-1)
+        real(wp), allocatable :: dv_dt(:)
         real(wp) :: dv_dt_now 
         real(wp) :: f_scale 
-        integer  :: ntot, kmin, kmax, nk  
+        integer  :: ntot, kmin, kmax, nk, k 
+        real(wp) :: dt_now 
 
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
 
-
-
-        ! Remove oldest point and add current one to the beginning
+        ! Remove oldest point from beginning and add current one to the end
         hyst%time = eoshift(hyst%time,1,boundary=time)
         hyst%var  = eoshift(hyst%var, 1,boundary=var)
 
         ! Determine range of indices of times within our 
         ! time-averaging window. 
-        kmin = 1
-        kmax = findloc(hyst%time - hyst%par%dt_ave .gt. 0.0_wp,value=.TRUE., &
-                                        dim=1,mask=hyst%time.ne.MV,back=.TRUE.)
+        kmin = findloc(hyst%time .ge. time - hyst%par%dt_ave,value=.TRUE., &
+                                                     dim=1,mask=hyst%time.ne.MV)
+        kmax = ntot 
 
-        nk = kmax - kmin + 1 
+        ! Determine currently available time window
+        ! Note: do not use kmin here, in case time step does not match dt_ave,
+        ! rather, use all available times in the vector to see if enough 
+        ! time has passed. 
+        dt_now = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
 
-        if (hyst%time(kmax)-hyst%time(kmin) .lt. hyst%par%dt_ave) then 
+        if (dt_now .lt. hyst%par%dt_ave) then 
             ! Not enough time has passed, maintain constant forcing 
             ! (to avoid affects of noisy derivatives)
 
@@ -149,11 +150,16 @@ contains
         else 
             ! Calculate forcing 
 
+            ! Get current number of averaging points 
+            nk = kmax - kmin + 1 
+            
+            allocate(dv_dt(nk-1)) 
+
             ! Calculate mean rate of change over time steps of interest
             dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
                       (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
             hyst%dv_dt = sum(dv_dt) / real(nk,wp)
-
+            
             ! Calculate the current df_dt
             ! BASED ON EXPONENTIAL (sharp transition, tuneable)
             ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
@@ -169,7 +175,7 @@ contains
             if (abs(hyst%df_dt) .lt. 1e-10) hyst%df_dt = 0.0 
 
             ! Once the rate is available, update the current forcing value 
-            hyst%f_now = hyst%f_now + hyst%df_dt * (time - hyst%time(hyst%n-1))
+            hyst%f_now = hyst%f_now + hyst%df_dt * (time - hyst%time(ntot-1))
             
         end if 
 

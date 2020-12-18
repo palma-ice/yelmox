@@ -121,6 +121,17 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
     
+    ! Testing hyster ======
+    ! var = 0.0 
+    ! do n = 1, 200
+    !     time = time_init + n*dtt 
+    !     var  = var + max(0.0,real(100-n,prec)*dtt)
+    !     if (use_hyster) call hyster_calc_forcing(hyst1,time=time,var=var)
+    !     write(*,*) "hyst: ", time, hyst1%dv_dt, hyst1%df_dt, hyst1%f_now 
+    ! end do 
+
+    ! stop 
+
     if (use_hyster) then
         ! Update hysteresis variable 
         call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
@@ -204,18 +215,7 @@ program yelmox
 
 !     ! Testing smb ======
 !     stop "Done."
-
-    ! Testing hyster ======
-    var = 0.0 
-    do n = 1, 200
-        time = time_init + n*dtt 
-        var  = var + max(0.0,real(100-n,prec)*dtt)
-        if (use_hyster) call hyster_calc_forcing(hyst1,time=time,var=var)
-        write(*,*) "hyst: ", time, hyst1%dv_dt, hyst1%df_dt, hyst1%f_now 
-    end do 
-
-    stop 
-
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -240,7 +240,7 @@ if (calc_transient_climate) then
         if (use_hyster) then
             ! Update forcing based on hysteresis module
             call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-            write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
+            write(*,*) "hyst: ", time, hyst1%time(size(hyst1%time,1))-hyst1%time(size(hyst1%time,1)-1), &
                                                     hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
         
             dT_summer = hyst1%f_now 
