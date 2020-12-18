@@ -13,7 +13,7 @@ module hyster
 
     type hyster_par_class  
         character(len=56) :: label 
-        integer  :: ntot 
+        real(wp) :: dt_ave 
         real(wp) :: df_sign 
         real(wp) :: dv_dt_scale
         real(wp) :: df_dt_min
@@ -59,7 +59,7 @@ contains
         if (present(label)) par_label = trim(par_label)//"_"//trim(label)
 
         ! Load parameters 
-        call nml_read(filename,trim(par_label),"ntot",          hyst%par%ntot)
+        call nml_read(filename,trim(par_label),"dt_ave",        hyst%par%dt_ave)
         call nml_read(filename,trim(par_label),"df_sign",       hyst%par%df_sign)
         call nml_read(filename,trim(par_label),"dv_dt_scale",   hyst%par%dv_dt_scale)
         call nml_read(filename,trim(par_label),"df_dt_min",     hyst%par%df_dt_min)
@@ -75,11 +75,13 @@ contains
         hyst%par%label = "hyster" 
         if (present(label)) hyst%par%label = trim(hyst%par%label)//"_"//trim(label)
 
-        ! (Re)initialize hyster vectors
+        ! (Re)initialize hyster vectors to a large value 
+        ! to store many timesteps.
+        ntot = 2000
         if (allocated(hyst%time)) deallocate(hyst%time)
         if (allocated(hyst%var))  deallocate(hyst%var)
-        allocate(hyst%time(hyst%par%ntot))
-        allocate(hyst%var(hyst%par%ntot))
+        allocate(hyst%time(ntot))
+        allocate(hyst%var(ntot))
 
         ! Initialize variable values
         hyst%time  = MV
@@ -116,28 +118,41 @@ contains
         real(wp),           intent(IN)    :: var 
 
         ! Local variables 
-        real(wp) :: dv_dt(hyst%par%ntot-1)
+        real(wp) :: dv_dt(size(hyst%time,1)-1)
         real(wp) :: dv_dt_now 
         real(wp) :: f_scale 
+        integer  :: ntot, kmin, kmax, nk  
 
-        if ( hyst%n .lt. hyst%par%ntot ) then 
-            ! Number of timesteps not reached yet, fill in the hyst vectors
+        ! Get size of hyst vectors 
+        ntot = size(hyst%time,1) 
 
-            hyst%n = hyst%n + 1 
-            hyst%time(hyst%n) = time 
-            hyst%var(hyst%n)  = var 
 
-            hyst%df_dt        = 0.0 
+
+        ! Remove oldest point and add current one to the beginning
+        hyst%time = eoshift(hyst%time,1,boundary=time)
+        hyst%var  = eoshift(hyst%var, 1,boundary=var)
+
+        ! Determine range of indices of times within our 
+        ! time-averaging window. 
+        kmin = 1
+        kmax = findloc(hyst%time - hyst%par%dt_ave .gt. 0.0_wp,value=.TRUE., &
+                                        dim=1,mask=hyst%time.ne.MV,back=.TRUE.)
+
+        nk = kmax - kmin + 1 
+
+        if (hyst%time(kmax)-hyst%time(kmin) .lt. hyst%par%dt_ave) then 
+            ! Not enough time has passed, maintain constant forcing 
+            ! (to avoid affects of noisy derivatives)
+
+            hyst%df_dt = 0.0_wp 
 
         else 
-            ! Keep a running average removing oldest point and adding current one
-            hyst%time = eoshift(hyst%time,1,boundary=time)
-            hyst%var  = eoshift(hyst%var, 1,boundary=var)
-            
-            ! Calculate mean rate of change for ntot time steps 
-            dv_dt = (hyst%var(2:hyst%par%ntot)-hyst%var(1:hyst%par%ntot-1)) / &
-                      (hyst%time(2:hyst%par%ntot)-hyst%time(1:hyst%par%ntot-1))
-            hyst%dv_dt = sum(dv_dt) / real(hyst%par%ntot,wp)
+            ! Calculate forcing 
+
+            ! Calculate mean rate of change over time steps of interest
+            dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
+                      (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
+            hyst%dv_dt = sum(dv_dt) / real(nk,wp)
 
             ! Calculate the current df_dt
             ! BASED ON EXPONENTIAL (sharp transition, tuneable)
@@ -165,7 +180,7 @@ contains
 
         return
 
-    end subroutine hyster_calc_forcing 
+    end subroutine hyster_calc_forcing
 
   
-end module hyster 
+end module hyster

@@ -14,11 +14,11 @@
 /
 
 &hyster
-    ntot        =  5                  ! [steps] Number of time steps for averaging
+    dt_ave      =  50.0               ! [yr]   Number of years for averaging
     df_sign     =  1                  ! [-1/1] Determines direction of hysteresis
     dv_dt_scale =  15.0               ! [Gt/a] 30 Gt/a, more or less...
     df_dt_min   =   0.0               ! [f/1e6 a]
-    df_dt_max   = 100.0               ! [f/1e6 a]
+    df_dt_max   =  50.0               ! [f/1e6 a]
     f_min       =   0.0               ! [K]
     f_max       =   4.0               ! [K]
 /

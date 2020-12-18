@@ -205,16 +205,16 @@ program yelmox
 !     ! Testing smb ======
 !     stop "Done."
 
-!     ! Testing hyster ======
-!     var = 0.0 
-!     do n = 1, 200
-!         time = time_init + n*dtt 
-!         var  = var + max(0.0,real(100-n,prec)*dtt)
-!         if (use_hyster) call hyster_calc_forcing(hyst1,time=time,var=var)
-!         write(*,*) "hyst: ", time, hyst1%dv_dt, hyst1%df_dt, hyst1%f_now 
-!     end do 
+    ! Testing hyster ======
+    var = 0.0 
+    do n = 1, 200
+        time = time_init + n*dtt 
+        var  = var + max(0.0,real(100-n,prec)*dtt)
+        if (use_hyster) call hyster_calc_forcing(hyst1,time=time,var=var)
+        write(*,*) "hyst: ", time, hyst1%dv_dt, hyst1%df_dt, hyst1%f_now 
+    end do 
 
-!     stop 
+    stop 
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
