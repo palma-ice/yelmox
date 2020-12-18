@@ -120,10 +120,13 @@ contains
         real(wp) :: dv_dt_now 
         real(wp) :: f_scale 
         integer  :: ntot, kmin, kmax, nk, k 
-        real(wp) :: dt_now 
+        real(wp) :: dt_tot, dt_now 
 
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
+
+        ! Get current timestep 
+        dt_now = time - hyst%time(ntot) 
 
         ! Remove oldest point from beginning and add current one to the end
         hyst%time = eoshift(hyst%time,1,boundary=time)
@@ -139,9 +142,9 @@ contains
         ! Note: do not use kmin here, in case time step does not match dt_ave,
         ! rather, use all available times in the vector to see if enough 
         ! time has passed. 
-        dt_now = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
+        dt_tot = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
 
-        if (dt_now .lt. hyst%par%dt_ave) then 
+        if (dt_tot .lt. hyst%par%dt_ave) then 
             ! Not enough time has passed, maintain constant forcing 
             ! (to avoid affects of noisy derivatives)
 
@@ -159,7 +162,7 @@ contains
             dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
                       (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
             hyst%dv_dt = sum(dv_dt) / real(nk,wp)
-            
+
             ! Calculate the current df_dt
             ! BASED ON EXPONENTIAL (sharp transition, tuneable)
             ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
@@ -175,7 +178,7 @@ contains
             if (abs(hyst%df_dt) .lt. 1e-10) hyst%df_dt = 0.0 
 
             ! Once the rate is available, update the current forcing value 
-            hyst%f_now = hyst%f_now + hyst%df_dt * (time - hyst%time(ntot-1))
+            hyst%f_now = hyst%f_now + hyst%df_dt * dt_now 
             
         end if 
 
