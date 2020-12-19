@@ -168,6 +168,10 @@ contains
             ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
             f_scale = exp(-abs(hyst%dv_dt)/hyst%par%dv_dt_scale)
 
+            ! For safety, enforce limit 
+            f_scale = min(f_scale,1.0_wp)
+            f_scale = max(f_scale,0.0_wp) 
+            
             ! Get forcing rate of change in [f/1e6 a]
             hyst%df_dt = hyst%par%df_sign * ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
 
