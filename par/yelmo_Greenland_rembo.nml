@@ -2,7 +2,7 @@
     
     ! Timing parameters 
     time_init    = 0.0                  ! [yr] Starting time 
-    time_end     = 300e3                ! [yr] Ending time
+    time_end     = 400e3                ! [yr] Ending time
     time_equil   = 10e3                 ! [yr] Equiibration time 
     dtt          = 10.0                 ! [yr] Main loop timestep 
     dt1D_out     = 100.0                ! [yr] Frequency of writing 1D output files 
@@ -16,9 +16,9 @@
 &hyster
     dt_ave      =  50.0               ! [yr]   Number of years for averaging
     df_sign     =  1                  ! [-1/1] Determines direction of hysteresis
-    dv_dt_scale =   5.0               ! [Gt/a] 30 Gt/a, more or less...
+    dv_dt_scale =   1.0               ! [Gt/a] 30 Gt/a, more or less...
     df_dt_min   =   0.0               ! [f/1e6 a]
-    df_dt_max   =  20.0               ! [f/1e6 a]
+    df_dt_max   = 100.0               ! [f/1e6 a]
     f_min       =   0.0               ! [K]
     f_max       =   4.0               ! [K]
 /
