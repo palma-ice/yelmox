@@ -317,8 +317,9 @@ contains
         ! Step 3: calculate the next time timestep (dt,n+1)
         dt_new = rhohat_n * dt_n
         
-        ! Finally, ensure timestep is within prescribed limits
-        call limit_adaptive_timestep(dt_new,dtmin,dtmax)
+        ! Ensure timestep is also within parameter limits 
+        dt_new = max(dtmin,dt_new)  ! dt >= dtmin
+        dt_new = min(dtmax,dt_new)  ! dt <= dtmax
 
         return 
 
