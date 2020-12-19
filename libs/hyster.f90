@@ -121,6 +121,7 @@ contains
         real(wp) :: f_scale 
         integer  :: ntot, kmin, kmax, nk, k 
         real(wp) :: dt_tot, dt_now 
+        real(wp) :: dvdt_fac 
 
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
@@ -161,16 +162,16 @@ contains
             ! Calculate mean rate of change over time steps of interest
             dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
                       (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
-            hyst%dv_dt = sum(dv_dt) / real(nk,wp)
+            hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
+                                         (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
 
             ! Calculate the current df_dt
             ! BASED ON EXPONENTIAL (sharp transition, tuneable)
             ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
-            f_scale = exp(-abs(hyst%dv_dt)/hyst%par%dv_dt_scale)
-
-            ! For safety, enforce limit 
-            f_scale = min(f_scale,1.0_wp)
-            f_scale = max(f_scale,0.0_wp) 
+            ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
+            ! that exp function doesn't explode (exp(-10)=>0.0)
+            dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%dv_dt_scale,10.0_wp)
+            f_scale = exp(-dvdt_fac)
             
             ! Get forcing rate of change in [f/1e6 a]
             hyst%df_dt = hyst%par%df_sign * ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
@@ -179,7 +180,7 @@ contains
             hyst%df_dt = hyst%df_dt *1e-6 
             
             ! Avoid underflow errors 
-            if (abs(hyst%df_dt) .lt. 1e-10) hyst%df_dt = 0.0 
+            if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
 
             ! Once the rate is available, update the current forcing value 
             hyst%f_now = hyst%f_now + hyst%df_dt * dt_now 

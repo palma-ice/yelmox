@@ -76,7 +76,7 @@ yelmox_rembo: yelmo-static rembo-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) -o libyelmox/bin/yelmox_rembo.x \
 			yelmox_rembo.f90 $(LIB_REMBO) $(LFLAGS) $(yelmox_libs)
 	@echo " "
-	@echo "    librembo/bin/yelmox_rembo.x is ready."
+	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
 	@echo " "
 
 check_sim : $(objdir)/ncio.o
