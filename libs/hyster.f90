@@ -20,6 +20,8 @@ module hyster
         real(wp) :: df_dt_max
         real(wp) :: f_min
         real(wp) :: f_max   
+        character(len=56) :: pc_controller
+        real(wp) :: pc_eps 
     end type 
 
     type hyster_class
@@ -32,6 +34,9 @@ module hyster
         real(wp) :: dv_dt
         real(wp) :: df_dt
         
+        real(wp) :: pc_df(3)
+        real(wp) :: pc_eta(3)
+
         real(wp) :: f_now
         logical  :: kill
     end type 
@@ -41,6 +46,7 @@ module hyster
     public :: hyster_class
     public :: hyster_init 
     public :: hyster_calc_forcing
+    public :: hyster_calc_forcing_pc
 
 contains
 
@@ -67,6 +73,9 @@ contains
         call nml_read(filename,trim(par_label),"f_min",         hyst%par%f_min)
         call nml_read(filename,trim(par_label),"f_max",         hyst%par%f_max)
         
+        call nml_read(filename,trim(par_label),"pc_controller", hyst%par%pc_controller)
+        call nml_read(filename,trim(par_label),"pc_eps",        hyst%par%pc_eps)
+        
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
 
@@ -87,6 +96,9 @@ contains
         hyst%var   = MV 
         hyst%dv_dt = 0.0_wp 
         hyst%df_dt = 0.0_wp
+
+        hyst%pc_df  = hyst%par%df_dt_min 
+        hyst%pc_eta = hyst%par%pc_eps
 
         ! Initialize values of forcing 
         if (hyst%par%df_sign .gt. 0) then 
@@ -165,6 +177,7 @@ contains
             hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
                                          (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
 
+
             ! Calculate the current df_dt
             ! BASED ON EXPONENTIAL (sharp transition, tuneable)
             ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
@@ -196,8 +209,107 @@ contains
 
     end subroutine hyster_calc_forcing
 
-    
-    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,dx,pc_k,controller)
+    subroutine hyster_calc_forcing_pc(hyst,time,var)
+        ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ! Subroutine :  d t T r a n s 1
+        ! Author     :  Alex Robinson
+        ! Purpose    :  Generate correct T_warming for gradual changes over
+        !               time (continuous stability diagram!)
+        ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++  
+
+        type(hyster_class), intent(INOUT) :: hyst 
+        real(wp),           intent(IN)    :: time
+        real(wp),           intent(IN)    :: var 
+
+        ! Local variables 
+        real(wp), allocatable :: dv_dt(:)
+        real(wp) :: dv_dt_now 
+        real(wp) :: f_scale 
+        integer  :: ntot, kmin, kmax, nk, k 
+        real(wp) :: dt_tot, dt_now 
+        real(wp) :: dvdt_fac 
+        real(wp) :: pc_df_now 
+
+        ! Get size of hyst vectors 
+        ntot = size(hyst%time,1) 
+
+        ! Get current timestep 
+        dt_now = time - hyst%time(ntot) 
+
+        ! Remove oldest point from beginning and add current one to the end
+        hyst%time = eoshift(hyst%time,1,boundary=time)
+        hyst%var  = eoshift(hyst%var, 1,boundary=var)
+
+        ! Determine range of indices of times within our 
+        ! time-averaging window. 
+        kmin = findloc(hyst%time .ge. time - hyst%par%dt_ave,value=.TRUE., &
+                                                     dim=1,mask=hyst%time.ne.MV)
+        kmax = ntot 
+
+        ! Determine currently available time window
+        ! Note: do not use kmin here, in case time step does not match dt_ave,
+        ! rather, use all available times in the vector to see if enough 
+        ! time has passed. 
+        dt_tot = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
+
+        if (dt_tot .lt. hyst%par%dt_ave) then 
+            ! Not enough time has passed, maintain constant forcing 
+            ! (to avoid affects of noisy derivatives)
+
+            hyst%df_dt = 0.0_wp 
+
+        else 
+            ! Calculate forcing 
+
+            ! Get current number of averaging points 
+            nk = kmax - kmin + 1 
+            
+            allocate(dv_dt(nk-1)) 
+
+            ! Calculate mean rate of change over time steps of interest [Gt/a]
+            dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
+                      (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
+            hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
+                                         (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
+
+            ! Calculate adaptive dfdt value using proportional-integral (PI) methods
+            call set_adaptive_timestep_pc(pc_df_now,hyst%pc_df,hyst%pc_eta,hyst%par%pc_eps, &
+                                    hyst%par%df_dt_min,hyst%par%df_dt_max,2,hyst%par%pc_controller)
+
+            ! Remove oldest point from the end and insert latest point in beginning
+            hyst%pc_eta = eoshift(hyst%pc_eta,-1,boundary=abs(hyst%dv_dt))
+            hyst%pc_df  = eoshift(hyst%pc_df, -1,boundary=abs(pc_df_now))
+
+            ! Apply limits to eta so that algorithm works well. 
+            ! pc_eta should be greater than zero
+            hyst%pc_eta(1) = max(hyst%pc_eta(1),1e-3)
+
+            
+            ! Get forcing rate of change in [f/1e6 a]
+            hyst%df_dt = hyst%par%df_sign * hyst%pc_df(1) 
+
+            ! Convert [f/1e6 a] => [f/a]
+            hyst%df_dt = hyst%df_dt *1e-6 
+            
+            ! Avoid underflow errors 
+            if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
+
+            ! Once the rate is available, update the current forcing value 
+            hyst%f_now = hyst%f_now + hyst%df_dt * dt_now 
+            
+        end if 
+
+        ! Check if kill should be activated 
+        if (hyst%f_now .lt. hyst%par%f_min .or. hyst%f_now .gt. hyst%par%f_max) then 
+            hyst%kill = .TRUE. 
+        end if 
+
+        return
+
+    end subroutine hyster_calc_forcing_pc
+
+        
+    subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.
         ! Implemented followig Cheng et al (2017, GMD)
@@ -208,9 +320,8 @@ contains
         real(wp), intent(IN)  :: dt(:)                ! [yr]   Timesteps (n:n-2)
         real(wp), intent(IN)  :: eta(:)               ! [X/yr] Maximum truncation error (n:n-2)
         real(wp), intent(IN)  :: eps                  ! [--]   Tolerance value (eg, eps=1e-4)
-        real(wp), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep
+        real(wp), intent(IN)  :: dtmin                ! [yr]   Minimum allowed timestep, must be > 0
         real(wp), intent(IN)  :: dtmax                ! [yr]   Maximum allowed timestep
-        real(wp), intent(IN)  :: dx                   ! [m]
         integer,    intent(IN)  :: pc_k                 ! pc_k gives the order of the timestepping scheme (pc_k=2 for FE-SBE, pc_k=3 for AB-SAM)
         character(len=*), intent(IN) :: controller      ! Adaptive controller to use [PI42, H312b, H312PID]
 
@@ -316,7 +427,7 @@ contains
         
         ! Step 3: calculate the next time timestep (dt,n+1)
         dt_new = rhohat_n * dt_n
-        
+
         ! Ensure timestep is also within parameter limits 
         dt_new = max(dtmin,dt_new)  ! dt >= dtmin
         dt_new = min(dtmax,dt_new)  ! dt <= dtmax
