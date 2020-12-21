@@ -121,17 +121,6 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
     
-    ! Testing hyster ======
-    ! var = 0.0 
-    ! do n = 1, 200
-    !     time = time_init + n*dtt 
-    !     var  = var + max(0.0,real(100-n,prec)*dtt)
-    !     if (use_hyster) call hyster_calc_forcing_pc(hyst1,time=time,var=var)
-    !     write(*,*) "hyst: ", time, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-    ! end do 
-
-    ! stop 
-
     if (use_hyster) then
         ! Update hysteresis variable 
         call hyster_calc_forcing_pc(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
