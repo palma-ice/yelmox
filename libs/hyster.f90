@@ -17,16 +17,14 @@ module hyster
         real(wp) :: dt_ave 
         real(wp) :: df_sign 
         real(wp) :: dv_dt_scale
-        real(wp) :: df_dt_min
         real(wp) :: df_dt_max
-        real(wp) :: df_dt_const 
-        real(wp) :: f_range(2)  
-        real(wp) :: pc_eps 
+        real(wp) :: f_range(2)   
 
         ! Internal parameters 
         real(wp) :: f_min 
         real(wp) :: f_max
-
+        real(wp) :: df_dt_min
+        
     end type 
 
     type hyster_class
@@ -39,8 +37,8 @@ module hyster
         real(wp) :: dv_dt
         real(wp) :: df_dt
         
-        real(wp) :: pc_df(3)
-        real(wp) :: pc_eta(3)
+        real(wp) :: pi_df(3)
+        real(wp) :: pi_eta(3)
 
         real(wp) :: f_now
         logical  :: kill
@@ -73,12 +71,9 @@ contains
         call nml_read(filename,trim(par_label),"dt_ave",        hyst%par%dt_ave)
         call nml_read(filename,trim(par_label),"df_sign",       hyst%par%df_sign)
         call nml_read(filename,trim(par_label),"dv_dt_scale",   hyst%par%dv_dt_scale)
-        call nml_read(filename,trim(par_label),"df_dt_min",     hyst%par%df_dt_min)
-        call nml_read(filename,trim(par_label),"df_dt_max",     hyst%par%df_dt_max)
-        call nml_read(filename,trim(par_label),"df_dt_const",   hyst%par%df_dt_const)
+        call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
         call nml_read(filename,trim(par_label),"f_range",       hyst%par%f_range)
-        call nml_read(filename,trim(par_label),"pc_eps",        hyst%par%pc_eps)
-        
+
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
 
@@ -86,6 +81,10 @@ contains
         hyst%par%f_min = hyst%par%f_range(1) 
         hyst%par%f_max = hyst%par%f_range(2) 
         
+        ! Prescribe a very small, but nonzero minimum value 
+        ! (important to be nonzero for the pi controller methods)
+        hyst%par%df_dt_min = 1e-9   ! [f/yr]
+
         ! Define label for this hyster object 
         hyst%par%label = "hyster" 
         if (present(label)) hyst%par%label = trim(hyst%par%label)//"_"//trim(label)
@@ -104,8 +103,8 @@ contains
         hyst%dv_dt = 0.0_wp 
         hyst%df_dt = 0.0_wp
 
-        hyst%pc_df  = hyst%par%df_dt_min 
-        hyst%pc_eta = hyst%par%pc_eps
+        hyst%pi_df  = hyst%par%df_dt_min 
+        hyst%pi_eta = hyst%par%dv_dt_scale 
 
         ! Initialize values of forcing 
         if (hyst%par%df_sign .gt. 0) then 
@@ -141,11 +140,11 @@ contains
         integer  :: ntot, kmin, kmax, nk, k 
         real(wp) :: dt_tot, dt_now 
         real(wp) :: dvdt_fac 
-        real(wp) :: pc_df_now 
+        real(wp) :: pi_df_now 
 
         ! Since dv_dt is typically calculated over an averaging period,
         ! assume second-order PI controller parameters are needed. 
-        integer, parameter :: pc_order = 2
+        integer, parameter :: pi_order = 2
 
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
@@ -193,9 +192,10 @@ contains
             select case(trim(hyst%par%method))
 
                 case("const") 
-                    ! Apply a constant rate of change, independent of dv_dt
-                    ! Set magnitude of df_dt right now in [f/(1e6 yr)] 
-                    hyst%df_dt = hyst%par%df_dt_const
+                    ! Apply a constant rate of change, independent of dv_dt.
+                    ! Use the df_dt_max parameter as a constant.
+
+                    hyst%df_dt = hyst%par%df_dt_max
 
                 case("exp")
 
@@ -207,30 +207,30 @@ contains
                     dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%dv_dt_scale,10.0_wp)
                     f_scale  = exp(-dvdt_fac)
 
-                    ! Get forcing rate of change magnitude in [f/1e6 a]
+                    ! Get forcing rate of change magnitude
                     hyst%df_dt = ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
 
                 case("PI42","H312b","H312PID","H321PID","PID1")
 
                     ! Calculate adaptive dfdt value using proportional-integral (PI) methods
-                    call set_adaptive_timestep_pc(pc_df_now,hyst%pc_df,hyst%pc_eta,hyst%par%pc_eps, &
-                                        hyst%par%df_dt_min,hyst%par%df_dt_max,pc_order,hyst%par%method)
+                    call set_adaptive_timestep_pc(pi_df_now,hyst%pi_df,hyst%pi_eta,hyst%par%dv_dt_scale, &
+                                        hyst%par%df_dt_min,hyst%par%df_dt_max,pi_order,hyst%par%method)
 
                     ! Remove oldest point from the end and insert latest point in beginning
-                    hyst%pc_eta = eoshift(hyst%pc_eta,-1,boundary=abs(hyst%dv_dt))
-                    hyst%pc_df  = eoshift(hyst%pc_df, -1,boundary=abs(pc_df_now))
+                    hyst%pi_eta = eoshift(hyst%pi_eta,-1,boundary=abs(hyst%dv_dt))
+                    hyst%pi_df  = eoshift(hyst%pi_df, -1,boundary=abs(pi_df_now))
 
                     ! Apply limits to eta so that algorithm works well. 
-                    ! pc_eta should be greater than zero
-                    hyst%pc_eta(1) = max(hyst%pc_eta(1),1e-3)
+                    ! pi_eta should be greater than zero
+                    hyst%pi_eta(1) = max(hyst%pi_eta(1),1e-3)
 
-                    ! Get forcing rate of change magnitude in [f/1e6 a]
-                    hyst%df_dt = hyst%pc_df(1) 
+                    ! Get forcing rate of change magnitude in [f/yr]
+                    hyst%df_dt = hyst%pi_df(1) 
 
             end select 
 
-            ! Convert [f/(1e6 yr)] => [f/yr] and apply sign of change
-            hyst%df_dt = hyst%par%df_sign*hyst%df_dt *1e-6 
+            ! Apply sign of change
+            hyst%df_dt = hyst%par%df_sign*hyst%df_dt
 
             ! Avoid underflow errors 
             if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
