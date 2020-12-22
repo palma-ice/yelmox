@@ -13,15 +13,20 @@ module hyster
 
     type hyster_par_class  
         character(len=56) :: label 
+        character(len=56) :: method 
         real(wp) :: dt_ave 
         real(wp) :: df_sign 
         real(wp) :: dv_dt_scale
         real(wp) :: df_dt_min
         real(wp) :: df_dt_max
-        real(wp) :: f_min
-        real(wp) :: f_max   
-        character(len=56) :: pc_controller
+        real(wp) :: df_dt_const 
+        real(wp) :: f_range(2)  
         real(wp) :: pc_eps 
+
+        ! Internal parameters 
+        real(wp) :: f_min 
+        real(wp) :: f_max
+
     end type 
 
     type hyster_class
@@ -46,7 +51,6 @@ module hyster
     public :: hyster_class
     public :: hyster_init 
     public :: hyster_calc_forcing
-    public :: hyster_calc_forcing_pc
 
 contains
 
@@ -63,22 +67,25 @@ contains
         par_label = "hyster"
         if (present(label)) par_label = trim(par_label)//"_"//trim(label)
 
-        ! Load parameters 
+        ! Load parameters
+        call nml_read(filename,trim(par_label),"method",        hyst%par%method)
+         
         call nml_read(filename,trim(par_label),"dt_ave",        hyst%par%dt_ave)
         call nml_read(filename,trim(par_label),"df_sign",       hyst%par%df_sign)
         call nml_read(filename,trim(par_label),"dv_dt_scale",   hyst%par%dv_dt_scale)
         call nml_read(filename,trim(par_label),"df_dt_min",     hyst%par%df_dt_min)
         call nml_read(filename,trim(par_label),"df_dt_max",     hyst%par%df_dt_max)
-        
-        call nml_read(filename,trim(par_label),"f_min",         hyst%par%f_min)
-        call nml_read(filename,trim(par_label),"f_max",         hyst%par%f_max)
-        
-        call nml_read(filename,trim(par_label),"pc_controller", hyst%par%pc_controller)
+        call nml_read(filename,trim(par_label),"df_dt_const",   hyst%par%df_dt_const)
+        call nml_read(filename,trim(par_label),"f_range",       hyst%par%f_range)
         call nml_read(filename,trim(par_label),"pc_eps",        hyst%par%pc_eps)
         
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
 
+        ! Get f_min and f_max values 
+        hyst%par%f_min = hyst%par%f_range(1) 
+        hyst%par%f_max = hyst%par%f_range(2) 
+        
         ! Define label for this hyster object 
         hyst%par%label = "hyster" 
         if (present(label)) hyst%par%label = trim(hyst%par%label)//"_"//trim(label)
@@ -134,6 +141,11 @@ contains
         integer  :: ntot, kmin, kmax, nk, k 
         real(wp) :: dt_tot, dt_now 
         real(wp) :: dvdt_fac 
+        real(wp) :: pc_df_now 
+
+        ! Since dv_dt is typically calculated over an averaging period,
+        ! assume second-order PI controller parameters are needed. 
+        integer, parameter :: pc_order = 2
 
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
@@ -178,25 +190,53 @@ contains
                                          (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
 
 
-            ! Calculate the current df_dt
-            ! BASED ON EXPONENTIAL (sharp transition, tuneable)
-            ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
-            ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
-            ! that exp function doesn't explode (exp(-10)=>0.0)
-            dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%dv_dt_scale,10.0_wp)
-            f_scale = exp(-dvdt_fac)
+            select case(trim(hyst%par%method))
 
-            ! Get forcing rate of change in [f/1e6 a]
-            hyst%df_dt = hyst%par%df_sign * ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
+                case("const") 
+                    ! Apply a constant rate of change, independent of dv_dt
+                    ! Set magnitude of df_dt right now in [f/(1e6 yr)] 
+                    hyst%df_dt = hyst%par%df_dt_const
 
-            ! Convert [f/1e6 a] => [f/a]
-            hyst%df_dt = hyst%df_dt *1e-6 
-            
+                case("exp")
+
+                    ! Calculate the current df_dt
+                    ! BASED ON EXPONENTIAL (sharp transition, tuneable)
+                    ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
+                    ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
+                    ! that exp function doesn't explode (exp(-10)=>0.0)
+                    dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%dv_dt_scale,10.0_wp)
+                    f_scale  = exp(-dvdt_fac)
+
+                    ! Get forcing rate of change magnitude in [f/1e6 a]
+                    hyst%df_dt = ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
+
+                case("PI42","H312b","H312PID","H321PID","PID1")
+
+                    ! Calculate adaptive dfdt value using proportional-integral (PI) methods
+                    call set_adaptive_timestep_pc(pc_df_now,hyst%pc_df,hyst%pc_eta,hyst%par%pc_eps, &
+                                        hyst%par%df_dt_min,hyst%par%df_dt_max,pc_order,hyst%par%method)
+
+                    ! Remove oldest point from the end and insert latest point in beginning
+                    hyst%pc_eta = eoshift(hyst%pc_eta,-1,boundary=abs(hyst%dv_dt))
+                    hyst%pc_df  = eoshift(hyst%pc_df, -1,boundary=abs(pc_df_now))
+
+                    ! Apply limits to eta so that algorithm works well. 
+                    ! pc_eta should be greater than zero
+                    hyst%pc_eta(1) = max(hyst%pc_eta(1),1e-3)
+
+                    ! Get forcing rate of change magnitude in [f/1e6 a]
+                    hyst%df_dt = hyst%pc_df(1) 
+
+            end select 
+
+            ! Convert [f/(1e6 yr)] => [f/yr] and apply sign of change
+            hyst%df_dt = hyst%par%df_sign*hyst%df_dt *1e-6 
+
             ! Avoid underflow errors 
             if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
 
             ! Once the rate is available, update the current forcing value 
-            hyst%f_now = hyst%f_now + hyst%df_dt * dt_now 
+            hyst%f_now = hyst%f_now + (hyst%df_dt*dt_now) 
             
         end if 
 
@@ -208,107 +248,7 @@ contains
         return
 
     end subroutine hyster_calc_forcing
-
-    subroutine hyster_calc_forcing_pc(hyst,time,var)
-        ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-        ! Subroutine :  d t T r a n s 1
-        ! Author     :  Alex Robinson
-        ! Purpose    :  Generate correct T_warming for gradual changes over
-        !               time (continuous stability diagram!)
-        ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++  
-
-        type(hyster_class), intent(INOUT) :: hyst 
-        real(wp),           intent(IN)    :: time
-        real(wp),           intent(IN)    :: var 
-
-        ! Local variables 
-        real(wp), allocatable :: dv_dt(:)
-        real(wp) :: dv_dt_now 
-        real(wp) :: f_scale 
-        integer  :: ntot, kmin, kmax, nk, k 
-        real(wp) :: dt_tot, dt_now 
-        real(wp) :: dvdt_fac 
-        real(wp) :: pc_df_now 
-
-        ! Get size of hyst vectors 
-        ntot = size(hyst%time,1) 
-
-        ! Get current timestep 
-        dt_now = time - hyst%time(ntot) 
-
-        ! Remove oldest point from beginning and add current one to the end
-        hyst%time = eoshift(hyst%time,1,boundary=time)
-        hyst%var  = eoshift(hyst%var, 1,boundary=var)
-
-        ! Determine range of indices of times within our 
-        ! time-averaging window. 
-        kmin = findloc(hyst%time .ge. time - hyst%par%dt_ave,value=.TRUE., &
-                                                     dim=1,mask=hyst%time.ne.MV)
-        kmax = ntot 
-
-        ! Determine currently available time window
-        ! Note: do not use kmin here, in case time step does not match dt_ave,
-        ! rather, use all available times in the vector to see if enough 
-        ! time has passed. 
-        dt_tot = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
-
-        if (dt_tot .lt. hyst%par%dt_ave) then 
-            ! Not enough time has passed, maintain constant forcing 
-            ! (to avoid affects of noisy derivatives)
-
-            hyst%df_dt = 0.0_wp 
-
-        else 
-            ! Calculate forcing 
-
-            ! Get current number of averaging points 
-            nk = kmax - kmin + 1 
             
-            allocate(dv_dt(nk-1)) 
-
-            ! Calculate mean rate of change over time steps of interest [Gt/a]
-            dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
-                      (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
-            hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
-                                         (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
-
-            ! Calculate adaptive dfdt value using proportional-integral (PI) methods
-            call set_adaptive_timestep_pc(pc_df_now,hyst%pc_df,hyst%pc_eta,hyst%par%pc_eps, &
-                                    hyst%par%df_dt_min,hyst%par%df_dt_max,2,hyst%par%pc_controller)
-
-            ! Remove oldest point from the end and insert latest point in beginning
-            hyst%pc_eta = eoshift(hyst%pc_eta,-1,boundary=abs(hyst%dv_dt))
-            hyst%pc_df  = eoshift(hyst%pc_df, -1,boundary=abs(pc_df_now))
-
-            ! Apply limits to eta so that algorithm works well. 
-            ! pc_eta should be greater than zero
-            hyst%pc_eta(1) = max(hyst%pc_eta(1),1e-3)
-
-            
-            ! Get forcing rate of change in [f/1e6 a]
-            hyst%df_dt = hyst%par%df_sign * hyst%pc_df(1) 
-
-            ! Convert [f/1e6 a] => [f/a]
-            hyst%df_dt = hyst%df_dt *1e-6 
-            
-            ! Avoid underflow errors 
-            if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
-
-            ! Once the rate is available, update the current forcing value 
-            hyst%f_now = hyst%f_now + hyst%df_dt * dt_now 
-            
-        end if 
-
-        ! Check if kill should be activated 
-        if (hyst%f_now .lt. hyst%par%f_min .or. hyst%f_now .gt. hyst%par%f_max) then 
-            hyst%kill = .TRUE. 
-        end if 
-
-        return
-
-    end subroutine hyster_calc_forcing_pc
-
-        
     subroutine set_adaptive_timestep_pc(dt_new,dt,eta,eps,dtmin,dtmax,pc_k,controller)
         ! Calculate the timestep following algorithm for 
         ! a general predictor-corrector (pc) method.

@@ -35,9 +35,10 @@ program yelmox
     integer    :: n
     logical    :: calc_transient_climate
     
-    logical, parameter :: use_hyster = .TRUE. 
+    logical :: use_hyster 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa, dT_summer
+    real(4) :: dTdt 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -63,7 +64,9 @@ program yelmox
     call nml_read(path_par,"ctrl","dt1D_out",    dt1D_out)                   ! [yr] Frequency of 1D output 
     call nml_read(path_par,"ctrl","dt2D_out",    dt2D_out)                   ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","transient",   calc_transient_climate)     ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","use_hyster",  use_hyster)                 ! Use hyster?
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
+    call nml_read(path_par,"ctrl","dTdt",        dTdt)                       ! Constant rate of temperature change when not using hyster
     call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
     
     ! Define input and output locations 
@@ -123,7 +126,7 @@ program yelmox
     
     if (use_hyster) then
         ! Update hysteresis variable 
-        call hyster_calc_forcing_pc(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+        call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
         dT_summer = hyst1%f_now 
     end if 
 
@@ -228,7 +231,7 @@ if (calc_transient_climate) then
         
         if (use_hyster) then
             ! Update forcing based on hysteresis module
-            call hyster_calc_forcing_pc(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
             write(*,*) "hyst: ", time, hyst1%time(size(hyst1%time,1))-hyst1%time(size(hyst1%time,1)-1), &
                                                     hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
         
@@ -284,7 +287,8 @@ end if
         end if 
 
         if (use_hyster .and. hyst1%kill) then 
-            write(*,*) "hyster kill switch activated, f_now = ", hyst1%f_now 
+            write(*,"(a,f12.3,a,f12.3)") "hyster:: kill switch activated. [time, f_now] = ", &
+                                                        time, ", ", hyst1%f_now 
             stop 
         end if 
 
