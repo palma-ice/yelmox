@@ -660,7 +660,7 @@ contains
                       dim1="time",start=[k],ncid=ncid)
         
         ! ===== Total ice variables =====
-
+        
         call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"z_srf",reg%z_srf,units="m",long_name="Mean surface elevation", &
