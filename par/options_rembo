@@ -12,7 +12,7 @@
     --   :  forcing_file                : in_rembo/forcing/mis11.climber_paleo.dat
 #   --   :  forcing_file                : in_rembo/forcing/paleo300ka_hybrid_aicc2012.nc
     --   :  emb_clim_file               : ice_data/Greenland/GRL-80KM/ERA-40/GRL-80KM_ERA-40_195801-200112.nc
-    --   :  clim_file                   : ice_data/Greenland/GRL-20KM/GRL-20KM_RACMO23-ERA-INTERIM_ann_1981-2010.nc
+    --   :  clim_file                   : ice_data/Greenland/GRL-20KM/GRL-20KM_MARv3.11-ERA_annmean_1961-1990.nc
     
 ## Program switches
     --   :  climchoice                  =  1
