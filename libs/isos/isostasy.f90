@@ -176,7 +176,7 @@ contains
         
         return 
 
-    end subroutine isos_init_state 
+    end subroutine isos_init_state
 
     subroutine isos_update(isos,H_ice,z_sl,time)
 
