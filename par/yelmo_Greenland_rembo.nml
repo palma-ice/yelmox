@@ -19,7 +19,7 @@
     df_sign         =  1                ! [-1/1] Determines direction of forcing
     dv_dt_scale     =  5.0              ! [Gt/yr] Ice sheets: 1 Gt/a, more or less...
     df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 40 kyr, 4/1.333e-5 ~ 300 kyr.
-    f_range         = 0.0, 4.0          ! Forcing range to cover
+    f_range         = -3.0, 4.0         ! Forcing range to cover
 /
 
 &yelmo
