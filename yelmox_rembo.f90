@@ -284,7 +284,7 @@ end if
         if (use_hyster .and. hyst1%kill) then 
             write(*,"(a,f12.3,a,f12.3)") "hyster:: kill switch activated. [time, f_now] = ", &
                                                         time, ", ", hyst1%f_now 
-            stop 
+            exit  
         end if 
 
     end do 
@@ -302,7 +302,7 @@ end if
     call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 
     write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
 
