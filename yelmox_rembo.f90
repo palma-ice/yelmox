@@ -36,6 +36,7 @@ program yelmox
     logical    :: calc_transient_climate
     
     logical :: use_hyster
+    logical :: write_restart 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa, dT_summer
     real(4) :: dTdt 
@@ -63,6 +64,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dtt",         dtt)                        ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt1D_out",    dt1D_out)                   ! [yr] Frequency of 1D output 
     call nml_read(path_par,"ctrl","dt2D_out",    dt2D_out)                   ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","write_restart", write_restart)
     call nml_read(path_par,"ctrl","transient",   calc_transient_climate)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_hyster",  use_hyster)                 ! Use hyster?
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
@@ -190,7 +192,7 @@ program yelmox
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
     end if 
-    
+
     ! 2D small file 
     ! call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
     ! call write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=time)
@@ -275,7 +277,7 @@ end if
             call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
         end if 
 
-        if (mod(time,dt_restart)==0) then 
+        if (write_restart .and. mod(time,dt_restart)==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
 
@@ -292,7 +294,9 @@ end if
     end do 
 
     ! Write the restart file for the end of the simulation
-    call yelmo_restart_write(yelmo1,file_restart,time=time) 
+    if (write_restart) then 
+        call yelmo_restart_write(yelmo1,file_restart,time=time) 
+    end if
 
 !     ! Let's see if we can read a restart file 
 !     call yelmo_restart_read(yelmo1,file_restart,time=time)

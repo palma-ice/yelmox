@@ -7,6 +7,7 @@
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 0.0               ! [yr] Frequency of writing 2D output files 
+    write_restart   = False             ! Write restart files
     transient       = True              ! Calculate transient climate? 
     use_hyster      = True              ! Use hysteresis module? 
     dT              = 0.0               ! [K]  Summer warming anomaly              
