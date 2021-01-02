@@ -77,10 +77,6 @@ contains
 
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
-
-        ! Get f_min and f_max values 
-        hyst%par%f_min = hyst%par%f_range(1) 
-        hyst%par%f_max = hyst%par%f_range(2) 
         
         ! Prescribe a very small, but nonzero minimum value 
         ! (important to be nonzero for the pi controller methods)
