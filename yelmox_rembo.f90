@@ -35,7 +35,7 @@ program yelmox
     integer    :: n
     logical    :: calc_transient_climate
     
-    logical :: use_hyster 
+    logical :: use_hyster
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa, dT_summer
     real(4) :: dTdt 
@@ -186,8 +186,10 @@ program yelmox
     !call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.FALSE.)
     
     ! 2D file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-    call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
+    if (dt2D_out .ne. 0.0) then 
+        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+        call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
+    end if 
     
     ! 2D small file 
     ! call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
@@ -264,7 +266,7 @@ end if
 
         ! == MODEL OUTPUT =======================================================
 
-        if (mod(time,dt2D_out)==0) then 
+        if (dt2D_out .ne. 0.0 .and. mod(time,dt2D_out)==0) then 
             call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
         end if 
 
