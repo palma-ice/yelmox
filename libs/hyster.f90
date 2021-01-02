@@ -66,13 +66,14 @@ contains
         if (present(label)) par_label = trim(par_label)//"_"//trim(label)
 
         ! Load parameters
-        call nml_read(filename,trim(par_label),"method",        hyst%par%method)
+        call nml_read(filename,trim(par_label),"method",      hyst%par%method)
          
-        call nml_read(filename,trim(par_label),"dt_ave",        hyst%par%dt_ave)
-        call nml_read(filename,trim(par_label),"df_sign",       hyst%par%df_sign)
-        call nml_read(filename,trim(par_label),"dv_dt_scale",   hyst%par%dv_dt_scale)
+        call nml_read(filename,trim(par_label),"dt_ave",      hyst%par%dt_ave)
+        call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
+        call nml_read(filename,trim(par_label),"dv_dt_scale", hyst%par%dv_dt_scale)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
-        call nml_read(filename,trim(par_label),"f_range",       hyst%par%f_range)
+        call nml_read(filename,trim(par_label),"f_min",       hyst%par%f_min)
+        call nml_read(filename,trim(par_label),"f_max",       hyst%par%f_max)
 
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
