@@ -45,10 +45,16 @@ module snapclim
 
     type recon_param_class 
         character(len=512)      :: clim_path 
-        character(len=56)       :: clim_names(3)
+        character(len=56)       :: clim_names(4)
         character(len=56)       :: clim_type 
         logical                 :: clim_monthly 
         real(prec), allocatable :: clim_times(:) 
+
+        character(len=512)      :: ocn_path
+        character(len=56)       :: ocn_names(4)
+        character(len=56)       :: ocn_type
+        logical                 :: ocn_monthly
+        real(prec), allocatable :: ocn_times(:)
 
     end type 
 
@@ -176,6 +182,9 @@ contains
             call recon_par_load(snp%recon,filename,domain,grid_name)
         end if 
 
+        if (trim(snp%par%ocn_type) .eq. "recon") then
+            call recon_par_load(snp%recon,filename,domain,grid_name)
+        end if
 
         ! Determine which snapshots should be loaded (atm)
         select case(trim(snp%par%atm_type))
@@ -205,7 +214,7 @@ contains
         ! Determine which snapshots should be loaded (atm)
         select case(trim(snp%par%ocn_type))
 
-            case("const","hybrid","anom","fraction")
+            case("const","hybrid","anom","fraction","recon")
 
                 load_ocn1 = .FALSE.
                 load_ocn2 = .FALSE. 
@@ -505,7 +514,27 @@ contains
                 call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
                 
                 ! Update external index 
-                ao = dTo_now 
+                ao = dTo_now
+
+            case("recon")
+                ! Use reconstructed input data 
+                ! (predetermined N snapshots with linear interpolation between)
+
+                ! Set clim1 = clim0 to ensure fields are available with present-day topo 
+                snp%clim1 = snp%clim0
+
+                ! Assume reconstruction consists of an anomalies temperature field.
+
+                ! Load reconstruction fields of to for the current time 
+                call read_ocean_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%depth,time) 
+
+                ! We  have loaded dTocn fields, apply to reference climate  
+                ! to get current climate snapshot   
+                call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann, snp%clim1%to_ann)
+
+                ! Update external index
+                ao = sum(snp%now%to_ann)    &
+                    / real(size(snp%now%to_ann,1)*size(snp%now%to_ann,2)*size(snp%now%to_ann,3)) 
                 
             case("snap_1ind","snap_1ind_new")
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
@@ -807,13 +836,15 @@ contains
         character(len=*), intent(IN) :: domain 
 
         ! Local variables 
-        integer    :: k0, k1, k, q, m, nt, nx, ny, nm   
+        integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j   
         real(prec) :: t0, t1, alpha
-        character(len=56) :: varnm  
+        character(len=56) :: varnm
+        real(prec) :: lapse_now_south, lapse_now_north  
         real(prec), allocatable :: var0(:,:,:)
         real(prec), allocatable :: var1(:,:,:)
-        real(prec), allocatable :: var(:,:,:)
-        
+        real(prec), allocatable :: var(:,:,:)      
+        real(prec), allocatable :: z_srf_pd(:,:)  
+
         real(prec) :: lapse_mon(12)   
         logical :: south 
 
@@ -829,7 +860,8 @@ contains
         allocate(var0(nx,ny,nm))
         allocate(var1(nx,ny,nm))
         allocate(var(nx,ny,nm))
-        
+        allocate(z_srf_pd(nx,ny))        
+
         ! Determine the indices of reconstruction time slices 
         ! bracketing the current time 
         if (time .lt. minval(par%clim_times)) then 
@@ -849,7 +881,7 @@ contains
 
             k1 = 0 
             do k = 1, nt 
-                k1 = k + 1
+                k1 = k1 + 1
                 if (par%clim_times(k) .gt. time) exit 
             end do 
 
@@ -881,7 +913,7 @@ contains
                 ! Read monthly values directly 
                 call nc_read(par%clim_path,varnm,var0,start=[1,1,1,k0],count=[nx,ny,nm,1])
                 call nc_read(par%clim_path,varnm,var1,start=[1,1,1,k1],count=[nx,ny,nm,1])
-
+                write(*,*) "Dimension of var0, tas:", size(var0)
             else 
 
                 ! Read annual values 
@@ -910,41 +942,250 @@ contains
         end do  
 
 
-        ! Step 3: Calculate sea-level temps and precip 
-        ! ajr: not currently used because reconstruction files 
-        ! are already anomalies with somewhat inconsistent z_srf 
-        ! definitions in each case. Cleanest is to ignore elevation effects here.
-if (.FALSE.) then 
+        ! Read in the elevation. Since tas and pr are anomalies, zsrf should be
+        ! an anomaly too (clim%z_srf-z_srf_pd). 
+        
+        if (trim(par%clim_names(4)) .eq. "zs") then 
+
+             ! Read in the elevation from the climatology reconstruction file
+ 
+             ! Get current variable name
+             varnm = trim(par%clim_names(4))
+
+             ! Read annual values
+             call nc_read(par%clim_path,varnm,var0(:,:,1),start=[1,1,k0],count=[nx,ny,1])
+             call nc_read(par%clim_path,varnm,var1(:,:,1),start=[1,1,k1],count=[nx,ny,1])
+
+             ! Calculate current elevation values from interpolation
+             var = var0*(1-alpha) + var1*alpha
+
+             ! Fill in the elevation values in a 2d array
+             do j = 1, ny
+             do i = 1, nx
+
+                 clim%z_srf(i,j) = var(i,j,1)
+
+             end do
+             end do
+
+             ! Read in the present day elevation from the climatology reconstruction file
+             call nc_read(par%clim_path,varnm,var(:,:,1),start=[1,1,nt],count=[nx,ny,1])
+
+             ! Fill in the elevation values in a 2d array
+             do j = 1, ny
+             do i = 1, nx
+
+                 z_srf_pd(i,j) = var(i,j,1)
+
+             end do
+             end do
+
+
+        else
+             clim%z_srf = z_srf
+             z_srf_pd = z_srf
+
+        end if 
+
+
+        ! Step 3: Calculate sea-level temps and precip (corrected to the elevation anomaly)
+        
+        lapse_now_south = (lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+        lapse_now_north = (lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
 
         do m = 1, 12
 
             ! Monthly lapse rates from ann and sum (jan or jul)
             if (south) then 
-                clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                    z_srf*(lapse(1)+(lapse(2)-lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+                clim%tsl(:,:,m) = clim%tas(:,:,m) + (clim%z_srf-z_srf_pd)*lapse_now_south
             else 
-                clim%tsl(:,:,m) = clim%tas(:,:,m) + &
-                    z_srf*(lapse(1)+(lapse(1)-lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
+                clim%tsl(:,:,m) = clim%tas(:,:,m) + (clim%z_srf-z_srf_pd)*lapse_now_north
             end if 
 
             ! Precip (scale by a fraction)
             clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
-        end do 
-        
-else 
-        ! Simply set sea-level fields equal to surface fields 
-        
-        clim%tsl   = clim%tas 
-        clim%prcor = clim%pr 
+        end do
 
-end if
 
         return 
 
     end subroutine read_climate_snapshot_reconstruction
 
+    subroutine read_ocean_snapshot_reconstruction(ocn,par,depth,time)
+        ! Given a predefined ocean snapshot ocn (already allocated),
+        ! repopulate it with new snapshot based on current time 
 
+        implicit none
+
+        type(snapclim_state_class), intent(INOUT) :: ocn
+        type(recon_param_class), intent(IN)       :: par
+        real(prec),       intent(IN) :: depth(:)
+        real(prec),       intent(IN) :: time
+
+        ! Local variables 
+        integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j
+        integer    :: nz, nz0
+        real(prec) :: t0, t1, alpha
+        character(len=56) :: varnm
+        real(prec), allocatable :: var0(:,:,:,:)
+        real(prec), allocatable :: var1(:,:,:,:)
+        real(prec), allocatable :: var(:,:,:,:)
+        real(prec), allocatable :: depth0(:)
+        integer,    allocatable :: mask3D(:,:,:)
+        real(prec), allocatable :: tocn3D(:,:,:)
+
+        nt = size(par%ocn_times,1)
+        nx = size(ocn%to_ann,1)
+        ny = size(ocn%to_ann,2)
+        nz = size(ocn%depth,1)
+        nm = 12
+   
+
+        ! Step 0: Determine the length of the input depth dimension 
+        ! and define the input depth dimension vector
+        
+        ! Read in depth dimension size from file
+        nz0 = nc_size(par%ocn_path,par%ocn_names(2))
+        allocate(depth0(nz0))
+        call nc_read(par%ocn_path,par%ocn_names(2),depth0)
+
+        ! Allocate temporary
+        allocate(mask3D(nx,ny,nz0))
+        allocate(tocn3D(nx,ny,nz0)) 
+        allocate(var0(nx,ny,nz0,nm))
+        allocate(var1(nx,ny,nz0,nm))
+        allocate(var(nx,ny,nz0,nm))
+
+
+        ! Step 1: Determine the indices of reconstruction time slices 
+        ! bracketing the current time 
+        if (time .lt. minval(par%ocn_times)) then
+            ! Current time is less than the minimum reconstruction range 
+
+            k0 = 1
+            k1 = 1
+
+        else if (time .gt. maxval(par%ocn_times)) then
+            ! Current time is greater than the maximum reconstruction range 
+
+            k0 = nt
+            k1 = nt
+
+        else
+            ! Current time is somewhere inside reconstruction range 
+
+            k1 = 0
+            do k = 1, nt
+                k1 = k1 + 1
+                if (par%ocn_times(k) .gt. time) exit
+            end do
+
+            k0 = k1-1
+
+        end if
+
+        ! Calculate linear interpolation weight
+        t0 = par%ocn_times(k0)
+        t1 = par%ocn_times(k1)
+
+        if (t0 .ne. t1) then
+            alpha = (time-t0)/(t1-t0)
+        else
+            alpha = 0.0_prec
+        end if
+
+        
+        ! Step 2: load oceanic temperature field and interpolate 
+        ! Assumes: var = var0*(1-alpha) + var1*alpha 
+
+        ! Get current variable name
+        varnm = trim(par%ocn_names(4))
+
+        if (par%ocn_monthly) then
+
+            ! Read monthly values directly 
+            call nc_read(par%ocn_path,varnm,var0,start=[1,1,1,1,k0],count=[nx,ny,nz0,nm,1])
+            call nc_read(par%ocn_path,varnm,var1,start=[1,1,1,1,k1],count=[nx,ny,nz0,nm,1])
+            write(*,*) "Dimension of var0, tocn:", size(var0)
+        
+        else
+
+            ! Read annual values 
+            call nc_read(par%ocn_path,varnm,var0(:,:,:,1),start=[1,1,1,k0],count=[nx,ny,nz0,1])
+            call nc_read(par%ocn_path,varnm,var1(:,:,:,1),start=[1,1,1,k1],count=[nx,ny,nz0,1])
+
+            ! Populate remaining months 
+            do k = 2, nm
+                var0(:,:,:,k) = var0(:,:,:,1)
+                var1(:,:,:,k) = var1(:,:,:,1)
+            end do
+
+        end if
+
+        ! Calculate current snapshot value
+        var = var0*(1-alpha) + var1*alpha
+
+        ! Calculate annual mean temperature 
+        tocn3D = sum(var,dim=4)
+        tocn3D = tocn3D/12.0
+            
+ 
+        ! Step 3: Read in the mask3D field. Input field has 4 dim (nx,ny,nz0,nt)
+        ! but output has only 3 dim (nx,ny,nz0).
+        
+        ! Get current variable name
+        varnm = trim(par%ocn_names(3))
+
+        ! Read annual values
+        call nc_read(par%ocn_path,varnm,var0(:,:,:,1),start=[1,1,1,k0],count=[nx,ny,nz0,1])
+        call nc_read(par%ocn_path,varnm,var1(:,:,:,1),start=[1,1,1,k1],count=[nx,ny,nz0,1])
+
+        ! Calculate current elevation values from interpolation
+        var = var0*(1-alpha) + var1*alpha
+
+        ! Fill in the mask3D values in a 3d array (nx,ny,nz0)
+        do k = 1, nz0
+        do j = 1, ny
+        do i = 1, nx
+
+             mask3D(i,j,k) = var(i,j,k,1)
+
+        end do
+        end do
+        end do
+
+        
+        ! Step 4: interpolate vertical levels to those needed by the model
+        do k = 1, size(ocn%depth)
+                do j = 1, ny
+                    do i = 1, nx
+
+                        ! Interpolate ocean temp to current depth level (negative to convert from depth to height)
+                        ocn%to_ann(i,j,k) = interp_linear(depth0,tocn3D(i,j,:),xout=ocn%depth(k))
+
+                        ! Get nearest mask value 
+                        if (ocn%depth(k) .gt. maxval(depth0)) then
+                            ! If the model ocean depth does not exist, set mask to land
+                            ocn%mask_ocn(i,j,k)=0
+
+                        else
+                            ! Interpolate ocean mask to current depth 
+                            ocn%mask_ocn(i,j,k) = &
+                                nint(interp_linear(depth0,real(mask3D(i,j,:)),xout=ocn%depth(k)))
+
+                        end if
+
+                    end do
+                end do
+        end do
+
+
+        return
+
+    end subroutine read_ocean_snapshot_reconstruction
+
+    
     subroutine snapclim_par_load(par,hpar,filename,init)
         ! == Parameters from namelist file ==
 
@@ -1005,8 +1246,13 @@ end if
         call nml_read(filename,"snap_recon","clim_names",   par%clim_names,   init=init_pars)
         call nml_read(filename,"snap_recon","clim_monthly", par%clim_monthly, init=init_pars)
 
+        call nml_read(filename,"snap_recon","ocn_path",     par%ocn_path,     init=init_pars)
+        call nml_read(filename,"snap_recon","ocn_names",    par%ocn_names,    init=init_pars)
+        call nml_read(filename,"snap_recon","ocn_monthly",  par%ocn_monthly,  init=init_pars)
+
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
+        call parse_path(par%ocn_path,domain,grid_name)
 
         ! Load clim times 
         nt = nc_size(par%clim_path,trim(par%clim_names(1)))
@@ -1014,11 +1260,21 @@ end if
         allocate(par%clim_times(nt))
         call nc_read(par%clim_path,trim(par%clim_names(1)),par%clim_times)
 
+        ! Load ocn times 
+        nt = nc_size(par%ocn_path,trim(par%ocn_names(1)))
+        if (allocated(par%ocn_times)) deallocate(par%ocn_times)
+        allocate(par%ocn_times(nt))
+        call nc_read(par%ocn_path,trim(par%ocn_names(1)),par%ocn_times)
+
         write(*,*) "recon_par_load:: "//trim(par%clim_path) 
-        write(*,"(a,a)")         "  recon_path:  ", trim(par%clim_path)
+        write(*,"(a,a)")         "  clim_path:  ", trim(par%clim_path)
         write(*,"(a,2f10.3)")    "  range(clim_times): ", minval(par%clim_times), &
                                                           maxval(par%clim_times)
-        
+        write(*,*) "recon_par_load:: "//trim(par%ocn_path)
+        write(*,"(a,a)")         "  ocn_path:  ", trim(par%ocn_path)
+        write(*,"(a,2f10.3)")    "  range(ocn_times): ", minval(par%ocn_times), &
+                                                          maxval(par%ocn_times)
+
         return 
 
     end subroutine recon_par_load
