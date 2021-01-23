@@ -15,6 +15,7 @@
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "None"            !"/home/dmoren07/yelmo-model/yelmox/output/PMIP3/ensembles/exp_convergence/btmthd.2.cfstrm.20.sstrcnv.0.01.sstrmx.5"
     log_timestep    = False 
+    disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
