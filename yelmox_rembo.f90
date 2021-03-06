@@ -170,7 +170,7 @@ program yelmox
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
@@ -198,8 +198,8 @@ program yelmox
     ! call write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=time)
     
     ! 1D file 
-    ! call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    ! call write_yreg_step(yelmo1,file1D,time=time) 
+    ! call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     ! 1D file hyst 
     call write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
@@ -231,9 +231,8 @@ if (calc_transient_climate) then
         if (use_hyster) then
             ! Update forcing based on hysteresis module
             call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-            write(*,*) "hyst: ", time, hyst1%time(size(hyst1%time,1))-hyst1%time(size(hyst1%time,1)-1), &
-                                                    hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-        
+            write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
+            
             dT_summer = hyst1%f_now 
         end if 
 
@@ -273,7 +272,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-            ! call write_yreg_step(yelmo1,file1D,time=time) 
+            ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
         end if 
 

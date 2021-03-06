@@ -34,6 +34,7 @@ module hyster
         ! variables 
         real(wp), allocatable :: time(:)
         real(wp), allocatable :: var(:)
+        real(wp) :: dt 
         real(wp) :: dv_dt
         real(wp) :: df_dt
         
@@ -135,7 +136,7 @@ contains
         real(wp) :: dv_dt_now 
         real(wp) :: f_scale 
         integer  :: ntot, kmin, kmax, nk, k 
-        real(wp) :: dt_tot, dt_now 
+        real(wp) :: dt_tot 
         real(wp) :: dvdt_fac 
         real(wp) :: pi_df_now 
 
@@ -147,7 +148,7 @@ contains
         ntot = size(hyst%time,1) 
 
         ! Get current timestep 
-        dt_now = time - hyst%time(ntot) 
+        hyst%dt = time - hyst%time(ntot) 
 
         ! Remove oldest point from beginning and add current one to the end
         hyst%time = eoshift(hyst%time,1,boundary=time)
@@ -233,7 +234,7 @@ contains
             if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
 
             ! Once the rate is available, update the current forcing value 
-            hyst%f_now = hyst%f_now + (hyst%df_dt*dt_now) 
+            hyst%f_now = hyst%f_now + (hyst%df_dt*hyst%dt) 
             
         end if 
 

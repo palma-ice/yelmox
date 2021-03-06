@@ -180,7 +180,7 @@ program yelmox
     
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
@@ -230,12 +230,12 @@ program yelmox
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
     
     ! 1D file 
-    call write_yreg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call write_yreg_step(yelmo1,file1D,time=time) 
+    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
+    call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     if (reg1_write) then 
-        call write_yreg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=reg1_mask)
-        call write_yreg_step(yelmo1,reg1_fnm,time,mask=reg1_mask)
+        call yelmo_write_reg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=reg1_mask)
+        call yelmo_write_reg_step(yelmo1,reg1_fnm,time,mask=reg1_mask)
     end if 
 
     ! Advance timesteps
@@ -293,10 +293,10 @@ end if
         end if
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then
-            call write_yreg_step(yelmo1,file1D,time=time)
+            call yelmo_write_reg_step(yelmo1,file1D,time=time)
 
             if (reg1_write) then 
-                call write_yreg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
+                call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
             end if  
         end if 
 
@@ -492,7 +492,7 @@ contains
 
         call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
+        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -524,13 +524,13 @@ contains
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"T_lith",ylmo%thrm%now%T_lith,units="K",long_name="Lithosphere temperature", &
+        call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
                       dim1="xc",dim2="yc",dim3="zeta_l",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        call nc_write(filename,"Q_lith",ylmo%thrm%now%Q_lith,units="J a-1 m-2",long_name="Lithosphere heat flux at bed surface", &
+        call nc_write(filename,"Q_rock",ylmo%thrm%now%Q_rock,units="mW m-2",long_name="Bedrock surface heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
+        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW m-2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &

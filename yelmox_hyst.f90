@@ -201,7 +201,7 @@ program yelmox
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,path_par,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
@@ -226,11 +226,11 @@ end if
     call write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=time)
     
     ! 1D file 
-!mmr    call write_yreg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-!mmr    call write_yreg_step(yelmo1,file1D,time=time) 
+!mmr    call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+!mmr    call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     ! 1D file hyst 
-    ! call write_yreg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+    ! call yelmo_write_reg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
     call write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
@@ -274,8 +274,7 @@ if (calc_transient_climate) then
             if ( (use_hyster.and.time.gt.100000).or.(use_hyster.and.init_no_ice)) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-                write(*,*) "hyst: ", time, hyst1%time(hyst1%n)-hyst1%time(hyst1%n-1), &
-                                                        hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
+                write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
 !mmr                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
                 call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now,dTo=hyst1%f_now*0.25) !mmr
             else
@@ -318,7 +317,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-!mmr            call write_yreg_step(yelmo1,file1D,time=time) 
+!mmr            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             call write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
         end if 
 
@@ -450,7 +449,7 @@ contains
 
         call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
+        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -483,7 +482,7 @@ contains
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
+        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW m-2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
