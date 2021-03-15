@@ -98,7 +98,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     # Add options
-    parser.add_argument('-e','--exe',type=str,default='initmip',
+    parser.add_argument('-e','--exe',type=str,default='yelmox',
         help="Define the executable file to use here. " \
              "Shortcuts: " + exe_aliases_str)
     parser.add_argument('-r','--run',action="store_true",
