@@ -41,7 +41,7 @@ module marine_shelf
         real(prec)         :: basin_bmb(50)
         real(prec) :: c_shlf, kappa_shlf, f_grz_shlf
         real(prec) :: c_grz, kappa_grz, grz_length
-        real(prec) :: gamma_lin, gamma_quad, gamma_basin 
+        real(prec) :: gamma_lin, gamma_quad, gamma_quad_nl 
 
         real(prec) :: c_deep, depth_deep
         real(prec) :: T_fp 
@@ -79,6 +79,7 @@ module marine_shelf
     public :: marshelf_class
     public :: marshelf_init
     public :: marshelf_calc_Tshlf
+    public :: marshelf_calc_Sshlf
     public :: marshelf_set_Tshlf 
     public :: marshelf_update
     public :: marshelf_end 
@@ -296,11 +297,6 @@ contains
         real(prec), intent(IN) :: dx
         real(prec), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
        
-        ! Local variables: jablasco
-        logical,    allocatable :: is_grline(:,:)
-        allocate(is_grline(size(f_grnd,1),size(f_grnd,2)))
-        is_grline = calc_grline(f_grnd)
- 
         ! 0. Calculate water temps at depths of interest ============================
 
         select case(trim(mshlf%par%T_shlf_method))
@@ -313,7 +309,6 @@ contains
             case("layer")
                 ! Takes the nearest layer for the temperature
                 call calc_shelf_temperature_layer(mshlf%now%T_shlf,mshlf%now%dT_shlf,depth,to_ann,dto_ann,H_ice)
-                ! call calc_shelf_salinity_layer(mshlf%now%S_shlf,depth,so_ann,H_ice)           
 
            case("interp")
                ! Interpolation from the two nearest layers 
@@ -337,6 +332,44 @@ contains
         return 
 
     end subroutine marshelf_calc_Tshlf
+
+    subroutine marshelf_calc_Sshlf(mshlf,H_ice,depth,so)
+        ! Calculate the 2D field of S_shlf from 3D ocean salinity
+        ! fields
+        ! TO DO: update S_shlf method as T_shlf
+        ! Right now: layer for PICO -> simplest case
+
+        implicit none
+
+        type(marshelf_class), intent(INOUT) :: mshlf
+        real(prec), intent(IN) :: H_ice(:,:)
+        real(prec), intent(IN) :: depth(:),so(:,:,:)
+
+        ! 0. Calculate water salinity at depths of interest
+        ! ============================
+
+        call calc_shelf_salinity_layer(mshlf%now%S_shlf,depth,so,H_ice)
+
+        select case(trim(mshlf%par%T_shlf_method))
+
+            case("mean")
+                ! Computes the salinity for a mean value
+                call calc_shelf_salinity_mean(mshlf%now%S_shlf,depth,so, &
+                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+
+            case("layer")
+                ! Takes the nearest layer for the salinity
+                call calc_shelf_salinity_layer(mshlf%now%S_shlf,depth,so,H_ice)
+
+           case("interp")
+               ! Interpolation from the two nearest layers
+               call  calc_shelf_salinity_depth(mshlf%now%S_shlf,depth,so,H_ice)
+
+        end select
+
+        return
+
+    end subroutine marshelf_calc_Sshlf
 
     subroutine marshelf_set_Tshlf(mshlf,to_ann,dto_ann)
         ! Specify the 2D T_shlf/dT_shlf field according to a spatially constant value 
@@ -443,7 +476,7 @@ contains
                 else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad") then
                         bmb_floating = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
                 else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                        bmb_floating = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_shlf_basin(i,j),mshlf%par%gamma_basin)
+                        bmb_floating = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_shlf_basin(i,j),mshlf%par%gamma_quad_nl)
                 end if
 
                 if (is_grline(i,j)) then
@@ -459,7 +492,7 @@ contains
                         bmb_grline = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
                         bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
                     else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                        bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_shlf_basin(i,j),mshlf%par%gamma_basin)
+                        bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_shlf_basin(i,j),mshlf%par%gamma_quad_nl)
                         bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
                     end if
 
@@ -549,7 +582,7 @@ contains
         call nml_read(filename,"marine_shelf","kappa_grz",      par%kappa_grz,      init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_lin",      par%gamma_lin,      init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_quad",     par%gamma_quad,     init=init_pars)
-        call nml_read(filename,"marine_shelf","gamma_basin",    par%gamma_basin,    init=init_pars)
+        call nml_read(filename,"marine_shelf","gamma_quad_nl",  par%gamma_quad_nl,  init=init_pars)
         call nml_read(filename,"marine_shelf","grz_length",     par%grz_length,     init=init_pars)
         call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
         call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
@@ -643,19 +676,19 @@ contains
     end function calc_bmb_shelf_quad
 
         ! jablasco: quadratic function with mean shelf temperature
-    elemental function calc_bmb_shelf_basin(dT_shlf,dT_shlf_basin,gamma_basin) result(bmb)
+    elemental function calc_bmb_shelf_basin(dT_shlf,dT_shlf_basin,gamma_quad_nl) result(bmb)
         ! Calculate basal mass balance of shelf (floating) ice [m/a] 
         ! as a quadratic law following (Holland et al., 2008) but with local ocean T and mean shelf T.
         ! This accounts for positive feedback between the sub-shelf melting and the circulation in the cavity.
 
         implicit none
 
-        real(prec), intent(IN)    :: dT_shlf, dT_shlf_basin, gamma_basin
+        real(prec), intent(IN)    :: dT_shlf, dT_shlf_basin, gamma_quad_nl
         real(prec) :: bmb
 
         ! jablasco: careful!!
         ! -1.0 because bmb is negative
-        bmb = -1.0*gamma_basin*(dT_shlf*dT_shlf_basin)*((rho_sw*cp_o)/(rho_ice*L_ice))**2
+        bmb = -1.0*gamma_quad_nl*(dT_shlf*dT_shlf_basin)*((rho_sw*cp_o)/(rho_ice*L_ice))**2
 
         return
 
@@ -882,7 +915,7 @@ contains
         real(prec), intent(IN)    :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:), H(:,:)
 
         ! Local variables
-        integer :: k0, k1, i, j
+        integer :: i, j
         real(prec) :: depth_H 
 
         do i = 1, size(Tshlf,1)
@@ -902,12 +935,89 @@ contains
 
     end subroutine calc_shelf_temperature_depth
 
-    ! jablasco: compute the mean temperature by regions
-    !subroutine calc_shelf_temperature_regions(???)
-    !    
-    !    implicit none
-    !
-    !end subroutine calc_shelf_temperature_regions
+    subroutine calc_shelf_salinity_layer(Sshlf,depth,S_ocn,H)
+        ! Calculates the water salinity at the depth of the ice shelf
+        ! It assigns the salinity of the nearest layer
+
+        implicit none
+
+        real(prec), intent(OUT)   :: Sshlf(:,:)
+        real(prec), intent(IN)    :: depth(:), S_ocn(:,:,:), H(:,:)
+
+        ! Local variables
+        integer :: k0, i, j
+
+        do i = 1, size(Sshlf,1)
+            do j = 1, size(Sshlf,2)
+                ! The depth of the ice shelve is a 90% of the ice thickness
+                k0 = minloc(abs(depth-rho_ice_sw*H(i,j)),dim=1)
+                Sshlf(i,j)  = S_ocn(i,j,k0)
+            end do
+        end do
+
+        return
+
+    end subroutine calc_shelf_salinity_layer
+
+    subroutine calc_shelf_salinity_depth(Sshlf,depth,S_ocn,H)
+
+        implicit none
+
+        real(prec), intent(OUT)   :: Sshlf(:,:)
+        real(prec), intent(IN)    :: depth(:), S_ocn(:,:,:), H(:,:)
+
+        ! Local variables
+        integer :: i, j
+        real(prec) :: depth_H
+
+        do i = 1, size(Sshlf,1)
+            do j = 1, size(Sshlf,2)
+
+                ! Depth of ice shelf
+                depth_H = rho_ice_sw*H(i,j)
+
+                ! Linearly interpolate to depth of ice shelf
+                Sshlf(i,j)  = interp_linear(depth,S_ocn(i,j,:), xout=depth_H)
+
+            end do
+        end do
+
+        return
+
+    end subroutine calc_shelf_salinity_depth
+
+    subroutine calc_shelf_salinity_mean(Sshlf,depth,S_ocn,depth_range)
+        ! Calculate water temp for a given range of depths
+
+        implicit none
+
+        real(prec), intent(OUT)    :: Sshlf(:,:)
+        real(prec), intent(IN)     :: depth(:), S_ocn(:,:,:)
+        real(prec), intent(IN)     :: depth_range(:)
+
+        ! Local variables
+        integer :: k0, k1
+
+        ! Note: this requires that k1 > k0, and it should be
+        ! weighted by the thickness of the layers (to do!)
+        ! Note: depth is z-coordinate, ie positive below sea level
+        k0 = minloc(abs(depth-depth_range(1)),dim=1)
+        k1 = minloc(abs(depth-depth_range(2)),dim=1)
+
+        if (k1 < k0) then
+            write(*,*) "calc_shelf_salinity_mean:: error in depth_range calculation."
+            write(*,*) "depth_min, depth_max: ", depth_range
+            write(*,*) "indices(k0,k1): ", k0, k1
+            write(*,*) "depths(k0,k1):  ", depth(k0), depth(k1)
+            stop
+        end if
+
+        ! Get the mean water temperature for these depths
+        Sshlf  = sum(S_ocn(:,:,k0:k1),dim=3)  / (k1-k0+1)
+
+        return
+
+    end subroutine calc_shelf_salinity_mean
 
     ! =======================================================
     !

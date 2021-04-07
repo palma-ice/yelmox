@@ -37,7 +37,7 @@ module snapclim
         character(len=56)  :: clim_stdev_name
 
         character(len=512) :: ocn_path 
-        character(len=56)  :: ocn_names(3)
+        character(len=56)  :: ocn_names(4)
         logical            :: ocn_monthly 
         real(prec)         :: ocn_time 
         
@@ -69,11 +69,12 @@ module snapclim
         integer    :: nx, ny
         character(len=56)  :: atm_type
         character(len=56)  :: ocn_type
-        character(len=512) :: fname_at, fname_ao, fname_ap 
-        character(len=512) :: fname_bt, fname_bo, fname_bp   
+        character(len=512) :: fname_at, fname_ao, fname_ap, fname_as 
+        character(len=512) :: fname_bt, fname_bo, fname_bp, fname_bs   
         real(prec) :: lapse(2)
         real(prec) :: dTa_const 
-        real(prec) :: dTo_const 
+        real(prec) :: dTo_const
+        real(prec) :: dSo_const 
         real(prec) :: f_to 
         real(prec) :: f_p
         real(prec) :: f_stdev
@@ -110,9 +111,10 @@ module snapclim
         real(prec), allocatable :: depth(:) 
         real(prec), allocatable :: mask_ocn(:,:,:) 
         real(prec), allocatable :: to_ann(:,:,:) 
+        real(prec), allocatable :: so(:,:,:) 
         
-        real(prec) :: at, ao, ap 
-        real(prec) :: bt, bo, bp
+        real(prec) :: at, ao, ap, as 
+        real(prec) :: bt, bo, bp, bs
 
     end type 
 
@@ -122,8 +124,8 @@ module snapclim
 
         type(snapclim_state_class) :: now  
         type(snapclim_state_class) :: clim0, clim1, clim2, clim3  
-        type(series_type)          :: at, ao, ap 
-        type(series_type)          :: bt, bo, bp 
+        type(series_type)          :: at, ao, ap, as 
+        type(series_type)          :: bt, bo, bp, bs 
         
         type(hybrid_class)         :: hybrid 
 
@@ -301,10 +303,12 @@ contains
         ! Make sure the time series files do not conatin empty lines at the end
         call read_series(snp%at, snp%par%fname_at)
         call read_series(snp%ao, snp%par%fname_ao)
-        call read_series(snp%ap, snp%par%fname_ap)        
+        call read_series(snp%ap, snp%par%fname_ap)
+        call read_series(snp%as, snp%par%fname_as)        
         call read_series(snp%bt, snp%par%fname_bt)
         call read_series(snp%bo, snp%par%fname_bo)
         call read_series(snp%bp, snp%par%fname_bp)
+        call read_series(snp%bs, snp%par%fname_bs)
    
         ! Also check consistency that in the case of absolute forcing clim0 = clim1,
         ! which is the reference climate 
@@ -321,7 +325,7 @@ contains
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo)
+    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo)
 
         implicit none 
 
@@ -331,10 +335,11 @@ contains
         character(len=*), intent(IN) :: domain 
         real(prec), intent(IN), optional :: dTa   ! For atm_type='anom'
         real(prec), intent(IN), optional :: dTo   ! For atm_type='anom'
+        real(prec), intent(IN), optional :: dSo   ! For atm_type='anom'
         
         ! Local variables
-        real(prec) :: at, ao, ap, bt, bo, bp, a1, a2 
-        real(prec) :: dTa_now, dTo_now  
+        real(prec) :: at, ao, ap, as, bt, bo, bp, bs, a1, a2 
+        real(prec) :: dTa_now, dTo_now, dSo_now  
         real(prec) :: dT(12) 
         logical :: south 
         integer :: m 
@@ -343,10 +348,12 @@ contains
         ! Determine the current values of various indices 
         at     = series_interp(snp%at, time)
         ao     = series_interp(snp%ao, time)
-        ap     = series_interp(snp%ap, time)        
+        ap     = series_interp(snp%ap, time)
+        as     = series_interp(snp%as, time)        
         bt     = series_interp(snp%bt, time)
         bo     = series_interp(snp%bo, time)
         bp     = series_interp(snp%bp, time)
+        bs     = series_interp(snp%bs, time)
 
         if (trim(snp%par%atm_type) .eq. "snap_1ind_new") then
 
@@ -488,6 +495,7 @@ contains
                 ! Constant steady-state climate
 
                 snp%now%to_ann = snp%clim0%to_ann 
+                snp%now%so     = snp%clim0%so
 
             case("anom")
                 ! Apply a simple spatially homogeneous anomaly
@@ -500,7 +508,17 @@ contains
                     dTo_now = ao*snp%par%dTo_const
                 end if
 
+                ! jablasco: slainity
+                if (present(dSo)) then
+                    ! If available, use argument to define anomaly
+                    dSo_now = dSo
+                else
+                    ! Calculate the current anomaly from the sea-level index
+                    dSo_now = as*snp%par%dSo_const
+                end if
+
                 call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
+                call calc_salinity_anom(snp%now%so,snp%clim0%so,dSo_now)
 
             case("fraction")
                 ! Scale oceanic temperature (anomaly) as a fraction of the atmospheric
@@ -538,9 +556,11 @@ contains
                 
             case("snap_1ind","snap_1ind_new")
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
+                call calc_salinity_1ind(snp%now%so,snp%clim0%so,snp%clim1%so,snp%clim2%so,as)
                         
             case("snap_2ind")
                 call calc_temp_2ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo)
+                call calc_salinity_2ind(snp%now%so,snp%clim0%so,snp%clim1%so,snp%clim2%so,snp%clim3%so,as,bs)
 
             case("snap_1ind_abs")
                 call calc_temp_1ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
@@ -611,10 +631,12 @@ contains
         ! Finally, store current index values in object for output 
         snp%now%at = at 
         snp%now%ao = ao 
-        snp%now%ap = ap        
+        snp%now%ap = ap
+        snp%now%as = as        
         snp%now%bt = bt 
         snp%now%bo = bo 
         snp%now%bp = bp
+        snp%now%bs = bs
         
         !write(*,"(a,6f12.2)") "snp: ", time, at, ao, dTa_now, dTo_now, snp%now%ta_ann(1,1) - snp%clim0%ta_ann(1,1) 
 
@@ -666,6 +688,20 @@ contains
 
     end subroutine calc_temp_1ind
 
+    elemental subroutine calc_salinity_1ind(salt_now,salt0,salt1,salt2,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt0, salt1, salt2
+        real(prec), intent(IN)  :: aa
+
+        salt_now = salt0 + aa*(salt2-salt1)
+
+        return
+
+    end subroutine calc_salinity_1ind
+
     elemental subroutine calc_temp_2ind(temp_now,temp0,temp1,temp2,temp3,aa,bb)
 
         implicit none
@@ -685,6 +721,20 @@ contains
         return
 
     end subroutine calc_temp_2ind
+
+    elemental subroutine calc_salinity_2ind(salt_now,salt0,salt1,salt2,salt3,aa,bb)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt0, salt1, salt2, salt3
+        real(prec), intent(IN)  :: aa, bb
+
+        salt_now = salt0 + aa*(salt2-salt1) + bb*(salt3-salt2)
+
+        return
+
+    end subroutine calc_salinity_2ind
 
     elemental subroutine calc_temp_1ind_abs(temp_now,temp1,temp2,aa)
 
@@ -819,7 +869,21 @@ contains
 
     end subroutine calc_precip_2ind_abs
 
+    ! jablasco
+    ! Salinity routines: first only anomaly
+    elemental subroutine calc_salinity_anom(sal_now,sal0,dS)
 
+        implicit none
+
+        real(prec), intent(OUT) :: sal_now
+        real(prec), intent(IN)  :: sal0
+        real(prec), intent(IN)  :: dS            ! Current anomaly value to impose
+
+        sal_now = sal0 + dS
+
+        return
+
+    end subroutine calc_salinity_anom
 
     subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,time,domain)
         ! Given a predefined climate snapshot clim (already allocated),
@@ -1051,7 +1115,7 @@ contains
 
         ! Allocate temporary
         allocate(mask3D(nx,ny,nz0))
-        allocate(tocn3D(nx,ny,nz0)) 
+        allocate(tocn3D(nx,ny,nz0))
         allocate(var0(nx,ny,nz0,nm))
         allocate(var1(nx,ny,nz0,nm))
         allocate(var(nx,ny,nz0,nm))
@@ -1203,13 +1267,16 @@ contains
         call nml_read(filename,"snap","ocn_type",           par%ocn_type,       init=init_pars)
         call nml_read(filename,"snap","fname_at",           par%fname_at,       init=init_pars)
         call nml_read(filename,"snap","fname_ao",           par%fname_ao,       init=init_pars)
-        call nml_read(filename,"snap","fname_ap",           par%fname_ap,       init=init_pars)        
+        call nml_read(filename,"snap","fname_ap",           par%fname_ap,       init=init_pars)
+        call nml_read(filename,"snap","fname_as",           par%fname_as,       init=init_pars)        
         call nml_read(filename,"snap","fname_bt",           par%fname_bt,       init=init_pars)
         call nml_read(filename,"snap","fname_bo",           par%fname_bo,       init=init_pars)
         call nml_read(filename,"snap","fname_bp",           par%fname_bp,       init=init_pars)
+        call nml_read(filename,"snap","fname_bs",           par%fname_bs,       init=init_pars)
         call nml_read(filename,"snap","lapse",              par%lapse,          init=init_pars)
         call nml_read(filename,"snap","dTa_const",          par%dTa_const,      init=init_pars)
         call nml_read(filename,"snap","dTo_const",          par%dTo_const,      init=init_pars)
+        call nml_read(filename,"snap","dSo_const",          par%dSo_const,      init=init_pars)
         call nml_read(filename,"snap","f_to",               par%f_to,           init=init_pars)
         call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
         call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
@@ -1575,7 +1642,9 @@ contains
         real(prec), allocatable :: depth0(:) 
         integer,    allocatable :: mask3D(:,:,:)
         real(prec), allocatable :: tocn3D(:,:,:)
+        real(prec), allocatable :: socn3D(:,:,:)
         real(prec), allocatable :: tocn4D(:,:,:,:)
+        real(prec), allocatable :: socn4D(:,:,:,:)
         integer :: nz, nz0, m 
         integer :: i, j, k 
 
@@ -1605,7 +1674,8 @@ contains
             call ocn_allocate(ocn,nx,ny,ocn%nzo)
 
             ocn%depth    = 0.0
-            ocn%to_ann   = 0.0 
+            ocn%to_ann   = 0.0
+            ocn%so       = 0.0 
             ocn%mask_ocn = 0.0 
 
             ocn%par%ocn_time = 0.0 
@@ -1639,6 +1709,7 @@ contains
                 ! Allocate additional arrays
                 allocate(mask3D(nx,ny,nz0))
                 allocate(tocn3D(nx,ny,nz0))
+                allocate(socn3D(nx,ny,nz0))
 
                 ! Read in the ocean mask 
                 call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
@@ -1649,27 +1720,36 @@ contains
                 ! Read in monthly field(s), then get the averages
 
                 allocate(tocn4D(nx,ny,nz0,12))
+                allocate(socn4D(nx,ny,nz0,12))
                 
                 if (is_2D_ocn) then
                     call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D(:,:,1,:))
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn4D(:,:,1,:))
                 else 
                     call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D)
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn4D)
                 end if 
 
                 ! Calculate annual mean temperature [degrees C]
                 tocn3D = sum(tocn4D,dim=4)
-                tocn3D = tocn3D/12.0 
+                tocn3D = tocn3D/12.0
+                socn3D = sum(socn4D,dim=4)
+                socn3D = socn3D/12.0
+ 
 
                 ! Delete working array to be safe
-                deallocate(tocn4D) 
+                deallocate(tocn4D)
+                deallocate(socn4D) 
 
             else
                 ! Read in specific field(s)
 
                 if (is_2D_ocn) then 
                     call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D(:,:,1))
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn3D(:,:,1))
                 else 
                     call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D)
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn3D)
                 end if 
 
             end if 
@@ -1692,6 +1772,7 @@ contains
 
                         ! Interpolate ocean temp to current depth level (negative to convert from depth to height)
                         ocn%to_ann(i,j,k) = interp_linear(depth0,tocn3D(i,j,:),xout=ocn%depth(k))
+                        ocn%so(i,j,k)     = interp_linear(depth0,socn3D(i,j,:),xout=ocn%depth(k))
 
                         ! Get nearest mask value 
                         if (ocn%depth(k) .gt. maxval(depth0)) then
@@ -1982,6 +2063,7 @@ contains
         allocate(ocn%depth(nz))
         allocate(ocn%to_ann(nx,ny,nz))
         allocate(ocn%mask_ocn(nx,ny,nz))
+        allocate(ocn%so(nx,ny,nz))
         
         if (.not. (nx .eq. size(ocn%to_ann,1) .and. &
                    ny .eq. size(ocn%to_ann,2)) ) then 

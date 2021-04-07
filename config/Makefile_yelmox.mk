@@ -74,6 +74,16 @@ $(objdir)/smbpal.o: $(libdir)/smbpal/smbpal.f90 $(objdir)/smbpal_precision.o $(o
 					$(objdir)/smb_pdd.o $(objdir)/smb_itm.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+# pico library
+$(objdir)/pico_geometry.o: $(libdir)/pico/pico_geometry.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/pico_physics.o: $(libdir)/pico/pico_physics.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/pico.o: $(libdir)/pico/pico.f90 $(objdir)/pico_geometry.o $(objdir)/pico_physics.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 #############################################################
 ##							
 ## List of library files
@@ -89,6 +99,9 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/insolation.o \
 					    $(objdir)/isostasy.o \
 					    $(objdir)/marine_shelf.o \
+                                            $(objdir)/pico_geometry.o \
+                                            $(objdir)/pico_physics.o \
+                                            $(objdir)/pico.o \
 					    $(objdir)/nml.o \
 			 		    $(objdir)/ncio.o \
 			 		    $(objdir)/sealevel.o \
