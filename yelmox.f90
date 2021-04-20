@@ -14,6 +14,7 @@ program yelmox
     use smbpal   
     use sediments 
     use geothermal
+    use pico
     
     implicit none 
 
@@ -21,7 +22,8 @@ program yelmox
     
     type(sealevel_class)   :: sealev 
     type(snapclim_class)   :: snp1 
-    type(marshelf_class)   :: mshlf1 
+    type(marshelf_class)   :: mshlf1
+    type(pico_class)       :: pico1 
     type(smbpal_class)     :: smbpal1  
     type(sediments_class)  :: sed1 
     type(geothermal_class) :: gthrm1
@@ -76,7 +78,7 @@ program yelmox
 
     ! Options for writing a specific region ====================
 
-    reg1_write = .TRUE. 
+    reg1_write = .FALSE. 
     reg1_val   = 1.12     ! 1.12 == Hudson region 
     reg1_nm    = "Hudson"
     reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
@@ -118,7 +120,11 @@ program yelmox
     
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
-    
+   
+    ! Initialize PICO model
+    ! pico,filename,nx,ny,domain,grid_name,regions
+    call pico_init(pico1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions)
+ 
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
@@ -162,15 +168,30 @@ program yelmox
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
-    call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
+    call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins, &
+                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
-    call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
-    yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+    if(pico1%par%use_pico) then
+            call pico_calc_geometry(pico1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins,yelmo1%grd%dx)
+            ! jablasco: cte salinity 34.7 PSU -> TO DO
+            !mshlf1%now%S_shlf = 34.7
+            !mshlf1%now%S_shlf = snp1%now%so(:,:,1)
+            call marshelf_calc_Sshlf(mshlf1,yelmo1%tpo%now%H_ice,depth=snp1%now%depth,so=snp1%now%so)
+            call pico_update_physics(pico1,mshlf1%now%T_shlf,mshlf1%now%S_shlf,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed, &
+                                     yelmo1%tpo%now%f_grnd,yelmo1%bnd%z_sl)
+            yelmo1%bnd%bmb_shlf = pico1%now%bmb_shlf
+
+    else
+            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
+    end if
+
+    !yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+    !yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
     yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
     
@@ -227,15 +248,15 @@ program yelmox
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
 !     call write_step_2D_small(yelmo1,file2D,time=time)  
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,pico1,file2D,time=time)
     
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     if (reg1_write) then 
-        call yelmo_write_reg_init(yelmo1,reg1_fnm,time_init=time_init,units="years",mask=reg1_mask)
-        call yelmo_write_reg_step(yelmo1,reg1_fnm,time,mask=reg1_mask)
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=reg1_mask)
+        call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask)
     end if 
 
     ! Advance timesteps
@@ -273,23 +294,35 @@ if (calc_transient_climate) then
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
+        call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins, &
+                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
 
-        call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx*1e-3)
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
-end if 
+        if(pico1%par%use_pico) then
+                call pico_calc_geometry(pico1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins,yelmo1%grd%dx)
+                ! jablasco: cte salinity 34.7 PSU -> TO DO
+                mshlf1%now%S_shlf = 34.7
+                call pico_update_physics(pico1,mshlf1%now%T_shlf,mshlf1%now%S_shlf,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed, &
+                                         yelmo1%tpo%now%f_grnd,yelmo1%bnd%z_sl)
+                yelmo1%bnd%bmb_shlf = pico1%now%bmb_shlf
+        else
+                call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
+        end if
 
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+end if
+
+        !yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        !yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
 !             call write_step_2D_small(yelmo1,file2D,time=time)
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,pico1,file2D,time=time)
         end if
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then
@@ -396,7 +429,7 @@ contains
 
     end subroutine write_step_2D_small
 
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,pico,filename,time)
 
         implicit none 
         
@@ -404,7 +437,8 @@ contains
         type(isos_class),       intent(IN) :: isos 
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
-        type(smbpal_class),     intent(IN) :: srf 
+        type(smbpal_class),     intent(IN) :: srf
+        type(pico_class),       intent(IN) :: pico 
         !type(sediments_class),  intent(IN) :: sed 
         !type(geothermal_class), intent(IN) :: gthrm
         !type(isos_class),       intent(IN) :: isos
@@ -482,24 +516,24 @@ contains
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
+        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
+        !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
+        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"enh_bar",ylmo%mat%now%enh_bar,units="1",long_name="Vertically averaged enhancement factor", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -524,13 +558,7 @@ contains
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
-                      dim1="xc",dim2="yc",dim3="zeta_l",dim4="time",start=[1,1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"Q_rock",ylmo%thrm%now%Q_rock,units="mW m-2",long_name="Bedrock surface heat flux", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW m-2",long_name="Geothermal heat flux", &
+        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
@@ -542,16 +570,36 @@ contains
  
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        ! jablasco
+        call nc_write(filename,"dT_shlf_basin",mshlf%now%dT_shlf_basin,units="K",long_name="Mean shelf temperature anomaly", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,units="K",long_name="Mean shelf temperature", &
+        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-       
-        call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-                      dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"d_shlf",pico%now%d_shlf,units="km",long_name="Shelf distance to grounding line", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"d_if",pico%now%d_if,units="km",long_name="Shelf distance to ice front", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"boxes",pico%now%boxes,units="",long_name="Shelf boxes", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)      
+        call nc_write(filename,"r_shlf",pico%now%r_shlf,units="",long_name="Ratio of ice shelf", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"T_box",pico%now%T_box,units="K?",long_name="Temperature of boxes", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"S_box",pico%now%S_box,units="PSU",long_name="Salinity of boxes", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"A_box",pico%now%A_box*0.000001,units="km2",long_name="Box area of ice shelf", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+ 
+        !call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        !              dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
               
         call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
