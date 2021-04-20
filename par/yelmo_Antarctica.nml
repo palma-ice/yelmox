@@ -200,18 +200,20 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    sl_path            = "input/lgm-120m-to-zero.dat"
+    sl_path            = "input/sl_deglaciation.dat"
 /
 
 &snap
     atm_type           = "anom"
     ocn_type           = "anom"
-    fname_at           = "input/ramp_dwnup.dat"
-    fname_ao           = "input/ramp_dwnup.dat"
-    fname_ap           = "input/zeros.dat"
+    fname_at           = "input/epica_deglaciation.dat"
+    fname_ao           = "input/epica_deglaciation.dat"
+    fname_ap           = "input/epica_deglaciation.dat"
+    fname_as           = "input/salinity_index_deglaciation.dat"
     fname_bt           = "input/ones.dat"
     fname_bo           = "input/ones.dat"
     fname_bp           = "input/ones.dat"
+    fname_bs           = "input/ones.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = 2.0  
     dTo_const          = 0.5
@@ -236,8 +238,9 @@
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
+    !ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
+    ocn_names       = "depth" "mask_ocn" "to" "so"
     ocn_monthly     = True
     ocn_time        = 0
 /
@@ -251,7 +254,7 @@
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
     ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
+    ocn_names       = "depth" "mask_ocn" "to"
     ocn_monthly     = False
     ocn_time        = 0
 /
@@ -329,28 +332,48 @@
 /
 
 &marine_shelf
-    bmb_shlf_method    = "anom"
-    T_shlf_method      = "mean"
-    use_obs            = False
+    bmb_shlf_method    = "anom"  ! "anom", "lin", "quad", "quad-nl"
+    T_shlf_method      = "interp" ! "mean", "layer", "interp" ! Same method is used for salinity
+    use_obs            = True
     obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
-    obs_name           = "bm_equil_ave"
+    obs_name           = "bm_eq_reese"
     obs_f              = 1.0
-    obs_lim            = 10.0
-    basin_name         = "None"         !"northwest" "northeast" "east"
+    obs_lim            = 100.0
+    basin_name         = "none"         !"northwest" "northeast" "east"
     basin_bmb          = 0.0            !        -1.0       -1.0   -1.0
     c_shlf             = -9999.0 
     kappa_shlf         = -9999.0 
-    f_grz_shlf         = 10.0
+    f_grz_shlf         = 1.0
     c_grz              = 1.0 
     kappa_grz          = 10.0 
     grz_length         = 32.0           ! [km]   
+    gamma_lin          = 630.0          ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad         = 30000.0        ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
+    gamma_quad_nl      = 40000.0        ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
     c_deep             = -1.0           ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep         = 2000.0
     T_fp               = -1.8
     depth_min          = 1100.0
     depth_max          = 1500.0
     find_ocean         = True 
-    
+
+/
+
+&pico
+    use_pico       = False      ! Use PICO module. If true, no mshlf routine (except T_shlf_method)
+    n_box          = 5.0        ! Maximum number of boxes in PICO.  
+    a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.
+    b_pico         = 0.0788     ! Constant coefficient of freezing equation [ºC]. Reese et al., (2018) suggest 0.0788.
+    c_pico         = 7.77e-8    ! Pressure coefficient of freezing equation [ºC/Pa]. Reese et al., (2018) suggest 7.77e-8.
+    alpha_pico     = 7.5e-5     ! Thermal expansion coefficien [1/ºC]. Reese et al., (2018) suggest 7.5e-5.
+    beta_pico      = 7.7e-4     ! Salt contraction coefficient [1/PSU]. Reese et al., (2018) suggest 7.7e-4.
+    rho_star       = 1033.0     ! Reference density [kg/m3]. Reese et al., (2018) suggest 1033.0.
+    gamma_tstar    = 630.0      ! Effective turbulent temperature exchange velocity [m/yr]. Reese et al., (2018) uses 630.0 and suggest 600-1000.
+    C_over         = 1.0        ! Overturning strength [Sv m3/kg]. Reese et al., (2018) suggest 1.0.
+    c_deep         = -10.0       ! [m/a] Melt rate in deep ocean, should be negative but not huge
+    depth_deep     = 2000.0
+    find_ocean     = True
+
 /
 
 &sediments
