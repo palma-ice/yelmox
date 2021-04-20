@@ -156,8 +156,12 @@ contains
 
         ! Determine range of indices of times within our 
         ! time-averaging window. 
-        kmin = findloc(hyst%time .ge. time - hyst%par%dt_ave,value=.TRUE., &
-                                                     dim=1,mask=hyst%time.ne.MV)
+        ! ajr: `findloc` only available for gfotran9 and above:
+        ! kmin = findloc(hyst%time .ge. time - hyst%par%dt_ave,value=.TRUE., &
+        !                                              dim=1,mask=hyst%time.ne.MV)
+        kmin = minloc(hyst%time,dim=1, &
+                mask=(hyst%time .ge. time - hyst%par%dt_ave) .and. hyst%time.ne.MV)
+        
         kmax = ntot 
 
         ! Determine currently available time window
