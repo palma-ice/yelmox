@@ -385,7 +385,7 @@ contains
 
         return 
 
-    end subroutine marshelf_set_Tshlf 
+    end subroutine marshelf_set_Tshlf
 
     subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx)
         
@@ -450,9 +450,14 @@ contains
 
             ! Redefine dT_shlf as the temperature anomaly wrt the freezing
             ! temperature
-            mshlf%now%dT_shlf = mshlf%now%T_shlf - mshlf%par%T_fp
+            mshlf%now%dT_shlf       = mshlf%now%T_shlf - mshlf%par%T_fp
             mshlf%now%dT_shlf_basin = mshlf%now%T_shlf_basin - mshlf%par%T_fp
 
+            ! Following Lipscomb et al (2021, Eq. 6 text), ensure 
+            ! dT_shlf >= 0 
+            where (mshlf%now%dT_shlf .lt. 0.0)       mshlf%now%dT_shlf = 0.0 
+            where (mshlf%now%dT_shlf_basin .lt. 0.0) mshlf%now%dT_shlf_basin = 0.0 
+            
         end if
 
         ! 2. Calculate current ice shelf bmb field (grounded-ice bmb is
@@ -803,7 +808,7 @@ contains
     end function calc_grline
 
     function calc_shelf_basin(f_grnd,basins,H_ice,T_shlf) result(T_shlf_basin)
-        ! jablasco: function to compute mean ocean temperature of ice shelf
+        ! jablasco: function to compute mean ocean temperature of ice-shelf basin
         implicit none
 
         real(prec), intent(IN)  :: f_grnd(:,:), basins(:,:), H_ice(:,:), T_shlf(:,:)
@@ -816,7 +821,7 @@ contains
         ! Assign to shelf values real ocean values
         T_shlf_basin(:,:) = T_shlf(:,:) 
 
-        do m=1, maxval(basins)
+        do m=1, int(maxval(basins))
             n_pts  = 0.0
             t_mean = 0.0
             do i = 1, size(T_shlf,1)
