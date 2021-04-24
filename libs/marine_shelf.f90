@@ -815,7 +815,7 @@ contains
         real(prec) :: T_shlf_basin(size(f_grnd,1),size(f_grnd,2))
 
         ! Local variables
-        integer :: i, j, k, l, m
+        integer :: i, j, m
         real(prec) :: n_pts, t_mean
 
         ! Assign to shelf values real ocean values
@@ -837,11 +837,11 @@ contains
             end do
 
             ! Assign shelf value
-            do k = 1, size(T_shlf,1)
-                do l = 1, size(T_shlf,2)
+            do i = 1, size(T_shlf,1)
+                do j = 1, size(T_shlf,2)
                     ! Basin floating ice point
-                    if (f_grnd(k,l) .lt. 1.0 .and. H_ice(k,l) .gt. 0.0 .and. basins(k,l) .eq. m) then
-                        T_shlf_basin(k,l) = t_mean / n_pts
+                    if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
+                        T_shlf_basin(i,j) = t_mean / n_pts
                     end if
                 end do
             end do
