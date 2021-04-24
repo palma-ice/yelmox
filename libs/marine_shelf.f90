@@ -497,9 +497,6 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            ! Calculate ocean depth
-            H_ocn(i,j) = max( (z_sl(i,j)-z_bed(i,j))-(rho_ice_sw*H_ice(i,j)),0.0 )
-
             if (mshlf%now%mask_ocn(i,j) .gt. 0) then
                 ! Floating ice points, including deep ocean (mask_ocn==2)
 
@@ -516,22 +513,30 @@ contains
                 end if
 
                 if (is_grline(i,j)) then
-                    ! Scale grounding line points by grounding line melt factor
-                    ! accounting for the resolution dependence
-                    if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
-                        bmb_grline = calc_bmb_shelf_anom(mshlf%now%bmb_ref(i,j),mshlf%now%dT_shlf(i,j), &
-                                                         mshlf%par%c_grz,mshlf%par%kappa_grz)
-                    else if (trim(mshlf%par%bmb_shlf_method) .eq. "lin") then
-                        bmb_grline = calc_bmb_shelf_linear(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_lin)
-                        bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
-                    else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad") then
-                        bmb_grline = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
-                        bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
-                    else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                        bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_basin(i,j),mshlf%par%gamma_quad_nl)
-                        bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
-                    end if
 
+                    ! ajr: this whole section seems unnecessary, now that we use f_grz_shlf, 
+                    ! so it has been replaced as below. Needs checking...
+                    ! ! Scale grounding line points by grounding line melt factor
+                    ! ! accounting for the resolution dependence
+                    ! if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
+                    !     bmb_grline = calc_bmb_shelf_anom(mshlf%now%bmb_ref(i,j),mshlf%now%dT_shlf(i,j), &
+                    !                                      mshlf%par%c_grz,mshlf%par%kappa_grz)
+                    ! else if (trim(mshlf%par%bmb_shlf_method) .eq. "lin") then
+                    !     bmb_grline = calc_bmb_shelf_linear(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_lin)
+                    !     bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
+                    ! else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad") then
+                    !     bmb_grline = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
+                    !     bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
+                    ! else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
+                    !     bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_basin(i,j),mshlf%par%gamma_quad_nl)
+                    !     bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
+                    ! end if
+
+                    ! Get the grounding-line value, fully scaled by f_grz_shlf 
+                    bmb_grline = mshlf%par%f_grz_shlf*bmb_floating
+
+                    ! Calcule gl-bmb as weighted average between gl-line value and shelf value 
+                    ! to account for resolution dependence 
                     mshlf%now%bmb_shlf(i,j) = (1.0-grz_wt)*bmb_floating + grz_wt*bmb_grline
 
                 else 
