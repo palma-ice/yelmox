@@ -59,9 +59,9 @@ module marine_shelf
         real(prec), allocatable   :: bmb_obs(:,:)           ! observed ice shelf melting [m/a]
         real(prec), allocatable   :: bmb_ref(:,:)           ! Basal mass balance reference field
         real(prec), allocatable   :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
-        real(prec), allocatable   :: T_shlf_basin(:,:)      ! Shelf average boundary ocean temps. for forcing the ice shelves
+        real(prec), allocatable   :: T_basin(:,:)           ! Basin average boundary ocean temps. for forcing the ice shelves
         real(prec), allocatable   :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
-        real(prec), allocatable   :: dT_shlf_basin(:,:)     ! Shelf average boundary ocean temp anomalies for forcing the ice shelves
+        real(prec), allocatable   :: dT_basin(:,:)          ! Basin average boundary ocean temp anomalies for forcing the ice shelves
         real(prec), allocatable   :: S_shlf(:,:)            ! Boundary salinity for forcing the ice shelves
         real(prec), allocatable   :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
 
@@ -276,9 +276,9 @@ contains
         mshlf%now%bmb_ref       = 0.0 
         mshlf%now%kappa         = 0.0 
         mshlf%now%T_shlf        = 0.0
-        mshlf%now%T_shlf_basin  = 0.0 
+        mshlf%now%T_basin       = 0.0 
         mshlf%now%dT_shlf       = 0.0
-        mshlf%now%dT_shlf_basin = 0.0 
+        mshlf%now%dT_basin      = 0.0 
 
         return 
 
@@ -325,7 +325,7 @@ contains
         select case(trim(mshlf%par%bmb_shlf_method))
             case("quad-nl")
 
-                mshlf%now%T_shlf_basin = calc_shelf_basin(f_grnd,basins,H_ice,mshlf%now%T_shlf)
+                mshlf%now%T_basin = calc_shelf_basin(f_grnd,basins,H_ice,mshlf%now%T_shlf)
  
         end select
 
@@ -450,13 +450,13 @@ contains
 
             ! Redefine dT_shlf as the temperature anomaly wrt the freezing
             ! temperature
-            mshlf%now%dT_shlf       = mshlf%now%T_shlf - mshlf%par%T_fp
-            mshlf%now%dT_shlf_basin = mshlf%now%T_shlf_basin - mshlf%par%T_fp
+            mshlf%now%dT_shlf  = mshlf%now%T_shlf  - mshlf%par%T_fp
+            mshlf%now%dT_basin = mshlf%now%T_basin - mshlf%par%T_fp
 
             ! Following Lipscomb et al (2021, Eq. 6 text), ensure 
             ! dT_shlf >= 0 
-            where (mshlf%now%dT_shlf .lt. 0.0)       mshlf%now%dT_shlf = 0.0 
-            where (mshlf%now%dT_shlf_basin .lt. 0.0) mshlf%now%dT_shlf_basin = 0.0 
+            where (mshlf%now%dT_shlf  .lt. 0.0) mshlf%now%dT_shlf  = 0.0 
+            where (mshlf%now%dT_basin .lt. 0.0) mshlf%now%dT_basin = 0.0 
             
         end if
 
@@ -481,7 +481,7 @@ contains
                 else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad") then
                         bmb_floating = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
                 else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                        bmb_floating = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_shlf_basin(i,j),mshlf%par%gamma_quad_nl)
+                        bmb_floating = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_basin(i,j),mshlf%par%gamma_quad_nl)
                 end if
 
                 if (is_grline(i,j)) then
@@ -497,7 +497,7 @@ contains
                         bmb_grline = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
                         bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
                     else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                        bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_shlf_basin(i,j),mshlf%par%gamma_quad_nl)
+                        bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_basin(i,j),mshlf%par%gamma_quad_nl)
                         bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
                     end if
 
@@ -681,19 +681,19 @@ contains
     end function calc_bmb_shelf_quad
 
         ! jablasco: quadratic function with mean shelf temperature
-    elemental function calc_bmb_shelf_basin(dT_shlf,dT_shlf_basin,gamma_quad_nl) result(bmb)
+    elemental function calc_bmb_shelf_basin(dT_shlf,dT_basin,gamma_quad_nl) result(bmb)
         ! Calculate basal mass balance of shelf (floating) ice [m/a] 
         ! as a quadratic law following (Holland et al., 2008) but with local ocean T and mean shelf T.
         ! This accounts for positive feedback between the sub-shelf melting and the circulation in the cavity.
 
         implicit none
 
-        real(prec), intent(IN)    :: dT_shlf, dT_shlf_basin, gamma_quad_nl
+        real(prec), intent(IN)    :: dT_shlf, dT_basin, gamma_quad_nl
         real(prec) :: bmb
 
         ! jablasco: careful!!
         ! -1.0 because bmb is negative
-        bmb = -1.0*gamma_quad_nl*(dT_shlf*dT_shlf_basin)*((rho_sw*cp_o)/(rho_ice*L_ice))**2
+        bmb = -1.0*gamma_quad_nl*(dT_shlf*dT_basin)*((rho_sw*cp_o)/(rho_ice*L_ice))**2
 
         return
 
@@ -807,19 +807,19 @@ contains
 
     end function calc_grline
 
-    function calc_shelf_basin(f_grnd,basins,H_ice,T_shlf) result(T_shlf_basin)
+    function calc_shelf_basin(f_grnd,basins,H_ice,T_shlf) result(T_basin)
         ! jablasco: function to compute mean ocean temperature of ice-shelf basin
         implicit none
 
         real(prec), intent(IN)  :: f_grnd(:,:), basins(:,:), H_ice(:,:), T_shlf(:,:)
-        real(prec) :: T_shlf_basin(size(f_grnd,1),size(f_grnd,2))
+        real(prec) :: T_basin(size(f_grnd,1),size(f_grnd,2))
 
         ! Local variables
         integer :: i, j, m
         real(prec) :: n_pts, t_mean
 
         ! Assign to shelf values real ocean values
-        T_shlf_basin(:,:) = T_shlf(:,:) 
+        T_basin(:,:) = T_shlf(:,:) 
 
         do m=1, int(maxval(basins))
             n_pts  = 0.0
@@ -841,7 +841,7 @@ contains
                 do j = 1, size(T_shlf,2)
                     ! Basin floating ice point
                     if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        T_shlf_basin(i,j) = t_mean / n_pts
+                        T_basin(i,j) = t_mean / n_pts
                     end if
                 end do
             end do
@@ -1045,9 +1045,9 @@ contains
         allocate(now%bmb_obs(nx,ny))
         allocate(now%bmb_ref(nx,ny))
         allocate(now%T_shlf(nx,ny))
-        allocate(now%T_shlf_basin(nx,ny))
+        allocate(now%T_basin(nx,ny))
         allocate(now%dT_shlf(nx,ny))
-        allocate(now%dT_shlf_basin(nx,ny))
+        allocate(now%dT_basin(nx,ny))
         allocate(now%S_shlf(nx,ny))
         allocate(now%kappa(nx,ny))
         
@@ -1055,19 +1055,19 @@ contains
         allocate(now%mask_ocn(nx,ny))
 
         ! Initialize variables 
-        now%bmb_shlf      = 0.0  
-        now%bmb_obs       = 0.0
-        now%bmb_ref       = 0.0  
-        now%T_shlf        = 0.0
-        now%T_shlf_basin  = 0.0
-        now%dT_shlf       = 0.0
-        now%dT_shlf_basin = 0.0
-        now%S_shlf        = 0.0
-        now%kappa         = 0.0
+        now%bmb_shlf        = 0.0  
+        now%bmb_obs         = 0.0
+        now%bmb_ref         = 0.0  
+        now%T_shlf          = 0.0
+        now%T_basin         = 0.0
+        now%dT_shlf         = 0.0
+        now%dT_basin        = 0.0
+        now%S_shlf          = 0.0
+        now%kappa           = 0.0
         
         ! By default set ocean points everywhere
-        now%mask_ocn_ref = 1
-        now%mask_ocn     = 1
+        now%mask_ocn_ref    = 1
+        now%mask_ocn        = 1
 
         return
 
@@ -1080,14 +1080,14 @@ contains
         type(marshelf_state_class) :: now 
 
         ! Allocate state objects
-        if (allocated(now%bmb_shlf)) deallocate(now%bmb_shlf)
-        if (allocated(now%bmb_obs))  deallocate(now%bmb_obs)
-        if (allocated(now%bmb_ref))  deallocate(now%bmb_ref)
-        if (allocated(now%T_shlf))   deallocate(now%T_shlf)
-        if (allocated(now%T_shlf_basin)) deallocate(now%T_shlf_basin)
-        if (allocated(now%dT_shlf))  deallocate(now%dT_shlf)
-        if (allocated(now%dT_shlf_basin))  deallocate(now%dT_shlf_basin)
-        if (allocated(now%kappa))    deallocate(now%kappa)
+        if (allocated(now%bmb_shlf))    deallocate(now%bmb_shlf)
+        if (allocated(now%bmb_obs))     deallocate(now%bmb_obs)
+        if (allocated(now%bmb_ref))     deallocate(now%bmb_ref)
+        if (allocated(now%T_shlf))      deallocate(now%T_shlf)
+        if (allocated(now%T_basin))     deallocate(now%T_basin)
+        if (allocated(now%dT_shlf))     deallocate(now%dT_shlf)
+        if (allocated(now%dT_basin))    deallocate(now%dT_basin)
+        if (allocated(now%kappa))       deallocate(now%kappa)
         
         return
 

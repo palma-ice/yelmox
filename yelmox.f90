@@ -571,11 +571,11 @@ contains
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         ! jablasco
-        call nc_write(filename,"dT_shlf_basin",mshlf%now%dT_shlf_basin,units="K",long_name="Mean shelf temperature anomaly", &
+        call nc_write(filename,"dT_basin",mshlf%now%dT_basin,units="K",long_name="Mean basin temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,units="K",long_name="Mean shelf temperature", &
+        !call nc_write(filename,"T_basin",mshlf%now%T_basin,units="K",long_name="Mean basin temperature", &
         !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
