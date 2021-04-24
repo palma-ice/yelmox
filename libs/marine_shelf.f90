@@ -7,7 +7,7 @@ module marine_shelf
     use nml 
     use ncio 
 
-!     use yelmo_defs, only : sp, dp, prec, rho_ice, rho_w, rho_sw, g, parse_path 
+!     use yelmo_defs, only : sp, dp, wp, rho_ice, rho_w, rho_sw, g, parse_path 
 
     implicit none 
 
@@ -15,19 +15,19 @@ module marine_shelf
     integer,  parameter :: dp  = kind(1.d0)
     integer,  parameter :: sp  = kind(1.0)
 
-    ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = sp 
+    ! Choose the working precision of the library (sp,dp)
+    integer,  parameter :: wp = sp 
 
     ! Physical constants 
-    real(prec), parameter :: rho_ice =  917.d0     ! Density ice           [kg/m^3] 
-    real(prec), parameter :: rho_w   = 1000.d0     ! Density water         [kg/m^3] 
-    real(prec), parameter :: rho_sw  = 1028.d0     ! Density seawater      [kg/m^3] 
-    real(prec), parameter :: g       = 9.81d0      ! Gravitational accel.  [m/s^2]
-    real(prec), parameter :: cp_o    = 3974.d0     ! Specific heat capacity of ocean mixed layer [J/kg*ºC]
-    real(prec), parameter :: L_ice   = 3.34e5      ! Latent heat of fusion of ice [J/kg] 
+    real(wp), parameter :: rho_ice =  917.d0     ! Density ice           [kg/m^3] 
+    real(wp), parameter :: rho_w   = 1000.d0     ! Density water         [kg/m^3] 
+    real(wp), parameter :: rho_sw  = 1028.d0     ! Density seawater      [kg/m^3] 
+    real(wp), parameter :: g       = 9.81d0      ! Gravitational accel.  [m/s^2]
+    real(wp), parameter :: cp_o    = 3974.d0     ! Specific heat capacity of ocean mixed layer [J/kg*ºC]
+    real(wp), parameter :: L_ice   = 3.34e5      ! Latent heat of fusion of ice [J/kg] 
  
-    real(prec), parameter :: lambda     = L_ice/cp_o
-    real(prec), parameter :: rho_ice_sw = rho_ice / rho_sw 
+    real(wp), parameter :: lambda     = L_ice/cp_o
+    real(wp), parameter :: rho_ice_sw = rho_ice / rho_sw 
 
 
     type marshelf_param_class
@@ -36,34 +36,34 @@ module marine_shelf
         logical            :: use_obs
         character(len=512) :: obs_path
         character(len=56)  :: obs_name 
-        real(prec)         :: obs_f, obs_lim 
+        real(wp)         :: obs_f, obs_lim 
         character(len=56)  :: basin_name(50)
-        real(prec)         :: basin_bmb(50)
-        real(prec) :: c_shlf, kappa_shlf, f_grz_shlf
-        real(prec) :: c_grz, kappa_grz, grz_length
-        real(prec) :: gamma_lin, gamma_quad, gamma_quad_nl 
+        real(wp)         :: basin_bmb(50)
+        real(wp) :: c_shlf, kappa_shlf, f_grz_shlf
+        real(wp) :: c_grz, kappa_grz, grz_length
+        real(wp) :: gamma_lin, gamma_quad, gamma_quad_nl 
 
-        real(prec) :: c_deep, depth_deep
-        real(prec) :: T_fp 
-        real(prec) :: depth_min, depth_max
+        real(wp) :: c_deep, depth_deep
+        real(wp) :: T_fp 
+        real(wp) :: depth_min, depth_max
 
         logical :: find_ocean 
 
         character(len=512) :: domain   
-        real(prec) :: rho_ice, rho_sw
+        real(wp) :: rho_ice, rho_sw
 
     end type 
 
     type marshelf_state_class 
-        real(prec), allocatable   :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
-        real(prec), allocatable   :: bmb_obs(:,:)           ! observed ice shelf melting [m/a]
-        real(prec), allocatable   :: bmb_ref(:,:)           ! Basal mass balance reference field
-        real(prec), allocatable   :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
-        real(prec), allocatable   :: T_basin(:,:)           ! Basin average boundary ocean temps. for forcing the ice shelves
-        real(prec), allocatable   :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
-        real(prec), allocatable   :: dT_basin(:,:)          ! Basin average boundary ocean temp anomalies for forcing the ice shelves
-        real(prec), allocatable   :: S_shlf(:,:)            ! Boundary salinity for forcing the ice shelves
-        real(prec), allocatable   :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
+        real(wp), allocatable   :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
+        real(wp), allocatable   :: bmb_obs(:,:)           ! observed ice shelf melting [m/a]
+        real(wp), allocatable   :: bmb_ref(:,:)           ! Basal mass balance reference field
+        real(wp), allocatable   :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
+        real(wp), allocatable   :: T_basin(:,:)           ! Basin average boundary ocean temps. for forcing the ice shelves
+        real(wp), allocatable   :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
+        real(wp), allocatable   :: dT_basin(:,:)          ! Basin average boundary ocean temp anomalies for forcing the ice shelves
+        real(wp), allocatable   :: S_shlf(:,:)            ! Boundary salinity for forcing the ice shelves
+        real(wp), allocatable   :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
 
         integer,    allocatable   :: mask_ocn_ref(:,:) 
         integer,    allocatable   :: mask_ocn(:,:) 
@@ -94,8 +94,8 @@ contains
         character(len=*), intent(IN)      :: filename
         integer, intent(IN)               :: nx, ny 
         character(len=*), intent(IN)      :: domain, grid_name
-        real(prec), intent(IN)            :: regions(:,:)
-        real(prec), intent(IN)            :: basins(:,:)
+        real(wp), intent(IN)            :: regions(:,:)
+        real(wp), intent(IN)            :: basins(:,:)
         
         ! Local variables
         integer :: j 
@@ -216,8 +216,8 @@ contains
         ! Define mask_ocn_ref based on regions mask 
         ! (these definitions should work for all North and Antarctica domains)
         mshlf%now%mask_ocn_ref = 0 
-        where (regions .eq. 1.0_prec) mshlf%now%mask_ocn_ref = 1   
-        where (regions .eq. 2.0_prec) mshlf%now%mask_ocn_ref = 1 
+        where (regions .eq. 1.0_wp) mshlf%now%mask_ocn_ref = 1   
+        where (regions .eq. 2.0_wp) mshlf%now%mask_ocn_ref = 1 
 
 
         select case(trim(mshlf%par%domain))
@@ -290,12 +290,12 @@ contains
         implicit none 
 
         type(marshelf_class), intent(INOUT) :: mshlf
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: z_bed(:,:) 
-        real(prec), intent(IN) :: f_grnd(:,:), basins(:,:) 
-        real(prec), intent(IN) :: z_sl(:,:)
-        real(prec), intent(IN) :: dx
-        real(prec), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: f_grnd(:,:), basins(:,:) 
+        real(wp), intent(IN) :: z_sl(:,:)
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
        
         ! 0. Calculate water temps at depths of interest ============================
 
@@ -342,8 +342,8 @@ contains
         implicit none
 
         type(marshelf_class), intent(INOUT) :: mshlf
-        real(prec), intent(IN) :: H_ice(:,:)
-        real(prec), intent(IN) :: depth(:),so(:,:,:)
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: depth(:),so(:,:,:)
 
         ! 0. Calculate water salinity at depths of interest
         ! ============================
@@ -377,8 +377,8 @@ contains
         implicit none 
 
         type(marshelf_class), intent(INOUT) :: mshlf
-        real(prec),           intent(IN)    :: to_ann 
-        real(prec),           intent(IN)    :: dto_ann 
+        real(wp),           intent(IN)    :: to_ann 
+        real(wp),           intent(IN)    :: dto_ann 
         
         mshlf%now%T_shlf  = to_ann 
         mshlf%now%dT_shlf = dto_ann 
@@ -392,21 +392,21 @@ contains
         implicit none
         
         type(marshelf_class), intent(INOUT) :: mshlf
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: z_bed(:,:) 
-        real(prec), intent(IN) :: f_grnd(:,:)
-        real(prec), intent(IN) :: basins(:,:)
-        real(prec), intent(IN) :: z_sl(:,:) 
-        !real(prec), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
-        real(prec), intent(IN) :: dx   ! grid resolution [m]
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: basins(:,:)
+        real(wp), intent(IN) :: z_sl(:,:) 
+        !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
+        real(wp), intent(IN) :: dx   ! grid resolution [m]
 
         ! Local variables
         integer :: i, j, nx, ny, ngr 
 
-        real(prec) :: bmb_floating, bmb_grline
-        real(prec), allocatable :: H_ocn(:,:)
+        real(wp) :: bmb_floating, bmb_grline
+        real(wp), allocatable :: H_ocn(:,:)
         logical,    allocatable :: is_grline(:,:)   
-        real(prec) :: grz_wt
+        real(wp) :: grz_wt
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
@@ -632,8 +632,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)    :: bmb_ref, dT, c, kappa
-        real(prec) :: bmb
+        real(wp), intent(IN)    :: bmb_ref, dT, c, kappa
+        real(wp) :: bmb
         
         ! Use temperature anomaly relative to a reference state
         bmb = c*bmb_ref - kappa*dT
@@ -651,8 +651,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)    :: dT_shlf, gamma_lin
-        real(prec) :: bmb
+        real(wp), intent(IN)    :: dT_shlf, gamma_lin
+        real(wp) :: bmb
 
         ! jablasco: careful!!
         ! -1.0 because bmb is negative
@@ -669,8 +669,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)    :: dT_shlf, gamma_quad
-        real(prec) :: bmb
+        real(wp), intent(IN)    :: dT_shlf, gamma_quad
+        real(wp) :: bmb
 
         ! jablasco: careful!!
         ! -1.0 because bmb is negative
@@ -688,8 +688,8 @@ contains
 
         implicit none
 
-        real(prec), intent(IN)    :: dT_shlf, dT_basin, gamma_quad_nl
-        real(prec) :: bmb
+        real(wp), intent(IN)    :: dT_shlf, dT_basin, gamma_quad_nl
+        real(wp) :: bmb
 
         ! jablasco: careful!!
         ! -1.0 because bmb is negative
@@ -705,17 +705,17 @@ contains
         implicit none 
 
         type(marshelf_param_class) :: par 
-        real(prec), intent(INOUT)  :: bmb(:,:)  
+        real(wp), intent(INOUT)  :: bmb(:,:)  
         integer,    intent(IN)     :: mask_ocn(:,:) 
-        real(prec), intent(IN)     :: z_bed(:,:) 
-        real(prec), intent(IN)     :: z_sl(:,:)
+        real(wp), intent(IN)     :: z_bed(:,:) 
+        real(wp), intent(IN)     :: z_sl(:,:)
         integer,    intent(IN)     :: n_smth       ! Smoothing neighborhood radius in grid points
 
         ! Local variables 
         integer :: i, j, nx, ny 
-        real(prec) :: n_pts 
+        real(wp) :: n_pts 
         logical,    allocatable :: is_c_deep(:,:) 
-        real(prec), allocatable :: bmb_tmp(:,:) 
+        real(wp), allocatable :: bmb_tmp(:,:) 
 
         nx = size(bmb,1)
         ny = size(bmb,2) 
@@ -749,7 +749,7 @@ contains
         if (n_smth .gt. 0) then 
             
             ! Get size of neighborhood
-            n_pts = real( (2*n_smth+1)**2, prec) 
+            n_pts = real( (2*n_smth+1)**2, wp) 
 
             bmb_tmp = bmb 
             do i = 1+n_smth, nx-n_smth
@@ -779,7 +779,7 @@ contains
 
         implicit none 
 
-        real(prec), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
         logical :: is_grline(size(f_grnd,1),size(f_grnd,2)) 
 
         ! Local variables 
@@ -811,12 +811,12 @@ contains
         ! jablasco: function to compute mean ocean temperature of ice-shelf basin
         implicit none
 
-        real(prec), intent(IN)  :: f_grnd(:,:), basins(:,:), H_ice(:,:), T_shlf(:,:)
-        real(prec) :: T_basin(size(f_grnd,1),size(f_grnd,2))
+        real(wp), intent(IN)  :: f_grnd(:,:), basins(:,:), H_ice(:,:), T_shlf(:,:)
+        real(wp) :: T_basin(size(f_grnd,1),size(f_grnd,2))
 
         ! Local variables
         integer :: i, j, m
-        real(prec) :: n_pts, t_mean
+        real(wp) :: n_pts, t_mean
 
         ! Assign to shelf values real ocean values
         T_basin(:,:) = T_shlf(:,:) 
@@ -857,9 +857,9 @@ contains
         
         implicit none 
         
-        real(prec), intent(OUT)    :: Tshlf(:,:), dTshlf(:,:)
-        real(prec), intent(IN)     :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:)
-        real(prec), intent(IN)     :: depth_range(:)
+        real(wp), intent(OUT)    :: Tshlf(:,:), dTshlf(:,:)
+        real(wp), intent(IN)     :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:)
+        real(wp), intent(IN)     :: depth_range(:)
 
         ! Local variables 
         integer :: k0, k1 
@@ -892,8 +892,8 @@ contains
         
         implicit none
 
-        real(prec), intent(OUT)   :: Tshlf(:,:), dTshlf(:,:)
-        real(prec), intent(IN)    :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:), H(:,:)
+        real(wp), intent(OUT)   :: Tshlf(:,:), dTshlf(:,:)
+        real(wp), intent(IN)    :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:), H(:,:)
 
         ! Local variables
         integer :: k0, i, j
@@ -916,12 +916,12 @@ contains
         
         implicit none
 
-        real(prec), intent(OUT)   :: Tshlf(:,:), dTshlf(:,:)
-        real(prec), intent(IN)    :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:), H(:,:)
+        real(wp), intent(OUT)   :: Tshlf(:,:), dTshlf(:,:)
+        real(wp), intent(IN)    :: depth(:), T_ocn(:,:,:), dT_ocn(:,:,:), H(:,:)
 
         ! Local variables
         integer :: i, j
-        real(prec) :: depth_H 
+        real(wp) :: depth_H 
 
         do i = 1, size(Tshlf,1)
             do j = 1, size(Tshlf,2)
@@ -946,8 +946,8 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT)   :: Sshlf(:,:)
-        real(prec), intent(IN)    :: depth(:), S_ocn(:,:,:), H(:,:)
+        real(wp), intent(OUT)   :: Sshlf(:,:)
+        real(wp), intent(IN)    :: depth(:), S_ocn(:,:,:), H(:,:)
 
         ! Local variables
         integer :: k0, i, j
@@ -968,12 +968,12 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT)   :: Sshlf(:,:)
-        real(prec), intent(IN)    :: depth(:), S_ocn(:,:,:), H(:,:)
+        real(wp), intent(OUT)   :: Sshlf(:,:)
+        real(wp), intent(IN)    :: depth(:), S_ocn(:,:,:), H(:,:)
 
         ! Local variables
         integer :: i, j
-        real(prec) :: depth_H
+        real(wp) :: depth_H
 
         do i = 1, size(Sshlf,1)
             do j = 1, size(Sshlf,2)
@@ -996,9 +996,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT)    :: Sshlf(:,:)
-        real(prec), intent(IN)     :: depth(:), S_ocn(:,:,:)
-        real(prec), intent(IN)     :: depth_range(:)
+        real(wp), intent(OUT)    :: Sshlf(:,:)
+        real(wp), intent(IN)     :: depth(:), S_ocn(:,:,:)
+        real(wp), intent(IN)     :: depth_range(:)
 
         ! Local variables
         integer :: k0, k1
@@ -1112,11 +1112,11 @@ contains
 
         implicit none 
  
-        real(prec), dimension(:), intent(IN) :: x, y
-        real(prec), intent(IN) :: xout
-        real(prec) :: yout 
+        real(wp), dimension(:), intent(IN) :: x, y
+        real(wp), intent(IN) :: xout
+        real(wp) :: yout 
         integer :: i, j, n, nout 
-        real(prec) :: alph
+        real(wp) :: alph
 
         n    = size(x) 
 
@@ -1151,7 +1151,7 @@ contains
         implicit none 
 
         integer,    intent(OUT) :: mask(:,:) 
-        real(prec), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
         integer,    intent(IN)  :: mask_ref(:,:) 
 
         ! Local variables 
