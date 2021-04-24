@@ -55,18 +55,21 @@ module marine_shelf
     end type 
 
     type marshelf_state_class 
-        real(wp), allocatable   :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
-        real(wp), allocatable   :: bmb_obs(:,:)           ! observed ice shelf melting [m/a]
-        real(wp), allocatable   :: bmb_ref(:,:)           ! Basal mass balance reference field
-        real(wp), allocatable   :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
-        real(wp), allocatable   :: T_basin(:,:)           ! Basin average boundary ocean temps. for forcing the ice shelves
-        real(wp), allocatable   :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
-        real(wp), allocatable   :: dT_basin(:,:)          ! Basin average boundary ocean temp anomalies for forcing the ice shelves
-        real(wp), allocatable   :: S_shlf(:,:)            ! Boundary salinity for forcing the ice shelves
-        real(wp), allocatable   :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
+        real(wp), allocatable :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
+        real(wp), allocatable :: bmb_obs(:,:)           ! observed ice shelf melting [m/a]
+        real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
+        real(wp), allocatable :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
+        real(wp), allocatable :: T_basin(:,:)           ! Basin average boundary ocean temps. for forcing the ice shelves
+        real(wp), allocatable :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
+        real(wp), allocatable :: dT_basin(:,:)          ! Basin average boundary ocean temp anomalies for forcing the ice shelves
+        real(wp), allocatable :: S_shlf(:,:)            ! Boundary salinity for forcing the ice shelves
+        real(wp), allocatable :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
 
-        integer,    allocatable   :: mask_ocn_ref(:,:) 
-        integer,    allocatable   :: mask_ocn(:,:) 
+        real(wp), allocatable :: z_base(:,:)            ! Ice-shelf base elevation (relative to sea level)
+        real(wp), allocatable :: slope_base(:,:)        ! Ice-shelf base slope (slope=sin(theta)=length/hypotenuse)
+
+        integer,  allocatable :: mask_ocn_ref(:,:) 
+        integer,  allocatable :: mask_ocn(:,:) 
         
     end type 
 
@@ -414,6 +417,35 @@ contains
         allocate(H_ocn(nx,ny)) 
         allocate(is_grline(nx,ny))
 
+        ! Step 1: calculate geometry ===========================
+
+        do j = 1, ny
+        do i = 1, nx
+
+            if (f_grnd(i,j) .eq. 0.0) then 
+                ! Floating ice shelves
+                
+                ! Calculate height of ice-shelf base relative to sea level 
+                mshlf%now%z_base(i,j) = z_sl(i,j) - (H_ice(i,j)*rho_ice_sw)
+                
+                ! Calculate ocean depth
+                H_ocn(i,j) = max(mshlf%now%z_base(i,j) - z_bed(i,j),0.0) 
+
+            else 
+                ! Grounded ice, define for completeness
+            
+                mshlf%now%z_base(i,j)       = z_bed(i,j) 
+                mshlf%now%slope_base(i,j)   = 0.0 
+                H_ocn(i,j)                  = 0.0 
+
+            end if 
+            
+        end do 
+        end do 
+
+        ! Calculate slope of ice-shelf base 
+        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,f_grnd)
+        
         ! Determine location of grounding line 
         is_grline = calc_grline(f_grnd)
 
@@ -436,7 +468,7 @@ contains
 
         end if
 
-        ! 1. Define the reference bmb field for floating ice =================
+        ! 2. Define the reference bmb field for floating ice =================
 
         if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
             ! Modify the basic bmb_obs fields by scalars
@@ -453,14 +485,13 @@ contains
             mshlf%now%dT_shlf  = mshlf%now%T_shlf  - mshlf%par%T_fp
             mshlf%now%dT_basin = mshlf%now%T_basin - mshlf%par%T_fp
 
-            ! Following Lipscomb et al (2021, Eq. 6 text), ensure 
-            ! dT_shlf >= 0 
+            ! Following Lipscomb et al (2021, Eq. 6 text), ensure dT_shlf >= 0 
             where (mshlf%now%dT_shlf  .lt. 0.0) mshlf%now%dT_shlf  = 0.0 
             where (mshlf%now%dT_basin .lt. 0.0) mshlf%now%dT_basin = 0.0 
             
         end if
 
-        ! 2. Calculate current ice shelf bmb field (grounded-ice bmb is
+        ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
         ! calculated in ice-sheet model separately) ========
 
         do j = 1, ny
@@ -772,6 +803,24 @@ contains
 
     end subroutine apply_c_deep
 
+    subroutine calc_shelf_slope(slope,z_base,f_grnd)
+        ! Calculate the slope of the ice shelf base centered on aa-node, 
+        ! where slope = sin(theta) = height/hypotenuse
+
+        implicit none 
+
+        real(wp), intent(OUT) :: slope(:,:) 
+        real(wp), intent(IN)  :: z_base(:,:) 
+        real(wp), intent(IN)  :: f_grnd(:,:) 
+
+        ! Local variables 
+        integer :: i, j, ip1, im1, jp1, jm1 
+
+        
+        return 
+
+    end subroutine calc_shelf_slope
+
     function calc_grline(f_grnd) result(is_grline)
         ! Determine the grounding line given the grounded fraction f_grnd
         ! ie, is_grline is true for a floating point or partially floating  
@@ -1051,6 +1100,9 @@ contains
         allocate(now%S_shlf(nx,ny))
         allocate(now%kappa(nx,ny))
         
+        allocate(now%z_base(nx,ny))
+        allocate(now%slope_base(nx,ny))
+
         allocate(now%mask_ocn_ref(nx,ny))
         allocate(now%mask_ocn(nx,ny))
 
@@ -1064,6 +1116,9 @@ contains
         now%dT_basin        = 0.0
         now%S_shlf          = 0.0
         now%kappa           = 0.0
+        
+        now%z_base          = 0.0 
+        now%slope_base      = 0.0 
         
         ! By default set ocean points everywhere
         now%mask_ocn_ref    = 1
@@ -1088,6 +1143,12 @@ contains
         if (allocated(now%dT_shlf))     deallocate(now%dT_shlf)
         if (allocated(now%dT_basin))    deallocate(now%dT_basin)
         if (allocated(now%kappa))       deallocate(now%kappa)
+        
+        if (allocated(now%z_base))      deallocate(now%z_base)
+        if (allocated(now%slope_base))  deallocate(now%slope_base)
+        
+        if (allocated(now%mask_ocn_ref))    deallocate(now%mask_ocn_ref)
+        if (allocated(now%mask_ocn))        deallocate(now%mask_ocn)
         
         return
 
