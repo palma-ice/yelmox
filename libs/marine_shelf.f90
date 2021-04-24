@@ -444,7 +444,7 @@ contains
         end do 
 
         ! Calculate slope of ice-shelf base 
-        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,f_grnd)
+        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,f_grnd,dx)
         
         ! Determine location of grounding line 
         is_grline = calc_grline(f_grnd)
@@ -803,7 +803,7 @@ contains
 
     end subroutine apply_c_deep
 
-    subroutine calc_shelf_slope(slope,z_base,f_grnd)
+    subroutine calc_shelf_slope(slope,z_base,f_grnd,dx)
         ! Calculate the slope of the ice shelf base centered on aa-node, 
         ! where slope = sin(theta) = height/hypotenuse
 
@@ -812,10 +812,36 @@ contains
         real(wp), intent(OUT) :: slope(:,:) 
         real(wp), intent(IN)  :: z_base(:,:) 
         real(wp), intent(IN)  :: f_grnd(:,:) 
+        real(wp), intent(IN)  :: dx 
 
         ! Local variables 
-        integer :: i, j, ip1, im1, jp1, jm1 
+        integer :: i, j, nx, ny, ip1, im1, jp1, jm1 
+        real(wp) :: dz, dx_2, hypot
 
+        nx = size(slope,1) 
+        ny = size(slope,2) 
+
+        dx_2 = dx*2.0_wp 
+
+        do j = 1, ny 
+        do i = 1, nx 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+
+            ! Get mean vertical change in distance between x and y directions
+            dz =  0.5_wp*(z_base(ip1,j)-z_base(im1,j)) &
+                + 0.5_wp*(z_base(i,jp1)-z_base(i,jm1))
+
+            ! Get hypotenuse 
+            hypot = sqrt(dz**2 + dx_2**2) 
+
+            ! Get slope == sin(theta) magnitude, independent of direction
+            slope(i,j) = abs(dz) / hypot 
+
+        end do 
+        end do
         
         return 
 
