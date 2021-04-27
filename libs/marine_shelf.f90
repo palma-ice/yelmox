@@ -19,13 +19,15 @@ module marine_shelf
     integer,  parameter :: wp = sp 
 
     ! Physical constants 
-    real(wp), parameter :: rho_ice =  917.d0     ! Density ice           [kg/m^3] 
-    real(wp), parameter :: rho_w   = 1000.d0     ! Density water         [kg/m^3] 
-    real(wp), parameter :: rho_sw  = 1028.d0     ! Density seawater      [kg/m^3] 
-    real(wp), parameter :: g       = 9.81d0      ! Gravitational accel.  [m/s^2]
-    real(wp), parameter :: cp_o    = 3974.d0     ! [J/(kg K)] Specific heat capacity of ocean mixed layer 
-    real(wp), parameter :: L_ice   = 3.34e5      ! [J/kg] Latent heat of fusion of ice 
- 
+    real(wp), parameter :: rho_ice =  917.d0    ! Density ice           [kg/m^3] 
+    real(wp), parameter :: rho_w   = 1000.d0    ! Density water         [kg/m^3] 
+    real(wp), parameter :: rho_sw  = 1028.d0    ! Density seawater      [kg/m^3] 
+    real(wp), parameter :: g       = 9.81d0     ! Gravitational accel.  [m/s^2]
+    real(wp), parameter :: cp_o    = 3974.d0    ! [J/(kg K)] Specific heat capacity of ocean mixed layer 
+    real(wp), parameter :: L_ice   = 3.34e5     ! [J/kg] Latent heat of fusion of ice 
+    
+    real(wp), parameter :: T0      = 273.15     ! [K] Reference freezing temp 
+
     real(wp), parameter :: lambda     = L_ice/cp_o
     real(wp), parameter :: rho_ice_sw = rho_ice / rho_sw 
     real(wp), parameter :: omega      = (rho_sw*cp_o) / (rho_ice*L_ice)     ! [1/K]
@@ -38,7 +40,7 @@ module marine_shelf
         logical             :: use_obs
         character(len=512)  :: obs_path
         character(len=56)   :: obs_name 
-        real(wp)            :: obs_f, obs_lim 
+        real(wp)            :: obs_scale, obs_lim 
         character(len=56)   :: basin_name(50)
         real(wp)            :: basin_bmb(50)
 
@@ -62,6 +64,7 @@ module marine_shelf
         real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
         
         real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
+        real(wp), allocatable :: dT_shlf(:,:)           ! [K] Shelf temperature anomaly relative to ref. state
         real(wp), allocatable :: S_shlf(:,:)            ! [K] Shelf temperature
         real(wp), allocatable :: T_fp_shlf(:,:)         ! [K] Shelf freezing-point temperature
         
@@ -85,14 +88,15 @@ module marine_shelf
     private
     public :: marshelf_class
     public :: marshelf_init
+    public :: marshelf_update_shelf
     public :: marshelf_update
     public :: marshelf_end 
 
 contains 
     
-    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx,depth,to_ann,so_ann)
+    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx,depth,to_ann,so_ann,dto_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
-        ! for the ice-shelf interface: T_shlf, S_shlf 
+        ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
 
         implicit none 
 
@@ -103,7 +107,10 @@ contains
         real(wp), intent(IN) :: basins(:,:) 
         real(wp), intent(IN) :: z_sl(:,:)
         real(wp), intent(IN) :: dx
-        real(wp), intent(IN) :: depth(:),to_ann(:,:,:),so_ann(:,:,:)
+        real(wp), intent(IN) :: depth(:)
+        real(wp), intent(IN) :: to_ann(:,:,:)
+        real(wp), intent(IN) :: so_ann(:,:,:)
+        real(wp), intent(IN) :: dto_ann(:,:,:)
         
         ! 1. Calculate water properties at depths of interest ============================
 
@@ -114,20 +121,24 @@ contains
 
                 call calc_shelf_variable_mean(mshlf%now%T_shlf,to_ann,depth, &
                                                  depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+                call calc_shelf_variable_mean(mshlf%now%dT_shlf,dto_ann,depth, &
+                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
                 call calc_shelf_variable_mean(mshlf%now%S_shlf,so_ann,depth, &
                                                  depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
             
             case("layer")
                 ! Takes the nearest layer for the temperature
 
-                call calc_shelf_variable_layer(mshlf%now%T_shlf,to_ann,depth,H_ice)
-                call calc_shelf_variable_layer(mshlf%now%S_shlf,so_ann,depth,H_ice)
+                call calc_shelf_variable_layer(mshlf%now%T_shlf, to_ann, depth,H_ice)
+                call calc_shelf_variable_layer(mshlf%now%dT_shlf,dto_ann,depth,H_ice)
+                call calc_shelf_variable_layer(mshlf%now%S_shlf, so_ann, depth,H_ice)
 
             case("interp")
                 ! Interpolation from the two nearest layers 
 
-                call  calc_shelf_variable_depth(mshlf%now%T_shlf,to_ann,depth,H_ice)
-                call  calc_shelf_variable_depth(mshlf%now%S_shlf,so_ann,depth,H_ice)
+                call  calc_shelf_variable_depth(mshlf%now%T_shlf, to_ann, depth,H_ice)
+                call  calc_shelf_variable_depth(mshlf%now%dT_shlf,dto_ann,depth,H_ice)
+                call  calc_shelf_variable_depth(mshlf%now%S_shlf, so_ann, depth,H_ice)
 
             case DEFAULT
                 write(*,*) "marshelf_update:: error: interp_method not recognized: ", mshlf%par%interp_method
@@ -184,7 +195,6 @@ contains
                 ! Grounded ice, define for completeness
             
                 mshlf%now%z_base(i,j)       = z_bed(i,j) 
-                mshlf%now%slope_base(i,j)   = 0.0 
                 H_ocn(i,j)                  = 0.0 
 
             end if 
@@ -215,25 +225,10 @@ contains
 
         ! 2. Calculate various fields of interest ============================
 
-
-        ! Calculate ocean water freezing point
+        ! Calculate ocean water freezing point [K]
         call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base, &
-                                    mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3)
-
-
-        ! 2. Define the reference bmb field for floating ice =================
-
-
-        
-        ! Redefine dT_shlf as the temperature anomaly wrt the freezing
-        ! temperature
-        ! mshlf%now%dT_shlf  = mshlf%now%T_shlf  - mshlf%par%T_fp
-        ! mshlf%now%dT_basin = mshlf%now%T_basin - mshlf%par%T_fp
-
-        ! ! Following Lipscomb et al (2021, Eq. 6 text), ensure dT_shlf >= 0 
-        ! where (mshlf%now%dT_shlf  .lt. 0.0) mshlf%now%dT_shlf  = 0.0 
-        ! where (mshlf%now%dT_basin .lt. 0.0) mshlf%now%dT_basin = 0.0 
-            
+                                    mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3, &
+                                    T_ref=T0)
 
         ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
         ! calculated in ice-sheet model separately) ========
@@ -249,6 +244,13 @@ contains
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 
                 ! Calculate bmb_shlf using other available parameterizations 
+
+                ! Calculate the thermal forcing
+                where (mshlf%now%mask_ocn .gt. 0) 
+                    mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
+                elsewhere 
+                    mshlf%now%tf_shlf = 0.0_wp 
+                end where 
 
                 ! For simplicity, first calculate everywhere (ocn and grounded points)
                 select case(trim(mshlf%par%bmb_method))
@@ -269,10 +271,17 @@ contains
                         call calc_variable_basin(mshlf%now%tf_basin,mshlf%now%tf_shlf, &
                                                                         f_grnd,basins,H_ice)
 
+                        ! Ensure tf_basin is non-negative following Lipscomb et al (2021)
+                        where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp 
+
                         call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
                             mshlf%par%gamma_quad_nl,omega)
                     
                     case("anom")
+
+                        ! Calculate the thermal forcing specific to the anom method 
+                        ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
+                        mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr 
 
                         call calc_bmb_anom(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%bmb_ref, &
                                     mshlf%par%kappa_grz,mshlf%par%c_grz,mshlf%par%f_grz_shlf, &
@@ -337,7 +346,7 @@ contains
             mshlf%now%bmb_ref = -mshlf%now%bmb_ref
 
             ! Scale the obs as needed 
-            mshlf%now%bmb_ref = mshlf%now%bmb_ref*mshlf%par%obs_f 
+            mshlf%now%bmb_ref = mshlf%now%bmb_ref*mshlf%par%obs_scale 
 
             ! Limit the max obs values as desired 
             where (mshlf%now%bmb_ref >  mshlf%par%obs_lim) mshlf%now%bmb_ref =  mshlf%par%obs_lim 
@@ -346,7 +355,7 @@ contains
         else 
 
             ! Set default psuedo-observation value since none are available and make them negative (as above) 
-            mshlf%now%bmb_ref = -1.0*mshlf%par%obs_f 
+            mshlf%now%bmb_ref = -1.0*mshlf%par%obs_scale 
 
         end if 
 
@@ -528,13 +537,7 @@ contains
         call nml_read(filename,"marine_shelf","bmb_method",     par%bmb_method,     init=init_pars)
         call nml_read(filename,"marine_shelf","interp_method",  par%interp_method,  init=init_pars)
         call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
-        call nml_read(filename,"marine_shelf","use_obs",        par%use_obs,        init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_path",       par%obs_path,       init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_name",       par%obs_name,       init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_f",          par%obs_f,          init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_lim",        par%obs_lim,        init=init_pars)
-        call nml_read(filename,"marine_shelf","basin_name",     par%basin_name,     init=init_pars)
-        call nml_read(filename,"marine_shelf","basin_bmb",      par%basin_bmb,      init=init_pars)
+        
         call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
         call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
         call nml_read(filename,"marine_shelf","depth_min",      par%depth_min,      init=init_pars)
@@ -545,17 +548,25 @@ contains
         call nml_read(filename,"marine_shelf","lambda2",        par%lambda2,        init=init_pars)
         call nml_read(filename,"marine_shelf","lambda3",        par%lambda3,        init=init_pars)
         
-        ! bmb_method == [lin,quad,quad_nl]
+        ! bmb_method == [lin,quad,quad-nl]
         call nml_read(filename,"marine_shelf","gamma_lin",      par%gamma_lin,      init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_quad",     par%gamma_quad,     init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_quad_nl",  par%gamma_quad_nl,  init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_prime",    par%gamma_prime,     init=init_pars)
         
         ! bmb_method == anom
-        call nml_read(filename,"marine_shelf","c_grz",          par%c_grz,          init=init_pars)
         call nml_read(filename,"marine_shelf","kappa_grz",      par%kappa_grz,      init=init_pars)
+        call nml_read(filename,"marine_shelf","c_grz",          par%c_grz,          init=init_pars)
         call nml_read(filename,"marine_shelf","f_grz_shlf",     par%f_grz_shlf,     init=init_pars)
         call nml_read(filename,"marine_shelf","grz_length",     par%grz_length,     init=init_pars)
+        
+        call nml_read(filename,"marine_shelf","use_obs",        par%use_obs,        init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_path",       par%obs_path,       init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_name",       par%obs_name,       init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_scale",      par%obs_scale,      init=init_pars)
+        call nml_read(filename,"marine_shelf","obs_lim",        par%obs_lim,        init=init_pars)
+        call nml_read(filename,"marine_shelf","basin_name",     par%basin_name,     init=init_pars)
+        call nml_read(filename,"marine_shelf","basin_bmb",      par%basin_bmb,      init=init_pars)
         
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
@@ -854,7 +865,7 @@ contains
 
     end subroutine calc_shelf_variable_depth
 
-    elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3)
+    elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
         ! Favier et al (2019), Eq. 3
 
@@ -866,8 +877,9 @@ contains
         real(wp), intent(IN)  :: lambda1 
         real(wp), intent(IN)  :: lambda2 
         real(wp), intent(IN)  :: lambda3 
-        
-        to_fp = lambda1*so + lambda2 + lambda3*z_base 
+        real(wp), intent(IN)  :: T_ref 
+
+        to_fp = lambda1*so + lambda2 + lambda3*z_base + T_ref 
 
         return 
 
@@ -1005,6 +1017,7 @@ contains
         allocate(now%bmb_ref(nx,ny))
         
         allocate(now%T_shlf(nx,ny))
+        allocate(now%dT_shlf(nx,ny))
         allocate(now%S_shlf(nx,ny))
         allocate(now%T_fp_shlf(nx,ny))
         
@@ -1023,6 +1036,7 @@ contains
         now%bmb_ref         = 0.0 
         
         now%T_shlf          = 0.0
+        now%dT_shlf         = 0.0
         now%S_shlf          = 0.0
         now%T_fp_shlf       = 0.0
 
@@ -1052,6 +1066,7 @@ contains
         if (allocated(now%bmb_ref))         deallocate(now%bmb_ref)
         
         if (allocated(now%T_shlf))          deallocate(now%T_shlf)
+        if (allocated(now%dT_shlf))         deallocate(now%dT_shlf)
         if (allocated(now%S_shlf))          deallocate(now%S_shlf)
         if (allocated(now%T_fp_shlf))       deallocate(now%T_fp_shlf)
         

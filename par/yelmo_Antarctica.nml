@@ -241,7 +241,7 @@
     !ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
     ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
     ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = True
+    ocn_monthly     = False
     ocn_time        = 0
 /
 
@@ -332,31 +332,41 @@
 /
 
 &marine_shelf
-    bmb_shlf_method    = "anom"  ! "anom", "lin", "quad", "quad-nl"
-    T_shlf_method      = "interp" ! "mean", "layer", "interp" ! Same method is used for salinity
-    use_obs            = True
-    obs_path           = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
-    obs_name           = "bm_eq_reese"
-    obs_f              = 1.0
-    obs_lim            = 100.0
-    basin_name         = "none"         !"northwest" "northeast" "east"
-    basin_bmb          = 0.0            !        -1.0       -1.0   -1.0
-    c_shlf             = -9999.0 
-    kappa_shlf         = -9999.0 
-    f_grz_shlf         = 1.0
-    c_grz              = 1.0 
-    kappa_grz          = 10.0 
-    grz_length         = 32.0           ! [km]   
-    gamma_lin          = 630.0          ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad         = 30000.0        ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
-    gamma_quad_nl      = 40000.0        ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
-    c_deep             = -1.0           ! [m/a] Melt rate in deep ocean, should be negative but not huge
-    depth_deep         = 2000.0
-    T_fp               = -1.8
-    depth_min          = 1100.0
-    depth_max          = 1500.0
-    find_ocean         = True 
+    bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
+    find_ocean      = True 
+    
+    ! Deep ocean bmb 
+    c_deep          = -1.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
+    depth_deep      = 2000.0
+    depth_min       = 1100.0
+    depth_max       = 1500.0
+    
+    ! Freezing point coefficients
+    lambda1         = -0.0575       ! [degC PSU−1] Liquidus slope
+    lambda2         = 0.0832        ! [degC] Liquidus intercept 
+    lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
 
+    ! bmb_method == [lin,quad,quad-nl] 
+    gamma_lin       = 630.0          ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad      = 30000.0        ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
+    gamma_quad_nl   = 40000.0        ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
+    
+    ! bmb_method == anom
+    kappa_grz       = 10.0 
+    c_grz           = 1.0 
+    f_grz_shlf      = 10.0
+    grz_length      = 32.0           ! [km] 
+
+    ! bmb_method == anom, bmb_ref parameters 
+    use_obs         = True
+    obs_path        = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+    obs_name        = "bm_eq_reese"
+    obs_scale       = 1.0
+    obs_lim         = 100.0
+    basin_name      = "none"         !"northwest" "northeast" "east"
+    basin_bmb       = 0.0            !        -1.0       -1.0   -1.0
+    
 /
 
 &pico

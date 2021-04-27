@@ -168,18 +168,14 @@ program yelmox
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
-    call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-                         dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+    call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
     if(pico1%par%use_pico) then
             call pico_calc_geometry(pico1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins,yelmo1%grd%dx)
-            ! jablasco: cte salinity 34.7 PSU -> TO DO
-            !mshlf1%now%S_shlf = 34.7
-            !mshlf1%now%S_shlf = snp1%now%so(:,:,1)
-            call marshelf_calc_Sshlf(mshlf1,yelmo1%tpo%now%H_ice,depth=snp1%now%depth,so=snp1%now%so)
             call pico_update_physics(pico1,mshlf1%now%T_shlf,mshlf1%now%S_shlf,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed, &
                                      yelmo1%tpo%now%f_grnd,yelmo1%bnd%z_sl)
             yelmo1%bnd%bmb_shlf = pico1%now%bmb_shlf
@@ -240,16 +236,24 @@ program yelmox
 
     end if 
 
+if (.FALSE.) then 
+
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
-    
+
+end if 
+
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
 !     call write_step_2D_small(yelmo1,file2D,time=time)  
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,pico1,file2D,time=time)
-    
+
+
+stop 
+
+
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,file1D,time=time) 
@@ -294,16 +298,14 @@ if (calc_transient_climate) then
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-                         dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+        call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
         if(pico1%par%use_pico) then
                 call pico_calc_geometry(pico1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins,yelmo1%grd%dx)
-                ! jablasco: cte salinity 34.7 PSU -> TO DO
-                mshlf1%now%S_shlf = 34.7
                 call pico_update_physics(pico1,mshlf1%now%T_shlf,mshlf1%now%S_shlf,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed, &
                                          yelmo1%tpo%now%f_grnd,yelmo1%bnd%z_sl)
                 yelmo1%bnd%bmb_shlf = pico1%now%bmb_shlf
@@ -570,13 +572,13 @@ contains
  
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! jablasco
-        call nc_write(filename,"dT_basin",mshlf%now%dT_basin,units="K",long_name="Mean basin temperature anomaly", &
+        call nc_write(filename,"tf_basin",mshlf%now%tf_basin,units="K",long_name="Mean basin thermal forcing", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
+        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf,units="K",long_name="Shelf thermal forcing", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"T_basin",mshlf%now%T_basin,units="K",long_name="Mean basin temperature", &
-        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing applied correction factor", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
