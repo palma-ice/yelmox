@@ -23,31 +23,35 @@ module marine_shelf
     real(wp), parameter :: rho_w   = 1000.d0     ! Density water         [kg/m^3] 
     real(wp), parameter :: rho_sw  = 1028.d0     ! Density seawater      [kg/m^3] 
     real(wp), parameter :: g       = 9.81d0      ! Gravitational accel.  [m/s^2]
-    real(wp), parameter :: cp_o    = 3974.d0     ! Specific heat capacity of ocean mixed layer [J/kg*ºC]
-    real(wp), parameter :: L_ice   = 3.34e5      ! Latent heat of fusion of ice [J/kg] 
+    real(wp), parameter :: cp_o    = 3974.d0     ! [J/(kg K)] Specific heat capacity of ocean mixed layer 
+    real(wp), parameter :: L_ice   = 3.34e5      ! [J/kg] Latent heat of fusion of ice 
  
     real(wp), parameter :: lambda     = L_ice/cp_o
     real(wp), parameter :: rho_ice_sw = rho_ice / rho_sw 
-
+    real(wp), parameter :: omega      = (rho_sw*cp_o) / (rho_ice*L_ice)     ! [1/K]
 
     type marshelf_param_class
 
-        character(len=56)  :: bmb_shlf_method, T_shlf_method
-        logical            :: use_obs
-        character(len=512) :: obs_path
-        character(len=56)  :: obs_name 
-        real(wp)           :: obs_f, obs_lim 
-        character(len=56)  :: basin_name(50)
-        real(wp)           :: basin_bmb(50)
-        real(wp) :: c_grz, kappa_grz, f_grz_shlf, grz_length
-        real(wp) :: gamma_lin, gamma_quad, gamma_quad_nl 
+        character(len=56)   :: bmb_method 
+        character(len=56)   :: interp_method 
+        logical             :: find_ocean 
+        logical             :: use_obs
+        character(len=512)  :: obs_path
+        character(len=56)   :: obs_name 
+        real(wp)            :: obs_f, obs_lim 
+        character(len=56)   :: basin_name(50)
+        real(wp)            :: basin_bmb(50)
 
-        real(wp) :: c_deep, depth_deep
-        real(wp) :: T_fp 
-        real(wp) :: depth_min, depth_max
+        real(wp)            :: c_deep, depth_deep
+        real(wp)            :: T_fp_const 
+        real(wp)            :: depth_min, depth_max
 
-        logical :: find_ocean 
+        real(wp)            :: lambda1, lambda2, lambda3 
+        real(wp)            :: gamma_lin, gamma_quad, gamma_quad_nl 
+        real(wp)            :: gamma_prime 
 
+        real(wp)            :: c_grz, kappa_grz, f_grz_shlf, grz_length
+        
         character(len=512) :: domain   
         real(wp) :: rho_ice, rho_sw
 
@@ -55,15 +59,16 @@ module marine_shelf
 
     type marshelf_state_class 
         real(wp), allocatable :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
-        real(wp), allocatable :: bmb_obs(:,:)           ! observed ice shelf melting [m/a]
         real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
-        real(wp), allocatable :: T_shlf(:,:)            ! Boundary ocean temps. for forcing the ice shelves
-        real(wp), allocatable :: T_basin(:,:)           ! Basin average boundary ocean temps. for forcing the ice shelves
-        real(wp), allocatable :: dT_shlf(:,:)           ! Boundary ocean temp anomalies for forcing the ice shelves
-        real(wp), allocatable :: dT_basin(:,:)          ! Basin average boundary ocean temp anomalies for forcing the ice shelves
-        real(wp), allocatable :: S_shlf(:,:)            ! Boundary salinity for forcing the ice shelves
-        real(wp), allocatable :: kappa(:,:)             ! Shelf-melt coefficient [m/a/K]
-
+        
+        real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
+        real(wp), allocatable :: S_shlf(:,:)            ! [K] Shelf temperature
+        real(wp), allocatable :: T_fp_shlf(:,:)         ! [K] Shelf freezing-point temperature
+        
+        real(wp), allocatable :: tf_shlf(:,:)           ! Thermal forcing at the ice-shelf interface
+        real(wp), allocatable :: tf_basin(:,:)          ! Basin-average thermal forcing at the ice-shelf interface
+        real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface (by basin usually)
+        
         real(wp), allocatable :: z_base(:,:)            ! Ice-shelf base elevation (relative to sea level)
         real(wp), allocatable :: slope_base(:,:)        ! Ice-shelf base slope (slope=sin(theta)=length/hypotenuse)
 
@@ -80,13 +85,226 @@ module marine_shelf
     private
     public :: marshelf_class
     public :: marshelf_init
-    public :: marshelf_calc_Tshlf
-    public :: marshelf_calc_Sshlf
-    public :: marshelf_set_Tshlf 
     public :: marshelf_update
     public :: marshelf_end 
 
 contains 
+    
+    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx,depth,to_ann,so_ann)
+        ! Calculate various 2D fields from 3D ocean fields representative 
+        ! for the ice-shelf interface: T_shlf, S_shlf 
+
+        implicit none 
+
+        type(marshelf_class), intent(INOUT) :: mshlf
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: basins(:,:) 
+        real(wp), intent(IN) :: z_sl(:,:)
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN) :: depth(:),to_ann(:,:,:),so_ann(:,:,:)
+        
+        ! 1. Calculate water properties at depths of interest ============================
+
+        select case(trim(mshlf%par%interp_method))
+
+            case("mean") 
+                ! Computes the temperature for a mean value
+
+                call calc_shelf_variable_mean(mshlf%now%T_shlf,to_ann,depth, &
+                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+                call calc_shelf_variable_mean(mshlf%now%S_shlf,so_ann,depth, &
+                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+            
+            case("layer")
+                ! Takes the nearest layer for the temperature
+
+                call calc_shelf_variable_layer(mshlf%now%T_shlf,to_ann,depth,H_ice)
+                call calc_shelf_variable_layer(mshlf%now%S_shlf,so_ann,depth,H_ice)
+
+            case("interp")
+                ! Interpolation from the two nearest layers 
+
+                call  calc_shelf_variable_depth(mshlf%now%T_shlf,to_ann,depth,H_ice)
+                call  calc_shelf_variable_depth(mshlf%now%S_shlf,so_ann,depth,H_ice)
+
+            case DEFAULT
+                write(*,*) "marshelf_update:: error: interp_method not recognized: ", mshlf%par%interp_method
+                write(*,*) "Must be one of [mean,layer,interp]"
+                stop
+            
+        end select
+        
+        return 
+
+    end subroutine marshelf_update_shelf
+
+    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx)
+        
+        implicit none
+        
+        type(marshelf_class), intent(INOUT) :: mshlf
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: basins(:,:)
+        real(wp), intent(IN) :: z_sl(:,:) 
+        !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
+        real(wp), intent(IN) :: dx   ! grid resolution [m]
+
+        ! Local variables
+        integer :: i, j, nx, ny, ngr 
+
+        real(wp), allocatable :: H_ocn(:,:)
+        logical,    allocatable :: is_grline(:,:)   
+        real(wp) :: grz_wt
+
+        nx = size(f_grnd,1)
+        ny = size(f_grnd,2) 
+
+        allocate(H_ocn(nx,ny)) 
+        allocate(is_grline(nx,ny))
+
+        ! Step 1: calculate geometry ===========================
+
+        do j = 1, ny
+        do i = 1, nx
+
+            if (f_grnd(i,j) .eq. 0.0) then 
+                ! Floating ice shelves
+                
+                ! Calculate height of ice-shelf base relative to sea level 
+                mshlf%now%z_base(i,j) = z_sl(i,j) - (H_ice(i,j)*rho_ice_sw)
+                
+                ! Calculate ocean depth
+                H_ocn(i,j) = max(mshlf%now%z_base(i,j) - z_bed(i,j),0.0) 
+
+            else 
+                ! Grounded ice, define for completeness
+            
+                mshlf%now%z_base(i,j)       = z_bed(i,j) 
+                mshlf%now%slope_base(i,j)   = 0.0 
+                H_ocn(i,j)                  = 0.0 
+
+            end if 
+            
+        end do 
+        end do 
+
+        ! Calculate slope of ice-shelf base 
+        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,f_grnd,dx)
+        
+        ! Determine location of grounding line 
+        call calc_grline(is_grline,f_grnd)
+
+        if (mshlf%par%find_ocean) then 
+            ! Determine which floating or partially floating points
+            ! are connected to the open-ocean
+
+            call find_open_ocean(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref)
+
+        else 
+            ! Set any floating or partially floating points to ocean points
+
+            mshlf%now%mask_ocn = 0 
+            where (f_grnd .lt. 1.0) mshlf%now%mask_ocn = 1
+            where (f_grnd .lt. 1.0 .and. mshlf%now%mask_ocn_ref .eq. 2) mshlf%now%mask_ocn = 2
+
+        end if
+
+        ! 2. Calculate various fields of interest ============================
+
+
+        ! Calculate ocean water freezing point
+        call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base, &
+                                    mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3)
+
+
+        ! 2. Define the reference bmb field for floating ice =================
+
+
+        
+        ! Redefine dT_shlf as the temperature anomaly wrt the freezing
+        ! temperature
+        ! mshlf%now%dT_shlf  = mshlf%now%T_shlf  - mshlf%par%T_fp
+        ! mshlf%now%dT_basin = mshlf%now%T_basin - mshlf%par%T_fp
+
+        ! ! Following Lipscomb et al (2021, Eq. 6 text), ensure dT_shlf >= 0 
+        ! where (mshlf%now%dT_shlf  .lt. 0.0) mshlf%now%dT_shlf  = 0.0 
+        ! where (mshlf%now%dT_basin .lt. 0.0) mshlf%now%dT_basin = 0.0 
+            
+
+        ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
+        ! calculated in ice-sheet model separately) ========
+
+        select case(trim(mshlf%par%bmb_method))
+
+            case("pico") 
+                ! Calculate bmb_shlf using the PICO box model 
+
+                write(*,*) "To do" 
+                stop 
+
+            case("lin","quad","quad-nl","lin-slope", &
+                    "quad-slope","quad-nl-slope","anom") 
+                ! Calculate bmb_shlf using other available parameterizations 
+
+                ! For simplicity, first calculate everywhere (ocn and grounded points)
+                select case(trim(mshlf%par%bmb_method))
+
+                    case("lin","lin-slope")
+
+                        call calc_bmb_linear(mshlf%now%bmb_shlf,mshlf%now%tf_shlf, &
+                            mshlf%par%gamma_lin,omega)
+                        
+                    case("quad","quad-slope")
+
+                        call calc_bmb_quad(mshlf%now%bmb_shlf,mshlf%now%tf_shlf, &
+                            mshlf%par%gamma_quad,omega)
+                        
+                    case("quad-nl","quad-nl-slope")
+
+                        ! Calculate basin-average thermal forcing 
+                        call calc_variable_basin(mshlf%now%tf_basin,mshlf%now%tf_shlf, &
+                                                                        f_grnd,basins,H_ice)
+
+                        call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
+                            mshlf%par%gamma_quad_nl,omega)
+                    
+                    case("anom")
+
+                        call calc_bmb_anom(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%bmb_ref, &
+                                    mshlf%par%kappa_grz,mshlf%par%c_grz,mshlf%par%f_grz_shlf, &
+                                    is_grline,mshlf%par%grz_length,dx)
+
+                end select 
+                
+                ! === Apply logical limitations =====
+
+                ! Set bmb to zero for grounded points 
+                where (mshlf%now%mask_ocn .eq. 0) mshlf%now%bmb_shlf = 0.0 
+
+                ! Ensure that ice accretion only occurs where ice exists 
+                where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0 
+
+            case DEFAULT 
+
+                write(*,*) "marshelf_update:: Error: bmb_method not recognized."
+                write(*,*) "bmb_method = ", trim(mshlf%par%bmb_method)
+                stop 
+
+        end select 
+
+        ! Apply c_deep melt value to deep ocean points
+        ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
+        ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
+        ! high melt rates. 
+        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl,n_smth=0) 
+
+        return
+        
+    end subroutine marshelf_update
 
     subroutine marshelf_init(mshlf,filename,nx,ny,domain,grid_name,regions,basins)
 
@@ -113,22 +331,22 @@ contains
         if (mshlf%par%use_obs) then
 
             ! Load observed field from file
-            call nc_read(mshlf%par%obs_path,mshlf%par%obs_name,mshlf%now%bmb_obs) 
+            call nc_read(mshlf%par%obs_path,mshlf%par%obs_name,mshlf%now%bmb_ref) 
 
             ! Make negative since bmb is defined with melt negative, but observed field has melt positive
-            mshlf%now%bmb_obs = -mshlf%now%bmb_obs
+            mshlf%now%bmb_ref = -mshlf%now%bmb_ref
 
             ! Scale the obs as needed 
-            mshlf%now%bmb_obs = mshlf%now%bmb_obs*mshlf%par%obs_f 
+            mshlf%now%bmb_ref = mshlf%now%bmb_ref*mshlf%par%obs_f 
 
             ! Limit the max obs values as desired 
-            where (mshlf%now%bmb_obs >  mshlf%par%obs_lim) mshlf%now%bmb_obs =  mshlf%par%obs_lim 
-            where (mshlf%now%bmb_obs < -mshlf%par%obs_lim) mshlf%now%bmb_obs = -mshlf%par%obs_lim 
+            where (mshlf%now%bmb_ref >  mshlf%par%obs_lim) mshlf%now%bmb_ref =  mshlf%par%obs_lim 
+            where (mshlf%now%bmb_ref < -mshlf%par%obs_lim) mshlf%now%bmb_ref = -mshlf%par%obs_lim 
         
         else 
 
             ! Set default psuedo-observation value since none are available and make them negative (as above) 
-            mshlf%now%bmb_obs = -1.0*mshlf%par%obs_f 
+            mshlf%now%bmb_ref = -1.0*mshlf%par%obs_f 
 
         end if 
 
@@ -137,38 +355,38 @@ contains
 
             case("Antarctica")
 
-                ! Modify bmb_obs in specific basins according to parameter values 
+                ! Modify bmb_ref in specific basins according to parameter values 
                 do j = 1, size(mshlf%par%basin_name)
                     
                     select case(trim(mshlf%par%basin_name(j)))
 
                         case("ronne")
                             where(basins .ge.  1.0 .and. basins .le. 2.0) &
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("queen")
                             where(basins .ge.  3.0 .and. basins .le.  5.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("amery")
                             where(basins .ge.  6.0 .and. basins .le. 7.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("wilkes")
                             where(basins .ge. 8.0 .and. basins .le. 10.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("ross")
                             where(basins .ge. 11.0 .and. basins .le. 12.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("pine")
                             where(basins .ge. 13.0 .and. basins .le. 15.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("peninsula")
                             where(basins .ge. 16.0 .and. basins .le. 19.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("west")
                             where((basins .ge. 12.0 .and. basins .le. 19.0) .or. (basins .eq. 1.0)) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         case("east")
                             where(basins .ge.  2.0 .and. basins .le. 11.0) & 
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
                         
                         case DEFAULT 
 
@@ -187,15 +405,15 @@ contains
 
                         case("east")
                             where(basins .eq. 3.0) &
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
 
                         case("northeast")
                             where(basins .eq. 2.0) &
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
 
                         case("northwest")
                             where(basins .eq. 1.0 .or. basins .eq. 8.0) &
-                                mshlf%now%bmb_obs = mshlf%par%basin_bmb(j)
+                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
 
                         case DEFAULT 
 
@@ -270,420 +488,17 @@ contains
         !
         ! ====================================
         
-        write(*,*) "range bmb_obs:      ", minval(mshlf%now%bmb_obs), maxval(mshlf%now%bmb_obs)
+        write(*,*) "range bmb_ref:      ", minval(mshlf%now%bmb_ref), maxval(mshlf%now%bmb_ref)
         write(*,*) "range mask_ocn_ref: ", minval(mshlf%now%mask_ocn_ref), maxval(mshlf%now%mask_ocn_ref)
         
         ! Initialize variables 
-        mshlf%now%bmb_shlf      = 0.0  
-        mshlf%now%bmb_ref       = 0.0 
-        mshlf%now%kappa         = 0.0 
-        mshlf%now%T_shlf        = 0.0
-        mshlf%now%T_basin       = 0.0 
-        mshlf%now%dT_shlf       = 0.0
-        mshlf%now%dT_basin      = 0.0 
+        mshlf%now%bmb_shlf      = 0.0   
+        mshlf%now%tf_shlf       = 0.0
+        mshlf%now%tf_basin      = 0.0 
 
         return 
 
     end subroutine marshelf_init
-    
-    subroutine marshelf_calc_Tshlf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx,depth,to_ann,dto_ann)
-        ! Calculate the 2D field of T_shlf (or dT_shlf) from 3D ocean temperature fields
-
-        implicit none 
-
-        type(marshelf_class), intent(INOUT) :: mshlf
-        real(wp), intent(IN) :: H_ice(:,:) 
-        real(wp), intent(IN) :: z_bed(:,:) 
-        real(wp), intent(IN) :: f_grnd(:,:), basins(:,:) 
-        real(wp), intent(IN) :: z_sl(:,:)
-        real(wp), intent(IN) :: dx
-        real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
-       
-        ! 0. Calculate water temps at depths of interest ============================
-
-        select case(trim(mshlf%par%T_shlf_method))
-
-            case("mean") 
-                ! Computes the temperature for a mean value
-                call calc_shelf_variable_mean(mshlf%now%T_shlf,to_ann,depth, &
-                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
-                call calc_shelf_variable_mean(mshlf%now%dT_shlf,dto_ann,depth, &
-                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
-            
-            case("layer")
-                ! Takes the nearest layer for the temperature
-                call calc_shelf_variable_layer(mshlf%now%T_shlf,to_ann,depth,H_ice)
-                call calc_shelf_variable_layer(mshlf%now%dT_shlf,dto_ann,depth,H_ice)
-            case("interp")
-                ! Interpolation from the two nearest layers 
-                call  calc_shelf_variable_depth(mshlf%now%T_shlf,to_ann,depth,H_ice)
-                call  calc_shelf_variable_depth(mshlf%now%dT_shlf,dto_ann,depth,H_ice)
-            case DEFAULT
-                write(*,*) "marshelf_update:: error: T_shlf_method not recognized: ", mshlf%par%T_shlf_method
-                write(*,*) "Must be one of [mean,layer,interp]"
-                stop
-        
-        end select
-       
-        ! jablasco: if method basin compute temperature by basin 
-        select case(trim(mshlf%par%bmb_shlf_method))
-            case("quad-nl")
-
-                mshlf%now%T_basin = calc_shelf_basin(f_grnd,basins,H_ice,mshlf%now%T_shlf)
- 
-        end select
-
-        return 
-
-    end subroutine marshelf_calc_Tshlf
-
-    subroutine marshelf_calc_Sshlf(mshlf,H_ice,depth,so)
-        ! Calculate the 2D field of S_shlf from 3D ocean salinity
-        ! fields
-        ! TO DO: update S_shlf method as T_shlf
-        ! Right now: layer for PICO -> simplest case
-
-        implicit none
-
-        type(marshelf_class), intent(INOUT) :: mshlf
-        real(wp), intent(IN) :: H_ice(:,:)
-        real(wp), intent(IN) :: depth(:),so(:,:,:)
-
-        ! 0. Calculate water salinity at depths of interest
-        ! ============================
-
-        select case(trim(mshlf%par%T_shlf_method))
-
-            case("mean")
-                ! Computes the salinity for a mean value
-                call calc_shelf_variable_mean(mshlf%now%S_shlf,so,depth, &
-                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
-
-            case("layer")
-                ! Takes the nearest layer for the salinity
-                call calc_shelf_variable_layer(mshlf%now%S_shlf,so,depth,H_ice)
-
-           case("interp")
-               ! Interpolation from the two nearest layers
-               call  calc_shelf_variable_depth(mshlf%now%S_shlf,so,depth,H_ice)
-
-        end select
-
-        return
-
-    end subroutine marshelf_calc_Sshlf
-
-    subroutine marshelf_set_Tshlf(mshlf,to_ann,dto_ann)
-        ! Specify the 2D T_shlf/dT_shlf field according to a spatially constant value 
-
-        implicit none 
-
-        type(marshelf_class), intent(INOUT) :: mshlf
-        real(wp),           intent(IN)    :: to_ann 
-        real(wp),           intent(IN)    :: dto_ann 
-        
-        mshlf%now%T_shlf  = to_ann 
-        mshlf%now%dT_shlf = dto_ann 
-
-        return 
-
-    end subroutine marshelf_set_Tshlf
-
-    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx)
-        
-        implicit none
-        
-        type(marshelf_class), intent(INOUT) :: mshlf
-        real(wp), intent(IN) :: H_ice(:,:) 
-        real(wp), intent(IN) :: z_bed(:,:) 
-        real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: basins(:,:)
-        real(wp), intent(IN) :: z_sl(:,:) 
-        !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
-        real(wp), intent(IN) :: dx   ! grid resolution [m]
-
-        ! Local variables
-        integer :: i, j, nx, ny, ngr 
-
-        real(wp) :: bmb_floating, bmb_grline
-        real(wp), allocatable :: H_ocn(:,:)
-        logical,    allocatable :: is_grline(:,:)   
-        real(wp) :: grz_wt
-
-        nx = size(f_grnd,1)
-        ny = size(f_grnd,2) 
-
-        allocate(H_ocn(nx,ny)) 
-        allocate(is_grline(nx,ny))
-
-        ! Step 1: calculate geometry ===========================
-
-        do j = 1, ny
-        do i = 1, nx
-
-            if (f_grnd(i,j) .eq. 0.0) then 
-                ! Floating ice shelves
-                
-                ! Calculate height of ice-shelf base relative to sea level 
-                mshlf%now%z_base(i,j) = z_sl(i,j) - (H_ice(i,j)*rho_ice_sw)
-                
-                ! Calculate ocean depth
-                H_ocn(i,j) = max(mshlf%now%z_base(i,j) - z_bed(i,j),0.0) 
-
-            else 
-                ! Grounded ice, define for completeness
-            
-                mshlf%now%z_base(i,j)       = z_bed(i,j) 
-                mshlf%now%slope_base(i,j)   = 0.0 
-                H_ocn(i,j)                  = 0.0 
-
-            end if 
-            
-        end do 
-        end do 
-
-        ! Calculate slope of ice-shelf base 
-        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,f_grnd,dx)
-        
-        ! Determine location of grounding line 
-        is_grline = calc_grline(f_grnd)
-
-        if (mshlf%par%find_ocean) then 
-            ! Determine which floating or partially floating points
-            ! are connected to the open-ocean
-
-            call find_open_ocean(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref)
-
-        else 
-            ! Set any floating or partially floating points to ocean points
-
-            mshlf%now%mask_ocn = 0 
-            where (f_grnd .lt. 1.0) mshlf%now%mask_ocn = 1
-            where (f_grnd .lt. 1.0 .and. mshlf%now%mask_ocn_ref .eq. 2) mshlf%now%mask_ocn = 2
-
-        end if
-
-        ! 2. Define the reference bmb field for floating ice =================
-
-        if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
-            ! Modify the basic bmb_obs fields by scalars
-
-            mshlf%now%bmb_ref  = mshlf%now%bmb_obs
-
-        else
-            ! method == "abs", absolute method does not use reference melt term
-
-            mshlf%now%bmb_ref = 0.0
-
-            ! Redefine dT_shlf as the temperature anomaly wrt the freezing
-            ! temperature
-            mshlf%now%dT_shlf  = mshlf%now%T_shlf  - mshlf%par%T_fp
-            mshlf%now%dT_basin = mshlf%now%T_basin - mshlf%par%T_fp
-
-            ! Following Lipscomb et al (2021, Eq. 6 text), ensure dT_shlf >= 0 
-            where (mshlf%now%dT_shlf  .lt. 0.0) mshlf%now%dT_shlf  = 0.0 
-            where (mshlf%now%dT_basin .lt. 0.0) mshlf%now%dT_basin = 0.0 
-            
-        end if
-
-        ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
-        ! calculated in ice-sheet model separately) ========
-
-        select case(trim(mshlf%par%bmb_shlf_method))
-
-            case("anom")
-
-
-                call calc_bmb_shelf_anom(mshlf%now%bmb_shlf,mshlf%now%bmb_ref,mshlf%now%dT_shlf, &
-                        mshlf%now%mask_ocn .gt. 0,is_grline,mshlf%par%c_grz, &
-                        mshlf%par%kappa_grz,mshlf%par%f_grz_shlf,mshlf%par%grz_length,dx)
-
-            case("lin")
-
-
-            case("quad")
-
-
-            case("quad-nl")
-
-
-            case("quad-nl-slope")
-
-
-            case DEFAULT 
-
-                write(*,*) "marshelf_update:: Error: bmb_shlf_method not recognized."
-                write(*,*) "bmb_shlf_method = ", trim(mshlf%par%bmb_shlf_method)
-                stop 
-
-        end select 
-
-
-        do j = 1, ny
-        do i = 1, nx
-
-            if (mshlf%now%mask_ocn(i,j) .gt. 0) then
-                ! Floating ice points, including deep ocean (mask_ocn==2)
-
-                ! Calculate the default floating bmb value
-                if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
-                        ! bmb_floating = calc_bmb_shelf_anom(mshlf%now%bmb_ref(i,j),mshlf%now%dT_shlf(i,j), &
-                        !                                 mshlf%par%c_shlf,mshlf%par%kappa_shlf)
-                else if (trim(mshlf%par%bmb_shlf_method) .eq. "lin") then
-                        bmb_floating = calc_bmb_shelf_linear(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_lin)
-                else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad") then
-                        bmb_floating = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
-                else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                        bmb_floating = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_basin(i,j),mshlf%par%gamma_quad_nl)
-                end if
-
-                if (is_grline(i,j)) then
-
-                    ! ajr: this whole section seems unnecessary, now that we use f_grz_shlf, 
-                    ! so it has been replaced as below. Needs checking...
-                    ! ! Scale grounding line points by grounding line melt factor
-                    ! ! accounting for the resolution dependence
-                    ! if (trim(mshlf%par%bmb_shlf_method) .eq. "anom") then
-                    !     bmb_grline = calc_bmb_shelf_anom(mshlf%now%bmb_ref(i,j),mshlf%now%dT_shlf(i,j), &
-                    !                                      mshlf%par%c_grz,mshlf%par%kappa_grz)
-                    ! else if (trim(mshlf%par%bmb_shlf_method) .eq. "lin") then
-                    !     bmb_grline = calc_bmb_shelf_linear(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_lin)
-                    !     bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
-                    ! else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad") then
-                    !     bmb_grline = calc_bmb_shelf_quad(mshlf%now%dT_shlf(i,j),mshlf%par%gamma_quad)
-                    !     bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
-                    ! else if (trim(mshlf%par%bmb_shlf_method) .eq. "quad-nl") then
-                    !     bmb_grline = calc_bmb_shelf_basin(mshlf%now%dT_shlf(i,j),mshlf%now%dT_basin(i,j),mshlf%par%gamma_quad_nl)
-                    !     bmb_grline = mshlf%par%f_grz_shlf*bmb_grline
-                    ! end if
-
-                    ! Get the grounding-line value, fully scaled by f_grz_shlf 
-                    !bmb_grline = mshlf%par%f_grz_shlf*bmb_floating
-
-                    ! Calcule gl-bmb as weighted average between gl-line value and shelf value 
-                    ! to account for resolution dependence 
-                    !mshlf%now%bmb_shlf(i,j) = (1.0-grz_wt)*bmb_floating + grz_wt*bmb_grline
-
-                else 
-                    ! Only apply floating bmb value 
-
-                    mshlf%now%bmb_shlf(i,j) = bmb_floating
-
-                end if 
-        
-
-                ! Ensure that ice accretion is only 0% of melting
-                ! Note: ajr: this should be a parameter!!
-                ! jablasco: allow accretion 
-                !if (mshlf%now%bmb_shlf(i,j) .gt. 0.0) mshlf%now%bmb_shlf(i,j) = mshlf%now%bmb_shlf(i,j)*0.0 
-
-                ! Ensure that ice accretion only occurs where ice exists 
-                if (mshlf%now%bmb_shlf(i,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) mshlf%now%bmb_shlf(i,j) = 0.0 
-
-                ! Note: the following condition is a good idea, but in grisli-ucm the grounding line
-                ! is defined as the last *grounded* point, so this limit sets bmb at grounding line to zero
-                ! ! Ensure that refreezing rate is less than the available water depth within one time step 
-                ! mshlf%now%bmb_shlf = max(mshlf%now%bmb_shlf,-H_ocn/dt)
-                
-            else 
-                ! Grounded point, or floating point not connected to the ocean 
-                ! Set bmb_shlf to zero 
-
-                mshlf%now%bmb_shlf(i,j) = 0.0
-                
-            end if 
-
-        end do 
-        end do  
-
-        ! Apply c_deep melt value to deep ocean points
-        ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
-        ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
-        ! high melt rates. 
-        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl,n_smth=0) 
-
-        return
-        
-    end subroutine marshelf_update
-
-
-    subroutine calc_bmb_shelf_anom(bmb_shlf,bmb_ref,dT_shlf,is_ocn,is_grline,c_grz,kappa_grz,f_grz_shlf,grz_length,dx)
-        ! Calculate the ice-shelf basal mass balance following an anomaly approach:
-        !
-        ! bmb = bmb_ref + kappa*dT 
-        !
-        ! First calculate bmb assuming grounding line parameters everywhere, then
-        ! for the open shelf away from the grounding line, scale bmb according to 
-        ! the prescribed ratio between grounding line melt and shelf melt (f_grz_shlf) 
-
-        implicit none 
-
-        real(wp), intent(OUT) :: bmb_shlf(:,:) 
-        real(wp), intent(IN)  :: bmb_ref(:,:) 
-        real(wp), intent(IN)  :: dT_shlf(:,:) 
-        logical,  intent(IN)  :: is_ocn(:,:) 
-        logical,  intent(IN)  :: is_grline(:,:) 
-        real(wp), intent(IN)  :: c_grz 
-        real(wp), intent(IN)  :: kappa_grz 
-        real(wp), intent(IN)  :: f_grz_shlf
-        real(wp), intent(IN)  :: grz_length
-        real(wp), intent(IN)  :: dx 
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(wp) :: bmb_grline 
-        real(wp) :: bmb_floating 
-        real(wp) :: f_shlf_grz 
-        real(wp) :: grz_wt
-
-        nx = size(bmb_shlf,1)
-        ny = size(bmb_shlf,2)
-
-        ! Get ratio of shelf melt to gr-line melt (inverse of parameter):
-        f_shlf_grz = 1.0_wp / f_grz_shlf 
-
-        ! Determine resolution scaling at the grounding line 
-        grz_wt = min( (grz_length*1e3) / dx, 1.0) 
-        
-        do j = 1, ny
-        do i = 1, nx
-
-            if (is_ocn(i,j)) then
-                ! Floating ice points, including deep ocean (mask_ocn==2)
-
-                ! Calculate grounding line bmb:
-                bmb_grline = c_grz*bmb_ref(i,j) - kappa_grz*dT_shlf(i,j)
-        
-                ! Calculate floating shelf bmb: 
-                bmb_floating = bmb_grline*f_shlf_grz
-
-                if (is_grline(i,j)) then 
-                    ! Calculate gl-bmb as weighted average between gl-line value and shelf value 
-                    ! to account for resolution dependence 
-                    
-                    bmb_shlf(i,j) = (1.0-grz_wt)*bmb_floating + grz_wt*bmb_grline
-                
-                else
-                    ! Set bmb to floating value 
-
-                    bmb_shlf(i,j) = bmb_floating 
-
-                end if 
-
-            else 
-                ! Grounded point, or floating point not connected to the ocean 
-                ! Set bmb_shlf to zero 
-
-                bmb_shlf(i,j) = 0.0
-                
-            end if 
-
-        end do 
-        end do 
-
-        return 
-
-    end subroutine calc_bmb_shelf_anom
 
     subroutine marshelf_end(mshlf)
 
@@ -710,8 +525,9 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"marine_shelf","bmb_shlf_method",par%bmb_shlf_method,init=init_pars)
-        call nml_read(filename,"marine_shelf","T_shlf_method",  par%T_shlf_method,  init=init_pars)
+        call nml_read(filename,"marine_shelf","bmb_method",     par%bmb_method,     init=init_pars)
+        call nml_read(filename,"marine_shelf","interp_method",  par%interp_method,  init=init_pars)
+        call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
         call nml_read(filename,"marine_shelf","use_obs",        par%use_obs,        init=init_pars)
         call nml_read(filename,"marine_shelf","obs_path",       par%obs_path,       init=init_pars)
         call nml_read(filename,"marine_shelf","obs_name",       par%obs_name,       init=init_pars)
@@ -719,98 +535,41 @@ contains
         call nml_read(filename,"marine_shelf","obs_lim",        par%obs_lim,        init=init_pars)
         call nml_read(filename,"marine_shelf","basin_name",     par%basin_name,     init=init_pars)
         call nml_read(filename,"marine_shelf","basin_bmb",      par%basin_bmb,      init=init_pars)
-        call nml_read(filename,"marine_shelf","c_grz",          par%c_grz,          init=init_pars)
-        call nml_read(filename,"marine_shelf","kappa_grz",      par%kappa_grz,      init=init_pars)
-        call nml_read(filename,"marine_shelf","f_grz_shlf",     par%f_grz_shlf,     init=init_pars)
+        call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_min",      par%depth_min,      init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_max",      par%depth_max,      init=init_pars)    
+        
+        ! Freezing point 
+        call nml_read(filename,"marine_shelf","lambda1",        par%lambda1,        init=init_pars)
+        call nml_read(filename,"marine_shelf","lambda2",        par%lambda2,        init=init_pars)
+        call nml_read(filename,"marine_shelf","lambda3",        par%lambda3,        init=init_pars)
+        
+        ! bmb_method == [lin,quad,quad_nl]
         call nml_read(filename,"marine_shelf","gamma_lin",      par%gamma_lin,      init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_quad",     par%gamma_quad,     init=init_pars)
         call nml_read(filename,"marine_shelf","gamma_quad_nl",  par%gamma_quad_nl,  init=init_pars)
+        call nml_read(filename,"marine_shelf","gamma_prime",    par%gamma_prime,     init=init_pars)
+        
+        ! bmb_method == anom
+        call nml_read(filename,"marine_shelf","c_grz",          par%c_grz,          init=init_pars)
+        call nml_read(filename,"marine_shelf","kappa_grz",      par%kappa_grz,      init=init_pars)
+        call nml_read(filename,"marine_shelf","f_grz_shlf",     par%f_grz_shlf,     init=init_pars)
         call nml_read(filename,"marine_shelf","grz_length",     par%grz_length,     init=init_pars)
-        call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
-        call nml_read(filename,"marine_shelf","T_fp",           par%T_fp,           init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_min",      par%depth_min,      init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_max",      par%depth_max,      init=init_pars)    
-        call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
         
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
         par%domain = trim(domain)
 
+        ! Consistency checks 
         if (par%f_grz_shlf .eq. 0.0) then 
             write(*,*) "marshelf_par_load:: Error: f_grz_shlf cannot be zero."
             stop 
         end if 
 
-        ! jablasco: convert T_fp from C to K
-        par%T_fp       = par%T_fp + 273.15
-
         return
 
     end subroutine marshelf_par_load
-
-    ! =======================================================
-    !
-    ! marine_shelf interface physics
-    !
-    ! =======================================================
-    
-    elemental function calc_bmb_shelf_linear(dT_shlf,gamma_lin) result(bmb)
-        ! Calculate basal mass balance of shelf (floating) ice [m/a] 
-        ! as a linear law following Beckmann and Goosse (2003).
-       ! The linear, local dependencyon thermal forcing assumes a balance 
-        ! between vertical diffusive heat flux across the oceancavity top 
-        ! boundary layer and latent heat due to melting and freezing. 
-
-        implicit none
-
-        real(wp), intent(IN)    :: dT_shlf, gamma_lin
-        real(wp) :: bmb
-
-        ! jablasco: careful!!
-        ! -1.0 because bmb is negative
-        bmb = -1.0*gamma_lin*(dT_shlf*(rho_sw*cp_o)/(rho_ice*L_ice))
-
-        return
-
-    end function calc_bmb_shelf_linear
-
-    elemental function calc_bmb_shelf_quad(dT_shlf,gamma_quad) result(bmb)
-        ! Calculate basal mass balance of shelf (floating) ice [m/a] 
-        ! as a quadratic law following (Holland et al., 2008) with local ocean T.
-        ! This accounts for positive feedback between the sub-shelf melting and the circulation in the cavity.
-
-        implicit none
-
-        real(wp), intent(IN)    :: dT_shlf, gamma_quad
-        real(wp) :: bmb
-
-        ! jablasco: careful!!
-        ! -1.0 because bmb is negative
-        bmb = -1.0*gamma_quad*(dT_shlf*(rho_sw*cp_o)/(rho_ice*L_ice))**2
-
-        return
-
-    end function calc_bmb_shelf_quad
-
-        ! jablasco: quadratic function with mean shelf temperature
-    elemental function calc_bmb_shelf_basin(dT_shlf,dT_basin,gamma_quad_nl) result(bmb)
-        ! Calculate basal mass balance of shelf (floating) ice [m/a] 
-        ! as a quadratic law following (Holland et al., 2008) but with local ocean T and mean shelf T.
-        ! This accounts for positive feedback between the sub-shelf melting and the circulation in the cavity.
-
-        implicit none
-
-        real(wp), intent(IN)    :: dT_shlf, dT_basin, gamma_quad_nl
-        real(wp) :: bmb
-
-        ! jablasco: careful!!
-        ! -1.0 because bmb is negative
-        bmb = -1.0*gamma_quad_nl*(dT_shlf*dT_basin)*((rho_sw*cp_o)/(rho_ice*L_ice))**2
-
-        return
-
-    end function calc_bmb_shelf_basin
 
     subroutine apply_c_deep(par,bmb,mask_ocn,z_bed,z_sl,n_smth)
         ! Apply c_deep for killing ice in the deep ocean 
@@ -845,17 +604,6 @@ contains
         ! Apply c_deep to appropriate regions or keep bmb, whichever is more negative
 
         where(mask_ocn .eq. 2 .and. z_sl-z_bed .ge. par%depth_deep) bmb = par%c_deep 
-        ! jablasco: parche
-            !bmb = min(bmb,par%c_deep)
-
-            !is_c_deep = .TRUE. 
-
-        !elsewhere 
-
-            !is_c_deep = .FALSE. 
-
-        !end where 
-
 
         ! Make sure bmb transitions smoothly to c_deep value from neighbors 
         
@@ -929,15 +677,15 @@ contains
 
     end subroutine calc_shelf_slope
 
-    function calc_grline(f_grnd) result(is_grline)
+    subroutine calc_grline(is_grline,f_grnd)
         ! Determine the grounding line given the grounded fraction f_grnd
         ! ie, is_grline is true for a floating point or partially floating  
         ! point with grounded neighbors
 
         implicit none 
 
-        real(wp), intent(IN) :: f_grnd(:,:)
-        logical :: is_grline(size(f_grnd,1),size(f_grnd,2)) 
+        logical,  intent(OUT) :: is_grline(:,:) 
+        real(wp), intent(IN)  :: f_grnd(:,:)
 
         ! Local variables 
         integer :: i, j, nx, ny  
@@ -962,31 +710,38 @@ contains
 
         return 
 
-    end function calc_grline
+    end subroutine calc_grline
 
-    function calc_shelf_basin(f_grnd,basins,H_ice,T_shlf) result(T_basin)
-        ! jablasco: function to compute mean ocean temperature of ice-shelf basin
+    subroutine calc_variable_basin(var_basin,var2D,f_grnd,basins,H_ice)
+        ! Compute mean ocean temperature of ice-shelf basin
+
         implicit none
 
-        real(wp), intent(IN)  :: f_grnd(:,:), basins(:,:), H_ice(:,:), T_shlf(:,:)
-        real(wp) :: T_basin(size(f_grnd,1),size(f_grnd,2))
+        real(wp), intent(OUT) :: var_basin(:,:) 
+        real(wp), intent(IN)  :: var2D(:,:) 
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: basins(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
 
         ! Local variables
-        integer :: i, j, m
-        real(wp) :: n_pts, t_mean
+        integer :: i, j, m, nx, ny 
+        real(wp) :: n_pts, var_mean
 
-        ! Assign to shelf values real ocean values
-        T_basin(:,:) = T_shlf(:,:) 
+        nx = size(var_basin,1)
+        ny = size(var_basin,2) 
+
+        ! Initially assign to shelf values real ocean values
+        var_basin = var2D 
 
         do m=1, int(maxval(basins))
             n_pts  = 0.0
-            t_mean = 0.0
-            do i = 1, size(T_shlf,1)
-                do j = 1, size(T_shlf,2)
+            var_mean = 0.0
+            do i = 1, nx
+                do j = 1, ny
                     ! Floating ice point
                     if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        !t_mean = t_mean+(1.0-f_grnd(i,j))*T_shlf(i,j)
-                        t_mean = t_mean + T_shlf(i,j)
+                        !var_mean = var_mean+(1.0-f_grnd(i,j))*var2D(i,j)
+                        var_mean = var_mean + var2D(i,j)
                         !n_pts = n_pts + (1.0-f_grnd(i,j))
                         n_pts = n_pts + 1.0
                     end if
@@ -994,11 +749,11 @@ contains
             end do
 
             ! Assign shelf value
-            do i = 1, size(T_shlf,1)
-                do j = 1, size(T_shlf,2)
+            do i = 1, nx
+                do j = 1, ny
                     ! Basin floating ice point
                     if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        T_basin(i,j) = t_mean / n_pts
+                        var_basin(i,j) = var_mean / n_pts
                     end if
                 end do
             end do
@@ -1007,7 +762,7 @@ contains
 
         return
 
-    end function calc_shelf_basin
+    end subroutine calc_variable_basin
 
     subroutine calc_shelf_variable_mean(var_shlf,var3D,depth,depth_range)
         ! Calculate average variable value for a given range of depths
@@ -1099,6 +854,136 @@ contains
 
     end subroutine calc_shelf_variable_depth
 
+    elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3)
+        ! Calculate the water freezing point following 
+        ! Favier et al (2019), Eq. 3
+
+        implicit none 
+
+        real(wp), intent(OUT) :: to_fp
+        real(wp), intent(IN)  :: so 
+        real(wp), intent(IN)  :: z_base 
+        real(wp), intent(IN)  :: lambda1 
+        real(wp), intent(IN)  :: lambda2 
+        real(wp), intent(IN)  :: lambda3 
+        
+        to_fp = lambda1*so + lambda2 + lambda3*z_base 
+
+        return 
+
+    end subroutine calc_freezing_point
+
+    elemental subroutine calc_bmb_linear(bmb,tf,gamma,omega)
+        ! Calculate the basal mass balance, linear method
+        ! Favier et al (2019), Eq. 2
+
+        ! Note: omega = (rho_sw*cp_o) / (rho_ice*L_ice)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: bmb            ! [m i.e./yr] Basal mass balance 
+        real(wp), intent(IN)  :: tf             ! [K] Thermal forcing 
+        real(wp), intent(IN)  :: gamma          ! [m yr-1] Heat exchange velocity 
+        real(wp), intent(IN)  :: omega          ! [1/K] Physical scaling constant 
+
+        bmb = -gamma * omega * tf 
+
+        return 
+
+    end subroutine calc_bmb_linear
+
+    elemental subroutine calc_bmb_quad(bmb,tf,gamma,omega)
+        ! Calculate the basal mass balance, (local) quadratic method
+        ! Favier et al (2019), Eq. 4
+
+        implicit none 
+
+        real(wp), intent(OUT) :: bmb            ! [m i.e./yr] Basal mass balance 
+        real(wp), intent(IN)  :: tf             ! [K] Thermal forcing 
+        real(wp), intent(IN)  :: gamma          ! [m yr-1] Heat exchange velocity 
+        real(wp), intent(IN)  :: omega          ! [1/K] Physical scaling constant 
+
+        bmb = -gamma * (omega*omega) * (tf*tf)
+
+        return 
+
+    end subroutine calc_bmb_quad
+    
+    elemental subroutine calc_bmb_quad_nl(bmb,tf,tf_basin,gamma,omega)
+        ! Calculate the basal mass balance, quadratic-nonlocal method
+        ! Favier et al (2019), Eq. 5
+
+        implicit none 
+
+        real(wp), intent(OUT) :: bmb            ! [m i.e./yr] Basal mass balance 
+        real(wp), intent(IN)  :: tf             ! [K] Thermal forcing 
+        real(wp), intent(IN)  :: tf_basin       ! [K] Basin thermal forcing 
+        real(wp), intent(IN)  :: gamma          ! [m yr-1] Heat exchange velocity 
+        real(wp), intent(IN)  :: omega          ! [1/K] Physical scaling constant 
+
+        bmb = -gamma * (omega*omega) * (tf*tf_basin)
+
+        return 
+
+    end subroutine calc_bmb_quad_nl
+    
+    elemental subroutine calc_bmb_anom(bmb,tf,bmb_ref,kappa_grz,c_grz,f_grz_shlf,is_grline,grz_length,dx)
+        ! Calculate the ice-shelf basal mass balance following an anomaly approach:
+        !
+        ! bmb = bmb_ref + kappa*dT 
+        !
+        ! First calculate bmb assuming grounding line parameters everywhere, then
+        ! for the open shelf away from the grounding line, scale bmb according to 
+        ! the prescribed ratio between grounding line melt and shelf melt (f_grz_shlf) 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: bmb            ! [m i.e./yr] Basal mass balance 
+        real(wp), intent(IN)  :: tf             ! [K] Thermal forcing 
+        real(wp), intent(IN)  :: bmb_ref        ! [m i.e./yr] Reference basal mass balance 
+        real(wp), intent(IN)  :: kappa_grz      ! [m yr-1 / K] Heat flux coeff. grounding zone 
+        real(wp), intent(IN)  :: c_grz          ! [-] Scalar coefficient, grounding zone  
+        real(wp), intent(IN)  :: f_grz_shlf     ! [-] Ratio of gl to shelf melt rate
+        logical,  intent(IN)  :: is_grline      ! [-] Grounding line mask
+        real(wp), intent(IN)  :: grz_length     ! [km] Grounding-zone length scale
+        real(wp), intent(IN)  :: dx             ! [m] Grid resolution 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(wp) :: bmb_grline 
+        real(wp) :: bmb_floating 
+        real(wp) :: f_shlf_grz 
+        real(wp) :: grz_wt
+
+        ! Get ratio of shelf melt to gr-line melt (inverse of parameter):
+        f_shlf_grz = 1.0_wp / f_grz_shlf 
+
+        ! Determine resolution scaling at the grounding line 
+        grz_wt = min( (grz_length*1e3) / dx, 1.0) 
+        
+        ! Calculate grounding line bmb:
+        bmb_grline = c_grz*bmb_ref - kappa_grz*tf
+
+        ! Calculate floating shelf bmb: 
+        bmb_floating = bmb_grline*f_shlf_grz
+
+        if (is_grline) then 
+            ! Calculate gl-bmb as weighted average between gl-line value and shelf value 
+            ! to account for resolution dependence 
+            
+            bmb = (1.0-grz_wt)*bmb_floating + grz_wt*bmb_grline
+        
+        else
+            ! Set bmb to floating value 
+
+            bmb = bmb_floating 
+
+        end if 
+
+        return 
+
+    end subroutine calc_bmb_anom
+    
     ! =======================================================
     !
     ! marshelf memory management
@@ -1117,15 +1002,16 @@ contains
 
         ! Allocate marshelf 
         allocate(now%bmb_shlf(nx,ny))
-        allocate(now%bmb_obs(nx,ny))
         allocate(now%bmb_ref(nx,ny))
-        allocate(now%T_shlf(nx,ny))
-        allocate(now%T_basin(nx,ny))
-        allocate(now%dT_shlf(nx,ny))
-        allocate(now%dT_basin(nx,ny))
-        allocate(now%S_shlf(nx,ny))
-        allocate(now%kappa(nx,ny))
         
+        allocate(now%T_shlf(nx,ny))
+        allocate(now%S_shlf(nx,ny))
+        allocate(now%T_fp_shlf(nx,ny))
+        
+        allocate(now%tf_shlf(nx,ny))
+        allocate(now%tf_basin(nx,ny))
+        allocate(now%tf_corr(nx,ny))
+
         allocate(now%z_base(nx,ny))
         allocate(now%slope_base(nx,ny))
 
@@ -1134,14 +1020,15 @@ contains
 
         ! Initialize variables 
         now%bmb_shlf        = 0.0  
-        now%bmb_obs         = 0.0
-        now%bmb_ref         = 0.0  
+        now%bmb_ref         = 0.0 
+        
         now%T_shlf          = 0.0
-        now%T_basin         = 0.0
-        now%dT_shlf         = 0.0
-        now%dT_basin        = 0.0
         now%S_shlf          = 0.0
-        now%kappa           = 0.0
+        now%T_fp_shlf       = 0.0
+
+        now%tf_shlf         = 0.0
+        now%tf_basin        = 0.0
+        now%tf_corr         = 0.0
         
         now%z_base          = 0.0 
         now%slope_base      = 0.0 
@@ -1161,17 +1048,19 @@ contains
         type(marshelf_state_class) :: now 
 
         ! Allocate state objects
-        if (allocated(now%bmb_shlf))    deallocate(now%bmb_shlf)
-        if (allocated(now%bmb_obs))     deallocate(now%bmb_obs)
-        if (allocated(now%bmb_ref))     deallocate(now%bmb_ref)
-        if (allocated(now%T_shlf))      deallocate(now%T_shlf)
-        if (allocated(now%T_basin))     deallocate(now%T_basin)
-        if (allocated(now%dT_shlf))     deallocate(now%dT_shlf)
-        if (allocated(now%dT_basin))    deallocate(now%dT_basin)
-        if (allocated(now%kappa))       deallocate(now%kappa)
+        if (allocated(now%bmb_shlf))        deallocate(now%bmb_shlf)
+        if (allocated(now%bmb_ref))         deallocate(now%bmb_ref)
         
-        if (allocated(now%z_base))      deallocate(now%z_base)
-        if (allocated(now%slope_base))  deallocate(now%slope_base)
+        if (allocated(now%T_shlf))          deallocate(now%T_shlf)
+        if (allocated(now%S_shlf))          deallocate(now%S_shlf)
+        if (allocated(now%T_fp_shlf))       deallocate(now%T_fp_shlf)
+        
+        if (allocated(now%tf_shlf))         deallocate(now%tf_shlf)
+        if (allocated(now%tf_basin))        deallocate(now%tf_basin)
+        if (allocated(now%tf_corr))         deallocate(now%tf_corr)
+        
+        if (allocated(now%z_base))          deallocate(now%z_base)
+        if (allocated(now%slope_base))      deallocate(now%slope_base)
         
         if (allocated(now%mask_ocn_ref))    deallocate(now%mask_ocn_ref)
         if (allocated(now%mask_ocn))        deallocate(now%mask_ocn)
@@ -1238,7 +1127,7 @@ contains
         implicit none 
 
         integer,    intent(OUT) :: mask(:,:) 
-        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp),   intent(IN)  :: f_grnd(:,:)
         integer,    intent(IN)  :: mask_ref(:,:) 
 
         ! Local variables 
