@@ -332,7 +332,7 @@
 /
 
 &marine_shelf
-    bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    bmb_method      = "lin"         ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True 
     
@@ -348,15 +348,16 @@
     lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
 
     ! bmb_method == [lin,quad,quad-nl] 
-    gamma_lin       = 630.0          ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad      = 30000.0        ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
-    gamma_quad_nl   = 40000.0        ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
-    
+    gamma_lin       = 630.0         ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad      = 30000.0       ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
+    gamma_quad_nl   = 40000.0       ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
+    gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
+
     ! bmb_method == anom
     kappa_grz       = 10.0 
     c_grz           = 1.0 
     f_grz_shlf      = 10.0
-    grz_length      = 32.0           ! [km] 
+    grz_length      = 32.0          ! [km] 
 
     ! bmb_method == anom, bmb_ref parameters 
     use_obs         = True
@@ -364,8 +365,8 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0
     obs_lim         = 100.0
-    basin_name      = "none"         !"northwest" "northeast" "east"
-    basin_bmb       = 0.0            !        -1.0       -1.0   -1.0
+    basin_name      = "none"        !"northwest" "northeast" "east"
+    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 

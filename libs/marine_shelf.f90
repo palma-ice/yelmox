@@ -168,14 +168,16 @@ contains
         integer :: i, j, nx, ny, ngr 
 
         real(wp), allocatable :: H_ocn(:,:)
-        logical,    allocatable :: is_grline(:,:)   
-        real(wp) :: grz_wt
+        logical,  allocatable :: is_grline(:,:)   
+        real(wp), allocatable :: gamma2D(:,:)
+        logical :: with_slope 
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
         allocate(H_ocn(nx,ny)) 
         allocate(is_grline(nx,ny))
+        allocate(gamma2D(nx,ny))
 
         ! Step 1: calculate geometry ===========================
 
@@ -252,21 +254,54 @@ contains
                     mshlf%now%tf_shlf = 0.0_wp 
                 end where 
 
+                ! Check whether slope is being applied here 
+                if (index(trim(mshlf%par%bmb_method),"slope") .gt. 0) then 
+                    with_slope = .TRUE. 
+                else 
+                    with_slope = .FALSE. 
+                end if 
+
+                write(*,*) "check: ", trim(mshlf%par%bmb_method), with_slope 
+                
                 ! For simplicity, first calculate everywhere (ocn and grounded points)
                 select case(trim(mshlf%par%bmb_method))
 
                     case("lin","lin-slope")
 
+                        if (with_slope) then 
+                            ! Scale gamma by gamma_prime*sin(theta)
+                            gamma2D = mshlf%par%gamma_lin * &
+                                        (mshlf%par%gamma_prime*mshlf%now%slope_base)
+                        else 
+                            gamma2D = mshlf%par%gamma_lin
+                        end if 
+
                         call calc_bmb_linear(mshlf%now%bmb_shlf,mshlf%now%tf_shlf, &
-                            mshlf%par%gamma_lin,omega)
-                        
+                                                                        gamma2D,omega)
+                            
                     case("quad","quad-slope")
 
+                        if (with_slope) then 
+                            ! Scale gamma by gamma_prime*sin(theta)
+                            gamma2D = mshlf%par%gamma_quad * &
+                                        (mshlf%par%gamma_prime*mshlf%now%slope_base)
+                        else 
+                            gamma2D = mshlf%par%gamma_quad
+                        end if 
+                        
                         call calc_bmb_quad(mshlf%now%bmb_shlf,mshlf%now%tf_shlf, &
-                            mshlf%par%gamma_quad,omega)
+                                                                        gamma2D,omega)
                         
                     case("quad-nl","quad-nl-slope")
 
+                        if (with_slope) then 
+                            ! Scale gamma by gamma_prime*sin(theta)
+                            gamma2D = mshlf%par%gamma_quad_nl * &
+                                        (mshlf%par%gamma_prime*mshlf%now%slope_base)
+                        else 
+                            gamma2D = mshlf%par%gamma_quad_nl
+                        end if 
+                        
                         ! Calculate basin-average thermal forcing 
                         call calc_variable_basin(mshlf%now%tf_basin,mshlf%now%tf_shlf, &
                                                                         f_grnd,basins,H_ice)
