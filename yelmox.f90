@@ -170,19 +170,8 @@ program yelmox
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
-    ! yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
-
-    ! if(pico1%par%use_pico) then
-    !         call pico_calc_geometry(pico1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins,yelmo1%grd%dx)
-    !         call pico_update_physics(pico1,mshlf1%now%T_shlf,mshlf1%now%S_shlf,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed, &
-    !                                  yelmo1%tpo%now%f_grnd,yelmo1%bnd%z_sl)
-    !         yelmo1%bnd%bmb_shlf = pico1%now%bmb_shlf
-
-    ! else
-            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
-    ! end if
+    call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -234,23 +223,15 @@ program yelmox
 
     end if 
 
-if (.FALSE.) then 
-
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
     call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
 
-end if 
-
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
 !     call write_step_2D_small(yelmo1,file2D,time=time)  
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-
-
-stop 
-
 
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -300,24 +281,15 @@ if (calc_transient_climate) then
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
-        ! yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
-
-        ! if(pico1%par%use_pico) then
-        !         call pico_calc_geometry(pico1,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%f_grnd,yelmo1%bnd%basins,yelmo1%grd%dx)
-        !         call pico_update_physics(pico1,mshlf1%now%T_shlf,mshlf1%now%S_shlf,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed, &
-        !                                  yelmo1%tpo%now%f_grnd,yelmo1%bnd%z_sl)
-        !         yelmo1%bnd%bmb_shlf = pico1%now%bmb_shlf
-        ! else
-                call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-                yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
-        ! end if
-
-end if
+        call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+end if
+
+        
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(dt2D_out*100))==0) then
