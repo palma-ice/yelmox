@@ -69,7 +69,7 @@ module pico
     private
     public :: pico_class
     public :: pico_init
-    public :: pico_calc_geometry
+    public :: pico_update_geometry
     public :: pico_update_physics
     public :: pico_end
 
@@ -288,7 +288,7 @@ contains
 
     end subroutine parse_path
 
-    subroutine pico_calc_geometry(pico,H_ice,f_grnd,basins,dx)
+    subroutine pico_update_geometry(pico,H_ice,f_grnd,basins,dx)
 
         implicit none
 
@@ -327,7 +327,7 @@ contains
             d_max_basin = 0.0
         end do        
 
-    end subroutine pico_calc_geometry
+    end subroutine pico_update_geometry
 
     subroutine pico_update_physics(pico,to,so,H_ice,z_bed,f_grnd,z_sl)
         
@@ -343,14 +343,12 @@ contains
         integer :: m, i, j, k, l, nx, ny, ngr
 
         real(prec) :: bmb_floating, pm_point, pm_point_box0
-        real(prec), allocatable :: H_ocn(:,:)
         real(prec), allocatable :: T_star(:,:)
         logical,    allocatable :: is_grline(:,:)
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
-        allocate(H_ocn(nx,ny)) 
         allocate(is_grline(nx,ny))
         allocate(T_star(nx,ny))
 
@@ -396,9 +394,6 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            ! Calculate ocean depth
-            H_ocn(i,j) = max( (z_sl(i,j)-z_bed(i,j))-(rho_ice_sw*H_ice(i,j)),0.0 )
-             
             if (pico%now%mask_ocn(i,j) .gt. 0) then
                 do m = 1, pico%par%n_box
                     ! jablasco: test box 1 -> .eq. -> .ge. la m
@@ -438,11 +433,6 @@ contains
                 ! No accretion allowed in  Box 1
                 if (pico%now%bmb_shlf(i,j) .gt. 0.0 .and. pico%now%boxes(i,j) .eq. 1.0) pico%now%bmb_shlf(i,j) = 0.0
 
-                ! Note: the following condition is a good idea, but in grisli-ucm the grounding line
-                ! is defined as the last *grounded* point, so this limit sets bmb at grounding line to zero
-                ! ! Ensure that refreezing rate is less than the available water depth within one time step 
-                ! pico%now%bmb_shlf = max(pico%now%bmb_shlf,-H_ocn/dt)
-                
             else 
                 ! Grounded point, or floating point not connected to the ocean 
                 ! Set bmb_shlf to zero 

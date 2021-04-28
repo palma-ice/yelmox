@@ -21,7 +21,8 @@ $(objdir)/hyster.o: $(libdir)/hyster.f90 $(objdir)/nml.o
 $(objdir)/latinhypercube.o: $(libdir)/latinhypercube.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/nml.o $(objdir)/ncio.o
+$(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/nml.o \
+							$(objdir)/ncio.o $(objdir)/pico.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/isostasy.o: $(libdir)/isos/isostasy.f90 $(objdir)/nml.o

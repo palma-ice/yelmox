@@ -7,6 +7,8 @@ module marine_shelf
     use nml 
     use ncio 
 
+    use pico 
+
 !     use yelmo_defs, only : sp, dp, wp, rho_ice, rho_w, rho_sw, g, parse_path 
 
     implicit none 
@@ -85,7 +87,8 @@ module marine_shelf
 
     type marshelf_class
         type(marshelf_param_class) :: par 
-        type(marshelf_state_class) :: now 
+        type(marshelf_state_class) :: now
+        type(pico_class)           :: pico  
     end type
 
     private
@@ -281,8 +284,15 @@ contains
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
 
-                write(*,*) "To do" 
-                stop 
+                ! First update the pico geometry
+                call pico_update_geometry(mshlf%pico,H_ice,f_grnd,basins,dx)
+
+                ! Next update the pico bmb 
+                call pico_update_physics(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
+                                                                    H_ice,z_bed,f_grnd,z_sl)
+
+                ! Set bmb_shlf to pico value 
+                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf 
 
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 
@@ -524,7 +534,6 @@ contains
         where (regions .eq. 1.0_wp) mshlf%now%mask_ocn_ref = 1   
         where (regions .eq. 2.0_wp) mshlf%now%mask_ocn_ref = 1 
 
-
         select case(trim(mshlf%par%domain))
 
             case("Greenland") 
@@ -565,7 +574,15 @@ contains
         end select 
 
         ! ==============================================
+        ! PICO 
 
+        if (trim(mshlf%par%bmb_method) .eq. "pico") then 
+
+            ! Initialize pico too 
+
+            call pico_init(mshlf%pico,filename,nx,ny,domain,grid_name,regions)
+
+        end if
 
         ! ====================================
         !
