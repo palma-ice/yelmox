@@ -611,11 +611,13 @@ contains
         if (present(init)) init_pars = .TRUE. 
 
         call nml_read(filename,"marine_shelf","bmb_method",     par%bmb_method,     init=init_pars)
+        call nml_read(filename,"marine_shelf","interp_depth",   par%interp_depth,   init=init_pars)
         call nml_read(filename,"marine_shelf","interp_method",  par%interp_method,  init=init_pars)
         call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
         
         call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
         call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
+        call nml_read(filename,"marine_shelf","depth_const",    par%depth_const,    init=init_pars)
         call nml_read(filename,"marine_shelf","depth_min",      par%depth_min,      init=init_pars)
         call nml_read(filename,"marine_shelf","depth_max",      par%depth_max,      init=init_pars)    
         
@@ -652,6 +654,12 @@ contains
         if (par%f_grz_shlf .eq. 0.0) then 
             write(*,*) "marshelf_par_load:: Error: f_grz_shlf cannot be zero."
             stop 
+        end if 
+
+        if (trim(par%bmb_method) .eq. "pico") then 
+            ! pico far-field ocean fields should be interpolated at the ocean bed (z_bed)
+            par%interp_depth  = "bed"
+            par%interp_method = "interp"
         end if 
 
         return
