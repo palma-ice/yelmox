@@ -112,14 +112,18 @@ contains
 
         ! Intern variables
         real(prec) :: g1, g2, s1
+        real(prec) :: fac 
 
         g1 = A_box * gamma_tstar
         g2 = g1/(rho_ice_sw*lambda)
         s1 = S_box/(rho_ice_sw*lambda)        
 
         ! Temperature for Box i > 1
-        T_box = T_box + g1 * T_star / (CC + g1 - g2 * a_pico * S_box)
-        S_box = S_box - s1 * g1 * T_star / (CC + g1 - g2 * a_pico * S_box)
+        fac = (CC + g1 - g2 * a_pico * S_box)
+        if (abs(fac) .lt. 1e-6) fac = 1e-6
+        
+        T_box = T_box +      g1 * T_star / fac
+        S_box = S_box - s1 * g1 * T_star / fac
 
         return
 

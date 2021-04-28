@@ -284,12 +284,8 @@ contains
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
 
-                ! First update the pico geometry
-                call pico_update_geometry(mshlf%pico,H_ice,f_grnd,basins,dx)
-
-                ! Next update the pico bmb 
-                call pico_update_physics(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
-                                                                    H_ice,z_bed,f_grnd,z_sl)
+                call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
+                                    H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
                 ! Set bmb_shlf to pico value 
                 mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf 
@@ -580,7 +576,7 @@ contains
 
             ! Initialize pico too 
 
-            call pico_init(mshlf%pico,filename,nx,ny,domain,grid_name,regions)
+            call pico_init(mshlf%pico,filename,nx,ny,domain)
 
         end if
 

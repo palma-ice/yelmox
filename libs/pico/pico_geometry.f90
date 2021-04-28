@@ -61,7 +61,7 @@ contains
        ! Initialize variable
        A_box = 0.0
 
-       do n=1,n_box
+       do n=1,int(n_box)
            n_count = 0.0
            do i=1, size(boxes,1)
                do j=1, size(boxes,2)
@@ -97,7 +97,7 @@ contains
         n_shlf = 1.0 + NINT(SQRT(d_max_basin/d_max)*(n_box-1))
 
         ! divide ice shelves
-        do k=1,n_shlf
+        do k=1,int(n_shlf)
             do i=1, size(f_grnd,1)
             do j=1, size(f_grnd,2)
                 ! Floating points
