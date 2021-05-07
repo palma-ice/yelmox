@@ -49,6 +49,9 @@ $(objdir)/snapclim.o: $(libdir)/snapclim.f90 $(objdir)/nml.o $(objdir)/ncio.o
 $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/transclim.o: $(libdir)/transclim.f90 $(objdir)/nml.o $(objdir)/ncio.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 # insol library 
 $(objdir)/interp1D.o: $(libdir)/insol/interp1D.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -100,9 +103,9 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/insolation.o \
 					    $(objdir)/isostasy.o \
 					    $(objdir)/marine_shelf.o \
-                                            $(objdir)/pico_geometry.o \
-                                            $(objdir)/pico_physics.o \
-                                            $(objdir)/pico.o \
+                        $(objdir)/pico_geometry.o \
+                        $(objdir)/pico_physics.o \
+                        $(objdir)/pico.o \
 					    $(objdir)/nml.o \
 			 		    $(objdir)/ncio.o \
 			 		    $(objdir)/sealevel.o \
@@ -112,5 +115,6 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smb_itm.o \
 					    $(objdir)/smb_pdd.o \
 					    $(objdir)/smbpal.o \
-					    $(objdir)/snapclim.o
+					    $(objdir)/snapclim.o \
+					    $(objdir)/transclim.o
 
