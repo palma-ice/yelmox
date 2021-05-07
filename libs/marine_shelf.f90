@@ -36,7 +36,8 @@ module marine_shelf
 
     type marshelf_param_class
 
-        character(len=56)   :: bmb_method 
+        character(len=56)   :: bmb_method
+        integer             :: tf_method  
         character(len=56)   :: interp_method 
         character(len=56)   :: interp_depth 
         logical             :: find_ocean 
@@ -302,6 +303,30 @@ contains
                                     mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3, &
                                     T_ref=T0)
 
+        ! Calculate the thermal forcing, if desired 
+        ! (not used for pico, but good to diagnose anyway and needed for other methods)
+        select case(mshlf%par%tf_method)
+
+            case(0)
+                ! tf_shlf defined externally, do nothing 
+
+            case(1) 
+                ! Determine tf_shlf 
+
+                where (mshlf%now%mask_ocn .gt. 0) 
+                    mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
+                elsewhere 
+                    mshlf%now%tf_shlf = 0.0_wp 
+                end where 
+
+            case DEFAULT 
+
+                write(*,*) "marshelf_update:: Error: tf_method not recognized."
+                write(*,*) "tf_method = ", mshlf%par%tf_method 
+                stop 
+
+        end select 
+
         ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
         ! calculated in ice-sheet model separately) ========
 
@@ -319,13 +344,6 @@ contains
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 
                 ! Calculate bmb_shlf using other available parameterizations 
-
-                ! Calculate the thermal forcing
-                where (mshlf%now%mask_ocn .gt. 0) 
-                    mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
-                elsewhere 
-                    mshlf%now%tf_shlf = 0.0_wp 
-                end where 
 
                 ! Check whether slope is being applied here 
                 if (index(trim(mshlf%par%bmb_method),"slope") .gt. 0) then 
@@ -650,6 +668,7 @@ contains
         if (present(init)) init_pars = .TRUE. 
 
         call nml_read(filename,"marine_shelf","bmb_method",     par%bmb_method,     init=init_pars)
+        call nml_read(filename,"marine_shelf","tf_method",      par%tf_method,      init=init_pars)
         call nml_read(filename,"marine_shelf","interp_depth",   par%interp_depth,   init=init_pars)
         call nml_read(filename,"marine_shelf","interp_method",  par%interp_method,  init=init_pars)
         call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
