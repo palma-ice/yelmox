@@ -100,7 +100,8 @@ module marine_shelf
 
 contains 
     
-    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx,depth,to_ann,so_ann,dto_ann)
+    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
+                                    depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
 
@@ -117,80 +118,105 @@ contains
         real(wp), intent(IN) :: to_ann(:,:,:)
         real(wp), intent(IN) :: so_ann(:,:,:)
         real(wp), intent(IN) :: dto_ann(:,:,:)
-        
-        ! Local variables 
-        real(wp), allocatable :: depth_shlf(:,:) 
+        real(wp), intent(IN), optional :: tf_ann(:,:,:)
 
-        allocate(depth_shlf(size(H_ice,1),size(H_ice,2)))
+        ! Local variables
+        integer :: i, j, nx, ny, nz 
+        real(wp), allocatable :: depth_shlf 
+        real(wp), allocatable :: wt_shlf(:) 
 
-        ! Determine which depth we want to use for the shelf interpolation 
-        select case(trim(mshlf%par%interp_depth))
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+        nz = size(depth,1) 
 
-            case("shlf")
-                ! Assign the depth to the shelf depth 
+        allocate(wt_shlf(nz)) 
+        wt_shlf = 0.0 
 
-                where(H_ice .gt. 0.0 .and. f_grnd .lt. 1.0) 
-                    ! Floating ice, depth == z_ice_base
-                    depth_shlf = H_ice*rho_ice_sw
-                else where(H_ice .gt. 0.0 .and. f_grnd .eq. 1.0) 
-                    ! Grounded ice, depth == z_bed 
-                    depth_shlf = z_bed
-                elsewhere 
-                    ! Open ocean, depth == constant value, eg 2000 m. 
-                    depth_shlf = mshlf%par%depth_const
-                end where
+        ! Loop over domain and update variables at each point (vertical interpolation)
+        do j = 1, ny 
+        do i = 1, nx 
 
-            case("bed")
-                ! Assign the depth of the bedrock 
+            ! 1. Calculate the depth of the current shelf base 
 
-                depth_shlf = z_bed
+            select case(trim(mshlf%par%interp_depth))
 
-            case("const")
+                case("shlf")
+                    ! Assign the depth to the shelf depth 
 
-                depth_shlf = mshlf%par%depth_const 
+                    if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .lt. 1.0) then
+                        ! Floating ice, depth == z_ice_base
+                        depth_shlf = H_ice(i,j)*rho_ice_sw
+                    else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
+                        ! Grounded ice, depth == z_bed 
+                        depth_shlf = z_bed(i,j)
+                    else 
+                        ! Open ocean, depth == constant value, eg 2000 m. 
+                        depth_shlf = mshlf%par%depth_const
+                    end if
 
-            case DEFAULT
+                case("bed")
+                    ! Assign the depth of the bedrock 
 
-                write(*,*) "marshelf_update_shelf:: Error: interp_depth method not recognized."
-                write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
+                    depth_shlf = z_bed(i,j)
 
-        end select
+                case("const")
 
-        ! 1. Calculate water properties at depths of interest ============================
+                    depth_shlf = mshlf%par%depth_const 
 
-        select case(trim(mshlf%par%interp_method))
+                case DEFAULT
 
-            case("mean") 
-                ! Computes the temperature for a mean value
+                    write(*,*) "marshelf_update_shelf:: Error: interp_depth method not recognized."
+                    write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
 
-                call calc_shelf_variable_mean(mshlf%now%T_shlf,to_ann,depth, &
-                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
-                call calc_shelf_variable_mean(mshlf%now%dT_shlf,dto_ann,depth, &
-                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
-                call calc_shelf_variable_mean(mshlf%now%S_shlf,so_ann,depth, &
-                                                 depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+            end select
+
+            ! 2. Calculate weighting function for vertical depths ===========================
+
+            select case(trim(mshlf%par%interp_method))
+
+                case("mean") 
+                    ! Equal weighting of layers within a specified depth range
+
+                    call calc_shelf_variable_mean(wt_shlf,depth, &
+                                depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+
+                case("layer")
+                    ! All weight given to the nearest layer to depth of shelf
+
+                    call calc_shelf_variable_layer(wt_shlf,depth,depth_shlf)
+                    
+                case("interp")
+                    ! Interpolation weights from the two nearest layers to depth of shelf
+
+                    call  calc_shelf_variable_depth(wt_shlf,depth,depth_shlf)
+
+                case DEFAULT
+                    write(*,*) "marshelf_update:: error: interp_method not recognized: ", mshlf%par%interp_method
+                    write(*,*) "Must be one of [mean,layer,interp]"
+                    stop
+                
+            end select
             
-            case("layer")
-                ! Takes the nearest layer for the temperature
+            ! Normalize weighting function 
+            if (sum(wt_shlf) .gt. 0.0_wp) then 
+                wt_shlf = wt_shlf / sum(wt_shlf) 
+            else 
+                write(*,*) "marshelf_update_shelf:: Error: weighting should be > 0."
+                stop 
+            end if 
 
-                call calc_shelf_variable_layer(mshlf%now%T_shlf,  to_ann,depth,depth_shlf)
-                call calc_shelf_variable_layer(mshlf%now%dT_shlf,dto_ann,depth,depth_shlf)
-                call calc_shelf_variable_layer(mshlf%now%S_shlf,  so_ann,depth,depth_shlf)
+            ! 3. Calculate water properties at depths of interest ============================
 
-            case("interp")
-                ! Interpolation from the two nearest layers 
+            mshlf%now%T_shlf(i,j)  = sum(to_ann(i,j,:) *wt_shlf)
+            mshlf%now%dT_shlf(i,j) = sum(dto_ann(i,j,:)*wt_shlf)
 
-                call  calc_shelf_variable_depth(mshlf%now%T_shlf,  to_ann,depth,depth_shlf)
-                call  calc_shelf_variable_depth(mshlf%now%dT_shlf,dto_ann,depth,depth_shlf)
-                call  calc_shelf_variable_depth(mshlf%now%S_shlf,  so_ann,depth,depth_shlf)
+            if (present(tf_ann)) then 
+                mshlf%now%tf_shlf(i,j) = sum(tf_ann(i,j,:)*wt_shlf)
+            end if 
 
-            case DEFAULT
-                write(*,*) "marshelf_update:: error: interp_method not recognized: ", mshlf%par%interp_method
-                write(*,*) "Must be one of [mean,layer,interp]"
-                stop
-            
-        end select
-        
+        end do 
+        end do  
+
         return 
 
     end subroutine marshelf_update_shelf
@@ -872,13 +898,13 @@ contains
 
     end subroutine calc_variable_basin
 
-    subroutine calc_shelf_variable_mean(var_shlf,var3D,depth,depth_range)
+    subroutine calc_shelf_variable_mean(wt_shlf,depth,depth_range)
         ! Calculate average variable value for a given range of depths
-        
+        ! at a specific point (x,y). 
+
         implicit none 
         
-        real(wp), intent(OUT)   :: var_shlf(:,:)
-        real(wp), intent(IN)    :: var3D(:,:,:)
+        real(wp), intent(OUT)   :: wt_shlf(:)
         real(wp), intent(IN)    :: depth(:)
         real(wp), intent(IN)    :: depth_range(:)
 
@@ -899,59 +925,69 @@ contains
             stop 
         end if 
 
-        ! Get the mean water temperature for these depths
-        var_shlf  = sum(var3D(:,:,k0:k1),dim=3)  / (k1-k0+1)
+        ! Get index weights to produce mean water temperature for these depths
+        wt_shlf        = 0.0 
+        wt_shlf(k0:k1) = 1.0 
 
         return 
 
     end subroutine calc_shelf_variable_mean
 
-    subroutine calc_shelf_variable_layer(var_shlf,var3D,depth,depth_shlf)
+    subroutine calc_shelf_variable_layer(wt_shlf,depth,depth_shlf)
         ! Calculates the water temperature at the depth of the ice shelf
         ! It assigns the temperature of the nearest layer
         
         implicit none
 
-        real(wp), intent(OUT)   :: var_shlf(:,:)
-        real(wp), intent(IN)    :: var3D(:,:,:)
+        real(wp), intent(OUT)   :: wt_shlf(:)
         real(wp), intent(IN)    :: depth(:)
-        real(wp), intent(IN)    :: depth_shlf(:,:)
+        real(wp), intent(IN)    :: depth_shlf
 
         ! Local variables
         integer :: k0, i, j
 
-        do j = 1, size(var_shlf,2)
-        do i = 1, size(var_shlf,1)
-            k0 = minloc(abs(depth-depth_shlf(i,j)),dim=1)
-            var_shlf(i,j)  = var3D(i,j,k0)
-        end do
-        end do 
+        ! Determine layer closest to target depth 
+        k0 = minloc(abs(depth-depth_shlf),dim=1)
+
+        ! Assign weighting function 
+        wt_shlf     = 0.0 
+        wt_shlf(k0) = 1.0 
 
         return
 
     end subroutine calc_shelf_variable_layer
 
-    subroutine calc_shelf_variable_depth(var_shlf,var3D,depth,depth_shlf)
+    subroutine calc_shelf_variable_depth(wt_shlf,depth,depth_shlf)
         ! Calculates the water temperature from linear interpolation of vertical profile
         
         implicit none
 
-        real(wp), intent(OUT)   :: var_shlf(:,:)
-        real(wp), intent(IN)    :: var3D(:,:,:)
+        real(wp), intent(OUT)   :: wt_shlf(:)
         real(wp), intent(IN)    :: depth(:)
-        real(wp), intent(IN)    :: depth_shlf(:,:)
+        real(wp), intent(IN)    :: depth_shlf
 
-        ! Local variables
-        integer :: i, j
+        ! Local variables 
+        integer  :: j, n 
+        real(wp) :: alpha 
 
-        do j = 1, size(var_shlf,2)
-        do i = 1, size(var_shlf,1)
-            
-            ! Linearly interpolate to depth of ice shelf 
-            var_shlf(i,j) = interp_linear(depth,var3D(i,j,:),xout=depth_shlf(i,j))
+        n    = size(depth) 
 
+        do j = 1, n 
+            if (depth(j) .ge. depth_shlf) exit 
         end do
-        end do
+
+        if (j .eq. 1) then 
+            wt_shlf    = 0.0 
+            wt_shlf(1) = 1.0 
+        else if (j .eq. n+1) then 
+            wt_shlf    = 0.0 
+            wt_shlf(n) = 1.0 
+        else 
+            alpha = (depth_shlf - depth(j-1)) / (depth(j) - depth(j-1))
+            wt_shlf      = 0.0 
+            wt_shlf(j-1) = 1.0-alpha 
+            wt_shlf(j)   = alpha
+        end if  
 
         return
 

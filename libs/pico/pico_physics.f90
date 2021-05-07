@@ -120,8 +120,12 @@ contains
 
         ! Temperature for Box i > 1
         fac = (CC + g1 - g2 * a_pico * S_box)
-        if (abs(fac) .lt. 1e-6) fac = 1e-6
-        
+        if (abs(fac) .lt. 1e-6) then 
+            write(*,*) "fac! ", fac 
+            stop 
+            fac = 1e-6
+        end if 
+
         T_box = T_box +      g1 * T_star / fac
         S_box = S_box - s1 * g1 * T_star / fac
 

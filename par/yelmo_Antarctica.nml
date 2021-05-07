@@ -382,9 +382,6 @@
     rho_star       = 1033.0     ! Reference density [kg/m3]. Reese et al., (2018) suggest 1033.0.
     gamma_tstar    = 630.0      ! Effective turbulent temperature exchange velocity [m/yr]. Reese et al., (2018) uses 630.0 and suggest 600-1000.
     C_over         = 1.0        ! Overturning strength [Sv m3/kg]. Reese et al., (2018) suggest 1.0.
-    c_deep         = -10.0       ! [m/a] Melt rate in deep ocean, should be negative but not huge
-    depth_deep     = 2000.0
-    find_ocean     = True
 
 /
 
