@@ -9,6 +9,8 @@ program yelmox
     use sealevel 
     use isostasy  
     
+    use transclim 
+
     use snapclim
     use marine_shelf 
     use smbpal   
@@ -26,6 +28,9 @@ program yelmox
     type(sediments_class)  :: sed1 
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
+    
+    type(transclim_class)  :: tclim_ts_ref 
+    type(transclim_class)  :: tclim_ts 
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
@@ -83,6 +88,26 @@ program yelmox
 
     !  =========================================================
 
+
+    ! Testing transclim 
+    call transclim_init_arg(tclim_ts_ref, &
+        filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc", &
+        name="ts",units_in="K",units_out="K",with_time=.FALSE.)
+    call transclim_init_arg(tclim_ts, &
+        filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_anom_1950-1994.nc", &
+        name="ts",units_in="K",units_out="K",with_time=.TRUE.)
+
+    write(*,*) "info: " 
+    write(*,*) size(tclim_ts_ref%var,1), size(tclim_ts_ref%var,2), size(tclim_ts_ref%var,3)
+    write(*,*) size(tclim_ts%var,1), size(tclim_ts%var,2), size(tclim_ts%var,3)
+    
+    call transclim_update(tclim_ts_ref)
+    
+    ! Check data 
+    write(*,*) "tclim_ts_ref: ", minval(tclim_ts_ref%var,mask=tclim_ts_ref%var.ne.mv), &
+                                 maxval(tclim_ts_ref%var,mask=tclim_ts_ref%var.ne.mv)
+
+    stop "Done testing transclim."
 
     ! === Initialize ice sheet model =====
 

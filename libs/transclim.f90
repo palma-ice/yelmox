@@ -17,10 +17,10 @@ module transclim
 
     type transclim_param_class
 
-        character(len=56) :: name 
-        character(len=56) :: filename
-        character(len=56) :: units_in
-        character(len=56) :: units_out
+        character(len=1024) :: filename
+        character(len=56)   :: name 
+        character(len=56)   :: units_in
+        character(len=56)   :: units_out
         real(wp) :: unit_scale 
         real(wp) :: unit_offset
         logical  :: with_time 
@@ -35,14 +35,10 @@ module transclim
 
         type(transclim_param_class) :: par 
 
-        real(wp), allocatable :: time_now
+        real(wp) :: time_now
         
-        real(wp), allocatable :: time(:) 
-        
-        real(wp) :: var0D  
-        real(wp), allocatable :: var1D(:) 
-        real(wp), allocatable :: var2D(:,:) 
-        real(wp), allocatable :: var3D(:,:,:) 
+        real(wp), allocatable :: time(:)  
+        real(wp), allocatable :: var(:,:,:) 
     end type 
 
     private 
@@ -61,29 +57,47 @@ contains
         implicit none 
 
         type(transclim_class),  intent(INOUT) :: tclim
-        real(wp),               intent(IN)    :: time       ! [yr] Current time 
+        real(wp), optional,     intent(IN)    :: time       ! [yr] Current time 
 
         ! Local variables 
         integer :: k_now, k0, k1, nt  
         type(transclim_param_class) :: par 
         logical :: with_time 
+        real(wp) :: time_now 
 
         ! Define shortcuts
         par = tclim%par 
         with_time = par%with_time 
-        
-        if (tclim%time_now .eq. time) then 
+
+        if (with_time) then 
+
+            if (.not. present(time)) then 
+                write(*,*) "transclim_update:: Error: current time must be given as an argument."
+                stop 
+            end if 
+
+        end if 
+
+        if (present(time)) then 
+            time_now = time 
+        else 
+            time_now = tclim%time_now 
+        end if 
+
+        if (with_time .and. tclim%time_now .eq. time_now) then 
 
             ! Do nothing, the transclim object is already up to date 
             ! fo the current time. 
 
         else 
 
-            ! 1. Determine the index of the current time 
-            nt = size(tclim%time)
-            do k_now = 1, nt 
-                if (tclim%time(k_now) .eq. time) exit 
-            end do
+            ! 1. Determine the index of the current time, if needed
+            if (with_time) then 
+                nt = size(tclim%time)
+                do k_now = 1, nt 
+                    if (tclim%time(k_now) .eq. time_now) exit 
+                end do
+            end if 
 
             ! 2. Read variable and convert units as needed
             select case(par%ndim)
@@ -92,52 +106,40 @@ contains
 
                     if (with_time) then 
                         ! 0D (point) variable plus time dimension 
-                        call nc_read(par%filename,par%name,tclim%var0D,missing_value=mv, &
+                        call nc_read(par%filename,par%name,tclim%var(1,1,1),missing_value=mv, &
                                 start=[k_now],count=[1])
                     else 
                         ! 1D variable
-                        call nc_read(par%filename,par%name,tclim%var1D,missing_value=mv)
-                    end if 
-
-                    if (tclim%var0D .ne. mv) then 
-                        tclim%var0D = tclim%var0D*par%unit_scale + par%unit_offset
+                        call nc_read(par%filename,par%name,tclim%var(:,1,1),missing_value=mv)
                     end if 
 
                 case(2)
 
                     if (with_time) then 
                         ! 1D variable plus time dimension 
-                        call nc_read(par%filename,par%name,tclim%var1D,missing_value=mv, &
+                        call nc_read(par%filename,par%name,tclim%var(:,1,1),missing_value=mv, &
                                 start=[1,k_now],count=[par%dim(1),1])
                     else 
                         ! 2D variable 
-                        call nc_read(par%filename,par%name,tclim%var2D,missing_value=mv)
+                        call nc_read(par%filename,par%name,tclim%var(:,:,1),missing_value=mv)
                     end if 
-
-                    where (tclim%var1D .ne. mv) 
-                        tclim%var1D = tclim%var1D*par%unit_scale + par%unit_offset
-                    end where 
 
                 case(3)
 
                     if (with_time) then 
                         ! 2D variable plus time dimension 
-                        call nc_read(par%filename,par%name,tclim%var2D,missing_value=mv, &
+                        call nc_read(par%filename,par%name,tclim%var(:,:,1),missing_value=mv, &
                                 start=[1,1,k_now],count=[par%dim(1),par%dim(2),1])
                     else 
                         ! 3D variable 
-                        call nc_read(par%filename,par%name,tclim%var3D,missing_value=mv)
+                        call nc_read(par%filename,par%name,tclim%var,missing_value=mv)
                     end if 
 
-                    where (tclim%var2D .ne. mv) 
-                        tclim%var2D = tclim%var2D*par%unit_scale + par%unit_offset
-                    end where 
-                    
                 case(4)
 
                     if (with_time) then 
                         ! 3D variable plus time dimension 
-                        call nc_read(par%filename,par%name,tclim%var3D,missing_value=mv, &
+                        call nc_read(par%filename,par%name,tclim%var,missing_value=mv, &
                                 start=[1,1,1,k_now],count=[par%dim(1),par%dim(2),par%dim(3),1])
                     else 
                         ! 4D variable 
@@ -146,10 +148,6 @@ contains
                         stop 
                     end if 
 
-                    where (tclim%var3D .ne. mv) 
-                        tclim%var3D = tclim%var3D*par%unit_scale + par%unit_offset
-                    end where 
-                    
                 case DEFAULT 
 
                     write(*,*) "transclim_update:: ndim not allowed."
@@ -158,6 +156,10 @@ contains
 
             end select
 
+            ! Apply scaling 
+            where (tclim%var .ne. mv) 
+                tclim%var = tclim%var*par%unit_scale + par%unit_offset
+            end where 
             
         end if 
 
@@ -243,9 +245,7 @@ contains
 
         ! First make sure all data objects are deallocated 
         if (allocated(tclim%time)) deallocate(tclim%time)
-        if (allocated(tclim%var1D)) deallocate(tclim%var1D)
-        if (allocated(tclim%var2D)) deallocate(tclim%var2D)
-        if (allocated(tclim%var3D)) deallocate(tclim%var3D)
+        if (allocated(tclim%var))  deallocate(tclim%var)
 
         ! Get information from netcdf file 
         call nc_dims(tclim%par%filename,tclim%par%name,dim_names,tclim%par%dim)
@@ -257,26 +257,29 @@ contains
             case(1)
                 if (with_time) then 
                     allocate(tclim%time(tclim%par%dim(1)))
+                    allocate(tclim%var(1,1,1))
+                else 
+                    allocate(tclim%var(tclim%par%dim(1),1,1))
                 end if 
             case(2)
                 if (with_time) then 
                     allocate(tclim%time(tclim%par%dim(2)))
-                    allocate(tclim%var1D(tclim%par%dim(1)))
+                    allocate(tclim%var(tclim%par%dim(1),1,1))
                 else 
-                    allocate(tclim%var2D(tclim%par%dim(1),tclim%par%dim(2)))
+                    allocate(tclim%var(tclim%par%dim(1),tclim%par%dim(2),1))
                 end if 
 
             case(3)
                 if (with_time) then
                     allocate(tclim%time(tclim%par%dim(3)))
-                    allocate(tclim%var2D(tclim%par%dim(1),tclim%par%dim(2)))
+                    allocate(tclim%var(tclim%par%dim(1),tclim%par%dim(2),1))
                 else 
-                    allocate(tclim%var3D(tclim%par%dim(1),tclim%par%dim(2),tclim%par%dim(2)))
+                    allocate(tclim%var(tclim%par%dim(1),tclim%par%dim(2),tclim%par%dim(3)))
                 end if 
             case(4)
                 if (with_time) then 
                     allocate(tclim%time(tclim%par%dim(4)))
-                    allocate(tclim%var3D(tclim%par%dim(1),tclim%par%dim(2),tclim%par%dim(3)))
+                    allocate(tclim%var(tclim%par%dim(1),tclim%par%dim(2),tclim%par%dim(3)))
                 else 
                     write(*,*) "transclim_init_data:: 4D array without time dimension is not yet supported."
                     stop 
@@ -336,4 +339,33 @@ contains
 
     end subroutine parse_path
     
+    subroutine axis_init(x,x0,dx)
+
+        implicit none 
+
+        real(wp) :: x(:)
+        real(wp), optional :: x0, dx
+        real(wp) :: dx_tmp 
+        integer :: i, nx  
+
+        nx = size(x) 
+
+        do i = 1, nx 
+            x(i) = real(i-1,wp)
+        end do 
+
+        dx_tmp = 1.d0 
+        if (present(dx)) dx_tmp = dx 
+        
+        x = x*dx_tmp  
+
+        if (present(x0)) then 
+            x = x + x0 
+        else
+            x = x + (-(nx-1.0)/2.0*dx_tmp)
+        end if 
+
+        return 
+    end subroutine axis_init
+
 end module transclim
