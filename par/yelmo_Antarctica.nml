@@ -203,6 +203,22 @@
     sl_path            = "input/sl_deglaciation.dat"
 /
 
+&tclim_atm 
+
+/
+
+&tclim_ocn 
+
+/
+
+&tclim_ts_noresm_rcp85
+    
+/
+
+&tclim_smb_noresm_rcp85
+    
+/
+
 &snap
     atm_type           = "anom"
     ocn_type           = "anom"
