@@ -1,4 +1,4 @@
-module transclim
+module dimarray
 
     use ncio 
     use nml 
@@ -15,7 +15,7 @@ module transclim
     ! Define default missing value 
     real(wp), parameter :: mv = -9999.0_wp 
 
-    type transclim_param_class
+    type dimarray_param_class
 
         character(len=56) :: varnm 
         character(len=56) :: filename
@@ -27,9 +27,9 @@ module transclim
 
     end type
 
-    type transclim_class 
+    type dimarray_class 
 
-        type(transclim_param_class) :: par 
+        type(dimarray_param_class) :: par 
 
         real(wp), allocatable :: time(:) 
         real(wp), allocatable :: layer(:) 
@@ -42,40 +42,40 @@ module transclim
     end type 
 
     private 
-    public :: transclim_class
-    public :: transclim_update
-    public :: transclim_init
+    public :: dimarray_class
+    public :: dimarray_update
+    public :: dimarray_init
 
 contains
 
     
-    subroutine transclim_update(tclim,time)
+    subroutine dimarray_update(da,time)
         ! Routine to update transient climate forcing to match 
         ! current `time`. 
 
         implicit none 
 
-        type(transclim_class),  intent(INOUT) :: tclim
+        type(dimarray_class),  intent(INOUT) :: da
         real(wp),               intent(IN)    :: time       ! [yr] Current time 
 
         ! Local variables 
         integer :: k_now, k0, k1, nt  
-        type(transclim_param_class) :: par 
+        type(dimarray_param_class) :: par 
 
         ! Define shortcut to par 
-        par = tclim%par 
+        par = da%par 
 
-        if (tclim%time_now .eq. time) then 
+        if (da%time_now .eq. time) then 
 
-            ! Do nothing, the transclim object is already up to date 
+            ! Do nothing, the dimarray object is already up to date 
             ! fo the current time. 
 
         else 
 
             ! 1. Determine the index of the current time 
-            nt = size(tclim%time)
+            nt = size(da%time)
             do k_now = 1, nt 
-                if (tclim%time(k_now) .eq. time) exit 
+                if (da%time(k_now) .eq. time) exit 
             end do
 
             ! 2. Read variable and convert units as needed
@@ -83,28 +83,28 @@ contains
 
                 case(1)
                     ! 0D (point) variable plus time dimension 
-                    call nc_read(par%filename,par%varnm,tclim%var0D,missing_value=mv, &
+                    call nc_read(par%filename,par%varnm,da%var0D,missing_value=mv, &
                             start=[k_now],count=[1])
 
-                    !tclim%var0D
+                    !da%var0D
                 case(2)
                     ! 1D variable plus time dimension 
-                    call nc_read(par%filename,par%varnm,tclim%var1D,missing_value=mv, &
+                    call nc_read(par%filename,par%varnm,da%var1D,missing_value=mv, &
                             start=[1,k_now],count=[par%dim(1),1])
 
                 case(3)
                     ! 2D variable plus time dimension 
-                    call nc_read(par%filename,par%varnm,tclim%var2D,missing_value=mv, &
+                    call nc_read(par%filename,par%varnm,da%var2D,missing_value=mv, &
                             start=[1,1,k_now],count=[par%dim(1),par%dim(2),1])
 
                 case(4)
                     ! 3D variable plus time dimension 
-                    call nc_read(par%filename,par%varnm,tclim%var3D,missing_value=mv, &
+                    call nc_read(par%filename,par%varnm,da%var3D,missing_value=mv, &
                             start=[1,1,1,k_now],count=[par%dim(1),par%dim(2),par%dim(3),1])
                 
                 case DEFAULT 
 
-                    write(*,*) "transclim_update:: ndim not allowed."
+                    write(*,*) "dimarray_update:: ndim not allowed."
                     write(*,*) "ndim = ", par%ndim 
                     stop 
 
@@ -115,15 +115,15 @@ contains
 
         return 
 
-    end subroutine transclim_update
+    end subroutine dimarray_update
 
-    subroutine transclim_init(tclim)
+    subroutine dimarray_init(da)
         ! Routine to load information related to a given 
         ! transient variable, so that it can be processed properly.
 
         implicit none 
 
-        type(transclim_class),  intent(INOUT) :: tclim
+        type(dimarray_class),  intent(INOUT) :: da
         
         ! Local variables 
         !
@@ -132,8 +132,8 @@ contains
         
         return 
 
-    end subroutine transclim_init
+    end subroutine dimarray_init
 
 
 
-end module transclim
+end module dimarray
