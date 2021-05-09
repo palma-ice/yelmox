@@ -211,11 +211,18 @@
 
 /
 
-&tclim_ts_noresm_rcp85
-    
+&tclim_noresm_rcp85_ts
+    filename    = "ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc"
+    name        = "ts"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1950, 1994, 1
 /
 
-&tclim_smb_noresm_rcp85
+&tclim_noresm_rcp85_smb
     
 /
 

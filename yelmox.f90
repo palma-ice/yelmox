@@ -95,17 +95,27 @@ program yelmox
         name="ts",units_in="K",units_out="K",with_time=.FALSE.)
     call transclim_init_arg(tclim_ts, &
         filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_anom_1950-1994.nc", &
-        name="ts",units_in="K",units_out="K",with_time=.TRUE.)
+        name="ts",units_in="K",units_out="K",with_time=.TRUE.,time_par=[1950.,1994.,1.])
 
     write(*,*) "info: " 
     write(*,*) size(tclim_ts_ref%var,1), size(tclim_ts_ref%var,2), size(tclim_ts_ref%var,3)
     write(*,*) size(tclim_ts%var,1), size(tclim_ts%var,2), size(tclim_ts%var,3)
-    
+    write(*,*) tclim_ts%time 
+
     call transclim_update(tclim_ts_ref)
-    
+
     ! Check data 
     write(*,*) "tclim_ts_ref: ", minval(tclim_ts_ref%var,mask=tclim_ts_ref%var.ne.mv), &
                                  maxval(tclim_ts_ref%var,mask=tclim_ts_ref%var.ne.mv)
+
+    do n = 1, size(tclim_ts%time) 
+        call transclim_update(tclim_ts,tclim_ts%time(n))
+
+        ! Check data 
+        write(*,*) tclim_ts%time(n)," : ",  minval(tclim_ts%var,mask=tclim_ts%var.ne.mv), &
+                                            maxval(tclim_ts%var,mask=tclim_ts%var.ne.mv)
+
+    end do 
 
     stop "Done testing transclim."
 
