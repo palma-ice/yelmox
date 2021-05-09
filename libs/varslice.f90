@@ -14,7 +14,7 @@ module varslice
 
     ! Define default missing value 
     real(wp), parameter :: mv = -9999.0_wp 
-
+    
     type varslice_param_class
 
         character(len=1024) :: filename
