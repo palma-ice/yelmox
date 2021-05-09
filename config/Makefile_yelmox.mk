@@ -25,6 +25,10 @@ $(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/nml.o \
 							$(objdir)/ncio.o $(objdir)/pico.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/ismip6.o: $(libdir)/ismip6.f90 $(objdir)/nml.o \
+							$(objdir)/ncio.o $(objdir)/varslice.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/isostasy.o: $(libdir)/isos/isostasy.f90 $(objdir)/nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -49,7 +53,7 @@ $(objdir)/snapclim.o: $(libdir)/snapclim.f90 $(objdir)/nml.o $(objdir)/ncio.o
 $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/transclim.o: $(libdir)/transclim.f90 $(objdir)/nml.o $(objdir)/ncio.o
+$(objdir)/varslice.o: $(libdir)/varslice.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/xarray.o: $(libdir)/xarray.f90 $(objdir)/nml.o $(objdir)/ncio.o
@@ -104,6 +108,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/gaussian_filter.o \
 					    $(objdir)/interp1D.o \
 					    $(objdir)/insolation.o \
+					    $(objdir)/ismip6.o \
 					    $(objdir)/isostasy.o \
 					    $(objdir)/marine_shelf.o \
                         $(objdir)/pico_geometry.o \
@@ -119,6 +124,6 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smb_pdd.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/snapclim.o \
-					    $(objdir)/transclim.o \
+					    $(objdir)/varslice.o \
 					    $(objdir)/xarray.o
 

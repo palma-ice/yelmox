@@ -9,7 +9,7 @@ program yelmox
     use sealevel 
     use isostasy  
     
-    use transclim 
+    use varslice 
 
     use snapclim
     use marine_shelf 
@@ -29,8 +29,8 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    type(transclim_class)  :: tclim_ts_ref 
-    type(transclim_class)  :: tclim_ts 
+    type(varslice_class)   :: vs_ts_ref 
+    type(varslice_class)   :: vs_ts 
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
@@ -89,35 +89,35 @@ program yelmox
     !  =========================================================
 
 
-    ! Testing transclim 
-    call transclim_init_arg(tclim_ts_ref, &
+    ! Testing varslice 
+    call varslice_init_arg(vs_ts_ref, &
         filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc", &
         name="ts",units_in="K",units_out="K",with_time=.FALSE.)
-    call transclim_init_arg(tclim_ts, &
+    call varslice_init_arg(vs_ts, &
         filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_anom_1950-1994.nc", &
         name="ts",units_in="K",units_out="K",with_time=.TRUE.,time_par=[1950.,1994.,1.])
 
     write(*,*) "info: " 
-    write(*,*) size(tclim_ts_ref%var,1), size(tclim_ts_ref%var,2), size(tclim_ts_ref%var,3)
-    write(*,*) size(tclim_ts%var,1), size(tclim_ts%var,2), size(tclim_ts%var,3)
-    write(*,*) tclim_ts%time 
+    write(*,*) size(vs_ts_ref%var,1), size(vs_ts_ref%var,2), size(vs_ts_ref%var,3)
+    write(*,*) size(vs_ts%var,1), size(vs_ts%var,2), size(vs_ts%var,3)
+    write(*,*) vs_ts%time 
 
-    call transclim_update(tclim_ts_ref)
+    call varslice_update(vs_ts_ref)
 
     ! Check data 
-    write(*,*) "tclim_ts_ref: ", minval(tclim_ts_ref%var,mask=tclim_ts_ref%var.ne.mv), &
-                                 maxval(tclim_ts_ref%var,mask=tclim_ts_ref%var.ne.mv)
+    write(*,*) "vs_ts_ref: ", minval(vs_ts_ref%var,mask=vs_ts_ref%var.ne.mv), &
+                                 maxval(vs_ts_ref%var,mask=vs_ts_ref%var.ne.mv)
 
-    do n = 1, size(tclim_ts%time) 
-        call transclim_update(tclim_ts,tclim_ts%time(n))
+    do n = 1, size(vs_ts%time) 
+        call varslice_update(vs_ts,vs_ts%time(n))
 
         ! Check data 
-        write(*,*) tclim_ts%time(n)," : ",  minval(tclim_ts%var,mask=tclim_ts%var.ne.mv), &
-                                            maxval(tclim_ts%var,mask=tclim_ts%var.ne.mv)
+        write(*,*) vs_ts%time(n)," : ",  minval(vs_ts%var,mask=vs_ts%var.ne.mv), &
+                                            maxval(vs_ts%var,mask=vs_ts%var.ne.mv)
 
     end do 
 
-    stop "Done testing transclim."
+    stop "Done testing varslice."
 
     ! === Initialize ice sheet model =====
 
