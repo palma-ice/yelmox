@@ -1,42 +1,61 @@
 
 
-program yelmox
+program yelmox_ismip6
 
     use ncio 
     use yelmo 
     
     ! External libraries
-    use sealevel 
-    use isostasy  
-     
-    use snapclim
-    use marine_shelf 
-    use smbpal   
-    use sediments 
     use geothermal
+    use ismip6
+    use isostasy  
+    use marine_shelf 
+    use sealevel 
+    use sediments 
+    use smbpal   
+    use snapclim
     
     implicit none 
 
-    type(yelmo_class)      :: yelmo1 
-    
-    type(sealevel_class)   :: sealev 
-    type(snapclim_class)   :: snp1 
-    type(marshelf_class)   :: mshlf1 
-    type(smbpal_class)     :: smbpal1  
-    type(sediments_class)  :: sed1 
-    type(geothermal_class) :: gthrm1
-    type(isos_class)       :: isos1
-    
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
-    character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart 
-    integer    :: n
-    logical    :: calc_transient_climate
-
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
-    ! Start timing 
-    call yelmo_cpu_time(cpu_start_time)
+    character(len=256) :: outfldr, file1D, file2D, file_restart
+    character(len=256) :: domain, grid_name 
+    character(len=512) :: path_par, path_const  
+    integer    :: n
+    real(wp)   :: time, time_bp 
+
+    type(yelmo_class)           :: yelmo1 
+    type(sealevel_class)        :: sealev 
+    type(snapclim_class)        :: snp1 
+    type(marshelf_class)        :: mshlf1 
+    type(smbpal_class)          :: smbpal1  
+    type(sediments_class)       :: sed1 
+    type(geothermal_class)      :: gthrm1
+    type(isos_class)            :: isos1
+    type(ismip6_forcing_class)  :: ismip6 
+
+    
+    type ctrl_param_spinup 
+        real(wp) :: time_init
+        real(wp) :: time_end
+        real(wp) :: time_equil
+        real(wp) :: dtt
+    end type 
+
+    type ctrl_param_transient
+        real(wp) :: time_init
+        real(wp) :: time_end
+        real(wp) :: dtt 
+        real(wp) :: dt1D_out 
+        real(wp) :: dt2D_out 
+    end type
+
+    character(len=12)           :: run_step 
+    type(ctrl_param_spinup)     :: ctl0         ! Spinup
+    type(ctrl_param_transient)  :: ctl1         ! lgm to pd 
+    type(ctrl_param_transient)  :: ctl2         ! projections
+    type(ctrl_param_transient)  :: ctl
     
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
@@ -45,14 +64,47 @@ program yelmox
     call nml_read(path_par,"ctrl","run_step",    run_step)
     
 
-    ! Timing and other parameters 
-    call nml_read(path_par,"ctrl","time_init",    time_init)                 ! [yr] Starting time
-    call nml_read(path_par,"ctrl","time_end",     time_end)                  ! [yr] Ending time
-    call nml_read(path_par,"ctrl","time_equil",   time_equil)                ! [yr] Years to equilibrate first
-    call nml_read(path_par,"ctrl","dtt",          dtt)                       ! [yr] Main loop time step 
-    call nml_read(path_par,"ctrl","dt1D_out",     dt1D_out)                  ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"ctrl","transient",    calc_transient_climate)    ! Calculate transient climate? 
+    select case(trim(run_step))
+
+    case("spinup")
+
+        call nml_read(path_par,"spinup","time_init",    ctl0%time_init)                 ! [yr] Starting time
+        call nml_read(path_par,"spinup","time_end",     ctl0%time_end)                  ! [yr] Ending time
+        call nml_read(path_par,"spinup","time_equil",   ctl0%time_equil)                ! [yr] Years to equilibrate first
+        call nml_read(path_par,"spinup","dtt",          ctl0%dtt)                       ! [yr] Main loop time step 
+        
+        time    = ctl0%time_init 
+        time_bp = time - 1950.0_wp 
+
+    case("transient_lgm_to_pd") 
+
+        call nml_read(path_par,"transient_lgm_to_pd","time_init",ctl1%time_init)                 ! [yr] Starting time
+        call nml_read(path_par,"transient_lgm_to_pd","time_end", ctl1%time_end)                  ! [yr] Ending time
+        call nml_read(path_par,"transient_lgm_to_pd","dtt",      ctl1%dtt)                       ! [yr] Main loop time step 
+        call nml_read(path_par,"transient_lgm_to_pd","dt1D_out", ctl1%dt1D_out)                  ! [yr] Frequency of 1D output 
+        call nml_read(path_par,"transient_lgm_to_pd","dt2D_out", ctl1%dt2D_out)                  ! [yr] Frequency of 2D output 
+
+        time    = ctl1%time_init 
+        time_bp = time - 1950.0_wp 
+        
+    case("transient_proj") 
+
+        call nml_read(path_par,"transient_proj","time_init", ctl2%time_init)                 ! [yr] Starting time
+        call nml_read(path_par,"transient_proj","time_end",  ctl2%time_end)                  ! [yr] Ending time
+        call nml_read(path_par,"transient_proj","dtt",       ctl2%dtt)                       ! [yr] Main loop time step 
+        call nml_read(path_par,"transient_proj","dt1D_out",  ctl2%dt1D_out)                  ! [yr] Frequency of 1D output 
+        call nml_read(path_par,"transient_proj","dt2D_out",  ctl2%dt2D_out)                  ! [yr] Frequency of 2D output 
+        
+        time    = ctl2%time_init 
+        time_bp = time - 1950.0_wp 
+        
+    case DEFAULT 
+
+        write(*,*) "yelmox_ismip6:: Error: run_step not recognized."
+        write(*,*) "run_step = ", trim(run_step)
+        stop 
+
+    end select
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -60,12 +112,8 @@ program yelmox
     ! Define input and output locations 
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
-    file2D       = trim(outfldr)//"yelmo2D.nc"
-    file_restart = trim(outfldr)//"yelmo_restart.nc"          
-    
-    ! How often to write a restart file 
-    dt_restart   = 20e3                 ! [yr] 
-
+    file2D       = trim(outfldr)//"yelmo2D.nc"     
+    file_restart = trim(outfldr)//"yelmo_restart.nc" 
 
     !  =========================================================
 
@@ -76,12 +124,13 @@ program yelmox
     call yelmo_global_init(path_const)
 
     ! Initialize data objects and load initial topography
-    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
 
     ! === Initialize external models (forcing for ice sheet) ======
 
-    ! Store domain name as a shortcut 
-    domain = yelmo1%par%domain 
+    ! Store domain and grid_name as shortcuts 
+    domain    = yelmo1%par%domain 
+    grid_name = yelmo1%par%grid_name 
 
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
@@ -90,61 +139,44 @@ program yelmox
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    call snapclim_init(snp1,path_par,domain,grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
     
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
     
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
-   
-    ! Initialize PICO model
-    ! pico,filename,nx,ny,domain,grid_name,regions
-    ! call pico_init(pico1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions)
- 
+    call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
+    
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
-    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-    ! === Update initial boundary conditions for current time and yelmo state =====
-    ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
-
+    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
+    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
 
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
     call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                           H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
+                           H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time)    !mmr
 
 
-    call sealevel_update(sealev,year_bp=time_init)
+    ! === Update external modules and pass variables to yelmo boundaries =======
+
+    call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init,time_equil=100.0)
+                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp,time_equil=100.0)
     end if 
-
-! Testing related to present-day surface mass balance
-!     snp1%now%tas = snp1%now%tas + 0.0 
-!     snp1%now%pr  = snp1%now%pr*exp(0.05*(0.0))
-
-!     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-!                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init, &
-!                                file_out=trim(outfldr)//"smbpal.nc",write_now=.TRUE.,write_init=.TRUE.) 
-
-!     stop 
+     
     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
+                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-!     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
-!     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-    
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -159,219 +191,221 @@ program yelmox
     
     call yelmo_print_bound(yelmo1%bnd)
 
-    time = time_init 
-    
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
     if (yelmo1%par%use_restart) then 
-        ! If using restart file, set boundary module variables equal to restarted value 
+        ! If using restart file, set boundary module variables 
+        ! equal to restarted value as needed 
          
         isos1%now%z_bed  = yelmo1%bnd%z_bed
 
-    else 
-
-        if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
-            ! Start with some ice thickness for testing
-
-            yelmo1%tpo%now%H_ice = 0.0
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
-
-            ! Run Yelmo for briefly to update surface topography 
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.,dyn_solver="sia")
-            
-            ! Update snapclim to reflect new topography 
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
-
-            ! Update smbpal
-            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
-            yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
-            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
-                        yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
-
-            ! Run with low maximum velocities only to smooth things out at first
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
-
-        end if  
-
     end if 
 
-    ! Run yelmo for several years with constant boundary conditions and topo
-    ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
 
-    ! 2D file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-!     call write_step_2D_small(yelmo1,file2D,time=time)  
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+! ================= RUN STEPS ===============================================
 
-    ! 1D file 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
-    call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+
+    select case(trim(run_step)) 
+
+    case("spinup")
+        ! Model can start from no spinup or equilibration (using restart file), 
+        ! here it is run under constant boundary conditions to spinup 
+        ! desired state. 
+
+        write(*,*)
+        write(*,*) "Performing spinup."
+        write(*,*) 
+
+        ! Start timing 
+        call yelmo_cpu_time(cpu_start_time)
     
-    ! Advance timesteps
-    do n = 1, ceiling((time_end-time_init)/dtt)
+        ! Run yelmo alone for several years with constant boundary conditions and topo
+        ! to equilibrate thermodynamics and dynamics
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,      dt=1.0_prec,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=ctl0%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
+
+        write(*,*) "Initial equilibration complete."
+
+        ! Next perform 'coupled' model simulations for desired time
+        do n = 1, ceiling((ctl0%time_end-ctl0%time_init)/ctl0%dtt)
+
+            ! Get current time 
+            time    = ctl0%time_init + n*ctl0%dtt
+            time_bp = time - 1950.0_wp 
+
+            ! == SEA LEVEL ==========================================================
+            call sealevel_update(sealev,year_bp=time_bp)
+            yelmo1%bnd%z_sl  = sealev%z_sl 
+
+            ! == Yelmo ice sheet ===================================================
+            call yelmo_update(yelmo1,time)
+
+            ! == ISOSTASY ==========================================================
+            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+
+
+            ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
+            if (mod(time,ctl0%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
+                ! Update snapclim
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+            end if 
+
+            ! == SURFACE MASS BALANCE ==============================================
+
+            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+            yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+
+    !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
+    !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
+        
+            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                            snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+
+            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+
+            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            end if 
+            
+        end do 
+
+        write(*,*)
+        write(*,*) "Spinup complete."
+        write(*,*)
+
+        ! Write the restart file for the end of the simulation
+        call yelmo_restart_write(yelmo1,file_restart,time=time) 
+
+        ! Stop timing 
+        call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+
+        write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl0%time_end-ctl0%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+        
+    case("transient_lgm_to_pd")
+        ! Here it is assumed that the model has gone through spinup 
+        ! and is ready for transient simulations 
+
+        write(*,*)
+        write(*,*) "Performing transient."
+        write(*,*) 
+
+        ! Start timing 
+        call yelmo_cpu_time(cpu_start_time)
+    
+        ! Define control parameters 
+        ctl = ctl1 
 
         ! Get current time 
-        time = time_init + n*dtt
+        time    = ctl%time_init
+        time_bp = time - 1950.0_wp 
 
-        ! == SEA LEVEL ==========================================================
-        call sealevel_update(sealev,year_bp=time)
-        yelmo1%bnd%z_sl  = sealev%z_sl 
+        ! First initialize output files 
 
-        ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
+        ! 2D file
+        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
+        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
 
-        ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
-        yelmo1%bnd%z_bed = isos1%now%z_bed
-
-if (calc_transient_climate) then 
-        ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-            ! Update snapclim
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
-        end if 
-
-        ! == SURFACE MASS BALANCE ==============================================
-
-        call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                   yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-        yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-        yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-!         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
-!         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-    
-        ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                        snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-        call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-end if
-
+        ! 1D file 
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+        call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         
-        ! == MODEL OUTPUT =======================================================
+        ! Perform 'coupled' model simulations for desired time
+        do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
-        if (mod(nint(time*100),nint(dt2D_out*100))==0) then
-!             call write_step_2D_small(yelmo1,file2D,time=time)
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-        end if
+            ! Get current time 
+            time    = ctl%time_init + n*ctl%dtt
+            time_bp = time - 1950.0_wp 
 
-        if (mod(nint(time*100),nint(dt1D_out*100))==0) then
-            call yelmo_write_reg_step(yelmo1,file1D,time=time)
-             
-        end if 
+            ! == SEA LEVEL ==========================================================
+            call sealevel_update(sealev,year_bp=time_bp)
+            yelmo1%bnd%z_sl  = sealev%z_sl 
 
-        if (mod(nint(time*100),nint(dt_restart*100))==0) then 
-            call yelmo_restart_write(yelmo1,file_restart,time=time) 
-        end if 
+            ! == Yelmo ice sheet ===================================================
+            call yelmo_update(yelmo1,time)
 
-        if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
-            write(*,"(a,f14.4)") "yelmo:: time = ", time
-        end if 
+            ! == ISOSTASY ==========================================================
+            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+
+
+            ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
+            if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
+                ! Update snapclim
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+            end if 
+
+            ! == SURFACE MASS BALANCE ==============================================
+
+            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+            yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+
+            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                            snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+
+            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+            ! == MODEL OUTPUT ===================================
+
+            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+            end if
+
+            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+                call yelmo_write_reg_step(yelmo1,file1D,time=time)
+                 
+            end if 
+
+            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            end if 
         
-    end do 
+            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            end if 
+            
+        end do 
 
-    ! Write the restart file for the end of the simulation
-    call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        write(*,*)
+        write(*,*) "Transient complete."
+        write(*,*)
 
-!     ! Let's see if we can read a restart file 
-!     call yelmo_restart_read(yelmo1,file_restart,time=time)
+        ! Write the restart file for the end of the transient simulation
+        call yelmo_restart_write(yelmo1,file_restart,time=time) 
+
+        ! Stop timing 
+        call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+
+        write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+        
+    end select
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 
-    ! Stop timing 
-    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-
-    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time_end-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
-
 contains
-
-    subroutine write_step_2D_small(ylmo,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class),      intent(IN) :: ylmo
-!         type(snapclim_class),   intent(IN) :: snp 
-!         type(marshelf_class),   intent(IN) :: mshlf 
-!         type(smbpal_class),     intent(IN) :: srf  
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
-        
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
-
-        ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
-
-        ! Write present-day data metrics (rmse[H],etc)
-        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        
-        ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Dragging coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine write_step_2D_small
-
+    
     subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none 
@@ -629,7 +663,76 @@ contains
 
     end subroutine write_step_2D_combined
 
-end program yelmox 
+        subroutine write_step_2D_small(ylmo,filename,time)
+
+        implicit none 
+        
+        type(yelmo_class),      intent(IN) :: ylmo
+!         type(snapclim_class),   intent(IN) :: snp 
+!         type(marshelf_class),   intent(IN) :: mshlf 
+!         type(smbpal_class),     intent(IN) :: srf  
+        !type(sediments_class),  intent(IN) :: sed 
+        !type(geothermal_class), intent(IN) :: gthrm
+        !type(isos_class),       intent(IN) :: isos
+        
+        character(len=*),  intent(IN) :: filename
+        real(prec), intent(IN) :: time
+
+        ! Local variables
+        integer    :: ncid, n
+        real(prec) :: time_prev 
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+
+        ! Write present-day data metrics (rmse[H],etc)
+        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        
+        ! == yelmo_topography ==
+        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Dragging coefficient", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
+                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+!         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
+!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine write_step_2D_small
+
+end program yelmox_ismip6
 
 
 

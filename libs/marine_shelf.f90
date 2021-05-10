@@ -351,9 +351,7 @@ contains
                 else 
                     with_slope = .FALSE. 
                 end if 
-
-                write(*,*) "check: ", trim(mshlf%par%bmb_method), with_slope 
-
+                
                 ! For simplicity, first calculate everywhere (ocn and grounded points)
                 select case(trim(mshlf%par%bmb_method))
 
