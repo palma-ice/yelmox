@@ -72,6 +72,13 @@ yelmox_iso : yelmo-static $(yelmox_libs)
 		@echo "    yelmox_iso.x is ready."
 		@echo " "
 
+yelmox_ismip6 : yelmo-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
+			$(LFLAGS) $(yelmox_libs) 
+		@echo " "
+		@echo "    yelmox_ismip6.x is ready."
+		@echo " "
+
 yelmox_rembo: yelmo-static rembo-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) -o libyelmox/bin/yelmox_rembo.x \
 			yelmox_rembo.f90 $(LIB_REMBO) $(LFLAGS) $(yelmox_libs)
