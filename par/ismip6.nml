@@ -112,18 +112,7 @@
     time_par    = 1995, 1995, 1
 /
 
-&dt_l_ref
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
-    name        = "dT_l"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 1995, 1
-/
-
-&dt_nl_ref
+&tf_cor
     filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
     name        = "dT_nl"
     units_in    = "K"

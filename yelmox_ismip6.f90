@@ -33,24 +33,17 @@ program yelmox
     integer    :: n
     logical    :: calc_transient_climate
 
-    real(4) :: conv_km3_Gt, var 
-    real(4) :: dTa 
-
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
-
-    ! Define whether to write some additional 1D files from Yelmo 
-    logical :: reg1_write 
-    real(prec) :: reg1_val
-    character(len=56)  :: reg1_nm 
-    character(len=512) :: reg1_fnm
-    logical, allocatable :: reg1_mask(:,:) 
-
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
+
+    ! Control parameters 
+    call nml_read(path_par,"ctrl","run_step",    run_step)
+    
 
     ! Timing and other parameters 
     call nml_read(path_par,"ctrl","time_init",    time_init)                 ! [yr] Starting time
@@ -74,13 +67,6 @@ program yelmox
     dt_restart   = 20e3                 ! [yr] 
 
 
-    ! Options for writing a specific region ====================
-
-    reg1_write = .FALSE. 
-    reg1_val   = 1.12     ! 1.12 == Hudson region 
-    reg1_nm    = "Hudson"
-    reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
-
     !  =========================================================
 
 
@@ -92,13 +78,6 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-    if (reg1_write) then 
-        ! If writing a region, define a mask for it here to use later 
-        allocate(reg1_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-        reg1_mask = .FALSE. 
-        where(abs(yelmo1%bnd%regions - reg1_val) .lt. 1e-3) reg1_mask = .TRUE. 
-    end if 
-    
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
@@ -237,11 +216,6 @@ program yelmox
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
-    if (reg1_write) then 
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time_init,units="years",mask=reg1_mask)
-        call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask)
-    end if 
-
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -299,10 +273,7 @@ end if
 
         if (mod(nint(time*100),nint(dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
-
-            if (reg1_write) then 
-                call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
-            end if  
+             
         end if 
 
         if (mod(nint(time*100),nint(dt_restart*100))==0) then 

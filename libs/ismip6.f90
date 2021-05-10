@@ -50,8 +50,7 @@ module ismip6
         type(varslice_class)   :: to_ref
         type(varslice_class)   :: so_ref
         type(varslice_class)   :: tf_ref
-        type(varslice_class)   :: dt_l_ref
-        type(varslice_class)   :: dt_nl_ref
+        type(varslice_class)   :: tf_cor
 
         type(varslice_class)   :: to_hist
         type(varslice_class)   :: so_hist
@@ -78,13 +77,15 @@ module ismip6
 contains
     
 
-    subroutine ismip6_forcing_init(ism,filename,experiment)
+    subroutine ismip6_forcing_init(ism,filename,experiment,domain,grid_name)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: experiment 
+        character(len=*), intent(IN), optional :: domain 
+        character(len=*), intent(IN), optional :: grid_name 
 
         ! Local variables 
         character(len=256) :: group_prefix 
@@ -107,33 +108,31 @@ contains
         ! Initialize all variables from namelist entries 
 
         ! General fields 
-        call varslice_init_nml(ism%basins,   filename,group="imbie_basins")
+        call varslice_init_nml(ism%basins,   filename,group="imbie_basins",domain=domain,grid_name=grid_name)
         
         ! Amospheric fields
-        call varslice_init_nml(ism%ts_ref,   filename,group=trim(group_prefix)//"ts_ref")
-        call varslice_init_nml(ism%smb_ref,  filename,group=trim(group_prefix)//"smb_ref")
+        call varslice_init_nml(ism%ts_ref,   filename,group=trim(group_prefix)//"ts_ref",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%smb_ref,  filename,group=trim(group_prefix)//"smb_ref",domain=domain,grid_name=grid_name)
         
-        call varslice_init_nml(ism%ts_hist,  filename,group=trim(group_prefix)//"ts_hist")
-        call varslice_init_nml(ism%smb_hist, filename,group=trim(group_prefix)//"smb_hist")
+        call varslice_init_nml(ism%ts_hist,  filename,group=trim(group_prefix)//"ts_hist",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%smb_hist, filename,group=trim(group_prefix)//"smb_hist",domain=domain,grid_name=grid_name)
 
-        call varslice_init_nml(ism%ts_proj,  filename,group=trim(group_prefix)//"ts_proj")
-        call varslice_init_nml(ism%smb_proj, filename,group=trim(group_prefix)//"smb_proj")
+        call varslice_init_nml(ism%ts_proj,  filename,group=trim(group_prefix)//"ts_proj",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%smb_proj, filename,group=trim(group_prefix)//"smb_proj",domain=domain,grid_name=grid_name)
 
         ! Oceanic fields
-        call varslice_init_nml(ism%to_ref,   filename,group="to_ref")
-        call varslice_init_nml(ism%so_ref,   filename,group="so_ref")
-        call varslice_init_nml(ism%tf_ref,   filename,group="tf_ref")
-        call varslice_init_nml(ism%dt_l_ref, filename,group="dt_l_ref")
-        call varslice_init_nml(ism%dt_nl_ref,filename,group="dt_nl_ref")
-        
-        call varslice_init_nml(ism%to_hist,  filename,group=trim(group_prefix)//"to_hist")
-        call varslice_init_nml(ism%so_hist,  filename,group=trim(group_prefix)//"so_hist")
-        call varslice_init_nml(ism%tf_hist,  filename,group=trim(group_prefix)//"tf_hist")
+        call varslice_init_nml(ism%to_ref,   filename,group="to_ref",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%so_ref,   filename,group="so_ref",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_ref,   filename,group="tf_ref",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_cor,   filename,group="tf_cor",domain=domain,grid_name=grid_name)
 
-        call varslice_init_nml(ism%to_proj,  filename,group=trim(group_prefix)//"to_proj")
-        call varslice_init_nml(ism%so_proj,  filename,group=trim(group_prefix)//"so_proj")
-        call varslice_init_nml(ism%tf_proj,  filename,group=trim(group_prefix)//"tf_proj")
+        call varslice_init_nml(ism%to_hist,  filename,group=trim(group_prefix)//"to_hist",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%so_hist,  filename,group=trim(group_prefix)//"so_hist",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_hist,  filename,group=trim(group_prefix)//"tf_hist",domain=domain,grid_name=grid_name)
 
+        call varslice_init_nml(ism%to_proj,  filename,group=trim(group_prefix)//"to_proj",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%so_proj,  filename,group=trim(group_prefix)//"so_proj",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_proj,  filename,group=trim(group_prefix)//"tf_proj",domain=domain,grid_name=grid_name)
 
         ! Load time-independent fields
 
@@ -145,8 +144,7 @@ contains
         call varslice_update(ism%to_ref)
         call varslice_update(ism%so_ref)
         call varslice_update(ism%tf_ref)
-        call varslice_update(ism%dt_l_ref)
-        call varslice_update(ism%dt_nl_ref)
+        call varslice_update(ism%tf_cor)
 
         return 
 
@@ -159,6 +157,9 @@ contains
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         real(wp), intent(IN) :: time
+
+        ! Local variables 
+        integer :: k 
 
         ! Get slices for current time
 
@@ -248,9 +249,13 @@ contains
 
             
 
-        ! Apply additional calculations 
+        ! === Additional calculations ======================
 
-        ! [To do, as needed] 
+        ! Apply oceanic correction factor to each depth level
+        do k = 1, size(ism%to%var,3)   
+            ism%to%var(:,:,k) = ism%to%var(:,:,k) + ism%tf_cor%var(:,:,1) 
+            ism%tf%var(:,:,k) = ism%tf%var(:,:,k) + ism%tf_cor%var(:,:,1) 
+        end do 
 
         return 
 
