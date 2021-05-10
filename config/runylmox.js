@@ -20,7 +20,10 @@
 
     "grp_aliases" : {},
 
-    "par_paths" : {},
+    "par_paths" : 
+        {
+            "ismip6" : "par/ismip6.nml"
+        },
 
     "files" : [], 
 
