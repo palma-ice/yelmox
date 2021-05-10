@@ -268,8 +268,8 @@ def main():
     ### PARAMETER FILES ###
 
     # Get list of parameter files to manage
-    #par_paths = list(info["par_paths"].values())
-    par_paths = [par_path]   # Yelmo-specific: only one parameter file, provided at command line 
+    par_paths = list(info["par_paths"].values())
+    par_paths.append(par_path)   # Yelmo-specific: include parameter file provided at command line 
 
     # Copy the default parameter files to the rundir 
     copy_files(par_paths,rundir)
