@@ -19,11 +19,13 @@ program yelmox_ismip6
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart
+    character(len=256) :: outfldr, file1D, file2D
+    character(len=256) :: file_restart, file_restart_hist
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
     integer    :: n
     real(wp)   :: time, time_bp 
+    real(wp)   :: time_wt 
 
     type(yelmo_class)           :: yelmo1 
     type(sealevel_class)        :: sealev 
@@ -35,7 +37,8 @@ program yelmox_ismip6
     type(isos_class)            :: isos1
     type(ismip6_forcing_class)  :: ismip6 
 
-    
+    type(marshelf_class)        :: mshlf2 
+
     type ctrl_param_spinup 
         real(wp) :: time_init
         real(wp) :: time_end
@@ -76,7 +79,7 @@ program yelmox_ismip6
         time    = ctl0%time_init 
         time_bp = time - 1950.0_wp 
 
-    case("transient_lgm_to_pd") 
+    case("transient_lgm_to_proj") 
 
         call nml_read(path_par,"transient_lgm_to_pd","time_init",ctl1%time_init)                 ! [yr] Starting time
         call nml_read(path_par,"transient_lgm_to_pd","time_end", ctl1%time_end)                  ! [yr] Ending time
@@ -114,7 +117,7 @@ program yelmox_ismip6
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"     
     file_restart = trim(outfldr)//"yelmo_restart.nc" 
-
+    file_restart_hist = trim(outfldr)//"yelmo_restart_1950ce.nc"
     !  =========================================================
 
 
@@ -249,8 +252,8 @@ program yelmox_ismip6
 
             ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
             if (mod(time,ctl0%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-                ! Update snapclim
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+                ! Update snapclim (for elevation changes, but keep time=time_init)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ctl0%time_init,domain=domain)
             end if 
 
             ! == SURFACE MASS BALANCE ==============================================
@@ -260,9 +263,6 @@ program yelmox_ismip6
             yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-    !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
-    !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-        
             ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
             call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
@@ -294,19 +294,33 @@ program yelmox_ismip6
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl0%time_end-ctl0%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
-    case("transient_lgm_to_pd")
+    case("transient_lgm_to_proj","transient_proj")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
         write(*,*)
         write(*,*) "Performing transient."
         write(*,*) 
+ 
+        ! Initialize variables inside of ismip6 object 
+        call ismip6_forcing_init(ismip6,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
+                                                domain="Antarctica",grid_name="ANT-32KM")
+
+
+        ! Initialize second marshelf object for use with ismip data, 
+        ! but make sure that tf is prescribed externally
+        mshlf2 = mshlf1
+        mshlf2%par%tf_method = 0 
 
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
     
         ! Define control parameters 
-        ctl = ctl1 
+        if (trim(run_step) .eq. "transient_lgm_to_proj") then 
+            ctl = ctl1 
+        else 
+            ctl = ctl2 
+        end if 
 
         ! Get current time 
         time    = ctl%time_init
@@ -341,30 +355,84 @@ program yelmox_ismip6
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
 
-            ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-            if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-                ! Update snapclim
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+            if (time .lt. 1850.0_wp) then 
+
+                ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
+                if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
+                    ! Update snapclim
+                    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+                end if 
+
+                ! == SURFACE MASS BALANCE ==============================================
+
+                call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+                
+                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+                call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                                snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+
+                call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+
+                
             end if 
 
-            ! == SURFACE MASS BALANCE ==============================================
+            if (time .gt. 850.0_wp) then 
+                ! ISMIP6 forcing 
 
-            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-            yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+                ! Update ismip6 forcing to current time
+                call ismip6_forcing_update(ismip6,time)
 
-            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                            snp1%now%to_ann,snp1%now%so,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+                call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismip6%to%lev, &
+                                ismip6%to%var,ismip6%so%var,dto_ann=ismip6%to%var-ismip6%to_ref%var, &
+                                tf_ann=ismip6%tf%var)
 
-            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+            end if 
 
+            ! Determine which forcing to use based on time period 
+            ! LGM to 850 CE == snapclim 
+            ! 850 CE to 1850 CE == linear transition from snapclim to ismip6 
+            ! 1850 CE to future == ismip6 
+
+            if (time .le. 850_wp) then 
+                ! Only snapclim-based forcing 
+
+                yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
+                yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+                yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+                yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+            else if (time .ge. 1850.0_wp) then 
+                ! Only ISMIP6 forcing 
+
+                yelmo1%bnd%smb      = ismip6%smb%var(:,:,1)
+                yelmo1%bnd%T_srf    = ismip6%ts%var(:,:,1)
+
+                yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
+                yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
+
+            else
+                ! Linear-weighted average between snapclim and ismip6 forcing 
+
+                time_wt = (time-850.0_wp) / (1850.0_wp - 850.0_wp)
+
+                yelmo1%bnd%smb      = time_wt*ismip6%smb%var(:,:,1) + (1.0-time_wt)*smbpal1%ann%smb*conv_we_ie*1e-3
+                yelmo1%bnd%T_srf    = time_wt*ismip6%ts%var(:,:,1)  + (1.0-time_wt)*smbpal1%ann%tsrf
+
+                yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf   + (1.0-time_wt)*mshlf1%now%bmb_shlf 
+                yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf     + (1.0-time_wt)*mshlf1%now%T_shlf  
+
+            end if 
+
+                
             ! == MODEL OUTPUT ===================================
 
             if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
@@ -384,6 +452,11 @@ program yelmox_ismip6
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
+            if (time == 1950.0_wp) then 
+                ! Write restart file at start of hist period
+                call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
+            end if 
+
         end do 
 
         write(*,*)

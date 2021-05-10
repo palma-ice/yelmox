@@ -9,12 +9,12 @@
     dtt             = 5.0               ! [yr] Main loop timestep 
 /
 
-&transient_lgm_to_pd
+&transient_lgm_to_proj
     time_init       = -18e3             ! [yr] Starting time (years CE)
-    time_end        = 1950.0            ! [yr] Ending time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 50.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 100.0              ! [yr] Frequency of writing 2D output files 
 /
 
 &transient_proj
@@ -223,7 +223,7 @@
 /
 
 &snap
-    atm_type           = "anom"
+    atm_type           = "snap_1ind"
     ocn_type           = "anom"
     fname_at           = "input/epica_deglaciation.dat"
     fname_ao           = "input/epica_deglaciation.dat"
@@ -235,7 +235,8 @@
     fname_bs           = "input/ones.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = 2.0  
-    dTo_const          = 0.5
+    dTo_const          = -2.5
+    dSo_const          =  3.0
     f_to               = 0.25 
     f_p                = 0.05
     f_stdev            = 0.0  
@@ -351,8 +352,8 @@
 /
 
 &marine_shelf
-    bmb_method      = "lin"         ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 0             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
+    bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
