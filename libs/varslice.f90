@@ -14,7 +14,7 @@ module varslice
 
     ! Define default missing value 
     real(wp), parameter :: mv = -9999.0_wp 
-    
+
     type varslice_param_class
 
         character(len=1024) :: filename
@@ -38,6 +38,10 @@ module varslice
 
         real(wp) :: time_now
         
+        real(wp), allocatable :: x(:) 
+        real(wp), allocatable :: y(:)
+        real(wp), allocatable :: lev(:)  
+
         real(wp), allocatable :: time(:)  
         real(wp), allocatable :: var(:,:,:) 
     end type 
@@ -47,6 +51,7 @@ module varslice
     public :: varslice_update
     public :: varslice_init_nml 
     public :: varslice_init_arg
+    public :: varslice_end 
 
 contains
 
@@ -157,6 +162,9 @@ contains
 
             end select
 
+            ! Make sure crazy values have been set to missing (for safety)
+            where (abs(vs%var) .ge. 1e10) vs%var = mv 
+
             ! Apply scaling 
             where (vs%var .ne. mv) 
                 vs%var = vs%var*par%unit_scale + par%unit_offset
@@ -168,22 +176,22 @@ contains
 
     end subroutine varslice_update
 
-    subroutine varslice_init_nml(vs,filename,group,domain,grid_name)
+    subroutine varslice_init_nml(vs,filename,group,domain,grid_name,verbose)
         ! Routine to load information related to a given 
         ! transient variable, so that it can be processed properly.
 
         implicit none 
 
-        type(varslice_class), intent(INOUT) :: vs
-        character(len=*),      intent(IN)   :: filename
-        character(len=*),      intent(IN)   :: group
-        character(len=*),      intent(IN)   :: domain
-        character(len=*),      intent(IN)   :: grid_name  
-        
+        type(varslice_class),   intent(INOUT) :: vs
+        character(len=*),       intent(IN)    :: filename
+        character(len=*),       intent(IN)    :: group
+        character(len=*),       intent(IN), optional :: domain
+        character(len=*),       intent(IN), optional :: grid_name  
+        logical,                intent(IN), optional :: verbose 
         ! Local variables 
         
         ! First load parameters from nml file 
-        call varslice_par_load(vs%par,filename,group,domain,grid_name)
+        call varslice_par_load(vs%par,filename,group,domain,grid_name,verbose)
 
         ! Perform remaining init operations 
         call varslice_init_data(vs) 
@@ -221,7 +229,7 @@ contains
         if (present(scale)) vs%par%unit_scale = scale 
 
         vs%par%unit_offset = 0.0_wp 
-        if (present(offset)) vs%par%unit_offset = scale 
+        if (present(offset)) vs%par%unit_offset = offset 
         
         vs%par%with_time = .TRUE. 
         if (present(with_time)) vs%par%with_time = with_time 
@@ -250,8 +258,7 @@ contains
         with_time = vs%par%with_time 
 
         ! First make sure all data objects are deallocated 
-        if (allocated(vs%time)) deallocate(vs%time)
-        if (allocated(vs%var))  deallocate(vs%var)
+        call varslice_end(vs)
 
         ! Get information from netcdf file 
         call nc_dims(vs%par%filename,vs%par%name,dim_names,vs%par%dim)
@@ -260,8 +267,9 @@ contains
         if (with_time) then
 
             ! Initialize time vector from user parameters 
-            call axis_init(vs%time,vs%par%time_par(1), &
-                                vs%par%time_par(2),vs%par%time_par(3))
+            call axis_init(vs%time,x0=vs%par%time_par(1), &
+                                   x1=vs%par%time_par(2), &
+                                   dx=vs%par%time_par(3))
 
             ! Check to make sure time vector matches netcdf file length 
             if (size(vs%time,1) .ne. vs%par%dim(vs%par%ndim)) then 
@@ -276,7 +284,8 @@ contains
 
         end if 
 
-        ! Allocate data variables 
+        ! Allocate coordinate and data variables,
+        ! load coordinates too 
         select case(vs%par%ndim)
 
             case(1)
@@ -287,24 +296,104 @@ contains
                 end if 
             case(2)
                 if (with_time) then 
+                    allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%var(vs%par%dim(1),1,1))
+
+                    if (nc_exists_var(vs%par%filename,dim_names(1))) then 
+                        call nc_read(vs%par%filename,dim_names(1),vs%x)
+                    else
+                        call axis_init(vs%x,nx=vs%par%dim(1))
+                    end if
                 else 
+                    allocate(vs%x(vs%par%dim(1)))
+                    allocate(vs%y(vs%par%dim(2)))
                     allocate(vs%var(vs%par%dim(1),vs%par%dim(2),1))
+
+                    if (nc_exists_var(vs%par%filename,dim_names(1))) then 
+                        call nc_read(vs%par%filename,dim_names(1),vs%x)
+                    else
+                        call axis_init(vs%x,nx=vs%par%dim(1))
+                    end if
+                    if (nc_exists_var(vs%par%filename,dim_names(2))) then 
+                        call nc_read(vs%par%filename,dim_names(2),vs%y)
+                    else
+                        call axis_init(vs%y,nx=vs%par%dim(2))
+                    end if
+                    
                 end if 
 
             case(3)
                 if (with_time) then
+                    allocate(vs%x(vs%par%dim(1)))
+                    allocate(vs%y(vs%par%dim(2)))
                     allocate(vs%var(vs%par%dim(1),vs%par%dim(2),1))
+
+                    if (nc_exists_var(vs%par%filename,dim_names(1))) then 
+                        call nc_read(vs%par%filename,dim_names(1),vs%x)
+                    else
+                        call axis_init(vs%x,nx=vs%par%dim(1))
+                    end if
+                    if (nc_exists_var(vs%par%filename,dim_names(2))) then 
+                        call nc_read(vs%par%filename,dim_names(2),vs%y)
+                    else
+                        call axis_init(vs%y,nx=vs%par%dim(2))
+                    end if
+                    
                 else 
+                    allocate(vs%x(vs%par%dim(1)))
+                    allocate(vs%y(vs%par%dim(2)))
+                    allocate(vs%lev(vs%par%dim(3)))
                     allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3)))
-                end if 
+
+                    if (nc_exists_var(vs%par%filename,dim_names(1))) then 
+                        call nc_read(vs%par%filename,dim_names(1),vs%x)
+                    else
+                        call axis_init(vs%x,nx=vs%par%dim(1))
+                    end if
+                    if (nc_exists_var(vs%par%filename,dim_names(2))) then 
+                        call nc_read(vs%par%filename,dim_names(2),vs%y)
+                    else
+                        call axis_init(vs%y,nx=vs%par%dim(2))
+                    end if
+                    if (nc_exists_var(vs%par%filename,dim_names(3))) then 
+                        call nc_read(vs%par%filename,dim_names(3),vs%lev)
+                    else
+                        call axis_init(vs%lev,nx=vs%par%dim(3))
+                    end if
+                    
+                end if
+
+                
+                 
             case(4)
                 if (with_time) then 
+                    allocate(vs%x(vs%par%dim(1)))
+                    allocate(vs%y(vs%par%dim(2)))
+                    allocate(vs%lev(vs%par%dim(3)))
                     allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3)))
+
+                    if (nc_exists_var(vs%par%filename,dim_names(1))) then 
+                        call nc_read(vs%par%filename,dim_names(1),vs%x)
+                    else
+                        call axis_init(vs%x,nx=vs%par%dim(1))
+                    end if
+                    if (nc_exists_var(vs%par%filename,dim_names(2))) then 
+                        call nc_read(vs%par%filename,dim_names(2),vs%y)
+                    else
+                        call axis_init(vs%y,nx=vs%par%dim(2))
+                    end if
+                    if (nc_exists_var(vs%par%filename,dim_names(3))) then 
+                        call nc_read(vs%par%filename,dim_names(3),vs%lev)
+                    else
+                        call axis_init(vs%lev,nx=vs%par%dim(3))
+                    end if
+                    
                 else 
                     write(*,*) "varslice_init_data:: 4D array without time dimension is not yet supported."
                     stop 
                 end if
+
+                    
             case DEFAULT 
                 write(*,*) "varslice_init_data:: ndim not allowed."
                 write(*,*) "ndim = ", vs%par%ndim 
@@ -316,21 +405,44 @@ contains
 
     end subroutine varslice_init_data
 
-    subroutine varslice_par_load(par,filename,group,domain,grid_name,init)
+    subroutine varslice_end(vs)
+        ! Deallocate all variables
+
+        implicit none 
+
+        type(varslice_class), intent(INOUT) :: vs 
+
+        if (allocated(vs%par%dim))  deallocate(vs%par%dim)
+        if (allocated(vs%x))        deallocate(vs%x)
+        if (allocated(vs%y))        deallocate(vs%y)
+        if (allocated(vs%lev))      deallocate(vs%lev)
+        if (allocated(vs%time))     deallocate(vs%time)
+        if (allocated(vs%var))      deallocate(vs%var)
+        
+        return 
+
+    end subroutine varslice_end
+
+    subroutine varslice_par_load(par,filename,group,domain,grid_name,init,verbose)
 
         type(varslice_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: group
-        character(len=*), intent(IN) :: domain
-        character(len=*), intent(IN) :: grid_name  
+        character(len=*), intent(IN), optional :: domain
+        character(len=*), intent(IN), optional :: grid_name  
         logical, optional :: init 
+        logical, optional :: verbose 
 
         ! Local variables
         logical  :: init_pars 
         real(wp) :: time_par(3) 
+        logical  :: print_summary 
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
+
+        print_summary = .TRUE. 
+        if (present(verbose)) print_summary = verbose 
 
         call nml_read(filename,group,"filename",       par%filename,     init=init_pars)
         call nml_read(filename,group,"name",           par%name,         init=init_pars)
@@ -342,10 +454,27 @@ contains
         call nml_read(filename,group,"time_par",       par%time_par,     init=init_pars)   
         
         ! Parse filename as needed
-        call parse_path(par%filename,domain,grid_name)
-        
+        if (present(domain) .and. present(grid_name)) then
+            call parse_path(par%filename,domain,grid_name)
+        end if 
+
         ! Make sure time parameters are consistent time_par=[x0,x1,dx]
         if (par%time_par(3) .eq. 0) par%time_par(2) = par%time_par(1) 
+
+        ! Summary 
+        if (print_summary) then  
+            write(*,*) "Loading: ", trim(filename), ":: ", trim(group)
+            write(*,*) "filename    = ", trim(par%filename)
+            write(*,*) "name        = ", trim(par%name)
+            write(*,*) "units_in    = ", trim(par%units_in)
+            write(*,*) "units_out   = ", trim(par%units_out)
+            write(*,*) "unit_scale  = ", par%unit_scale
+            write(*,*) "unit_offset = ", par%unit_offset
+            write(*,*) "with_time   = ", par%with_time
+            if (par%with_time) then
+                write(*,*) "time_par    = ", par%time_par
+            end if
+        end if 
 
         return
 
@@ -365,7 +494,7 @@ contains
 
     end subroutine parse_path
     
-    subroutine axis_init(x,x0,x1,dx)
+    subroutine axis_init(x,x0,x1,dx,nx)
 
         implicit none 
 
@@ -373,17 +502,38 @@ contains
         real(wp), optional :: x0
         real(wp), optional :: x1
         real(wp), optional :: dx
+        integer,  optional :: nx 
 
         ! Local variables 
-        integer :: i, nx  
+        integer :: i  
+        real(wp) :: x0_now
+        real(wp) :: x1_now
+        real(wp) :: dx_now
+        integer  :: nx_now 
+
+        dx_now = 1.0_wp 
+        if (present(dx)) dx_now = dx 
+
+        x0_now = 0.0_wp 
+        if (present(x0)) x0_now = x0 
+        
+        ! Note: if x1 is present, nx is ignored 
+        if (present(x1)) then 
+            x1_now = x1 
+        else if (present(nx)) then 
+            x1_now = (nx-1)*dx_now 
+        else 
+            write(*,*) "axis_init:: Error: either x1 or nx must be present."
+            stop 
+        end if 
 
         if (allocated(x)) deallocate(x)
 
-        nx = (x1-x0)/dx + 1
-        allocate(x(nx))
+        nx_now = (x1_now-x0_now)/dx_now + 1
+        allocate(x(nx_now))
 
-        do i = 1, nx 
-            x(i) = x0 + dx*real(i-1,wp)
+        do i = 1, nx_now 
+            x(i) = x0_now + dx_now*real(i-1,wp)
         end do 
 
         return

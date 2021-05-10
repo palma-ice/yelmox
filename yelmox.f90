@@ -8,9 +8,7 @@ program yelmox
     ! External libraries
     use sealevel 
     use isostasy  
-    
-    use varslice 
-
+     
     use snapclim
     use marine_shelf 
     use smbpal   
@@ -28,9 +26,6 @@ program yelmox
     type(sediments_class)  :: sed1 
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
-    
-    type(varslice_class)   :: vs_ts_ref 
-    type(varslice_class)   :: vs_ts 
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
     character(len=512) :: path_par, path_const  
@@ -88,36 +83,6 @@ program yelmox
 
     !  =========================================================
 
-
-    ! Testing varslice 
-    call varslice_init_arg(vs_ts_ref, &
-        filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc", &
-        name="ts",units_in="K",units_out="K",with_time=.FALSE.)
-    call varslice_init_arg(vs_ts, &
-        filename="ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_anom_1950-1994.nc", &
-        name="ts",units_in="K",units_out="K",with_time=.TRUE.,time_par=[1950.,1994.,1.])
-
-    write(*,*) "info: " 
-    write(*,*) size(vs_ts_ref%var,1), size(vs_ts_ref%var,2), size(vs_ts_ref%var,3)
-    write(*,*) size(vs_ts%var,1), size(vs_ts%var,2), size(vs_ts%var,3)
-    write(*,*) vs_ts%time 
-
-    call varslice_update(vs_ts_ref)
-
-    ! Check data 
-    write(*,*) "vs_ts_ref: ", minval(vs_ts_ref%var,mask=vs_ts_ref%var.ne.mv), &
-                                 maxval(vs_ts_ref%var,mask=vs_ts_ref%var.ne.mv)
-
-    do n = 1, size(vs_ts%time) 
-        call varslice_update(vs_ts,vs_ts%time(n))
-
-        ! Check data 
-        write(*,*) vs_ts%time(n)," : ",  minval(vs_ts%var,mask=vs_ts%var.ne.mv), &
-                                            maxval(vs_ts%var,mask=vs_ts%var.ne.mv)
-
-    end do 
-
-    stop "Done testing varslice."
 
     ! === Initialize ice sheet model =====
 
