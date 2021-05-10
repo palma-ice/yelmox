@@ -351,7 +351,7 @@ contains
                 else 
                     with_slope = .FALSE. 
                 end if 
-                
+
                 ! For simplicity, first calculate everywhere (ocn and grounded points)
                 select case(trim(mshlf%par%bmb_method))
 
@@ -439,12 +439,13 @@ contains
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,nx,ny,domain,grid_name,regions,basins)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins)
 
         implicit none 
 
         type(marshelf_class), intent(OUT) :: mshlf
         character(len=*), intent(IN)      :: filename
+        character(len=*), intent(IN)      :: group
         integer, intent(IN)               :: nx, ny 
         character(len=*), intent(IN)      :: domain, grid_name
         real(wp), intent(IN)            :: regions(:,:)
@@ -455,7 +456,7 @@ contains
         integer :: num
 
         ! Load parameters
-        call marshelf_par_load(mshlf%par,filename,domain,grid_name)
+        call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
 
         ! Allocate the object 
         call marshelf_allocate(mshlf%now,nx,ny)
@@ -654,10 +655,11 @@ contains
     end subroutine marshelf_end
 
 
-    subroutine marshelf_par_load(par,filename,domain,grid_name,init)
+    subroutine marshelf_par_load(par,filename,group,domain,grid_name,init)
 
         type(marshelf_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
+        character(len=*), intent(IN) :: group
         character(len=*), intent(IN) :: domain, grid_name  
         logical, optional :: init 
         logical :: init_pars 
@@ -665,42 +667,42 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"marine_shelf","bmb_method",     par%bmb_method,     init=init_pars)
-        call nml_read(filename,"marine_shelf","tf_method",      par%tf_method,      init=init_pars)
-        call nml_read(filename,"marine_shelf","interp_depth",   par%interp_depth,   init=init_pars)
-        call nml_read(filename,"marine_shelf","interp_method",  par%interp_method,  init=init_pars)
-        call nml_read(filename,"marine_shelf","find_ocean",     par%find_ocean,     init=init_pars)   
+        call nml_read(filename,group,"bmb_method",     par%bmb_method,     init=init_pars)
+        call nml_read(filename,group,"tf_method",      par%tf_method,      init=init_pars)
+        call nml_read(filename,group,"interp_depth",   par%interp_depth,   init=init_pars)
+        call nml_read(filename,group,"interp_method",  par%interp_method,  init=init_pars)
+        call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)   
         
-        call nml_read(filename,"marine_shelf","c_deep",         par%c_deep,         init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_deep",     par%depth_deep,     init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_const",    par%depth_const,    init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_min",      par%depth_min,      init=init_pars)
-        call nml_read(filename,"marine_shelf","depth_max",      par%depth_max,      init=init_pars)    
+        call nml_read(filename,group,"c_deep",         par%c_deep,         init=init_pars)
+        call nml_read(filename,group,"depth_deep",     par%depth_deep,     init=init_pars)
+        call nml_read(filename,group,"depth_const",    par%depth_const,    init=init_pars)
+        call nml_read(filename,group,"depth_min",      par%depth_min,      init=init_pars)
+        call nml_read(filename,group,"depth_max",      par%depth_max,      init=init_pars)    
         
         ! Freezing point 
-        call nml_read(filename,"marine_shelf","lambda1",        par%lambda1,        init=init_pars)
-        call nml_read(filename,"marine_shelf","lambda2",        par%lambda2,        init=init_pars)
-        call nml_read(filename,"marine_shelf","lambda3",        par%lambda3,        init=init_pars)
+        call nml_read(filename,group,"lambda1",        par%lambda1,        init=init_pars)
+        call nml_read(filename,group,"lambda2",        par%lambda2,        init=init_pars)
+        call nml_read(filename,group,"lambda3",        par%lambda3,        init=init_pars)
         
         ! bmb_method == [lin,quad,quad-nl]
-        call nml_read(filename,"marine_shelf","gamma_lin",      par%gamma_lin,      init=init_pars)
-        call nml_read(filename,"marine_shelf","gamma_quad",     par%gamma_quad,     init=init_pars)
-        call nml_read(filename,"marine_shelf","gamma_quad_nl",  par%gamma_quad_nl,  init=init_pars)
-        call nml_read(filename,"marine_shelf","gamma_prime",    par%gamma_prime,     init=init_pars)
+        call nml_read(filename,group,"gamma_lin",      par%gamma_lin,      init=init_pars)
+        call nml_read(filename,group,"gamma_quad",     par%gamma_quad,     init=init_pars)
+        call nml_read(filename,group,"gamma_quad_nl",  par%gamma_quad_nl,  init=init_pars)
+        call nml_read(filename,group,"gamma_prime",    par%gamma_prime,     init=init_pars)
         
         ! bmb_method == anom
-        call nml_read(filename,"marine_shelf","kappa_grz",      par%kappa_grz,      init=init_pars)
-        call nml_read(filename,"marine_shelf","c_grz",          par%c_grz,          init=init_pars)
-        call nml_read(filename,"marine_shelf","f_grz_shlf",     par%f_grz_shlf,     init=init_pars)
-        call nml_read(filename,"marine_shelf","grz_length",     par%grz_length,     init=init_pars)
+        call nml_read(filename,group,"kappa_grz",      par%kappa_grz,      init=init_pars)
+        call nml_read(filename,group,"c_grz",          par%c_grz,          init=init_pars)
+        call nml_read(filename,group,"f_grz_shlf",     par%f_grz_shlf,     init=init_pars)
+        call nml_read(filename,group,"grz_length",     par%grz_length,     init=init_pars)
         
-        call nml_read(filename,"marine_shelf","use_obs",        par%use_obs,        init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_path",       par%obs_path,       init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_name",       par%obs_name,       init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_scale",      par%obs_scale,      init=init_pars)
-        call nml_read(filename,"marine_shelf","obs_lim",        par%obs_lim,        init=init_pars)
-        call nml_read(filename,"marine_shelf","basin_name",     par%basin_name,     init=init_pars)
-        call nml_read(filename,"marine_shelf","basin_bmb",      par%basin_bmb,      init=init_pars)
+        call nml_read(filename,group,"use_obs",        par%use_obs,        init=init_pars)
+        call nml_read(filename,group,"obs_path",       par%obs_path,       init=init_pars)
+        call nml_read(filename,group,"obs_name",       par%obs_name,       init=init_pars)
+        call nml_read(filename,group,"obs_scale",      par%obs_scale,      init=init_pars)
+        call nml_read(filename,group,"obs_lim",        par%obs_lim,        init=init_pars)
+        call nml_read(filename,group,"basin_name",     par%basin_name,     init=init_pars)
+        call nml_read(filename,group,"basin_bmb",      par%basin_bmb,      init=init_pars)
         
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
