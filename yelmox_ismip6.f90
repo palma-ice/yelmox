@@ -41,75 +41,37 @@ program yelmox_ismip6
     type(smbpal_class)          :: smbpal2
     type(marshelf_class)        :: mshlf2 
 
-    type ctrl_param_spinup 
+    type ctrl_params
+        character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
-        real(wp) :: time_equil
+        real(wp) :: time_equil      ! Only for spinup
         real(wp) :: dtt
+        real(wp) :: dt1D_out        ! Only for transient
+        real(wp) :: dt2D_out        ! Only for transient
     end type 
 
-    type ctrl_param_transient
-        real(wp) :: time_init
-        real(wp) :: time_end
-        real(wp) :: dtt 
-        real(wp) :: dt1D_out 
-        real(wp) :: dt2D_out 
-    end type
+    type(ctrl_params)     :: ctl
 
-    character(len=12)           :: run_step 
-    type(ctrl_param_spinup)     :: ctl0         ! Spinup
-    type(ctrl_param_transient)  :: ctl1         ! lgm to pd 
-    type(ctrl_param_transient)  :: ctl2         ! projections
-    type(ctrl_param_transient)  :: ctl
-    
+    logical, parameter :: with_ice_sheet = .FALSE. 
+
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
     ! Control parameters 
-    call nml_read(path_par,"ctrl","run_step",    run_step)
+    call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
     
-
-    select case(trim(run_step))
-
-    case("spinup")
-
-        call nml_read(path_par,"spinup","time_init",    ctl0%time_init)                 ! [yr] Starting time
-        call nml_read(path_par,"spinup","time_end",     ctl0%time_end)                  ! [yr] Ending time
-        call nml_read(path_par,"spinup","time_equil",   ctl0%time_equil)                ! [yr] Years to equilibrate first
-        call nml_read(path_par,"spinup","dtt",          ctl0%dtt)                       ! [yr] Main loop time step 
-        
-        time    = ctl0%time_init 
-        time_bp = time - 1950.0_wp 
-
-    case("transient_lgm_to_proj") 
-
-        call nml_read(path_par,"transient_lgm_to_pd","time_init",ctl1%time_init)                 ! [yr] Starting time
-        call nml_read(path_par,"transient_lgm_to_pd","time_end", ctl1%time_end)                  ! [yr] Ending time
-        call nml_read(path_par,"transient_lgm_to_pd","dtt",      ctl1%dtt)                       ! [yr] Main loop time step 
-        call nml_read(path_par,"transient_lgm_to_pd","dt1D_out", ctl1%dt1D_out)                  ! [yr] Frequency of 1D output 
-        call nml_read(path_par,"transient_lgm_to_pd","dt2D_out", ctl1%dt2D_out)                  ! [yr] Frequency of 2D output 
-
-        time    = ctl1%time_init 
-        time_bp = time - 1950.0_wp 
-        
-    case("transient_proj") 
-
-        call nml_read(path_par,"transient_proj","time_init", ctl2%time_init)                 ! [yr] Starting time
-        call nml_read(path_par,"transient_proj","time_end",  ctl2%time_end)                  ! [yr] Ending time
-        call nml_read(path_par,"transient_proj","dtt",       ctl2%dtt)                       ! [yr] Main loop time step 
-        call nml_read(path_par,"transient_proj","dt1D_out",  ctl2%dt1D_out)                  ! [yr] Frequency of 1D output 
-        call nml_read(path_par,"transient_proj","dt2D_out",  ctl2%dt2D_out)                  ! [yr] Frequency of 2D output 
-        
-        time    = ctl2%time_init 
-        time_bp = time - 1950.0_wp 
-        
-    case DEFAULT 
-
-        write(*,*) "yelmox_ismip6:: Error: run_step not recognized."
-        write(*,*) "run_step = ", trim(run_step)
-        stop 
-
-    end select
+    ! Read run_step specific control parameters
+    call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
+    call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
+    call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
+    call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
+    call nml_read(path_par,trim(ctl%run_step),"dt1D_out",ctl%dt1D_out)          ! [yr] Frequency of 1D output 
+    call nml_read(path_par,trim(ctl%run_step),"dt2D_out",ctl%dt2D_out)          ! [yr] Frequency of 2D output 
+    
+    ! Set initial time 
+    time    = ctl%time_init 
+    time_bp = time - 1950.0_wp 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -122,6 +84,38 @@ program yelmox_ismip6
     file_restart_hist = trim(outfldr)//"yelmo_restart_1950ce.nc"
     !  =========================================================
 
+
+    ! Print summary of run settings 
+    write(*,*)
+    write(*,*) "run_step:  ", trim(ctl%run_step) 
+    write(*,*)
+    write(*,*) "time_init: ",   ctl%time_init 
+    write(*,*) "time_end:  ",   ctl%time_end 
+    write(*,*) "dtt:       ",   ctl%dtt 
+    write(*,*) 
+    write(*,*) "time    = ", time 
+    write(*,*) "time_bp = ", time_bp 
+    
+
+    select case(trim(ctl%run_step))
+
+    case("spinup")
+
+        write(*,*) "time_equil: ",    ctl%time_equil 
+    
+    case("transient_lgm_to_proj","transient_proj")
+
+        write(*,*) "dt1D_out: ",    ctl%dt1D_out 
+        write(*,*) "dt2D_out: ",    ctl%dt2D_out 
+
+    case DEFAULT 
+        ! Safety check here, to make sure run_step makes sense...
+
+        write(*,*) "yelmox_ismip6:: Error: run_step not recognized."
+        write(*,*) "run_step = ", trim(ctl%run_step)
+        stop 
+
+    end select
 
     ! === Initialize ice sheet model =====
 
@@ -171,14 +165,20 @@ program yelmox_ismip6
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
 
+    write(*,*) "check"
+    write(*,*) minval(snp1%now%tas), maxval(snp1%now%tas)
+    write(*,*) minval(snp1%now%pr),  maxval(snp1%now%pr)
+    write(*,*) minval(yelmo1%tpo%now%z_srf), maxval(yelmo1%tpo%now%z_srf)
+    write(*,*) minval(yelmo1%tpo%now%H_ice), maxval(yelmo1%tpo%now%H_ice)
+    
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp,time_equil=100.0)
     end if 
      
-    call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
+    ! call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+    !                            yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
@@ -212,7 +212,7 @@ program yelmox_ismip6
 ! ================= RUN STEPS ===============================================
 
 
-    select case(trim(run_step)) 
+    select case(trim(ctl%run_step)) 
 
     case("spinup")
         ! Model can start from no spinup or equilibration (using restart file), 
@@ -229,15 +229,15 @@ program yelmox_ismip6
         ! Run yelmo alone for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
         call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec,      dt=1.0_prec,topo_fixed=.FALSE.)
-        call yelmo_update_equil(yelmo1,time,time_tot=ctl0%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
 
         write(*,*) "Initial equilibration complete."
 
         ! Next perform 'coupled' model simulations for desired time
-        do n = 1, ceiling((ctl0%time_end-ctl0%time_init)/ctl0%dtt)
+        do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-            time    = ctl0%time_init + n*ctl0%dtt
+            time    = ctl%time_init + n*ctl%dtt
             time_bp = time - 1950.0_wp 
 
             ! == SEA LEVEL ==========================================================
@@ -253,9 +253,9 @@ program yelmox_ismip6
 
 
             ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-            if (mod(time,ctl0%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
+            if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
                 ! Update snapclim (for elevation changes, but keep time=time_init)
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ctl0%time_init,domain=domain)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ctl%time_init,domain=domain)
             end if 
 
             ! == SURFACE MASS BALANCE ==============================================
@@ -294,7 +294,7 @@ program yelmox_ismip6
         call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
 
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl0%time_end-ctl0%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
     case("transient_lgm_to_proj","transient_proj")
         ! Here it is assumed that the model has gone through spinup 
@@ -319,14 +319,7 @@ program yelmox_ismip6
 
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
-    
-        ! Define control parameters 
-        if (trim(run_step) .eq. "transient_lgm_to_proj") then 
-            ctl = ctl1 
-        else 
-            ctl = ctl2 
-        end if 
-
+        
         ! Get current time 
         time    = ctl%time_init
         time_bp = time - 1950.0_wp 
@@ -353,7 +346,7 @@ program yelmox_ismip6
             yelmo1%bnd%z_sl  = sealev%z_sl 
 
             ! == Yelmo ice sheet ===================================================
-            call yelmo_update(yelmo1,time)
+            if (with_ice_sheet) call yelmo_update(yelmo1,time)
 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 

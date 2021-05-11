@@ -1,5 +1,5 @@
 &ctrl
-    run_step        = "spinup"
+    run_step        = "transient_lgm_to_proj"
 /
 
 &spinup

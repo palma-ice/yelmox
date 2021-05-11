@@ -209,6 +209,7 @@ contains
         real(prec), allocatable :: sf_daily(:,:,:)
         double precision, allocatable :: tmp(:,:,:)
         
+        real(prec), allocatable :: tmp4(:,:)
         real(prec), allocatable :: t2m_ann(:,:), pr_ann(:,:), sf_ann(:,:) 
         real(prec), allocatable :: PDDs_ann(:,:) 
 
@@ -218,6 +219,8 @@ contains
         ! Determine whether this is first time running (for output)
         init_now = .FALSE. 
         if (write_out_now .and. present(write_init)) init_now = write_init 
+
+        allocate(tmp4(size(t2m,1),size(t2m,2)))
 
         if (trim(smb%par%abl_method) .eq. "itm") then 
             ndays_daily = 37
@@ -279,7 +282,13 @@ contains
                 smb%now%sigma = smb%par%sigma_snow 
                 where (z_srf .gt. 0.0 .and. H_ice .eq. 0.0)          smb%now%sigma = smb%par%sigma_land 
                 where (H_ice .gt. 0.0 .and. smb%now%t2m .ge. 273.15) smb%now%sigma = smb%par%sigma_melt
-                PDDs_ann = PDDs_ann + calc_temp_effective(smb%now%t2m-273.15,smb%now%sigma)*30.0
+
+                write(*,*) "check1", k 
+                write(*,*) minval(smb%now%t2m-273.15),  maxval(smb%now%t2m-273.15)
+                write(*,*) minval(smb%now%sigma),       maxval(smb%now%sigma)
+                
+                call calc_temp_effective(tmp4,smb%now%t2m-273.15,smb%now%sigma)
+                PDDs_ann = PDDs_ann + tmp4*30.0
             end do 
 
             ! Populate the ann object with the now object, then calculate the annual values 
@@ -328,6 +337,10 @@ contains
         type(smbpal_param_class) :: par
         type(smbpal_state_class) :: now
 
+        real(prec), allocatable :: tmp(:,:) 
+
+        allocate(tmp(size(t2m,1),size(t2m,2)))
+
         ! Determine whether this is first time running (for output)
         init_now = .FALSE. 
         if (present(write_init)) init_now = write_init 
@@ -352,7 +365,8 @@ contains
         do day = 1, ndays, 10
             k1 = idx_today(days,day)
             now%t2m = var_today(days(k1-1),days(k1),t2m(:,:,k1-1),t2m(:,:,k1),day)
-            now%PDDs = now%PDDs + calc_temp_effective(now%t2m-273.15,par%sigma_snow)*10.0
+            call calc_temp_effective(tmp,now%t2m-273.15,par%sigma_snow)
+            now%PDDs = now%PDDs + tmp*10.0
         end do 
 
         ! Initialize averaging 

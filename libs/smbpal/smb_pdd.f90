@@ -53,7 +53,7 @@ contains
 
     end subroutine calc_ablation_pdd
 
-        elemental function calc_temp_effective(temp, sigma) result(teff)
+        elemental subroutine calc_temp_effective(teff, temp, sigma)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         ! Subroutine : e f f e c t i v e T
         ! Author     : Reinhard Calov
@@ -69,8 +69,9 @@ contains
 
         implicit none
 
-        real(prec), intent(IN) :: temp, sigma
-        real(prec) :: teff
+        real(prec), intent(OUT) :: teff
+        real(prec), intent(IN)  :: temp
+        real(prec), intent(IN)  :: sigma
         
         real(prec) :: temp_c, inv_sigma
         real(prec), parameter :: inv_sqrt2   = 1.0/sqrt(2.0)
@@ -95,7 +96,7 @@ contains
                      
         return
 
-    end function calc_temp_effective 
+    end subroutine calc_temp_effective
 
     elemental function calc_temp_effective_old(temp, sigma) result(teff)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -136,6 +137,6 @@ contains
                      
         return
 
-    end function calc_temp_effective_old 
+    end function calc_temp_effective_old
 
-end module smb_pdd 
+end module smb_pdd
