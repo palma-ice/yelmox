@@ -35,7 +35,7 @@ program yelmox_ismip6
     type(sediments_class)       :: sed1 
     type(geothermal_class)      :: gthrm1
     type(isos_class)            :: isos1
-    type(ismip6_forcing_class)  :: ismip6 
+    type(ismip6_forcing_class)  :: ismp1 
 
     type(snapclim_class)        :: snp2
     type(smbpal_class)          :: smbpal2
@@ -305,7 +305,7 @@ program yelmox_ismip6
         write(*,*) 
  
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismip6,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -388,7 +388,7 @@ program yelmox_ismip6
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
-                call ismip6_forcing_update(ismip6,time)
+                call ismip6_forcing_update(ismp1,time)
 
                 ! Set climate to present day 
                 snp2%now = snp2%clim0
@@ -402,12 +402,12 @@ program yelmox_ismip6
                 ! Apply ISMIP6 anomalies
                 ! (apply to climate just for consistency)
 
-                smbpal2%ann%smb  = smbpal2%ann%smb  + ismip6%smb%var(:,:,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-                smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismip6%ts%var(:,:,1)
+                smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+                smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1)
 
                 do m = 1,12
-                    snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismip6%ts%var(:,:,1)
-                    snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismip6%pr%var(:,:,1)/365.0 ! [mm/yr] => [mm/d]
+                    snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1)
+                    snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1)/365.0 ! [mm/yr] => [mm/d]
                 end do 
 
                 snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_prec 
@@ -421,9 +421,9 @@ program yelmox_ismip6
 
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismip6%to%lev, &
-                                ismip6%to%var,ismip6%so%var,dto_ann=ismip6%to%var-ismip6%to_ref%var, &
-                                tf_ann=ismip6%tf%var)
+                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismp1%to%lev, &
+                                ismp1%to%var,ismp1%so%var,dto_ann=ismp1%to%var-ismp1%to_ref%var, &
+                                tf_ann=ismp1%tf%var)
 
                 call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                      yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
@@ -434,7 +434,7 @@ program yelmox_ismip6
             ! LGM to 850 CE     == snapclim 
             ! 850 CE to 1850 CE == linear transition from snapclim to ismip6 
             ! 1850 CE to future == ismip6 
-            
+
             if (time .le. 850_wp) then 
                 ! Only snapclim-based forcing 
 
