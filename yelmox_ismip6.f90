@@ -431,10 +431,10 @@ program yelmox_ismip6
             end if 
 
             ! Determine which forcing to use based on time period 
-            ! LGM to 850 CE == snapclim 
+            ! LGM to 850 CE     == snapclim 
             ! 850 CE to 1850 CE == linear transition from snapclim to ismip6 
             ! 1850 CE to future == ismip6 
-
+            
             if (time .le. 850_wp) then 
                 ! Only snapclim-based forcing 
 
@@ -447,8 +447,8 @@ program yelmox_ismip6
             else if (time .ge. 1850.0_wp) then 
                 ! Only ISMIP6 forcing 
 
-                yelmo1%bnd%smb      = ismip6%smb%var(:,:,1)
-                yelmo1%bnd%T_srf    = ismip6%ts%var(:,:,1)
+                yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
+                yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
 
                 yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
                 yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
@@ -458,15 +458,15 @@ program yelmox_ismip6
 
                 time_wt = (time-850.0_wp) / (1850.0_wp - 850.0_wp)
 
-                yelmo1%bnd%smb      = time_wt*ismip6%smb%var(:,:,1) + (1.0-time_wt)*smbpal1%ann%smb*conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    = time_wt*ismip6%ts%var(:,:,1)  + (1.0-time_wt)*smbpal1%ann%tsrf
+                yelmo1%bnd%smb      = time_wt*smbpal2%ann%smb*conv_we_ie*1e-3 + (1.0-time_wt)*smbpal1%ann%smb*conv_we_ie*1e-3
+                yelmo1%bnd%T_srf    = time_wt*smbpal2%ann%tsrf                + (1.0-time_wt)*smbpal1%ann%tsrf
 
                 yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf   + (1.0-time_wt)*mshlf1%now%bmb_shlf 
                 yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf     + (1.0-time_wt)*mshlf1%now%T_shlf  
 
             end if 
 
-                
+            
             ! == MODEL OUTPUT ===================================
 
             if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
