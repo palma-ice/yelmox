@@ -322,7 +322,9 @@ program yelmox_ismip6
 
         ! 2D file
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+        ! call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
+                                                  file2D,time,snp2,mshlf2,smbpal2)
 
         ! 1D file 
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
@@ -405,14 +407,6 @@ program yelmox_ismip6
                 end if 
                 snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
                 
-
-                ! Get ismip anomalies on snapclim grids 
-                call snapclim_var_to_ocn(snp2,ismp1%to%var,ismp1%so%var,ismp1%to%lev)
-
-                ! Add reference ocean field 
-                snp2%now%to_ann = snp2%now%to_ann + snp2%clim0%to_ann 
-                snp2%now%so_ann = snp2%now%so_ann + snp2%clim0%so_ann 
-
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismp1%to%lev, &
@@ -452,11 +446,11 @@ program yelmox_ismip6
 
                 time_wt = (time-850.0_wp) / (1850.0_wp - 850.0_wp)
 
-                yelmo1%bnd%smb      = time_wt*smbpal2%ann%smb*conv_we_ie*1e-3 + (1.0-time_wt)*smbpal1%ann%smb*conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    = time_wt*smbpal2%ann%tsrf                + (1.0-time_wt)*smbpal1%ann%tsrf
+                yelmo1%bnd%smb      = (time_wt*smbpal2%ann%smb  + (1.0-time_wt)*smbpal1%ann%smb)  * conv_we_ie*1e-3
+                yelmo1%bnd%T_srf    =  time_wt*smbpal2%ann%tsrf + (1.0-time_wt)*smbpal1%ann%tsrf
 
-                yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf   + (1.0-time_wt)*mshlf1%now%bmb_shlf 
-                yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf     + (1.0-time_wt)*mshlf1%now%T_shlf  
+                yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
+                yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
 
             end if 
 
@@ -464,7 +458,8 @@ program yelmox_ismip6
             ! == MODEL OUTPUT ===================================
 
             if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
+                                                  file2D,time,snp2,mshlf2,smbpal2)
             end if
 
             if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
@@ -472,10 +467,6 @@ program yelmox_ismip6
                  
             end if 
 
-            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
-                write(*,"(a,f14.4)") "yelmo:: time = ", time
-            end if 
-        
             if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
@@ -507,7 +498,7 @@ program yelmox_ismip6
 
 contains
     
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time,snp2,mshlf2,srf2)
 
         implicit none 
         
@@ -523,6 +514,10 @@ contains
         character(len=*),       intent(IN) :: filename
         real(wp),               intent(IN) :: time
 
+        type(snapclim_class),   intent(IN), optional :: snp2 
+        type(marshelf_class),   intent(IN), optional :: mshlf2 
+        type(smbpal_class),     intent(IN), optional :: srf2 
+        
         ! Local variables
         integer    :: ncid, n
         real(wp) :: time_prev 
@@ -652,13 +647,14 @@ contains
         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         if (trim(mshlf%par%bmb_method) .eq. "pico") then 
             call nc_write(filename,"d_shlf",mshlf%pico%now%d_shlf,units="km",long_name="Shelf distance to grounding line", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -698,6 +694,58 @@ contains
         
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+if (.TRUE.) then 
+    ! Output values from second set of climate objects 
+        call nc_write(filename,"Ta_ann_2",snp2%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"Ta_sum_2",snp2%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"Pr_ann_2",snp2%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"T_shlf_2",mshlf2%now%T_shlf,units="K",long_name="Shelf temperature", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"S_shlf_2",mshlf2%now%S_shlf,units="PSU",long_name="Shelf salinity", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dT_shlf_2",mshlf2%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        if (trim(mshlf2%par%bmb_method) .eq. "pico") then 
+            call nc_write(filename,"d_shlf_2",mshlf2%pico%now%d_shlf,units="km",long_name="Shelf distance to grounding line", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"d_if_2",mshlf2%pico%now%d_if,units="km",long_name="Shelf distance to ice front", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"boxes_2",mshlf2%pico%now%boxes,units="",long_name="Shelf boxes", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)      
+            call nc_write(filename,"r_shlf_2",mshlf2%pico%now%r_shlf,units="",long_name="Ratio of ice shelf", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"T_box_2",mshlf2%pico%now%T_box,units="K?",long_name="Temperature of boxes", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"S_box_2",mshlf2%pico%now%S_box,units="PSU",long_name="Salinity of boxes", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"A_box_2",mshlf2%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        else 
+            call nc_write(filename,"tf_basin_2",mshlf2%now%tf_basin,units="K",long_name="Mean basin thermal forcing", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tf_shlf_2",mshlf2%now%tf_shlf,units="K",long_name="Shelf thermal forcing", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tf_corr_2",mshlf2%now%tf_corr,units="K",long_name="Shelf thermal forcing applied correction factor", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"slope_base_2",mshlf2%now%slope_base,units="",long_name="Shelf-base slope", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        end if 
+
+        call nc_write(filename,"dTa_ann_2",snp2%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dTa_sum_2",snp2%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dPr_ann_2",(snp2%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+end if 
 
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
