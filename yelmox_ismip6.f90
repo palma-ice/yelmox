@@ -23,7 +23,7 @@ program yelmox_ismip6
     character(len=256) :: file_restart, file_restart_hist
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
-    integer    :: n
+    integer    :: n, m
     real(wp)   :: time, time_bp 
     real(wp)   :: time_wt 
 
@@ -37,6 +37,8 @@ program yelmox_ismip6
     type(isos_class)            :: isos1
     type(ismip6_forcing_class)  :: ismip6 
 
+    type(snapclim_class)        :: snp2
+    type(smbpal_class)          :: smbpal2
     type(marshelf_class)        :: mshlf2 
 
     type ctrl_param_spinup 
@@ -306,10 +308,13 @@ program yelmox_ismip6
         call ismip6_forcing_init(ismip6,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
-
-        ! Initialize second marshelf object for use with ismip data, 
-        ! but make sure that tf is prescribed externally
-        mshlf2 = mshlf1
+        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
+        
+        snp2    = snp1 
+        smbpal2 = smbpal1
+        mshlf2  = mshlf1
+        
+        ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
 
         ! Start timing 
@@ -354,10 +359,10 @@ program yelmox_ismip6
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
-
             if (time .lt. 1850.0_wp) then 
 
                 ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
+
                 if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
                     ! Update snapclim
                     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
@@ -384,6 +389,35 @@ program yelmox_ismip6
 
                 ! Update ismip6 forcing to current time
                 call ismip6_forcing_update(ismip6,time)
+
+                ! Set climate to present day 
+                snp2%now = snp2%clim0
+
+                ! == SURFACE MASS BALANCE ==============================================
+
+                ! Calculate smb for present day 
+                call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
+                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+                
+                ! Apply ISMIP6 anomalies
+                ! (apply to climate just for consistency)
+
+                smbpal2%ann%smb  = smbpal2%ann%smb  + ismip6%smb%var(:,:,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+                smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismip6%ts%var(:,:,1)
+
+                do m = 1,12
+                    snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismip6%ts%var(:,:,1)
+                    snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismip6%pr%var(:,:,1)/365.0 ! [mm/yr] => [mm/d]
+                end do 
+
+                snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_prec 
+                if (trim(domain) .eq. "Antarctica") then 
+                    snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+                else 
+                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
+                end if 
+                snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+                
 
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &

@@ -14,7 +14,7 @@
     time_end        = 2300.0            ! [yr] Ending time (years CE)
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 100.0              ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
 /
 
 &transient_proj
