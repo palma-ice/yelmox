@@ -209,6 +209,7 @@ contains
             ! 3. Calculate water properties at depths of interest ============================
 
             mshlf%now%T_shlf(i,j)  = sum(to_ann(i,j,:) *wt_shlf)
+            mshlf%now%S_shlf(i,j)  = sum(so_ann(i,j,:) *wt_shlf)
             mshlf%now%dT_shlf(i,j) = sum(dto_ann(i,j,:)*wt_shlf)
 
             if (present(tf_ann)) then 
