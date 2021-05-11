@@ -268,6 +268,17 @@ contains
 
         ! === Additional calculations ======================
 
+        ! Add reference ocean values to current anomalies 
+
+        do k = 1, size(ism%to%var,3)
+            where(ism%to%var(:,:,k) .ne. mv .and. ism%to_ref%var(:,:,k) .ne. mv)
+                ism%to%var(:,:,k) = ism%to%var(:,:,k) + ism%to_ref%var(:,:,k)
+            end where 
+            where(ism%so%var(:,:,k) .ne. mv .and. ism%so_ref%var(:,:,k) .ne. mv)
+                ism%so%var(:,:,k) = ism%so%var(:,:,k) + ism%so_ref%var(:,:,k)
+            end where 
+        end do 
+        
         ! Remove missing values 
         do k = 1, size(ism%to%var,3)
             tmp = minval(ism%to%var(:,:,k),mask=ism%to%var(:,:,k) .ne. mv)

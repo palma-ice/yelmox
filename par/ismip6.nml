@@ -104,8 +104,8 @@
 &imbie_basins
     filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/imbie2_basin_numbers.nc"
     name        = "basinNumber"
-    units_in    = ""
-    units_out   = ""
+    units_in    = "1"
+    units_out   = "1"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = False 

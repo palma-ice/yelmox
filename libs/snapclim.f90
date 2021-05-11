@@ -14,6 +14,7 @@ module snapclim
 
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: prec = sp 
+    integer,  parameter :: wp   = sp 
 
     real(prec), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
     real(prec), parameter :: pi        = 3.14159265359
@@ -111,7 +112,7 @@ module snapclim
         real(prec), allocatable :: depth(:) 
         real(prec), allocatable :: mask_ocn(:,:,:) 
         real(prec), allocatable :: to_ann(:,:,:) 
-        real(prec), allocatable :: so(:,:,:) 
+        real(prec), allocatable :: so_ann(:,:,:) 
         
         real(prec) :: at, ao, ap, as 
         real(prec) :: bt, bo, bp, bs
@@ -137,6 +138,9 @@ module snapclim
     public :: snapclim_class 
     public :: snapclim_init 
     public :: snapclim_update 
+
+    public :: snapclim_var_to_ocn
+
 !     public :: snapclim_end 
 
     ! === NOTES ===
@@ -154,6 +158,38 @@ module snapclim
     ! =True  | The climate_forcing files provide monthly temperatures and precipitations
 
 contains 
+    
+    subroutine snapclim_var_to_ocn(snp,to_ann,so_ann,depth)
+
+        implicit none 
+
+        type(snapclim_class),   intent(INOUT) :: snp
+        real(wp),               intent(IN)    :: to_ann(:,:,:)
+        real(wp),               intent(IN)    :: so_ann(:,:,:)
+        real(wp),               intent(IN)    :: depth(:) 
+
+        ! Local variables 
+        integer :: i, j, k, nx, ny, nk 
+
+        nx = size(to_ann,1)
+        ny = size(to_ann,2) 
+        nk = size(snp%now%to_ann,3)
+
+        do k = 1, nk 
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Interpolate ocean variables to the levels of interest
+            snp%now%to_ann(i,j,k) = interp_linear(depth,to_ann(i,j,:),xout=snp%now%depth(k))
+            snp%now%so_ann(i,j,k) = interp_linear(depth,so_ann(i,j,:),xout=snp%now%depth(k))
+            
+        end do 
+        end do 
+        end do 
+
+        return 
+
+    end subroutine snapclim_var_to_ocn
 
     subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny)
         ! This subroutine will initialize four climate snapshots
@@ -495,7 +531,7 @@ contains
                 ! Constant steady-state climate
 
                 snp%now%to_ann = snp%clim0%to_ann 
-                snp%now%so     = snp%clim0%so
+                snp%now%so_ann = snp%clim0%so_ann
 
             case("anom")
                 ! Apply a simple spatially homogeneous anomaly
@@ -508,7 +544,7 @@ contains
                     dTo_now = ao*snp%par%dTo_const
                 end if
 
-                ! jablasco: slainity
+                ! jablasco: salinity
                 if (present(dSo)) then
                     ! If available, use argument to define anomaly
                     dSo_now = dSo
@@ -518,7 +554,7 @@ contains
                 end if
 
                 call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
-                call calc_salinity_anom(snp%now%so,snp%clim0%so,dSo_now)
+                call calc_salinity_anom(snp%now%so_ann,snp%clim0%so_ann,dSo_now)
 
             case("fraction")
                 ! Scale oceanic temperature (anomaly) as a fraction of the atmospheric
@@ -556,11 +592,11 @@ contains
                 
             case("snap_1ind","snap_1ind_new")
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
-                call calc_salinity_1ind(snp%now%so,snp%clim0%so,snp%clim1%so,snp%clim2%so,as)
+                call calc_salinity_1ind(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,as)
                         
             case("snap_2ind")
                 call calc_temp_2ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo)
-                call calc_salinity_2ind(snp%now%so,snp%clim0%so,snp%clim1%so,snp%clim2%so,snp%clim3%so,as,bs)
+                call calc_salinity_2ind(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as,bs)
 
             case("snap_1ind_abs")
                 call calc_temp_1ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
@@ -1675,7 +1711,7 @@ contains
 
             ocn%depth    = 0.0
             ocn%to_ann   = 0.0
-            ocn%so       = 0.0 
+            ocn%so_ann   = 0.0 
             ocn%mask_ocn = 0.0 
 
             ocn%par%ocn_time = 0.0 
@@ -1772,7 +1808,7 @@ contains
 
                         ! Interpolate ocean temp to current depth level (negative to convert from depth to height)
                         ocn%to_ann(i,j,k) = interp_linear(depth0,tocn3D(i,j,:),xout=ocn%depth(k))
-                        ocn%so(i,j,k)     = interp_linear(depth0,socn3D(i,j,:),xout=ocn%depth(k))
+                        ocn%so_ann(i,j,k) = interp_linear(depth0,socn3D(i,j,:),xout=ocn%depth(k))
 
                         ! Get nearest mask value 
                         if (ocn%depth(k) .gt. maxval(depth0)) then
@@ -2063,7 +2099,7 @@ contains
         allocate(ocn%depth(nz))
         allocate(ocn%to_ann(nx,ny,nz))
         allocate(ocn%mask_ocn(nx,ny,nz))
-        allocate(ocn%so(nx,ny,nz))
+        allocate(ocn%so_ann(nx,ny,nz))
         
         if (.not. (nx .eq. size(ocn%to_ann,1) .and. &
                    ny .eq. size(ocn%to_ann,2)) ) then 

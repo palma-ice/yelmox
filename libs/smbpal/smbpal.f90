@@ -282,10 +282,6 @@ contains
                 smb%now%sigma = smb%par%sigma_snow 
                 where (z_srf .gt. 0.0 .and. H_ice .eq. 0.0)          smb%now%sigma = smb%par%sigma_land 
                 where (H_ice .gt. 0.0 .and. smb%now%t2m .ge. 273.15) smb%now%sigma = smb%par%sigma_melt
-
-                write(*,*) "check1", k 
-                write(*,*) minval(smb%now%t2m-273.15),  maxval(smb%now%t2m-273.15)
-                write(*,*) minval(smb%now%sigma),       maxval(smb%now%sigma)
                 
                 call calc_temp_effective(tmp4,smb%now%t2m-273.15,smb%now%sigma)
                 PDDs_ann = PDDs_ann + tmp4*30.0
@@ -356,6 +352,9 @@ contains
         insol_time = time_bp
         if (smb%par%const_insol) insol_time = smb%par%const_kabp*1e3
         
+        ! Set sigma to snow sigma everywhere for pdd calcs
+        smb%now%sigma = par%sigma_snow
+        
         ! Fill in local versions for easier access 
         par = smb%par 
         now = smb%now 
@@ -365,7 +364,7 @@ contains
         do day = 1, ndays, 10
             k1 = idx_today(days,day)
             now%t2m = var_today(days(k1-1),days(k1),t2m(:,:,k1-1),t2m(:,:,k1),day)
-            call calc_temp_effective(tmp,now%t2m-273.15,par%sigma_snow)
+            call calc_temp_effective(tmp,now%t2m-273.15,now%sigma)
             now%PDDs = now%PDDs + tmp*10.0
         end do 
 
