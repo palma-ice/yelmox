@@ -36,14 +36,18 @@ module varslice
 
         type(varslice_param_class) :: par 
 
-        real(wp) :: time_now
+        ! Parameters defined during update call
+        real(wp)          :: time_range(2)
+        character(len=56) :: slice_method 
+        integer           :: range_rep 
         
+        ! Variable information
         real(wp), allocatable :: x(:) 
         real(wp), allocatable :: y(:)
         real(wp), allocatable :: lev(:)  
 
         real(wp), allocatable :: time(:)  
-        real(wp), allocatable :: var(:,:,:) 
+        real(wp), allocatable :: var(:,:,:,:) 
     end type 
 
     private 
@@ -56,20 +60,28 @@ module varslice
 contains
 
     
-    subroutine varslice_update(vs,time)
+    subroutine varslice_update(vs,time,method,rep)
         ! Routine to update transient climate forcing to match 
         ! current `time`. 
 
         implicit none 
 
-        type(varslice_class),  intent(INOUT) :: vs
-        real(wp), optional,     intent(IN)   :: time       ! [yr] Current time 
-
+        type(varslice_class),       intent(INOUT) :: vs
+        real(wp),         optional, intent(IN)    :: time(:)    ! [yr] Current time, or time range 
+        character(len=*), optional, intent(IN)    :: method     ! slice_method (only if with_time==True)
+        integer,          optional, intent(IN)    :: rep        ! Only if with_time==True, and slice_method==range_*
+        
         ! Local variables 
-        integer :: k_now, k0, k1, nt  
+        integer :: k, k0, k1, nt, nt_now, nt_out
+        integer :: n1, n2, i, j, l    
         type(varslice_param_class) :: par 
-        logical :: with_time 
-        real(wp) :: time_now 
+        logical  :: with_time 
+        real(wp) :: time_range(2) 
+        character(len=56) :: slice_method
+        character(len=56) :: vec_method 
+        integer  :: range_rep 
+        integer,  allocatable :: kk(:) 
+        real(wp), allocatable :: var(:,:,:,:) 
 
         ! Define shortcuts
         par = vs%par 
@@ -78,89 +90,306 @@ contains
         if (with_time) then 
 
             if (.not. present(time)) then 
-                write(*,*) "varslice_update:: Error: current time must be given as an argument."
+                write(*,*) "varslice_update:: Error: current time or time range &
+                            &must be given as an argument (1D array)."
                 stop 
             end if 
 
-        end if 
-
-        if (present(time)) then 
-            time_now = time 
-        else 
-            time_now = vs%time_now 
-        end if 
-
-        if (with_time .and. vs%time_now .eq. time_now) then 
-
-            ! Do nothing, the varslice object is already up to date 
-            ! fo the current time. 
-
-        else 
-
-            ! 1. Determine the index of the current time, if needed
-            if (with_time) then 
-                nt = size(vs%time)
-                do k_now = 1, nt 
-                    if (vs%time(k_now) .eq. time_now) exit 
-                end do
+            ! Consistency check 
+            if (size(time,1) .eq. 2) then 
+                if (time(2) .lt. time(1)) then 
+                    write(*,*) "varslice_update:: Error: time(2) should be >= time(1)."
+                    write(*,*) "time = ", time
+                    stop 
+                end if
             end if 
 
+        end if 
+
+        slice_method = "exact"
+        if (present(method)) slice_method = trim(method)
+
+        range_rep = 1
+        if (present(rep)) range_rep = rep 
+
+
+        if (present(time)) then
+
+            if (size(time) .eq. 2) then 
+                time_range = time
+            else 
+                time_range(1:2) = time(1) 
+            end if 
+
+        else 
+
+            time_range = vs%time_range 
+
+        end if 
+
+        
+        if ( with_time .and. trim(slice_method) .eq. trim(vs%slice_method) &
+                .and. range_rep .eq. vs%range_rep &
+                .and. vs%time_range(1) .eq. time_range(1) &
+                .and. vs%time_range(2) .eq. time_range(2) ) then 
+
+            ! Do nothing, the varslice object is already up to date 
+            ! fo the current time and method. 
+
+        else 
+
+            ! Set parameters in varslice object 
+            vs%slice_method = trim(slice_method)
+            vs%range_rep    = range_rep 
+            vs%time_range   = time_range 
+
             ! 2. Read variable and convert units as needed
-            select case(par%ndim)
 
-                case(1)
+            if (.not. with_time) then 
+                ! Handle cases that do not have time dimension (simpler)
 
-                    if (with_time) then 
-                        ! 0D (point) variable plus time dimension 
-                        call nc_read(par%filename,par%name,vs%var(1,1,1),missing_value=mv, &
-                                start=[k_now],count=[1])
-                    else 
+                select case(par%ndim)
+
+                    case(1)
+
                         ! 1D variable
-                        call nc_read(par%filename,par%name,vs%var(:,1,1),missing_value=mv)
-                    end if 
+                        call nc_read(par%filename,par%name,vs%var(:,1,1,1),missing_value=mv)
 
-                case(2)
+                    case(2)
 
-                    if (with_time) then 
-                        ! 1D variable plus time dimension 
-                        call nc_read(par%filename,par%name,vs%var(:,1,1),missing_value=mv, &
-                                start=[1,k_now],count=[par%dim(1),1])
-                    else 
                         ! 2D variable 
-                        call nc_read(par%filename,par%name,vs%var(:,:,1),missing_value=mv)
-                    end if 
+                        call nc_read(par%filename,par%name,vs%var(:,:,1,1),missing_value=mv)
 
-                case(3)
+                    case(3)
 
-                    if (with_time) then 
-                        ! 2D variable plus time dimension 
-                        call nc_read(par%filename,par%name,vs%var(:,:,1),missing_value=mv, &
-                                start=[1,1,k_now],count=[par%dim(1),par%dim(2),1])
-                    else 
                         ! 3D variable 
-                        call nc_read(par%filename,par%name,vs%var,missing_value=mv)
-                    end if 
+                        call nc_read(par%filename,par%name,vs%var(:,:,:,1),missing_value=mv)
 
-                case(4)
+                    case DEFAULT 
 
-                    if (with_time) then 
-                        ! 3D variable plus time dimension 
-                        call nc_read(par%filename,par%name,vs%var,missing_value=mv, &
-                                start=[1,1,1,k_now],count=[par%dim(1),par%dim(2),par%dim(3),1])
-                    else 
-                        ! 4D variable 
-                        write(*,*) "varslice_update:: Error: 4D variable without time dimension &
-                        &is not yet supported."
+                        write(*,*) "varslice_update:: ndim >= 4 with no time dimension is not allowed."
+                        write(*,*) "ndim = ", par%ndim 
                         stop 
-                    end if 
 
-                case DEFAULT 
+                end select
 
-                    write(*,*) "varslice_update:: ndim not allowed."
-                    write(*,*) "ndim = ", par%ndim 
-                    stop 
+            else 
+                ! Cases with a time dimension (more complicated)
 
-            end select
+                ! Determine time indices
+                ! nt = size(vs%time)
+                ! do k_now = 1, nt 
+                !     if (vs%time(k_now) .eq. time_now) exit 
+                ! end do
+                call get_indices(k0,k1,vs%time,vs%time_range,trim(slice_method))
+
+                if (k0 .gt. 0 .and. k1 .gt. 0) then 
+                    ! Dimension range is available for loading, proceed 
+
+                    ! Get size of time dimension needed for loading
+                    nt_now = k1-k0+1
+
+                    ! write(*,*) "time: ", vs%time_range, k0, k1 
+                    ! write(*,*) "      ", vs%time(k0), vs%time(k1)
+
+                    if (allocated(var)) deallocate(var) 
+
+                    select case(par%ndim)
+
+                        case(1)
+
+                            ! Allocate local var to the right size 
+                            allocate(var(nt_now,1,1,1))
+
+                            ! 0D (point) variable plus time dimension 
+                            call nc_read(par%filename,par%name,var,missing_value=mv, &
+                                    start=[k0],count=[nt_now])
+
+
+                        case(2)
+
+                            ! Allocate local var to the right size 
+                            allocate(var(par%dim(1),nt_now,1,1))
+
+                            ! 1D variable plus time dimension 
+                            call nc_read(par%filename,par%name,var,missing_value=mv, &
+                                    start=[1,k0],count=[par%dim(1),nt_now])
+
+                        case(3)
+        
+                            ! Allocate local var to the right size 
+                            allocate(var(par%dim(1),par%dim(2),nt_now,1))
+
+                            ! 2D variable plus time dimension 
+                            call nc_read(par%filename,par%name,var,missing_value=mv, &
+                                    start=[1,1,k0],count=[par%dim(1),par%dim(2),nt_now])
+
+                        case(4)
+
+                            ! Allocate local var to the right size 
+                            allocate(var(par%dim(1),par%dim(2),par%dim(3),nt_now))
+
+                            ! 3D variable plus time dimension 
+                            call nc_read(par%filename,par%name,var,missing_value=mv, &
+                                    start=[1,1,1,k0],count=[par%dim(1),par%dim(2),par%dim(3),nt_now]) 
+
+                        case DEFAULT 
+
+                            write(*,*) "varslice_update:: ndim > 4 with time dimension not allowed."
+                            write(*,*) "ndim = ", par%ndim 
+                            stop 
+
+                    end select
+
+
+                    ! At this point, the local var variable has been defined 
+                    ! with data from the file for the appropriate time indices 
+
+                    ! Next, we need to allocate the vs%var variable to the 
+                    ! appropriate size and perform any calculations on the time 
+                    ! indices of the local var variable as needed. 
+
+
+                    ! Now, allocate the vs%var variable to the right size 
+
+                    select case(trim(vs%slice_method)) 
+
+                        case("exact","range")
+                            ! Allocate vs%var to the same size as var 
+                            ! and store all values 
+
+                            if (size(vs%var,1) .eq. size(var,1) .and. &
+                                size(vs%var,2) .eq. size(var,2) .and. &
+                                size(vs%var,3) .eq. size(var,3) .and. &
+                                size(vs%var,4) .eq. size(var,4) ) then 
+
+                                ! No allocation needed size is the same 
+
+                            else 
+
+                                deallocate(vs%var)
+                                allocate(vs%var(size(vs%var,1),size(vs%var,2),size(vs%var,3),size(vs%var,4)))
+
+                            end if 
+
+                            ! Store data in vs%var 
+                            vs%var = var 
+
+                        case("range_mean","range_sd","range_min","range_max","range_sum")
+                            ! Allocate vs%var to match desired output size, 
+                            ! and calculate output values 
+
+                            ! Define 'vec_method'
+                            n1 = index(slice_method,"_")
+                            n2 = len_trim(slice_method)
+                            vec_method = slice_method(n1+1:n2)
+
+                            ! Size of dimension out is the size of the 
+                            ! repitition desired. Ie, range_rep = 1 means 
+                            ! to apply mean/sd/etc to all values along dimension
+                            ! with the result of calculating 1 value. 
+                            ! range_rep = 12 means apply calculation to every 12th 
+                            ! value, resulting in 12 values along dimension.
+
+                            nt_out = vs%range_rep 
+                            
+                            ! Make sure that var has at least as many values as we expect 
+                            if (nt_out .gt. nt_now) then 
+                                write(*,*) "varslice_update:: Error: the specified time range &
+                                    & does not provide enough data points to be consistent with &
+                                    & the specified value of range_rep."
+                                write(*,*) "time_range      = ", vs%time_range 
+                                write(*,*) "nt (time_range) = ", nt_now 
+                                write(*,*) "range_rep       = ", vs%range_rep 
+                                write(*,*) "range_rep must be <= nt."
+                                stop 
+                            end if 
+
+                            deallocate(vs%var)
+
+                            select case(par%ndim)
+
+                                case(1)
+                                    allocate(vs%var(nt_out,1,1,1))
+
+                                    ! Calculate each slice 
+                                    do k = 1, nt_out 
+
+                                        ! Get indices for current repitition
+                                        call get_rep_indices(kk,i0=k,i1=nt_now,nrep=vs%range_rep)
+
+                                        ! Calculate the vector value desired (mean,sd,...)
+                                        call calc_vec_value(vs%var(k,1,1,1),var(kk,1,1,1),vec_method,mv)
+
+                                    end do 
+
+                                case(2)
+                                    allocate(vs%var(size(var,1),nt_out,1,1))
+
+                                    ! Calculate each slice 
+                                    do k = 1, nt_out 
+
+                                        ! Get indices for current repitition
+                                        call get_rep_indices(kk,i0=k,i1=nt_now,nrep=vs%range_rep)
+
+                                        do i = 1, size(vs%var,1)
+                                            ! Calculate the vector value desired (mean,sd,...)
+                                            call calc_vec_value(vs%var(i,k,1,1),var(i,kk,1,1),vec_method,mv)
+                                        end do 
+
+                                    end do 
+                                    
+                                case(3)
+                                    allocate(vs%var(size(var,1),size(var,2),nt_out,1))
+                                
+                                    ! Calculate each slice 
+                                    do k = 1, nt_out 
+
+                                        ! Get indices for current repitition
+                                        call get_rep_indices(kk,i0=k,i1=nt_now,nrep=vs%range_rep)
+
+                                        do j = 1, size(vs%var,2)
+                                        do i = 1, size(vs%var,1)
+                                            ! Calculate the vector value desired (mean,sd,...)
+                                            call calc_vec_value(vs%var(i,j,k,1),var(i,j,kk,1),vec_method,mv)
+                                        end do
+                                        end do 
+                                        
+                                    end do 
+                                    
+                                case(4)
+                                    allocate(vs%var(size(var,1),size(var,2),size(var,3),nt_out))
+
+                                    ! Calculate each slice 
+                                    do k = 1, nt_out 
+
+                                        ! Get indices for current repitition
+                                        call get_rep_indices(kk,i0=k,i1=nt_now,nrep=vs%range_rep)
+
+                                        do l = 1, size(vs%var,3)
+                                        do j = 1, size(vs%var,2)
+                                        do i = 1, size(vs%var,1)
+                                            ! Calculate the vector value desired (mean,sd,...)
+                                            call calc_vec_value(vs%var(i,j,l,k),var(i,j,l,kk),vec_method,mv)
+                                        end do
+                                        end do
+                                        end do 
+                                        
+                                    end do 
+                                    
+                            end select
+
+
+                    end select
+                    
+                else 
+                    ! Dimension range was not found, set variable to missing values 
+
+                    vs%var = mv 
+
+                end if
+
+            end if 
 
             ! Make sure crazy values have been set to missing (for safety)
             where (abs(vs%var) .ge. 1e10) vs%var = mv 
@@ -175,6 +404,194 @@ contains
         return 
 
     end subroutine varslice_update
+
+
+    subroutine get_indices(k0,k1,x,xrange,slice_method)
+        ! Get the indices k0 and k1 that 
+        ! correspond to the lower and upper bound 
+        ! range of xmin <= x <= xmax. 
+
+        ! Resulting indices should either match 
+        ! the range exactly, or bracket the range of interest 
+
+        ! Note: routine assumes xmin <= xmax! 
+
+        implicit none 
+
+        integer,  intent(OUT) :: k0 
+        integer,  intent(OUT) :: k1 
+        real(wp), intent(IN)  :: x(:) 
+        real(wp), intent(IN)  :: xrange(2)
+        character(len=*), intent(IN) :: slice_method 
+
+        ! Local variables 
+        integer  :: k, nk 
+        real(wp) :: xmin, xmax 
+
+        xmin = xrange(1)
+        xmax = xrange(2) 
+
+        nk = size(x,1) 
+
+        ! Get lower bound 
+        k0 = 1 
+        do k = 1, nk 
+            if (x(k) .gt. xmin) exit 
+            k0 = k 
+        end do 
+
+        if (xmax .eq. xmin) then 
+
+            k1 = k0 
+
+        else 
+
+            ! Get upper bound 
+            k1 = nk 
+            do k = nk, k0, -1 
+                if (x(k) .lt. xmax) exit 
+                k1 = k 
+            end do 
+
+        end if 
+
+        ! Make sure indices work for slice_method of choice
+        select case(trim(slice_method))
+
+            case("exact") 
+
+                if (x(k0) .ne. xmin) then 
+                    k0 = -1 
+                    k1 = -1 
+                end if 
+     
+
+            case("range","range_mean","range_sd","range_min","range_max") 
+
+                if ( xmin .ne. xmax .and. &
+                      (k0 .eq. size(x,1) .or. k1 .eq. 1) ) then 
+                    k0 = -1
+                    k1 = -1 
+                end if 
+
+            ! No default case
+        end select 
+
+        return 
+
+    end subroutine get_indices
+
+    subroutine get_rep_indices(ii,i0,i1,nrep)
+        ! Given starting value i0 and final value i1, 
+        ! and number of values to skip nrep, generate 
+        ! an vector of indices ii. 
+        ! eg, i0 = 1, i1 = 36, nrep = 12
+        ! => ii = [1,13,25]
+        ! eg, i0 = 2, i1 = 36, nrep = 12
+        ! => ii = [2,14,26]
+        
+        implicit none 
+
+        integer, allocatable, intent(OUT) :: ii(:) 
+        integer, intent(IN) :: i0 
+        integer, intent(IN) :: i1 
+        integer, intent(IN) :: nrep 
+
+        ! Local variables   
+        integer :: i, ni, ntot 
+        integer :: jj(10000)
+
+        ni = i1-i0+1 
+
+        jj = 0  
+
+        do i = 1, ni
+            jj(i) = i0 + nrep*(i-1) 
+            if (jj(i) .gt. i1) then 
+                jj(i) = 0
+                exit 
+            end if 
+        end do 
+
+        ntot = count(jj .gt. 0)
+        if (allocated(ii)) deallocate(ii)
+        allocate(ii(ntot)) 
+
+        ii = jj(1:ntot) 
+
+        return 
+
+    end subroutine get_rep_indices
+
+    subroutine calc_vec_value(val,var,method,mv)
+
+        implicit none 
+
+        real(wp),         intent(OUT) :: val 
+        real(wp),         intent(IN)  :: var(:) 
+        character(len=*), intent(IN)  :: method 
+        real(wp),         intent(IN)  :: mv 
+
+        ! Local variables 
+        integer  :: ntot 
+        real(wp) :: mean, variance 
+
+        ntot = count(var .ne. mv)
+        
+        if (ntot .gt. 0) then 
+            ! Values available for calculations 
+
+            select case(trim(method))
+
+                case("sum")
+
+                    val = sum(var,mask=var.ne.mv)
+
+                case("mean")
+
+                    val = sum(var,mask=var.ne.mv) / real(ntot,wp)
+
+                case("sd")
+
+                    if (ntot .ge. 2) then
+
+                        mean     = sum(var,mask=var.ne.mv) / real(ntot,wp)
+                        variance = real(ntot/(ntot-1),wp) &
+                                        *sum( (var-mean)**2, mask=var.ne.mv)
+                        val      = sqrt(variance)
+
+                    else 
+
+                        val = mv 
+
+                    end if 
+
+                case("min") 
+
+                    val = minval(var,mask=var.ne.mv)
+
+                case("max")
+
+                    val = maxval(var,mask=var.ne.mv)
+
+                case DEFAULT 
+
+                    write(*,*) "calc_vec_value:: Error: method not recognized."
+                    write(*,*) "method = ", trim(method) 
+                    stop 
+
+            end select
+
+        else 
+            ! No values available in vector, set to missing value 
+
+            val = mv 
+
+        end if 
+
+        return 
+
+    end subroutine calc_vec_value
 
     subroutine varslice_init_nml(vs,filename,group,domain,grid_name,verbose)
         ! Routine to load information related to a given 
@@ -290,14 +707,14 @@ contains
 
             case(1)
                 if (with_time) then 
-                    allocate(vs%var(1,1,1))
+                    allocate(vs%var(1,1,1,1))
                 else 
-                    allocate(vs%var(vs%par%dim(1),1,1))
+                    allocate(vs%var(vs%par%dim(1),1,1,1))
                 end if 
             case(2)
                 if (with_time) then 
                     allocate(vs%x(vs%par%dim(1)))
-                    allocate(vs%var(vs%par%dim(1),1,1))
+                    allocate(vs%var(vs%par%dim(1),1,1,1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
                         call nc_read(vs%par%filename,dim_names(1),vs%x)
@@ -307,7 +724,7 @@ contains
                 else 
                     allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%y(vs%par%dim(2)))
-                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),1))
+                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),1,1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
                         call nc_read(vs%par%filename,dim_names(1),vs%x)
@@ -326,7 +743,7 @@ contains
                 if (with_time) then
                     allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%y(vs%par%dim(2)))
-                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),1))
+                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),1,1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
                         call nc_read(vs%par%filename,dim_names(1),vs%x)
@@ -343,7 +760,7 @@ contains
                     allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%y(vs%par%dim(2)))
                     allocate(vs%lev(vs%par%dim(3)))
-                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3)))
+                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3),1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
                         call nc_read(vs%par%filename,dim_names(1),vs%x)
@@ -362,15 +779,13 @@ contains
                     end if
                     
                 end if
-
-                
-                 
+                  
             case(4)
                 if (with_time) then 
                     allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%y(vs%par%dim(2)))
                     allocate(vs%lev(vs%par%dim(3)))
-                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3)))
+                    allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3),1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
                         call nc_read(vs%par%filename,dim_names(1),vs%x)
@@ -395,7 +810,7 @@ contains
 
                     
             case DEFAULT 
-                write(*,*) "varslice_init_data:: ndim not allowed."
+                write(*,*) "varslice_init_data:: ndim > 4 not allowed."
                 write(*,*) "ndim = ", vs%par%ndim 
                 stop 
 
