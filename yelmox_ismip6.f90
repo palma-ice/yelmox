@@ -48,8 +48,8 @@ program yelmox_ismip6
         real(wp) :: time_equil      ! Only for spinup
         real(wp) :: time_const      ! Only for spinup 
         real(wp) :: dtt
-        real(wp) :: dt1D_out        ! Only for transient
-        real(wp) :: dt2D_out        ! Only for transient
+        real(wp) :: dt1D_out
+        real(wp) :: dt2D_out
     end type 
 
     type(ctrl_params)     :: ctl
@@ -233,6 +233,16 @@ program yelmox_ismip6
 
         write(*,*) "Initial equilibration complete."
 
+        ! Initialize output files for checking progress 
+
+        ! 2D file 
+        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
+        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+
+        ! 1D file 
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+        call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+        
         ! Next perform 'coupled' model simulations for desired time
         do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
@@ -276,6 +286,16 @@ program yelmox_ismip6
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+            ! == MODEL OUTPUT ===================================
+            
+            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
+            end if
+
+            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+                call yelmo_write_reg_step(yelmo1,file1D,time=time)
+                 
+            end if 
 
             if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
