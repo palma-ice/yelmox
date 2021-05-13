@@ -113,7 +113,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
@@ -267,7 +267,6 @@
 /
 
 &snap_clim1
-    ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
     clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
     clim_monthly    = False
@@ -281,7 +280,6 @@
 /
 
 &snap_clim2
-    ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
     clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
     clim_monthly    = False
@@ -360,7 +358,7 @@
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
     ! Deep ocean bmb 
-    c_deep          = -1.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
+    c_deep          = -1.0          ! [m/yr] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
     depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depthconst
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
@@ -372,13 +370,13 @@
     lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
 
     ! bmb_method == [lin,quad,quad-nl] 
-    gamma_lin       = 630.0         ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad      = 30000.0       ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
-    gamma_quad_nl   = 40000.0       ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
+    gamma_lin       = 630.0         ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad      = 11100.0       ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
+    gamma_quad_nl   = 14500.0       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
     gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
 
     ! bmb_method == anom
-    kappa_grz       = 10.0          ! [m/a K-1] Heat flux coefficient [kappa*dT]
+    kappa_grz       = 10.0          ! [m/yr K-1] Heat flux coefficient [kappa*dT]
     c_grz           = 1.0           ! [-] bmb_ref scalar [c_grz*bmb_ref]
     f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
     grz_length      = 32.0          ! [km] Length scale of assumed grounding zone
