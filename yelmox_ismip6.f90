@@ -708,7 +708,7 @@ contains
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-if (.TRUE.) then 
+if (.TRUE. .and. present(snp2) .and. present(mshlf2)) then 
     ! Output values from second set of climate objects 
         call nc_write(filename,"Ta_ann_2",snp2%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
