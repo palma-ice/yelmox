@@ -94,35 +94,21 @@ program yelmox_ismip6
     write(*,*) "time_init: ",   ctl%time_init 
     write(*,*) "time_end:  ",   ctl%time_end 
     write(*,*) "dtt:       ",   ctl%dtt 
+    write(*,*) "dt1D_out:  ",   ctl%dt1D_out 
+    write(*,*) "dt2D_out:  ",   ctl%dt2D_out 
     write(*,*) 
+    
+    if (trim(ctl%run_step) .eq. "spinup") then 
+        write(*,*) "time_equil: ",    ctl%time_equil 
+        write(*,*) "time_const: ",    ctl%time_const 
+
+        time_bp = ctl%time_const - 1950.0_wp
+
+    end if 
+
     write(*,*) "time    = ", time 
     write(*,*) "time_bp = ", time_bp 
     
-
-    select case(trim(ctl%run_step))
-
-    case("spinup")
-         
-        time_bp = ctl%time_const - 1950.0_wp 
-
-        write(*,*) "time_equil: ",    ctl%time_equil 
-        write(*,*) "time_const: ",    ctl%time_const 
-        write(*,*) "time_bp:    ",    time_bp 
-
-    case("transient_lgm_to_proj","transient_proj")
-
-        write(*,*) "dt1D_out: ",    ctl%dt1D_out 
-        write(*,*) "dt2D_out: ",    ctl%dt2D_out 
-
-    case DEFAULT 
-        ! Safety check here, to make sure run_step makes sense...
-
-        write(*,*) "yelmox_ismip6:: Error: run_step not recognized."
-        write(*,*) "run_step = ", trim(ctl%run_step)
-        stop 
-
-    end select
-
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -287,7 +273,7 @@ program yelmox_ismip6
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
             ! == MODEL OUTPUT ===================================
-            
+
             if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
             end if
