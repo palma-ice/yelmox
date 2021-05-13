@@ -46,6 +46,7 @@ program yelmox_ismip6
         real(wp) :: time_init
         real(wp) :: time_end
         real(wp) :: time_equil      ! Only for spinup
+        real(wp) :: time_const      ! Only for spinup 
         real(wp) :: dtt
         real(wp) :: dt1D_out        ! Only for transient
         real(wp) :: dt2D_out        ! Only for transient
@@ -66,6 +67,7 @@ program yelmox_ismip6
     call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
     call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
     call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
+    call nml_read(path_par,trim(ctl%run_step),"time_const", ctl%time_const) 
     call nml_read(path_par,trim(ctl%run_step),"dt1D_out",ctl%dt1D_out)          ! [yr] Frequency of 1D output 
     call nml_read(path_par,trim(ctl%run_step),"dt2D_out",ctl%dt2D_out)          ! [yr] Frequency of 2D output 
     
@@ -100,9 +102,13 @@ program yelmox_ismip6
     select case(trim(ctl%run_step))
 
     case("spinup")
+         
+        time_bp = ctl%time_const - 1950.0_wp 
 
         write(*,*) "time_equil: ",    ctl%time_equil 
-    
+        write(*,*) "time_const: ",    ctl%time_const 
+        write(*,*) "time_bp:    ",    time_bp 
+
     case("transient_lgm_to_proj","transient_proj")
 
         write(*,*) "dt1D_out: ",    ctl%dt1D_out 
@@ -232,7 +238,7 @@ program yelmox_ismip6
 
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
-            time_bp = time - 1950.0_wp 
+            time_bp = ctl%time_const - 1950.0_wp 
 
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=time_bp)
@@ -247,15 +253,15 @@ program yelmox_ismip6
 
 
             ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-            if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
+            if (mod(time,ctl%dtt)==0) then
                 ! Update snapclim (for elevation changes, but keep time=time_init)
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ctl%time_init,domain=domain)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
             end if 
 
             ! == SURFACE MASS BALANCE ==============================================
 
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
             yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
@@ -282,7 +288,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart file for the end of the simulation
-        call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        call yelmo_restart_write(yelmo1,file_restart,time=time_bp) 
 
         ! Stop timing 
         call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
