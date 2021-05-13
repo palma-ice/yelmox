@@ -10,6 +10,7 @@
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
     time_const      = -18e3             ! [yr] Year that equilibration represents
+    with_ice_sheet  = True              ! Is the ice sheet active?
 /
 
 &transient_lgm_to_proj
@@ -18,6 +19,7 @@
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
+    with_ice_sheet  = True              ! Is the ice sheet active?
 /
 
 &transient_proj
@@ -26,6 +28,7 @@
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 10.0              ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 50.0              ! [yr] Frequency of writing 2D output files 
+    with_ice_sheet  = True              ! Is the ice sheet active?
 /
 
 

@@ -50,11 +50,11 @@ program yelmox_ismip6
         real(wp) :: dtt
         real(wp) :: dt1D_out
         real(wp) :: dt2D_out
+
+        logical  :: with_ice_sheet 
     end type 
 
     type(ctrl_params)     :: ctl
-
-    logical, parameter :: with_ice_sheet = .FALSE. 
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
@@ -70,6 +70,8 @@ program yelmox_ismip6
     call nml_read(path_par,trim(ctl%run_step),"time_const", ctl%time_const) 
     call nml_read(path_par,trim(ctl%run_step),"dt1D_out",ctl%dt1D_out)          ! [yr] Frequency of 1D output 
     call nml_read(path_par,trim(ctl%run_step),"dt2D_out",ctl%dt2D_out)          ! [yr] Frequency of 2D output 
+    
+    call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     
     ! Set initial time 
     time    = ctl%time_init 
@@ -241,7 +243,7 @@ program yelmox_ismip6
             yelmo1%bnd%z_sl  = sealev%z_sl 
 
             ! == Yelmo ice sheet ===================================================
-            if (with_ice_sheet) call yelmo_update(yelmo1,time)
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
@@ -354,7 +356,7 @@ program yelmox_ismip6
             yelmo1%bnd%z_sl  = sealev%z_sl 
 
             ! == Yelmo ice sheet ===================================================
-            if (with_ice_sheet) call yelmo_update(yelmo1,time)
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
