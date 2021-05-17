@@ -54,6 +54,9 @@ program yelmox_ismip6
         real(wp) :: dt2D_out
 
         logical  :: with_ice_sheet 
+        real(wp) :: time0 
+        real(wp) :: time1 
+
     end type 
 
     type(ctrl_params)     :: ctl
@@ -63,6 +66,8 @@ program yelmox_ismip6
 
     ! Control parameters 
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
+    call nml_read(path_par,"ctrl","time0",      ctl%time0)
+    call nml_read(path_par,"ctrl","time1",      ctl%time1)
     
     ! Read run_step specific control parameters
     call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
@@ -87,8 +92,15 @@ program yelmox_ismip6
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"     
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
-    file_restart_trans  = trim(outfldr)//"yelmo_restart_1500ce.nc"
+    !file_restart_trans  = trim(outfldr)//"yelmo_restart_1500ce.nc"
     file_restart_hist   = trim(outfldr)//"yelmo_restart_1950ce.nc"
+
+    if (ctl%time0 .lt. 1e3) then 
+        write(file_restart_trans,"(a,i3,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), ".nc"
+    else 
+        write(file_restart_trans,"(a,i4,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), ".nc"
+    end if
+
     !  =========================================================
 
 
@@ -365,7 +377,7 @@ program yelmox_ismip6
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
-            if (time .le. 1850.0_wp) then 
+            if (time .le. ctl%time1) then 
 
                 ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
 
@@ -390,7 +402,7 @@ program yelmox_ismip6
                 
             end if 
 
-            if (time .ge. 1500.0_wp) then 
+            if (time .ge. ctl%time0) then 
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
@@ -437,11 +449,11 @@ program yelmox_ismip6
             end if 
 
             ! Determine which forcing to use based on time period 
-            ! LGM to 1500 CE     == snapclim 
-            ! 1500 CE to 1850 CE == linear transition from snapclim to ismip6 
-            ! 1850 CE to future  == ismip6 
+            ! LGM to time0 CE      == snapclim 
+            ! time0 CE to time1 CE == linear transition from snapclim to ismip6 
+            ! time1 CE to future   == ismip6 
 
-            if (time .le. 1500_wp) then 
+            if (time .le. ctl%time0) then 
                 ! Only snapclim-based forcing 
 
                 yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -450,7 +462,7 @@ program yelmox_ismip6
                 yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
                 yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-            else if (time .ge. 1850.0_wp) then 
+            else if (time .ge. ctl%time1) then 
                 ! Only ISMIP6 forcing 
 
                 yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
@@ -462,7 +474,7 @@ program yelmox_ismip6
             else
                 ! Linear-weighted average between snapclim and ismip6 forcing 
 
-                time_wt = (time-1500.0_wp) / (1850.0_wp - 1500.0_wp)
+                time_wt = (time-ctl%time0) / (ctl%time1 - ctl%time0)
 
                 yelmo1%bnd%smb      = (time_wt*smbpal2%ann%smb  + (1.0-time_wt)*smbpal1%ann%smb)  * conv_we_ie*1e-3
                 yelmo1%bnd%T_srf    =  time_wt*smbpal2%ann%tsrf + (1.0-time_wt)*smbpal1%ann%tsrf
@@ -489,7 +501,7 @@ program yelmox_ismip6
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
-            if (time == 1500.0_wp) then 
+            if (time == ctl%time0) then 
                 ! Write restart file at start of transition period
                 call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
             end if 

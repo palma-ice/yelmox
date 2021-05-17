@@ -1,5 +1,7 @@
 &ctrl
     run_step        = "spinup"
+    time0           =  850.0
+    time1           = 1850.0 
 /
 
 &spinup
