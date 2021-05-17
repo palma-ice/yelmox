@@ -2,7 +2,9 @@ module ismip6
     ! This module contains routines that help with performing the ISMIP6 suite
     ! of experiments. 
     
-    use varslice 
+    use nml  
+    use ncio 
+    use varslice
 
     implicit none 
 
@@ -66,9 +68,21 @@ module ismip6
         
     end type
 
+    type ismip6_ice_var_class
+        character(len=56)  :: name 
+        character(len=128) :: long_name
+        character(len=12)  :: var_type
+        character(len=128) :: standard_name 
+        character(len=128) :: units_in
+        character(len=128) :: units_out
+        real(wp) :: unit_scale 
+        real(wp) :: unit_offset
+    end type
+
+        
     ! Class for holding ice output for writing to standard formats...
     type ismip6_ice_class
-
+        type(ismip6_ice_var_class), allocatable :: vars(:)
     end type 
 
 
@@ -77,6 +91,9 @@ module ismip6
     public :: ismip6_ice_class
     public :: ismip6_forcing_init
     public :: ismip6_forcing_update
+
+    public :: ismip6_write_init
+    public :: ismip6_write_step
 
 contains
     
@@ -173,7 +190,7 @@ contains
 
         ! Get slices for current time
 
-        slice_method = "exact" 
+        slice_method = "interp" 
 
         ! === Atmospheric fields ==================================
         
@@ -271,17 +288,6 @@ contains
 
         ! === Additional calculations ======================
 
-        ! Add reference ocean values to current anomalies 
-
-        do k = 1, size(ism%to%var,3)
-            where(ism%to%var(:,:,k,1) .ne. mv .and. ism%to_ref%var(:,:,k,1) .ne. mv)
-                ism%to%var(:,:,k,1) = ism%to%var(:,:,k,1) + ism%to_ref%var(:,:,k,1)
-            end where 
-            where(ism%so%var(:,:,k,1) .ne. mv .and. ism%so_ref%var(:,:,k,1) .ne. mv)
-                ism%so%var(:,:,k,1) = ism%so%var(:,:,k,1) + ism%so_ref%var(:,:,k,1)
-            end where 
-        end do 
-        
         ! Remove missing values, if possible
         do k = 1, size(ism%to%var,3)
             if (count(ism%to%var(:,:,k,1) .ne. mv) .gt. 0) then
@@ -296,8 +302,13 @@ contains
                     ism%so%var(:,:,k,1) = tmp
                 end where 
             end if
-        end do 
-
+            if (count(ism%tf%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%tf%var(:,:,k,1),mask=ism%tf%var(:,:,k,1) .ne. mv)
+                where(ism%tf%var(:,:,k,1) .eq. mv) 
+                    ism%tf%var(:,:,k,1) = tmp
+                end where 
+            end if
+        end do
 
         ! Apply oceanic correction factor to each depth level
         do k = 1, size(ism%to%var,3)
@@ -313,5 +324,217 @@ contains
         return 
 
     end subroutine ismip6_forcing_update
+
+    ! === ISMIP6 OUTPUT ROUTINES ==========
+
+    subroutine ismip6_write_init(filename,xc,yc,time,lon,lat,area,map_name,lambda,phi)
+
+        implicit none 
+
+        character(len=*),   intent(IN) :: filename
+        real(wp),           intent(IN) :: xc(:)
+        real(wp),           intent(IN) :: yc(:)
+        real(wp),           intent(IN) :: time
+        real(wp),           intent(IN) :: lon(:,:)
+        real(wp),           intent(IN) :: lat(:,:)
+        real(wp),           intent(IN) :: area(:,:)
+        character(len=*),   intent(IN) :: map_name
+        real(wp),           intent(IN) :: lambda
+        real(wp),           intent(IN) :: phi 
+
+        ! Local variables 
+        character(len=12) :: xnm 
+        character(len=12) :: ynm 
+        
+        xnm = "xc"
+        ynm = "yc" 
+
+        ! === Initialize netcdf file and dimensions =========
+
+        ! Create the netcdf file 
+        call nc_create(filename)
+
+        ! Add grid axis variables to netcdf file
+        call nc_write_dim(filename,xnm,x=xc*1e-3,units="kilometers")
+        call nc_write_attr(filename,xnm,"_CoordinateAxisType","GeoX")
+
+        call nc_write_dim(filename,ynm,x=yc*1e-3,units="kilometers")
+        call nc_write_attr(filename,ynm,"_CoordinateAxisType","GeoY")
+        
+        ! Add time axis with current value 
+        call nc_write_dim(filename,"time", x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
+        
+        ! Projection information 
+        call nc_write_map(filename,map_name,dble(lambda),phi=dble(phi))
+
+        ! Lat-lon information
+        call nc_write(filename,"lon2D",lon,dim1=xnm,dim2=ynm,grid_mapping=map_name)
+        call nc_write_attr(filename,"lon2D","_CoordinateAxisType","Lon")
+        call nc_write(filename,"lat2D",lat,dim1=xnm,dim2=ynm,grid_mapping=map_name)
+        call nc_write_attr(filename,"lat2D","_CoordinateAxisType","Lat")
+
+        call nc_write(filename,"area",  area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=map_name,units="km^2")
+        call nc_write_attr(filename,"area","coordinates","lat2D lon2D")
+        
+
+        return
+
+    end subroutine ismip6_write_init
+
+
+    subroutine ismip6_write_step(filename,file_nml,time)
+
+        implicit none 
+
+        character(len=*),   intent(IN) :: filename
+        character(len=*),   intent(IN) :: file_nml 
+        real(wp),           intent(IN) :: time 
+
+        ! Local variables 
+        integer    :: ncid, n
+        real(wp) :: time_prev 
+        type(ismip6_ice_class) :: ismp 
+
+if (.FALSE.) then    
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+end if 
+        ! Load up output variable meta information 
+        call ismip6_load_ice_var_info(ismp,file_nml,verbose=.TRUE.)
+
+        ! Proceed to calculating and writing each variable 
+
+        ! Variables to output every five years 
+        if (time - time_prev .ge. 5.0_wp) then 
+            ! Five years have passed, proceed 
+
+
+
+
+        end if 
+
+
+        ! Next, variables that should be output every year 
+        return
+
+    end subroutine ismip6_write_step
+
+    subroutine ismip6_load_ice_var_info(ismp,filename,verbose)
+
+        implicit none 
+
+        type(ismip6_ice_class), intent(OUT) :: ismp 
+        character(len=*),       intent(IN)  :: filename 
+        logical,                intent(IN)  :: verbose 
+
+        ! Local variables
+        integer :: n  
+        integer, parameter :: n_variables = 38
+
+        type(ismip6_ice_var_class) :: v 
+
+        ! First initialize ismp object to hold variable meta data 
+        if (allocated(ismp%vars)) deallocate(ismp%vars)
+        allocate(ismp%vars(n_variables))
+
+        ! Load individual variables by namelist group 
+        call ice_var_par_load(ismp%vars(1), filename,var_name="lithk")
+        call ice_var_par_load(ismp%vars(2), filename,var_name="orog")
+        call ice_var_par_load(ismp%vars(3), filename,var_name="base")
+        call ice_var_par_load(ismp%vars(4), filename,var_name="topg")
+        call ice_var_par_load(ismp%vars(5), filename,var_name="hfgeoubed")
+        call ice_var_par_load(ismp%vars(6), filename,var_name="acabf")
+        call ice_var_par_load(ismp%vars(7), filename,var_name="libmassbfgr")
+        call ice_var_par_load(ismp%vars(8), filename,var_name="libmassbffl")
+        call ice_var_par_load(ismp%vars(9), filename,var_name="dlithkdt")
+        call ice_var_par_load(ismp%vars(10),filename,var_name="xvelsurf")
+        call ice_var_par_load(ismp%vars(11),filename,var_name="yvelsurf")
+        call ice_var_par_load(ismp%vars(12),filename,var_name="zvelsurf")
+        call ice_var_par_load(ismp%vars(13),filename,var_name="xvelbase")
+        call ice_var_par_load(ismp%vars(14),filename,var_name="yvelbase")
+        call ice_var_par_load(ismp%vars(15),filename,var_name="zvelbase")
+        call ice_var_par_load(ismp%vars(16),filename,var_name="xvelmean")
+        call ice_var_par_load(ismp%vars(17),filename,var_name="yvelmean")
+        call ice_var_par_load(ismp%vars(18),filename,var_name="litemptop")
+        call ice_var_par_load(ismp%vars(19),filename,var_name="litempbotgr")
+        call ice_var_par_load(ismp%vars(20),filename,var_name="litempbotfl")
+        call ice_var_par_load(ismp%vars(21),filename,var_name="strbasemag")
+        call ice_var_par_load(ismp%vars(22),filename,var_name="licalvf")
+        call ice_var_par_load(ismp%vars(23),filename,var_name="lifmassbf")
+        call ice_var_par_load(ismp%vars(24),filename,var_name="lifmassbf")
+        call ice_var_par_load(ismp%vars(25),filename,var_name="ligroundf")
+        call ice_var_par_load(ismp%vars(26),filename,var_name="sftgif")
+        call ice_var_par_load(ismp%vars(27),filename,var_name="sftgrf")
+        call ice_var_par_load(ismp%vars(28),filename,var_name="sftflf")
+
+        call ice_var_par_load(ismp%vars(29),filename,var_name="lim")
+        call ice_var_par_load(ismp%vars(30),filename,var_name="limnsw")
+        call ice_var_par_load(ismp%vars(31),filename,var_name="iareagr")
+        call ice_var_par_load(ismp%vars(32),filename,var_name="iareafl")
+        call ice_var_par_load(ismp%vars(33),filename,var_name="tendacabf")
+        call ice_var_par_load(ismp%vars(34),filename,var_name="tendlibmassbf")
+        call ice_var_par_load(ismp%vars(35),filename,var_name="tendlibmassbffl")
+        call ice_var_par_load(ismp%vars(36),filename,var_name="tendlicalvf")
+        call ice_var_par_load(ismp%vars(37),filename,var_name="tendlifmassbf")
+        call ice_var_par_load(ismp%vars(38),filename,var_name="tendligroundf")
+
+        if (verbose) then 
+
+            ! === Print summary =========
+
+            write(*,"(a40,a8,a65,a15)") &
+                                    "Variable name",    &
+                                    "Type",             &
+                                    "Standard name",    &
+                                    "Unit"
+            
+            do n = 1, n_variables 
+                v = ismp%vars(n)
+                write(*,"(a40,a8,a65,a15)") &
+                                    trim(v%long_name),      &
+                                    trim(v%var_type),       &
+                                    trim(v%standard_name),  &
+                                    trim(v%units_out) 
+            end do 
+
+
+        end if 
+
+        return 
+
+    end subroutine ismip6_load_ice_var_info
+
+    subroutine ice_var_par_load(ismpv,filename,var_name)
+        ! Load parmaeters associated with a given ice variable
+
+        implicit none 
+
+        type(ismip6_ice_var_class), intent(OUT) :: ismpv 
+        character(len=*),           intent(IN)  :: filename 
+        character(len=*),           intent(IN)  :: var_name
+
+        ! Local variables 
+        character(len=56) :: group 
+
+        group = "ismip6_out_"//trim(var_name)
+
+        call nml_read(filename,group,"name",            ismpv%name)
+        call nml_read(filename,group,"long_name",       ismpv%long_name)
+        call nml_read(filename,group,"var_type",        ismpv%var_type)
+        call nml_read(filename,group,"standard_name",   ismpv%standard_name)
+        call nml_read(filename,group,"units_in",        ismpv%units_in)
+        call nml_read(filename,group,"units_out",       ismpv%units_out)
+        call nml_read(filename,group,"unit_scale",      ismpv%unit_scale)
+        call nml_read(filename,group,"unit_offset",     ismpv%unit_offset)
+
+        return 
+
+    end subroutine ice_var_par_load
 
 end module ismip6

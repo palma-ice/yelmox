@@ -77,6 +77,7 @@ contains
         type(varslice_param_class) :: par 
         logical  :: with_time 
         real(wp) :: time_range(2) 
+        real(wp) :: time_wt(2)
         character(len=56) :: slice_method
         character(len=56) :: vec_method 
         integer  :: range_rep 
@@ -176,12 +177,30 @@ contains
             else 
                 ! Cases with a time dimension (more complicated)
 
-                ! Determine time indices
-                ! nt = size(vs%time)
-                ! do k_now = 1, nt 
-                !     if (vs%time(k_now) .eq. time_now) exit 
-                ! end do
-                call get_indices(k0,k1,vs%time,vs%time_range,trim(slice_method))
+                if (trim(slice_method) .eq. "interp" .or. &
+                    trim(slice_method) .eq. "extrap") then 
+                    ! Update time range for interp/extrap methods 
+
+                    ! Time range should cover all available data since 
+                    ! bracketing indices to the desired time will be found
+                    vs%time_range(1) = minval(vs%time) 
+                    vs%time_range(2) = maxval(vs%time) 
+
+                    ! Additional consistency check 
+                    if (size(time,1) .ne. 1) then 
+                        write(*,*) "varslice_update:: Error: to use slice_method=['interp','extrap'], &
+                        &only one time should be provided as an argument."
+                        write(*,*) "time = ", time 
+                        stop 
+                    end if 
+
+                end if 
+
+                ! Determine indices of data to load 
+
+                call get_indices(k0,k1,vs%time,vs%time_range,trim(slice_method),time(1))
+
+
 
                 if (k0 .gt. 0 .and. k1 .gt. 0) then 
                     ! Dimension range is available for loading, proceed 
@@ -249,10 +268,21 @@ contains
                     ! appropriate size and perform any calculations on the time 
                     ! indices of the local var variable as needed. 
 
+                    ! Handle special case: if only one time is available 
+                    ! for interp/extrap methods, then change method 
+                    ! to exact 
+                    if ( (trim(vs%slice_method) .eq. "interp" .or. & 
+                          trim(vs%slice_method) .eq. "extrap") .and. &
+                          vs%time(k0) .eq. vs%time(k1)) then 
+                        ! Same time is given for upper and lower bound
+
+                        slice_method = "exact"     
+                    end if 
+
 
                     ! Now, allocate the vs%var variable to the right size 
 
-                    select case(trim(vs%slice_method)) 
+                    select case(trim(slice_method)) 
 
                         case("exact","range")
                             ! Allocate vs%var to the same size as var 
@@ -274,6 +304,86 @@ contains
 
                             ! Store data in vs%var 
                             vs%var = var 
+
+                        case("interp","extrap")
+                            ! var should have two time dimensions to interpolate
+                            ! between. Allocate vs%var to appropriate size and 
+                            ! perform interpolation 
+
+                            if (nt_now .ne. 2) then 
+                                write(*,*) "varslice_update:: Error: something went wrong during &
+                                &interpolation. More than 2 time slices are available to interpolate &
+                                &between. Check!"
+                                write(*,*) "nt_now = ", nt_now 
+                                write(*,*) "time   = ", time 
+                                write(*,*) "indices k0, k1: ", k0, k1 
+                                write(*,*) "times : ", vs%time(k0:k1) 
+                                stop 
+                            end if 
+
+                            ! Calculate time weighting between two extremes
+                            time_wt(2) = (time(1)-vs%time(k0)) / (vs%time(k1) - vs%time(k0))
+                            time_wt(1) = 1.0_wp - time_wt(2) 
+
+                            if (minval(time_wt) .lt. 0.0_wp .or. maxval(time_wt) .gt. 1.0_wp) then 
+                                write(*,*) "varslice_update:: Error: interpolation weights are incorrect."
+                                write(*,*) "time_wt  = ", time_wt 
+                                write(*,*) "time     = ", time 
+                                write(*,*) "time(k0) = ", vs%time(k0)
+                                write(*,*) "time(k1) = ", vs%time(k1) 
+                                stop
+                            end if 
+                            
+                            ! Note: slice_method='interp' and 'extrap' use the same method, since 
+                            ! the indices determine interpolation weights (ie, 
+                            ! for slice_method='interp', if the time of interest lies
+                            ! outside of the bounds of the data, then k0=k1=-1 and 
+                            ! output data are set to missing values) 
+
+                            vec_method = "mean"     ! interp methods use the (weighted) mean
+                            nt_out     = 1          ! We expect one time out 
+
+                            deallocate(vs%var)
+
+                            select case(par%ndim)
+
+                                case(1)
+                                    allocate(vs%var(nt_out,1,1,1))
+
+                                    ! Calculate the vector value desired (wtd mean)
+                                    call calc_vec_value(vs%var(1,1,1,1),var([1,2],1,1,1),vec_method,mv,wt=time_wt)
+
+                                case(2)
+                                    allocate(vs%var(size(var,1),nt_out,1,1))
+
+                                    do i = 1, size(vs%var,1)
+                                        ! Calculate the vector value desired (mean,sd,...)
+                                        call calc_vec_value(vs%var(i,1,1,1),var(i,[1,2],1,1),vec_method,mv,wt=time_wt)
+                                    end do 
+                                    
+                                case(3)
+                                    allocate(vs%var(size(var,1),size(var,2),nt_out,1))
+                                    
+                                    do j = 1, size(vs%var,2)
+                                    do i = 1, size(vs%var,1)
+                                        ! Calculate the vector value desired (mean,sd,...)
+                                        call calc_vec_value(vs%var(i,j,1,1),var(i,j,[1,2],1),vec_method,mv,wt=time_wt)
+                                    end do
+                                    end do 
+                                    
+                                case(4)
+                                    allocate(vs%var(size(var,1),size(var,2),size(var,3),nt_out))
+
+                                    do l = 1, size(vs%var,3)
+                                    do j = 1, size(vs%var,2)
+                                    do i = 1, size(vs%var,1)
+                                        ! Calculate the vector value desired (mean,sd,...)
+                                        call calc_vec_value(vs%var(i,j,l,1),var(i,j,l,[1,2]),vec_method,mv,wt=time_wt)
+                                    end do
+                                    end do
+                                    end do 
+                                    
+                            end select
 
                         case("range_mean","range_sd","range_min","range_max","range_sum")
                             ! Allocate vs%var to match desired output size, 
@@ -381,7 +491,7 @@ contains
 
 
                     end select
-                    
+
                 else 
                     ! Dimension range was not found, set variable to missing values 
 
@@ -406,7 +516,7 @@ contains
     end subroutine varslice_update
 
 
-    subroutine get_indices(k0,k1,x,xrange,slice_method)
+    subroutine get_indices(k0,k1,x,xrange,slice_method,x_interp)
         ! Get the indices k0 and k1 that 
         ! correspond to the lower and upper bound 
         ! range of xmin <= x <= xmax. 
@@ -423,6 +533,7 @@ contains
         real(wp), intent(IN)  :: x(:) 
         real(wp), intent(IN)  :: xrange(2)
         character(len=*), intent(IN) :: slice_method 
+        real(wp), intent(IN)  :: x_interp               ! only used for interp methods
 
         ! Local variables 
         integer  :: k, nk 
@@ -460,16 +571,77 @@ contains
 
             case("exact") 
 
+                ! If index wasn't found, set idices to -1
                 if (x(k0) .ne. xmin) then 
                     k0 = -1 
                     k1 = -1 
                 end if 
      
+            case("interp") 
+
+                ! If xmin/xmax are not found in range, set indices to -1
+                if (x_interp .gt. xmax .or. x_interp .lt. xmin) then 
+                    k0 = -1
+                    k1 = -1 
+
+                else 
+
+                    ! Redo indices to get nearest bracketing points in time_range
+
+                    ! Get lower bound 
+                    k0 = 1 
+                    do k = 1, nk 
+                        if (x(k) .gt. x_interp) exit 
+                        k0 = k 
+                    end do 
+
+                    ! Get upper bound 
+                    k1 = nk 
+                    do k = nk, k0, -1 
+                        if (x(k) .lt. x_interp) exit 
+                        k1 = k 
+                    end do 
+
+                end if 
+
+            case("extrap") 
+
+                ! If xmin/xmax are not found in range, 
+                ! set indices to extreme bound
+                if (minval(x) .gt. x_interp) then 
+
+                    k0 = 1
+                    k1 = 1 
+                
+                else if (maxval(x) .lt. x_interp) then 
+
+                    k0 = nk
+                    k1 = nk
+
+                else 
+
+                    ! Redo indices to get nearest bracketing points in time_range
+
+                    ! Get lower bound 
+                    k0 = 1 
+                    do k = 1, nk 
+                        if (x(k) .gt. x_interp) exit 
+                        k0 = k 
+                    end do 
+
+                    ! Get upper bound 
+                    k1 = nk 
+                    do k = nk, k0, -1 
+                        if (x(k) .lt. x_interp) exit 
+                        k1 = k 
+                    end do 
+
+                end if 
 
             case("range","range_mean","range_sd","range_min","range_max") 
-
-                if ( xmin .ne. xmax .and. &
-                      (k0 .eq. size(x,1) .or. k1 .eq. 1) ) then 
+                 
+                ! If xmin/xmax are not found in range, set indices to -1
+                if (minval(x) .gt. xmax .or. maxval(x) .lt. xmin) then 
                     k0 = -1
                     k1 = -1 
                 end if 
@@ -523,7 +695,7 @@ contains
 
     end subroutine get_rep_indices
 
-    subroutine calc_vec_value(val,var,method,mv)
+    subroutine calc_vec_value(val,var,method,mv,wt)
 
         implicit none 
 
@@ -531,33 +703,47 @@ contains
         real(wp),         intent(IN)  :: var(:) 
         character(len=*), intent(IN)  :: method 
         real(wp),         intent(IN)  :: mv 
+        real(wp),         intent(IN), optional :: wt(:) 
 
         ! Local variables 
         integer  :: ntot 
         real(wp) :: mean, variance 
+        real(wp), allocatable :: wt_now(:) 
 
         ntot = count(var .ne. mv)
         
         if (ntot .gt. 0) then 
             ! Values available for calculations 
 
+            allocate(wt_now(size(var)))
+            if (present(wt)) then 
+                wt_now = wt 
+            else 
+                wt_now = 1.0_wp
+            end if 
+
+            where(var .eq. mv) wt_now = 0.0_wp 
+
             select case(trim(method))
 
-                case("sum")
+                case("sum","mean")
+                    ! Calculate a weighted sum/mean with the right weights for each case 
 
-                    val = sum(var,mask=var.ne.mv)
-
-                case("mean")
-
-                    val = sum(var,mask=var.ne.mv) / real(ntot,wp)
+                    ! Normalize weights to sum to one
+                    if (trim(method) .eq. "mean") wt_now = wt_now / sum(wt_now)
+                    
+                    val = sum(wt_now*var)
 
                 case("sd")
+                    ! Calculate the weighted mean and then weighted standard deviation 
+
+                    ! Normalize weights to sum to one
+                    wt_now = wt_now / sum(wt_now)
 
                     if (ntot .ge. 2) then
 
-                        mean     = sum(var,mask=var.ne.mv) / real(ntot,wp)
-                        variance = real(ntot/(ntot-1),wp) &
-                                        *sum( (var-mean)**2, mask=var.ne.mv)
+                        mean     = sum(wt_now*var)
+                        variance = real(ntot/(ntot-1),wp) * sum( wt_now*(var-mean)**2 )
                         val      = sqrt(variance)
 
                     else 
