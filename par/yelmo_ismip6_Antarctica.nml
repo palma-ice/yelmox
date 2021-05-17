@@ -1,5 +1,5 @@
 &ctrl
-    run_step        = "spinup"
+    run_step        = "transient_lgm_to_proj"
     time0           =  850.0
     time1           = 1850.0 
 /
@@ -40,7 +40,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "None"
+    restart         = "../spinup/yelmo_restart.nc"
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
