@@ -96,9 +96,9 @@ program yelmox_ismip6
     file_restart_hist   = trim(outfldr)//"yelmo_restart_1950ce.nc"
 
     if (ctl%time0 .lt. 1e3) then 
-        write(file_restart_trans,"(a,i3,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), ".nc"
+        write(file_restart_trans,"(a,i3,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), "ce.nc"
     else 
-        write(file_restart_trans,"(a,i4,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), ".nc"
+        write(file_restart_trans,"(a,i4,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), "ce.nc"
     end if
 
     !  =========================================================

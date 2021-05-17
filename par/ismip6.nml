@@ -38,7 +38,7 @@
     name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
-    unit_scale  = 34654.9492 
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
     unit_offset = 0.0 
     with_time   = FALSE 
     time_par    = 1995, 1995, 0
@@ -60,7 +60,7 @@
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31536000.0 
+    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
     time_par    = 1950, 1994, 1
@@ -71,7 +71,7 @@
     name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
-    unit_scale  = 34654.9492
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
     unit_offset = 0.0 
     with_time   = True 
     time_par    = 1950, 1994, 1
@@ -93,7 +93,7 @@
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31536000.0 
+    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
     time_par    = 1995, 2100, 1
@@ -104,7 +104,7 @@
     name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
-    unit_scale  = 34654.9492
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
     unit_offset = 0.0 
     with_time   = True 
     time_par    = 1995, 2100, 1
@@ -172,8 +172,8 @@
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
-    unit_scale  = 273.15
-    unit_offset = 0.0 
+    unit_scale  = 1.0
+    unit_offset = 273.15 
     with_time   = True 
     time_par    = 1850, 1994, 1
 /
@@ -205,8 +205,8 @@
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
-    unit_scale  = 273.15
-    unit_offset = 0.0 
+    unit_scale  = 1.0
+    unit_offset = 273.15 
     with_time   = True 
     time_par    = 1995, 2100, 1
 /
@@ -302,7 +302,7 @@
     standard_name   = "land_ice_surface_specific_mass_balance_flux"
     units_in        = "m i.e. yr^-1"
     units_out       = "kg m^-2 s^-1"
-    unit_scale      = 2.885590725e-5    ! == 1/34654.9492 
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
 
@@ -313,7 +313,7 @@
     standard_name   = "land_ice_basal_specific_mass_balance_flux"
     units_in        = "m i.e. yr^-1"
     units_out       = "kg m^-2 s^-1"
-    unit_scale      = 2.885590725e-5    ! == 1/34654.9492 
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
 
@@ -324,10 +324,9 @@
     standard_name   = "land_ice_basal_specific_mass_balance_flux"
     units_in        = "m i.e. yr^-1"
     units_out       = "kg m^-2 s^-1"
-    unit_scale      = 2.885590725e-5    ! == 1/34654.9492 
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
-
 
 &ismip6_out_dlithkdt
     name            = "dlithkdt"
@@ -336,7 +335,7 @@
     standard_name   = "tendency_of_land_ice_thickness"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -347,7 +346,7 @@
     standard_name   = "land_ice_surface_x_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -358,7 +357,7 @@
     standard_name   = "land_ice_surface_y_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -369,7 +368,7 @@
     standard_name   = "land_ice_surface_upward_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -381,7 +380,7 @@
     standard_name   = "land_ice_basal_x_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -392,7 +391,7 @@
     standard_name   = "land_ice_basal_y_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -403,7 +402,7 @@
     standard_name   = "land_ice_basal_upward_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -414,7 +413,7 @@
     standard_name   = "land_ice_vertical_mean_x_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -425,7 +424,7 @@
     standard_name   = "land_ice_vertical_mean_y_velocity"
     units_in        = "m yr^-1"
     units_out       = "m s^-1"
-    unit_scale      =  3.170979e-8    ! == 1/31536000.0
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -480,7 +479,7 @@
     standard_name   = "land_ice_specific_mass_flux_due_to_calving"
     units_in        = "m i.e. yr^-1"
     units_out       = "kg m^-2 s^-1"
-    unit_scale      = 2.885590725e-5    ! == 1/34654.9492 
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
 
@@ -491,7 +490,7 @@
     standard_name   = "land_ice_specific_mass_flux_due_to_calving_and_ice_front_melting"
     units_in        = "m i.e. yr^-1"
     units_out       = "kg m^-2 s^-1"
-    unit_scale      = 2.885590725e-5    ! == 1/34654.9492 
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
 &ismip6_out_ligroundf
@@ -501,7 +500,7 @@
     standard_name   = "land_ice_specific_mass_flux_at_grounding_line"
     units_in        = "m i.e. yr^-1"
     units_out       = "kg m^-2 s^-1"
-    unit_scale      = 2.885590725e-5    ! == 1/34654.9492 
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
 
@@ -589,7 +588,7 @@
     standard_name   = "tendency_of_land_ice_mass_due_to_surface_mass_balance"
     units_in        = "kg yr^-1"
     units_out       = "kg s^-1"
-    unit_scale      = 3.170979e-8    ! == 1/31536000.0
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -600,7 +599,7 @@
     standard_name   = "tendency_of_land_ice_mass_due_to_basal_mass_balance"
     units_in        = "kg yr^-1"
     units_out       = "kg s^-1"
-    unit_scale      = 3.170979e-8    ! == 1/31536000.0
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -611,7 +610,7 @@
     standard_name   = "tendency_of_land_ice_mass_due_to_basal_mass_balance"
     units_in        = "kg yr^-1"
     units_out       = "kg s^-1"
-    unit_scale      = 3.170979e-8    ! == 1/31536000.0
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -622,7 +621,7 @@
     standard_name   = "tendency_of_land_ice_mass_due_to_calving"
     units_in        = "kg yr^-1"
     units_out       = "kg s^-1"
-    unit_scale      = 3.170979e-8    ! == 1/31536000.0
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
 
@@ -633,7 +632,7 @@
     standard_name   = "tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting"
     units_in        = "kg yr^-1"
     units_out       = "kg s^-1"
-    unit_scale      = 3.170979e-8    ! == 1/31536000.0
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
 &ismip6_out_tendligroundf
@@ -643,6 +642,6 @@
     standard_name   = "tendency_of_grounded_ice_mass"
     units_in        = "kg yr^-1"
     units_out       = "kg s^-1"
-    unit_scale      = 3.170979e-8    ! == 1/31536000.0
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
