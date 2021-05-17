@@ -20,7 +20,9 @@ program yelmox_ismip6
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     character(len=256) :: outfldr, file1D, file2D
-    character(len=256) :: file_restart, file_restart_hist
+    character(len=256) :: file_restart
+    character(len=256) :: file_restart_hist
+    character(len=256) :: file_restart_trans
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
     integer    :: n, m
@@ -85,6 +87,7 @@ program yelmox_ismip6
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"     
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
+    file_restart_trans  = trim(outfldr)//"yelmo_restart_1500ce.nc"
     file_restart_hist   = trim(outfldr)//"yelmo_restart_1950ce.nc"
     !  =========================================================
 
@@ -362,7 +365,7 @@ program yelmox_ismip6
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
-            if (time .lt. 1850.0_wp) then 
+            if (time .le. 1850.0_wp) then 
 
                 ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
 
@@ -387,7 +390,7 @@ program yelmox_ismip6
                 
             end if 
 
-            if (time .gt. 850.0_wp) then 
+            if (time .ge. 1500.0_wp) then 
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
@@ -434,11 +437,11 @@ program yelmox_ismip6
             end if 
 
             ! Determine which forcing to use based on time period 
-            ! LGM to 850 CE     == snapclim 
-            ! 850 CE to 1850 CE == linear transition from snapclim to ismip6 
-            ! 1850 CE to future == ismip6 
+            ! LGM to 1500 CE     == snapclim 
+            ! 1500 CE to 1850 CE == linear transition from snapclim to ismip6 
+            ! 1850 CE to future  == ismip6 
 
-            if (time .le. 850_wp) then 
+            if (time .le. 1500_wp) then 
                 ! Only snapclim-based forcing 
 
                 yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -459,7 +462,7 @@ program yelmox_ismip6
             else
                 ! Linear-weighted average between snapclim and ismip6 forcing 
 
-                time_wt = (time-850.0_wp) / (1850.0_wp - 850.0_wp)
+                time_wt = (time-1500.0_wp) / (1850.0_wp - 1500.0_wp)
 
                 yelmo1%bnd%smb      = (time_wt*smbpal2%ann%smb  + (1.0-time_wt)*smbpal1%ann%smb)  * conv_we_ie*1e-3
                 yelmo1%bnd%T_srf    =  time_wt*smbpal2%ann%tsrf + (1.0-time_wt)*smbpal1%ann%tsrf
@@ -486,6 +489,11 @@ program yelmox_ismip6
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
+            if (time == 1500.0_wp) then 
+                ! Write restart file at start of transition period
+                call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
+            end if 
+
             if (time == 1950.0_wp) then 
                 ! Write restart file at start of hist period
                 call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
