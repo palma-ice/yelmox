@@ -347,11 +347,13 @@ program yelmox_ismip6
 
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
-        
+
+if (ctl%with_ice_sheet) then 
         ! Run yelmo alone for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
         call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,     dt=1.0_wp,topo_fixed=.FALSE.)
         call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
+end if 
 
         write(*,*) "Initial equilibration complete."
 
@@ -395,9 +397,9 @@ program yelmox_ismip6
             ! Calculate smb for present day 
             call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
                                        yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-            
+
             ! Apply ISMIP6 anomalies
-            ! (apply to climate just for consistency)
+            ! (apply to climate too, just for consistency)
 
             smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
             smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
@@ -409,15 +411,15 @@ program yelmox_ismip6
 
             snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
             if (trim(domain) .eq. "Antarctica") then 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0     ! Antarctica summer
             else 
-                snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
+                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0      ! NH summer 
             end if 
             snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
             
             ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
             call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismp1%to%lev, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
                             ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
                             dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
                             tf_ann=ismp1%tf%var(:,:,:,1))
@@ -429,6 +431,9 @@ program yelmox_ismip6
             snp1    = snp2
             smbpal1 = smbpal2  
             mshlf1  = mshlf2 
+
+            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -582,7 +587,7 @@ program yelmox_ismip6
                 
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismp1%to%lev, &
+                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
                                 ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
                                 dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
                                 tf_ann=ismp1%tf%var(:,:,:,1))

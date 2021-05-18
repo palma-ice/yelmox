@@ -19,7 +19,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = FALSE 
-    time_par    = 1995, 1995, 0
+    time_par    = 1995, 2014, 0
 /
 
 &noresm_rcp85_pr_ref
@@ -30,7 +30,7 @@
     unit_scale  = 31556926.0        ! ISMIP standard sec_to_year 
     unit_offset = 0.0 
     with_time   = FALSE 
-    time_par    = 1995, 1995, 0
+    time_par    = 1995, 2014, 0
 /
 
 &noresm_rcp85_smb_ref
@@ -41,7 +41,7 @@
     unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
     unit_offset = 0.0 
     with_time   = FALSE 
-    time_par    = 1995, 1995, 0
+    time_par    = 1995, 2014, 0
 /
 
 &noresm_rcp85_ts_hist
@@ -131,7 +131,7 @@
     unit_scale  = 1.0 
     unit_offset = 273.15 
     with_time   = False 
-    time_par    = 1995, 1995, 1
+    time_par    = 1995, 2017, 1
 /
 
 &so_ref
@@ -142,7 +142,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = False 
-    time_par    = 1995, 1995, 1
+    time_par    = 1995, 2017, 1
 /
 
 &tf_ref
@@ -153,7 +153,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = False 
-    time_par    = 1995, 1995, 1
+    time_par    = 1995, 2017, 1
 /
 
 &tf_cor

@@ -17,11 +17,11 @@
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 1e3               ! [yr] Ending time (model years)
+    time_end        = 50e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
+    dt1D_out        = 100. 0            ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
 /
@@ -37,11 +37,11 @@
 
 &transient_proj
     time_init       = 1950.0            ! [yr] Starting time (years CE)
-    time_end        = 2300.0            ! [yr] Ending time (years CE)
+    time_end        = 2100.0            ! [yr] Ending time (years CE)
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 10.0              ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 50.0              ! [yr] Frequency of writing 2D output files 
-    with_ice_sheet  = True              ! Is the ice sheet active?
+    with_ice_sheet  = False             ! Is the ice sheet active?
 /
 
 
@@ -371,14 +371,14 @@
 &marine_shelf
     bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
     tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
-    interp_depth    = "shlf"        ! "shlf", "bed", "const"
+    interp_depth    = "shlf         ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
     ! Deep ocean bmb 
     c_deep          = -1.0          ! [m/yr] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
-    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depthconst
+    depth_const     =    0.0        ! [m] Constant shelf depth for interp_depthconst
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
     depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
     

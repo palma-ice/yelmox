@@ -21,7 +21,7 @@ module marine_shelf
     integer,  parameter :: wp = sp 
 
     ! Physical constants 
-    real(wp), parameter :: rho_ice =  917.d0    ! Density ice           [kg/m^3] 
+    real(wp), parameter :: rho_ice =  918.d0    ! Density ice           [kg/m^3] 
     real(wp), parameter :: rho_w   = 1000.d0    ! Density water         [kg/m^3] 
     real(wp), parameter :: rho_sw  = 1028.d0    ! Density seawater      [kg/m^3] 
     real(wp), parameter :: g       = 9.81d0     ! Gravitational accel.  [m/s^2]
