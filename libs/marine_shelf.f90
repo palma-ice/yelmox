@@ -170,7 +170,7 @@ contains
                     write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
 
             end select
-
+            
             ! 2. Calculate weighting function for vertical depths ===========================
 
             select case(trim(mshlf%par%interp_method))
