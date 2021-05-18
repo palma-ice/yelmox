@@ -176,12 +176,13 @@ contains
     end subroutine ismip6_forcing_init
 
 
-    subroutine ismip6_forcing_update(ism,time)
+    subroutine ismip6_forcing_update(ism,time,use_ref_ocn)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         real(wp), intent(IN) :: time
+        logical,  intent(IN), optional :: use_ref_ocn 
 
         ! Local variables 
         integer  :: k 
@@ -202,7 +203,7 @@ contains
 
             ism%ts  = ism%ts_hist 
             ism%pr  = ism%pr_hist 
-            ism%smb = ism%smb_hist 
+            ism%smb = ism%smb_hist
             
         else if (time .ge. 1950 .and. time .le. 1994) then 
 
@@ -284,7 +285,15 @@ contains
             
         end if
 
-            
+        if (present(use_ref_ocn)) then 
+        if (use_ref_ocn) then  
+
+            ism%to = ism%to_ref 
+            ism%so = ism%so_ref 
+            ism%tf = ism%tf_ref 
+
+        end if 
+        end if
 
         ! === Additional calculations ======================
 

@@ -1,5 +1,5 @@
 &ctrl
-    run_step        = "transient_lgm_to_proj"
+    run_step        = "spinup_ismip6"
     time0           =  850.0
     time1           = 1850.0 
 /
@@ -12,6 +12,17 @@
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
     time_const      = -18e3             ! [yr] Year that equilibration represents
+    with_ice_sheet  = True              ! Is the ice sheet active?
+/
+
+&spinup_ismip6
+    time_init       = 0.0               ! [yr] Starting time (model years)
+    time_end        = 1e3               ! [yr] Ending time (model years)
+    time_equil      = 10.0              ! [yr] Equilibration time 
+    dtt             = 5.0               ! [yr] Main loop timestep 
+    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
+    time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
 /
 
@@ -40,7 +51,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "../spinup/yelmo_restart.nc"
+    restart         = "None"
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
@@ -189,7 +200,7 @@
 &yelmo_masks
     basins_load     = True 
     basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin" "basin_mask"
+    basins_nms      = "basin_reese" "basin_mask"
     regions_load    = True 
     regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     regions_nms     = "mask" "None"

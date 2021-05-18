@@ -92,7 +92,6 @@ program yelmox_ismip6
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"     
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
-    !file_restart_trans  = trim(outfldr)//"yelmo_restart_1500ce.nc"
     file_restart_hist   = trim(outfldr)//"yelmo_restart_1950ce.nc"
 
     if (ctl%time0 .lt. 1e3) then 
@@ -115,7 +114,8 @@ program yelmox_ismip6
     write(*,*) "dt2D_out:  ",   ctl%dt2D_out 
     write(*,*) 
     
-    if (trim(ctl%run_step) .eq. "spinup") then 
+    if (trim(ctl%run_step) .eq. "spinup" .or. &
+        trim(ctl%run_step) .eq. "spinup_ismip6") then 
         write(*,*) "time_equil: ",    ctl%time_equil 
         write(*,*) "time_const: ",    ctl%time_const 
 
@@ -308,6 +308,150 @@ program yelmox_ismip6
 
         write(*,*)
         write(*,*) "Spinup complete."
+        write(*,*)
+
+        ! Write the restart file for the end of the simulation
+        call yelmo_restart_write(yelmo1,file_restart,time=time_bp) 
+
+        ! Stop timing 
+        call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+
+        write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    
+    case("spinup_ismip6")
+        ! Model can start from no spinup or equilibration (using restart file), 
+        ! here it is run under constant boundary conditions to spinup 
+        ! desired state. 
+
+        write(*,*)
+        write(*,*) "Performing spinup_ismip6."
+        write(*,*) 
+
+        ! Initialize variables inside of ismip6 object 
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
+                                                domain="Antarctica",grid_name="ANT-32KM")
+
+        ! Update ismip6 forcing to current time
+        call ismip6_forcing_update(ismp1,time)
+
+        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
+        
+        snp2    = snp1 
+        smbpal2 = smbpal1
+        mshlf2  = mshlf1
+        
+        ! Make sure that tf is prescribed externally
+        mshlf2%par%tf_method = 0 
+        
+
+        ! Start timing 
+        call yelmo_cpu_time(cpu_start_time)
+        
+        ! Run yelmo alone for several years with constant boundary conditions and topo
+        ! to equilibrate thermodynamics and dynamics
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,     dt=1.0_wp,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
+
+        write(*,*) "Initial equilibration complete."
+
+        ! Initialize output files for checking progress 
+
+        ! 2D file 
+        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
+        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+
+        ! 1D file 
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+        call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+        
+        ! Next perform 'coupled' model simulations for desired time
+        do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+
+            ! Get current time 
+            time    = ctl%time_init + n*ctl%dtt
+            time_bp = ctl%time_const - 1950.0_wp 
+
+            ! == SEA LEVEL ==========================================================
+            call sealevel_update(sealev,year_bp=time_bp)
+            yelmo1%bnd%z_sl  = sealev%z_sl 
+
+            ! == Yelmo ice sheet ===================================================
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+
+            ! == ISOSTASY ==========================================================
+            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+
+
+            ! Update ismip6 forcing to current time
+            call ismip6_forcing_update(ismp1,time,use_ref_ocn=.TRUE.)
+
+            ! Set climate to present day 
+            snp2%now = snp2%clim0
+
+            ! == SURFACE MASS BALANCE ==============================================
+
+            ! Calculate smb for present day 
+            call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+            
+            ! Apply ISMIP6 anomalies
+            ! (apply to climate just for consistency)
+
+            smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+            smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
+
+            do m = 1,12
+                snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
+                snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
+            end do 
+
+            snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
+            if (trim(domain) .eq. "Antarctica") then 
+                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+            else 
+                snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
+            end if 
+            snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+            
+            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+            call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,ismp1%to%lev, &
+                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
+                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
+                            tf_ann=ismp1%tf%var(:,:,:,1))
+
+            call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+
+            ! Overwrite original mshlf and snp with ismip6 derived ones 
+            snp1    = snp2
+            smbpal1 = smbpal2  
+            mshlf1  = mshlf2 
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+            ! == MODEL OUTPUT ===================================
+
+            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
+            end if
+
+            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+                call yelmo_write_reg_step(yelmo1,file1D,time=time)
+                 
+            end if 
+
+            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            end if 
+            
+        end do 
+
+        write(*,*)
+        write(*,*) "spinup_ismip6 complete."
         write(*,*)
 
         ! Write the restart file for the end of the simulation
