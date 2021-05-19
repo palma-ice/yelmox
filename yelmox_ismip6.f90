@@ -4,7 +4,8 @@ program yelmox_ismip6
 
     use ncio 
     use yelmo 
-    
+    use ice_optimization 
+
     ! External libraries
     use geothermal
     use ismip6
@@ -54,13 +55,37 @@ program yelmox_ismip6
         real(wp) :: dt2D_out
 
         logical  :: with_ice_sheet 
+        logical  :: optimize
         real(wp) :: time0 
         real(wp) :: time1 
 
     end type 
 
-    type(ctrl_params)     :: ctl
+    type opt_params
+        real(wp) :: cf_init
+        real(wp) :: cf_min
+        real(wp) :: cf_max 
+        real(wp) :: tau_c 
+        real(wp) :: H0
+        real(wp) :: sigma_err 
+        real(wp) :: sigma_vel 
 
+        real(wp) :: rel_tau 
+        real(wp) :: rel_tau1 
+        real(wp) :: rel_tau2
+        real(wp) :: rel_time1
+        real(wp) :: rel_time2
+        real(wp) :: rel_m 
+
+        real(wp), allocatable :: cf_ref_dot(:,:) 
+    end type 
+
+    type(ctrl_params)   :: ctl
+    type(opt_params)    :: opt 
+
+    ! Set optimize to False by default, unless it is loaded later 
+    ctl%optimize = .FALSE. 
+    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -79,7 +104,26 @@ program yelmox_ismip6
     call nml_read(path_par,trim(ctl%run_step),"dt2D_out",ctl%dt2D_out)          ! [yr] Frequency of 2D output 
     
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
+    call nml_read(path_par,trim(ctl%run_step),"optimize",ctl%optimize)              ! Optimize basal friction?
     
+    if (ctl%optimize) then 
+        ! Load optimization parameters 
+
+        call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
+        call nml_read(path_par,"opt_L21","H0",          opt%H0)
+        call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        
+        call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+    end if 
+
     ! Set initial time 
     time    = ctl%time_init 
     time_bp = time - 1950.0_wp 
@@ -125,7 +169,11 @@ program yelmox_ismip6
 
     write(*,*) "time    = ", time 
     write(*,*) "time_bp = ", time_bp 
+    write(*,*) 
+    write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
+    write(*,*) "optimize:       ",  ctl%optimize
     
+
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -133,6 +181,12 @@ program yelmox_ismip6
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
+
+    ! === basal friction optimization ====
+    ! Define cf_ref_dot for later use 
+    allocate(opt%cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
+    opt%cf_ref_dot = 0.0 
+    ! ====================================
 
     ! === Initialize external models (forcing for ice sheet) ======
 
@@ -345,6 +399,15 @@ program yelmox_ismip6
         mshlf2%par%tf_method = 0 
         
 
+        ! ===== basal friction optimization ======
+        if (ctl%optimize) then 
+
+            ! Prescribe cf_ref to initial guess 
+            yelmo1%dyn%now%cf_ref = opt%cf_init 
+
+        end if 
+        ! ========================================
+
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
 
@@ -373,6 +436,37 @@ end if
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
             time_bp = ctl%time_const - 1950.0_wp 
+
+
+            ! ===== basal friction optimization ==================
+            if (ctl%optimize) then 
+
+                ! === Optimization parameters =========
+                
+                ! Update model relaxation time scale and error scaling (in [m])
+                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                
+                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                yelmo1%tpo%par%topo_rel     = 2
+                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+
+                ! Diagnose mass balance correction term 
+                !call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
+                
+
+                ! === Optimization update step =========
+
+                ! Update cf_ref based on error metric(s) 
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,opt%cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    fill_dist=80.0_prec,dt=ctl%dtt)
+            end if 
+            ! ====================================================
+
 
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=time_bp)

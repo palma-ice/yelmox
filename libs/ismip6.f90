@@ -289,6 +289,7 @@ contains
             
         end if
 
+        ! If desired, override time choice and use reference ocean fields
         if (present(use_ref_ocn)) then 
         if (use_ref_ocn) then  
 
@@ -323,7 +324,6 @@ contains
             end if
         end do
 
-if (.TRUE.) then 
         ! Apply oceanic correction factor to each depth level
         do k = 1, size(ism%to%var,3)
             where(ism%to%var(:,:,k,1) .ne. mv .and. ism%tf_cor%var(:,:,1,1) .ne. mv)   
@@ -333,7 +333,6 @@ if (.TRUE.) then
                 ism%tf%var(:,:,k,1) = ism%tf%var(:,:,k,1) + ism%tf_cor%var(:,:,1,1) 
             end where
         end do 
-end if 
         
         return 
 
