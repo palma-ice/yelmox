@@ -85,7 +85,7 @@ program yelmox_ismip6
 
     ! Set optimize to False by default, unless it is loaded later 
     ctl%optimize = .FALSE. 
-    
+
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -405,6 +405,9 @@ program yelmox_ismip6
             ! Prescribe cf_ref to initial guess 
             yelmo1%dyn%now%cf_ref = opt%cf_init 
 
+            ! Ensure that cf_ref will be optimized (cb_method == set externally) 
+            yelmo1%dyn%par%cb_method = -1  
+
         end if 
         ! ========================================
 
@@ -414,7 +417,7 @@ program yelmox_ismip6
 if (ctl%with_ice_sheet) then 
         ! Run yelmo alone for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,     dt=1.0_wp,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,       dt=1.0_wp,topo_fixed=.FALSE.)
         call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
 end if 
 

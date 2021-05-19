@@ -21,7 +21,7 @@
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100. 0            ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     optimize        = True 
