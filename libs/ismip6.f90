@@ -242,13 +242,14 @@ contains
         if (time .lt. 1950) then 
 
             ! Oceanic fields 
-            call varslice_update(ism%to_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            call varslice_update(ism%so_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            call varslice_update(ism%tf_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            
+            ! call varslice_update(ism%to_hist,[1950.0_wp,1980.0_wp],method="range_mean")
+            ! call varslice_update(ism%so_hist,[1950.0_wp,1980.0_wp],method="range_mean")
+            ! call varslice_update(ism%tf_hist,[1950.0_wp,1980.0_wp],method="range_mean")
+
             ! ism%to = ism%to_hist
             ! ism%so = ism%so_hist
             ! ism%tf = ism%tf_hist
+
             ism%to = ism%to_ref
             ism%so = ism%so_ref
             ism%tf = ism%tf_ref
@@ -322,7 +323,7 @@ contains
             end if
         end do
 
-if (.FALSE.) then 
+if (.TRUE.) then 
         ! Apply oceanic correction factor to each depth level
         do k = 1, size(ism%to%var,3)
             where(ism%to%var(:,:,k,1) .ne. mv .and. ism%tf_cor%var(:,:,1,1) .ne. mv)   
