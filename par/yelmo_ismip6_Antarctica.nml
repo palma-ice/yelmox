@@ -1,5 +1,5 @@
 &ctrl
-    run_step        = "spinup_ismip6"
+    run_step        = "transient_proj"
     time0           =  850.0
     time1           = 1850.0 
 /
@@ -37,12 +37,12 @@
 /
 
 &transient_proj
-    time_init       = 1950.0            ! [yr] Starting time (years CE)
+    time_init       = 1899.0            ! [yr] Starting time (years CE)
     time_end        = 2100.0            ! [yr] Ending time (years CE)
     dtt             = 1.0               ! [yr] Main loop timestep 
-    dt1D_out        = 10.0              ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 50.0              ! [yr] Frequency of writing 2D output files 
-    with_ice_sheet  = False             ! Is the ice sheet active?
+    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
+    with_ice_sheet  = True              ! Is the ice sheet active?
 /
 
 &opt_L21
@@ -68,7 +68,7 @@
     grid_name       = "ANT-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "None"
+    restart         = "../spin_opt7_ens/2/yelmo_restart.nc"
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
@@ -97,7 +97,7 @@
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
-    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_H_lim        = 225.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
     H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt         = 30.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
@@ -124,7 +124,7 @@
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
-    cb_method           = 1               ! -1: set externally; 1: calculate cb online  
+    cb_method           = -1              ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially

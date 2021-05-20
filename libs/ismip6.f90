@@ -21,6 +21,11 @@ module ismip6
     ! Class for holding ice-forcing data from ISMIP6 archives
     type ismip6_forcing_class
         
+        ! Experiment information 
+        character(len=256)     :: gcm 
+        character(len=256)     :: scen 
+        character(len=256)     :: experiment 
+        
         ! Current state:
 
         ! Atmospheric fields
@@ -98,30 +103,78 @@ module ismip6
 contains
     
 
-    subroutine ismip6_forcing_init(ism,filename,experiment,domain,grid_name)
+    subroutine ismip6_forcing_init(ism,filename,gcm,scen,domain,grid_name)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         character(len=*), intent(IN) :: filename
-        character(len=*), intent(IN) :: experiment 
+        character(len=*), intent(IN) :: gcm
+        character(len=*), intent(IN) :: scen
         character(len=*), intent(IN), optional :: domain 
         character(len=*), intent(IN), optional :: grid_name 
 
         ! Local variables 
         character(len=256) :: group_prefix 
+        character(len=256) :: grp_ts_ref 
+        character(len=256) :: grp_pr_ref 
+        character(len=256) :: grp_smb_ref 
+        character(len=256) :: grp_ts_hist 
+        character(len=256) :: grp_pr_hist 
+        character(len=256) :: grp_smb_hist 
+        character(len=256) :: grp_ts_proj 
+        character(len=256) :: grp_pr_proj 
+        character(len=256) :: grp_smb_proj 
+        
+        character(len=256) :: grp_to_ref 
+        character(len=256) :: grp_so_ref 
+        character(len=256) :: grp_tf_ref 
+        character(len=256) :: grp_tf_cor
+        character(len=256) :: grp_to_hist 
+        character(len=256) :: grp_so_hist 
+        character(len=256) :: grp_tf_hist 
+        character(len=256) :: grp_to_proj 
+        character(len=256) :: grp_so_proj 
+        character(len=256) :: grp_tf_proj 
+        
+        ! Define the current experiment characteristics
+        ism%gcm        = trim(gcm)
+        ism%scen       = trim(scen) 
+        ism%experiment = trim(ism%gcm)//"_"//trim(ism%scen) 
 
+        select case(trim(ism%experiment))
 
-        select case(trim(experiment))
-
-            case("noresm_rcp85")
+            case("noresm_rcp85","noresm_ctrl")
+                ! Control and RCP85 scenarios use the same files 
+                ! since ctrl specific forcing adapted in update step 
 
                 group_prefix = "noresm_rcp85_"
 
+                grp_ts_ref   = trim(group_prefix)//"ts_ref"
+                grp_pr_ref   = trim(group_prefix)//"pr_ref"
+                grp_smb_ref  = trim(group_prefix)//"smb_ref"
+                grp_ts_hist  = trim(group_prefix)//"ts_hist"
+                grp_pr_hist  = trim(group_prefix)//"pr_hist"
+                grp_smb_hist = trim(group_prefix)//"smb_hist"
+                grp_ts_proj  = trim(group_prefix)//"ts_proj"
+                grp_pr_proj  = trim(group_prefix)//"pr_proj"
+                grp_smb_proj = trim(group_prefix)//"smb_proj"
+                
+                grp_to_ref   = "to_ref"
+                grp_so_ref   = "so_ref"
+                grp_tf_ref   = "tf_ref"
+                grp_tf_cor   = "tf_cor"
+                grp_to_hist  = trim(group_prefix)//"to_hist"
+                grp_so_hist  = trim(group_prefix)//"so_hist"
+                grp_tf_hist  = trim(group_prefix)//"tf_hist"
+                grp_to_proj  = trim(group_prefix)//"to_proj"
+                grp_so_proj  = trim(group_prefix)//"so_proj"
+                grp_tf_proj  = trim(group_prefix)//"tf_proj"
+                
             case DEFAULT 
 
                 write(*,*) "ismip6_forcing_init:: Error: experiment not recognized."
-                write(*,*) "experiment = ", trim(experiment) 
+                write(*,*) "experiment = ", trim(ism%experiment) 
                 stop 
 
         end select
@@ -132,31 +185,31 @@ contains
         call varslice_init_nml(ism%basins,   filename,group="imbie_basins",domain=domain,grid_name=grid_name)
         
         ! Amospheric fields
-        call varslice_init_nml(ism%ts_ref,   filename,group=trim(group_prefix)//"ts_ref",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_ref,   filename,group=trim(group_prefix)//"pr_ref",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_ref,  filename,group=trim(group_prefix)//"smb_ref",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%pr_ref,   filename,group=trim(grp_pr_ref), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%smb_ref,  filename,group=trim(grp_smb_ref),domain=domain,grid_name=grid_name)
         
-        call varslice_init_nml(ism%ts_hist,  filename,group=trim(group_prefix)//"ts_hist",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_hist,  filename,group=trim(group_prefix)//"pr_hist",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_hist, filename,group=trim(group_prefix)//"smb_hist",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_hist,  filename,group=trim(grp_ts_hist), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%pr_hist,  filename,group=trim(grp_pr_hist), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%smb_hist, filename,group=trim(grp_smb_hist),domain=domain,grid_name=grid_name)
 
-        call varslice_init_nml(ism%ts_proj,  filename,group=trim(group_prefix)//"ts_proj",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_proj,  filename,group=trim(group_prefix)//"pr_proj",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_proj, filename,group=trim(group_prefix)//"smb_proj",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%pr_proj,  filename,group=trim(grp_pr_proj), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name)
 
         ! Oceanic fields
-        call varslice_init_nml(ism%to_ref,   filename,group="to_ref",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_ref,   filename,group="so_ref",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_ref,   filename,group="tf_ref",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_cor,   filename,group="tf_cor",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_ref,   filename,group=trim(grp_to_ref),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%so_ref,   filename,group=trim(grp_so_ref),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_ref,   filename,group=trim(grp_tf_ref),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_cor,   filename,group=trim(grp_tf_cor),domain=domain,grid_name=grid_name)
 
-        call varslice_init_nml(ism%to_hist,  filename,group=trim(group_prefix)//"to_hist",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_hist,  filename,group=trim(group_prefix)//"so_hist",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_hist,  filename,group=trim(group_prefix)//"tf_hist",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_hist,  filename,group=trim(grp_to_hist),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%so_hist,  filename,group=trim(grp_so_hist),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_hist,  filename,group=trim(grp_tf_hist),domain=domain,grid_name=grid_name)
 
-        call varslice_init_nml(ism%to_proj,  filename,group=trim(group_prefix)//"to_proj",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_proj,  filename,group=trim(group_prefix)//"so_proj",domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_proj,  filename,group=trim(group_prefix)//"tf_proj",domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_proj,  filename,group=trim(grp_to_proj),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%so_proj,  filename,group=trim(grp_so_proj),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name)
 
         ! Load time-independent fields
 
@@ -176,12 +229,13 @@ contains
     end subroutine ismip6_forcing_init
 
 
-    subroutine ismip6_forcing_update(ism,time,use_ref_ocn)
+    subroutine ismip6_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         real(wp), intent(IN) :: time
+        logical,  intent(IN), optional :: use_ref_atm 
         logical,  intent(IN), optional :: use_ref_ocn 
 
         ! Local variables 
@@ -205,21 +259,46 @@ contains
             ism%pr  = ism%pr_hist 
             ism%smb = ism%smb_hist
             
-        else if (time .ge. 1950 .and. time .le. 1994) then 
-
-            call varslice_update(ism%ts_hist,[time],method=slice_method)
-            call varslice_update(ism%pr_hist,[time],method=slice_method)
-            call varslice_update(ism%smb_hist,[time],method=slice_method)
+        else if (time .ge. 1950 .and. time .le. 2014) then 
+            
+            if (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) then 
+                ! Deal with particular case: noresm hist file only goes until 1994 
+                call varslice_update(ism%ts_proj, [time],method=slice_method)
+                call varslice_update(ism%pr_proj, [time],method=slice_method)
+                call varslice_update(ism%smb_proj,[time],method=slice_method)
+            else 
+                ! Load hist variable as normal 
+                call varslice_update(ism%ts_hist, [time],method=slice_method)
+                call varslice_update(ism%pr_hist, [time],method=slice_method)
+                call varslice_update(ism%smb_hist,[time],method=slice_method)
+            end if 
 
             ism%ts  = ism%ts_hist 
             ism%pr  = ism%pr_hist 
             ism%smb = ism%smb_hist 
             
-        else if (time .ge. 1995 .and. time .le. 2100) then 
+        else if (time .ge. 2015 .and. time .le. 2100) then 
 
-            call varslice_update(ism%ts_proj,[time],method=slice_method)
-            call varslice_update(ism%pr_proj,[time],method=slice_method)
-            call varslice_update(ism%smb_proj,[time],method=slice_method)
+            if (trim(ism%scen) .eq. "ctrl") then
+                ! For control sim, apply historical average climate into the future 
+
+                if (trim(ism%gcm) .eq. "noresm") then 
+                    ! Deal with particular case: noresm hist file only goes until 1994 
+                    call varslice_update(ism%ts_hist, [1980.0_wp,1994.0_wp],method="range_mean")
+                    call varslice_update(ism%pr_hist, [1980.0_wp,1994.0_wp],method="range_mean")
+                    call varslice_update(ism%smb_hist,[1980.0_wp,1994.0_wp],method="range_mean")
+                else  
+                    call varslice_update(ism%ts_hist, [1980.0_wp,2004.0_wp],method="range_mean")
+                    call varslice_update(ism%pr_hist, [1980.0_wp,2004.0_wp],method="range_mean")
+                    call varslice_update(ism%smb_hist,[1980.0_wp,2004.0_wp],method="range_mean")
+                end if 
+            else 
+            
+                call varslice_update(ism%ts_proj, [time],method=slice_method)
+                call varslice_update(ism%pr_proj, [time],method=slice_method)
+                call varslice_update(ism%smb_proj,[time],method=slice_method)
+            
+            end if 
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -227,9 +306,26 @@ contains
             
         else ! time .gt. 2100
 
-            call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%pr_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            if (trim(ism%scen) .eq. "ctrl") then
+                ! For control sim, apply historical average climate into the future 
+
+                if (trim(ism%gcm) .eq. "noresm") then 
+                    ! Deal with particular case: noresm hist file only goes until 1994 
+                    call varslice_update(ism%ts_hist, [1980.0_wp,1994.0_wp],method="range_mean")
+                    call varslice_update(ism%pr_hist, [1980.0_wp,1994.0_wp],method="range_mean")
+                    call varslice_update(ism%smb_hist,[1980.0_wp,1994.0_wp],method="range_mean")
+                else  
+                    call varslice_update(ism%ts_hist, [1980.0_wp,2004.0_wp],method="range_mean")
+                    call varslice_update(ism%pr_hist, [1980.0_wp,2004.0_wp],method="range_mean")
+                    call varslice_update(ism%smb_hist,[1980.0_wp,2004.0_wp],method="range_mean")
+                end if 
+            else
+
+                call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
+                call varslice_update(ism%pr_proj, [2090.0_wp,2100.0_wp],method="range_mean")
+                call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+
+            end if 
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -237,9 +333,20 @@ contains
             
         end if
 
+
+        if (trim(ism%scen) .eq. "ctrl") then 
+
+            ! Set atm anomalies to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+
+        end if 
+
         ! === Oceanic fields ==================================
 
         if (time .lt. 1950) then 
+            ! Prehistoric 
 
             ! Oceanic fields 
             ! call varslice_update(ism%to_hist,[1950.0_wp,1980.0_wp],method="range_mean")
@@ -254,42 +361,109 @@ contains
             ism%so = ism%so_ref
             ism%tf = ism%tf_ref
 
-        else if (time .ge. 1950 .and. time .le. 1994) then 
+        else if (time .ge. 1950 .and. time .le. 2014) then 
+            ! Historical period 
 
-            ! Oceanic fields 
-            call varslice_update(ism%to_hist,[time],method=slice_method)
-            call varslice_update(ism%so_hist,[time],method=slice_method)
-            call varslice_update(ism%tf_hist,[time],method=slice_method)
-
+            if (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) then 
+                ! Deal with particular case: noresm hist file only goes until 1994 
+                call varslice_update(ism%to_proj, [time],method=slice_method)
+                call varslice_update(ism%so_proj, [time],method=slice_method)
+                call varslice_update(ism%tf_proj, [time],method=slice_method)
+            else 
+                ! Load hist variable as normal 
+                call varslice_update(ism%to_hist, [time],method=slice_method)
+                call varslice_update(ism%so_hist, [time],method=slice_method)
+                call varslice_update(ism%tf_hist, [time],method=slice_method)
+            end if 
+            
             ism%to = ism%to_hist
             ism%so = ism%so_hist
             ism%tf = ism%tf_hist
             
-        else if (time .ge. 1995 .and. time .le. 2100) then 
+        else if (time .ge. 2015 .and. time .le. 2100) then 
+            ! Projection period 1 
 
-            ! Oceanic fields 
-            call varslice_update(ism%to_proj,[time],method=slice_method)
-            call varslice_update(ism%so_proj,[time],method=slice_method)
-            call varslice_update(ism%tf_proj,[time],method=slice_method)
+            if (trim(ism%scen) .eq. "ctrl") then
+                ! For control sim, apply historical average climate into the future 
 
-            ism%to = ism%to_proj
-            ism%so = ism%so_proj
-            ism%tf = ism%tf_proj
+                ism%to = ism%to_ref
+                ism%so = ism%so_ref
+                ism%tf = ism%tf_ref
+                
+            else 
             
+                call varslice_update(ism%to_proj,[time],method=slice_method)
+                call varslice_update(ism%so_proj,[time],method=slice_method)
+                call varslice_update(ism%tf_proj,[time],method=slice_method)
+
+                ism%to = ism%to_proj
+                ism%so = ism%so_proj
+                ism%tf = ism%tf_proj
+                
+            end if 
+               
         else ! time .gt. 2100
+            ! Projection period 2 
 
-            ! Oceanic fields 
-            call varslice_update(ism%to_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%so_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%tf_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            if (trim(ism%scen) .eq. "ctrl") then
+                ! For control sim, apply historical average climate into the future 
 
-            ism%to = ism%to_proj
-            ism%so = ism%so_proj
-            ism%tf = ism%tf_proj
+                ism%to = ism%to_ref
+                ism%so = ism%so_ref
+                ism%tf = ism%tf_ref
+                 
+            else 
+            
+                call varslice_update(ism%to_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+                call varslice_update(ism%so_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+                call varslice_update(ism%tf_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+
+                ism%to = ism%to_proj
+                ism%so = ism%so_proj
+                ism%tf = ism%tf_proj
+                
+            end if 
             
         end if
 
-        ! If desired, override time choice and use reference ocean fields
+        ! === Additional calculations ======================
+
+        if (trim(ism%scen) .eq. "ctrl") then 
+
+            ! Set atm fields to reference values (ie, zero anomaly) 
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+            
+            ! Set ocn fields to reference values 
+            ism%to = ism%to_ref 
+            ism%so = ism%so_ref 
+            ism%tf = ism%tf_ref 
+
+        end if 
+        
+        ! If desired, override other choices and use reference ocean fields
+        if (present(use_ref_atm)) then 
+        if (use_ref_atm) then  
+
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+            
+        end if 
+        end if
+
+        ! If desired, override other choices and use reference ocean fields
         if (present(use_ref_ocn)) then 
         if (use_ref_ocn) then  
 
@@ -300,9 +474,7 @@ contains
         end if 
         end if
 
-        ! === Additional calculations ======================
-
-        ! Remove missing values, if possible
+        ! Remove missing values from the ocean, if possible
         do k = 1, size(ism%to%var,3)
             if (count(ism%to%var(:,:,k,1) .ne. mv) .gt. 0) then
                 tmp = minval(ism%to%var(:,:,k,1),mask=ism%to%var(:,:,k,1) .ne. mv)

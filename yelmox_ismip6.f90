@@ -29,6 +29,7 @@ program yelmox_ismip6
     integer    :: n, m
     real(wp)   :: time, time_bp 
     real(wp)   :: time_wt 
+    logical    :: init_output_files 
 
     type(yelmo_class)           :: yelmo1 
     type(sealevel_class)        :: sealev 
@@ -383,7 +384,7 @@ program yelmox_ismip6
         write(*,*) 
 
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen="rcp85", &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
         ! Update ismip6 forcing to current time
@@ -486,7 +487,8 @@ end if
 
 
             ! Update ismip6 forcing to current time
-            call ismip6_forcing_update(ismp1,time,use_ref_ocn=.TRUE.)
+            call ismip6_forcing_update(ismp1,ctl%time_const, &
+                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
 
             ! Set climate to present day 
             snp2%now = snp2%clim0
@@ -576,7 +578,7 @@ end if
         write(*,*) 
  
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml","noresm_rcp85", &
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen="ctrl", &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -595,18 +597,8 @@ end if
         time    = ctl%time_init
         time_bp = time - 1950.0_wp 
 
-        ! First initialize output files 
+        init_output_files = .TRUE. 
 
-        ! 2D file
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        ! call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
-                                                  file2D,time,snp2,mshlf2,smbpal2)
-
-        ! 1D file 
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-        call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-        
         ! Perform 'coupled' model simulations for desired time
         do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
@@ -734,6 +726,13 @@ end if
 
             
             ! == MODEL OUTPUT ===================================
+
+            if (init_output_files) then 
+                ! Initialize output files 
+                call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+                call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
+                init_output_files = .FALSE. 
+            end if
 
             if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
