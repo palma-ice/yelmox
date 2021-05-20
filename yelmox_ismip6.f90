@@ -600,7 +600,7 @@ end if
         init_output_files = .TRUE. 
 
         ! Perform 'coupled' model simulations for desired time
-        do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
