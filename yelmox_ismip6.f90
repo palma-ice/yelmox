@@ -401,12 +401,14 @@ program yelmox_ismip6
 
         ! ===== basal friction optimization ======
         if (ctl%optimize) then 
-
-            ! Prescribe cf_ref to initial guess 
-            yelmo1%dyn%now%cf_ref = opt%cf_init 
-
+            
             ! Ensure that cf_ref will be optimized (cb_method == set externally) 
             yelmo1%dyn%par%cb_method = -1  
+
+            ! If not using restart, prescribe cf_ref to initial guess 
+            if (.not. yelmo1%par%use_restart) then
+                yelmo1%dyn%now%cf_ref = opt%cf_init 
+            end if 
 
         end if 
         ! ========================================
