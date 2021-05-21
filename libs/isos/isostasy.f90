@@ -234,7 +234,7 @@ contains
 
         return 
 
-    end subroutine isos_update 
+    end subroutine isos_update
 
     subroutine isos_end(isos)
 
@@ -247,7 +247,7 @@ contains
 
         return 
 
-    end subroutine isos_end 
+    end subroutine isos_end
 
     subroutine isos_par_load(par,filename,init)
 

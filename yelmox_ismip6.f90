@@ -605,14 +605,14 @@ end if
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
             time_bp = time - 1950.0_wp 
-
+ 
             ! == SEA LEVEL ==========================================================
-            call sealevel_update(sealev,year_bp=time_bp)
-            yelmo1%bnd%z_sl  = sealev%z_sl 
+            call sealevel_update(sealev,year_bp=0.0_wp)
+            yelmo1%bnd%z_sl  = sealev%z_sl
 
             ! == Yelmo ice sheet ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
+ 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
@@ -646,7 +646,8 @@ end if
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
-                call ismip6_forcing_update(ismp1,time)
+                call ismip6_forcing_update(ismp1,time, &
+                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
 
                 ! Set climate to present day 
                 snp2%now = snp2%clim0
@@ -670,7 +671,7 @@ end if
 
                 snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
                 if (trim(domain) .eq. "Antarctica") then 
-                    snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
                 else 
                     snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
                 end if 
@@ -702,16 +703,7 @@ end if
                 yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
                 yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-            else if (time .ge. ctl%time1) then 
-                ! Only ISMIP6 forcing 
-
-                yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
-
-                yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
-                yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
-
-            else
+            else if (time .gt. ctl%time0 .and. time .le. ctl%time1) then 
                 ! Linear-weighted average between snapclim and ismip6 forcing 
 
                 time_wt = (time-ctl%time0) / (ctl%time1 - ctl%time0)
@@ -722,8 +714,22 @@ end if
                 yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
                 yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
 
-            end if 
+            else    ! time >= ctl%time1
+                ! Only ISMIP6 forcing 
 
+                ! Overwrite original mshlf and snp with ismip6 derived ones 
+                snp1    = snp2
+                smbpal1 = smbpal2  
+                mshlf1  = mshlf2 
+                
+                yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
+                yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
+
+                yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
+                yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
+
+            
+            end if
             
             ! == MODEL OUTPUT ===================================
 

@@ -38,10 +38,10 @@
 
 &transient_proj
     time_init       = 1900.0            ! [yr] Starting time (years CE)
-    time_end        = 2100.0            ! [yr] Ending time (years CE)
+    time_end        = 1910.0            ! [yr] Ending time (years CE)
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 1.0               ! [yr] Frequency of writing 2D output files 
     with_ice_sheet  = True              ! Is the ice sheet active?
 /
 
