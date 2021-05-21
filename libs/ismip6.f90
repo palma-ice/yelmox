@@ -249,56 +249,58 @@ contains
 
         ! === Atmospheric fields ==================================
         
-        if (time .lt. 1950) then 
+        if (time .lt. 1995) then 
 
-            call varslice_update(ism%ts_hist, [1950.0_wp,1980.0_wp],method="range_mean")
-            call varslice_update(ism%pr_hist, [1950.0_wp,1980.0_wp],method="range_mean")
-            call varslice_update(ism%smb_hist,[1950.0_wp,1980.0_wp],method="range_mean")
+            ! call varslice_update(ism%ts_hist, [1950.0_wp,1980.0_wp],method="range_mean")
+            ! call varslice_update(ism%pr_hist, [1950.0_wp,1980.0_wp],method="range_mean")
+            ! call varslice_update(ism%smb_hist,[1950.0_wp,1980.0_wp],method="range_mean")
 
-            ism%ts  = ism%ts_hist 
-            ism%pr  = ism%pr_hist 
-            ism%smb = ism%smb_hist
+            ! ism%ts  = ism%ts_hist 
+            ! ism%pr  = ism%pr_hist 
+            ! ism%smb = ism%smb_hist
             
-        else if (time .ge. 1950 .and. time .le. 2014) then 
+            ! Prior to 1995, no anomalies 
+            ! Set atm fields to reference values (ie, zero anomaly) 
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
             
-            if (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) then 
-                ! Deal with particular case: noresm hist file only goes until 1994 
+        else if (time .ge. 1995 .and. time .le. 2014) then 
+            
+            if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+                    .or. time .ge. 2005 ) then 
+                ! noresm hist file only goes until 1994, other gcms hist file goes to 2004
                 call varslice_update(ism%ts_proj, [time],method=slice_method)
                 call varslice_update(ism%pr_proj, [time],method=slice_method)
                 call varslice_update(ism%smb_proj,[time],method=slice_method)
+                
+                ism%ts  = ism%ts_proj 
+                ism%pr  = ism%pr_proj 
+                ism%smb = ism%smb_proj 
+                
             else 
                 ! Load hist variable as normal 
                 call varslice_update(ism%ts_hist, [time],method=slice_method)
                 call varslice_update(ism%pr_hist, [time],method=slice_method)
                 call varslice_update(ism%smb_hist,[time],method=slice_method)
+                
+                ism%ts  = ism%ts_hist 
+                ism%pr  = ism%pr_hist 
+                ism%smb = ism%smb_hist 
+                
             end if 
 
-            ism%ts  = ism%ts_hist 
-            ism%pr  = ism%pr_hist 
-            ism%smb = ism%smb_hist 
-            
+                
         else if (time .ge. 2015 .and. time .le. 2100) then 
 
-            if (trim(ism%scen) .eq. "ctrl") then
-                ! For control sim, apply historical average climate into the future 
-
-                if (trim(ism%gcm) .eq. "noresm") then 
-                    ! Deal with particular case: noresm hist file only goes until 1994 
-                    call varslice_update(ism%ts_hist, [1980.0_wp,1994.0_wp],method="range_mean")
-                    call varslice_update(ism%pr_hist, [1980.0_wp,1994.0_wp],method="range_mean")
-                    call varslice_update(ism%smb_hist,[1980.0_wp,1994.0_wp],method="range_mean")
-                else  
-                    call varslice_update(ism%ts_hist, [1980.0_wp,2004.0_wp],method="range_mean")
-                    call varslice_update(ism%pr_hist, [1980.0_wp,2004.0_wp],method="range_mean")
-                    call varslice_update(ism%smb_hist,[1980.0_wp,2004.0_wp],method="range_mean")
-                end if 
-            else 
-            
-                call varslice_update(ism%ts_proj, [time],method=slice_method)
-                call varslice_update(ism%pr_proj, [time],method=slice_method)
-                call varslice_update(ism%smb_proj,[time],method=slice_method)
-            
-            end if 
+            call varslice_update(ism%ts_proj, [time],method=slice_method)
+            call varslice_update(ism%pr_proj, [time],method=slice_method)
+            call varslice_update(ism%smb_proj,[time],method=slice_method) 
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -306,26 +308,9 @@ contains
             
         else ! time .gt. 2100
 
-            if (trim(ism%scen) .eq. "ctrl") then
-                ! For control sim, apply historical average climate into the future 
-
-                if (trim(ism%gcm) .eq. "noresm") then 
-                    ! Deal with particular case: noresm hist file only goes until 1994 
-                    call varslice_update(ism%ts_hist, [1980.0_wp,1994.0_wp],method="range_mean")
-                    call varslice_update(ism%pr_hist, [1980.0_wp,1994.0_wp],method="range_mean")
-                    call varslice_update(ism%smb_hist,[1980.0_wp,1994.0_wp],method="range_mean")
-                else  
-                    call varslice_update(ism%ts_hist, [1980.0_wp,2004.0_wp],method="range_mean")
-                    call varslice_update(ism%pr_hist, [1980.0_wp,2004.0_wp],method="range_mean")
-                    call varslice_update(ism%smb_hist,[1980.0_wp,2004.0_wp],method="range_mean")
-                end if 
-            else
-
-                call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-                call varslice_update(ism%pr_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-                call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-
-            end if 
+            call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%pr_proj, [2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -333,19 +318,9 @@ contains
             
         end if
 
-
-        if (trim(ism%scen) .eq. "ctrl") then 
-
-            ! Set atm anomalies to zero 
-            ism%ts%var  = 0.0_wp 
-            ism%pr%var  = 0.0_wp 
-            ism%smb%var = 0.0_wp 
-
-        end if 
-
         ! === Oceanic fields ==================================
 
-        if (time .lt. 1950) then 
+        if (time .lt. 1995) then 
             ! Prehistoric 
 
             ! Oceanic fields 
@@ -357,78 +332,67 @@ contains
             ! ism%so = ism%so_hist
             ! ism%tf = ism%tf_hist
 
+            ! Set reference oceanic fields
             ism%to = ism%to_ref
             ism%so = ism%so_ref
             ism%tf = ism%tf_ref
 
-        else if (time .ge. 1950 .and. time .le. 2014) then 
+        else if (time .ge. 1995 .and. time .le. 2014) then 
             ! Historical period 
 
-            if (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) then 
-                ! Deal with particular case: noresm hist file only goes until 1994 
+            if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+                    .or. time .ge. 2005) then 
+                ! noresm hist file only goes until 1994, other hist files go until 2004
                 call varslice_update(ism%to_proj, [time],method=slice_method)
                 call varslice_update(ism%so_proj, [time],method=slice_method)
                 call varslice_update(ism%tf_proj, [time],method=slice_method)
+                
+                ism%to = ism%to_proj
+                ism%so = ism%so_proj
+                ism%tf = ism%tf_proj
+                
             else 
                 ! Load hist variable as normal 
                 call varslice_update(ism%to_hist, [time],method=slice_method)
                 call varslice_update(ism%so_hist, [time],method=slice_method)
                 call varslice_update(ism%tf_hist, [time],method=slice_method)
+                
+                ism%to = ism%to_hist
+                ism%so = ism%so_hist
+                ism%tf = ism%tf_hist
+                
             end if 
             
-            ism%to = ism%to_hist
-            ism%so = ism%so_hist
-            ism%tf = ism%tf_hist
-            
+                
         else if (time .ge. 2015 .and. time .le. 2100) then 
             ! Projection period 1 
 
-            if (trim(ism%scen) .eq. "ctrl") then
-                ! For control sim, apply historical average climate into the future 
+            call varslice_update(ism%to_proj,[time],method=slice_method)
+            call varslice_update(ism%so_proj,[time],method=slice_method)
+            call varslice_update(ism%tf_proj,[time],method=slice_method)
 
-                ism%to = ism%to_ref
-                ism%so = ism%so_ref
-                ism%tf = ism%tf_ref
-                
-            else 
-            
-                call varslice_update(ism%to_proj,[time],method=slice_method)
-                call varslice_update(ism%so_proj,[time],method=slice_method)
-                call varslice_update(ism%tf_proj,[time],method=slice_method)
-
-                ism%to = ism%to_proj
-                ism%so = ism%so_proj
-                ism%tf = ism%tf_proj
-                
-            end if 
+            ism%to = ism%to_proj
+            ism%so = ism%so_proj
+            ism%tf = ism%tf_proj
                
         else ! time .gt. 2100
             ! Projection period 2 
 
-            if (trim(ism%scen) .eq. "ctrl") then
-                ! For control sim, apply historical average climate into the future 
+            call varslice_update(ism%to_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%so_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%tf_proj,[2090.0_wp,2100.0_wp],method="range_mean")
 
-                ism%to = ism%to_ref
-                ism%so = ism%so_ref
-                ism%tf = ism%tf_ref
-                 
-            else 
-            
-                call varslice_update(ism%to_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-                call varslice_update(ism%so_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-                call varslice_update(ism%tf_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-
-                ism%to = ism%to_proj
-                ism%so = ism%so_proj
-                ism%tf = ism%tf_proj
-                
-            end if 
+            ism%to = ism%to_proj
+            ism%so = ism%so_proj
+            ism%tf = ism%tf_proj 
             
         end if
 
         ! === Additional calculations ======================
 
         if (trim(ism%scen) .eq. "ctrl") then 
+            ! For control scenario, override above choices and 
+            ! set control atm and ocn 
 
             ! Set atm fields to reference values (ie, zero anomaly) 
             ism%ts  = ism%ts_ref 
@@ -447,7 +411,7 @@ contains
 
         end if 
         
-        ! If desired, override other choices and use reference ocean fields
+        ! If desired, override other choices and use reference atm fields
         if (present(use_ref_atm)) then 
         if (use_ref_atm) then  
 

@@ -60,6 +60,8 @@ program yelmox_ismip6
         real(wp) :: time0 
         real(wp) :: time1 
 
+        character(len=256) :: scenario 
+
     end type 
 
     type opt_params
@@ -106,6 +108,8 @@ program yelmox_ismip6
     
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"optimize",ctl%optimize)              ! Optimize basal friction?
+    
+    call nml_read(path_par,trim(ctl%run_step),"scenario",ctl%scenario)              ! Optimize basal friction?
     
     if (ctl%optimize) then 
         ! Load optimization parameters 
@@ -384,7 +388,7 @@ program yelmox_ismip6
         write(*,*) 
 
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen="rcp85", &
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
         ! Update ismip6 forcing to current time
@@ -578,7 +582,7 @@ end if
         write(*,*) 
  
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen="ctrl", &
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -589,6 +593,9 @@ end if
         
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
+
+        ! Additionally make sure isostasy is update every timestep 
+        isos1%par%dt = 1.0_wp 
 
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
@@ -646,8 +653,7 @@ end if
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
-                call ismip6_forcing_update(ismp1,time, &
-                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
+                call ismip6_forcing_update(ismp1,time)
 
                 ! Set climate to present day 
                 snp2%now = snp2%clim0
@@ -714,7 +720,7 @@ end if
                 yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
                 yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
 
-            else    ! time >= ctl%time1
+            else    ! time > ctl%time1
                 ! Only ISMIP6 forcing 
 
                 ! Overwrite original mshlf and snp with ismip6 derived ones 
@@ -833,6 +839,9 @@ contains
         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/yr",long_name="Ice thickness rate of change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m",long_name="Applied net mass balance", &
@@ -983,7 +992,7 @@ contains
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-if (.TRUE. .and. present(snp2) .and. present(mshlf2)) then 
+if (.FALSE. .and. present(snp2) .and. present(mshlf2)) then 
     ! Output values from second set of climate objects 
         call nc_write(filename,"Ta_ann_2",snp2%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
