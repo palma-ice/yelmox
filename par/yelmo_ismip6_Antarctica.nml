@@ -1,12 +1,12 @@
 &ctrl
-    run_step        = "transient_proj"
+    run_step        = "spinup_ismip6"
     time0           =  850.0
     time1           = 1850.0 
 /
 
 &spinup
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 50e3              ! [yr] Ending time (model years)
+    time_end        = 30e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
@@ -17,14 +17,14 @@
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 20e3              ! [yr] Ending time (model years)
+    time_end        = 30e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100. 0            ! [yr] Frequency of writing 1D output files 
+    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
-    optimize        = True
+    optimize        = True              ! Should basal friction be optimized?
     scenario        = "ctrl"            ! "ctrl" or "rcp85" 
 /
 
