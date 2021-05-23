@@ -45,7 +45,7 @@ module hyster
         real(wp) :: pi_eta(3)
 
         real(wp) :: f_now
-        real(wp) :: eta_now 
+        real(wp) :: f_mean_now, eta_now 
         logical  :: kill
         real(wp) :: time_init 
     end type 
@@ -117,6 +117,7 @@ contains
         end if 
 
         ! Set noise to zero for now 
+        hyst%f_mean_now = hyst%f_now 
         hyst%eta_now = 0.0_wp 
 
         ! Set kill switch to false to start 
@@ -268,17 +269,20 @@ contains
             ! Once the rate is available, update the current forcing value 
             hyst%f_now = hyst%f_now + (hyst%df_dt*hyst%dt) 
             
+            ! Set this equal to mean value to save it 
+            hyst%f_mean_now = hyst%f_now 
+            
             ! If desired add some noise 
             if (hyst%par%with_noise) then 
                 call gen_random_normal(hyst%eta_now,mu=0.0_wp,sigma=hyst%par%sigma)
 
-                hyst%f_now = hyst%f_now + hyst%eta_now 
+                hyst%f_now = hyst%f_mean_now + hyst%eta_now 
             end if 
 
         end if 
 
         ! Check if kill should be activated 
-        if (hyst%f_now .lt. hyst%par%f_min .or. hyst%f_now .gt. hyst%par%f_max) then 
+        if (hyst%f_mean_now .lt. hyst%par%f_min .or. hyst%f_mean_now .gt. hyst%par%f_max) then 
             hyst%kill = .TRUE. 
         end if 
 
