@@ -216,7 +216,7 @@ contains
                     else 
                         ! Linear rate of change from f_max to f_min (or vice versa) over 
                         ! the time of interest dt_ramp. 
-                        
+
                         hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
 
                     end if 
@@ -526,5 +526,33 @@ contains
         return 
 
     end function calc_pi_rho_PID1
+
+
+    subroutine gen_random_normal(ynrm,mu,sigma)
+        ! Calculate a random number from a normal distribution 
+        ! following the Box-Mueller algorithm 
+        ! https://en.wikipedia.org/wiki/Normal_distribution#Generating_values_from_normal_distribution 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: ynrm
+        real(wp), intent(IN)  :: mu 
+        real(wp), intent(IN)  :: sigma 
+
+        ! Local variables 
+        integer :: i, j, nx, ny 
+        real(wp) :: yuni(2)
+        real(wp), parameter :: pi = 4.0_wp*atan(1.0_wp)
+
+        ! Get 2 numbers from uniform distribution between 0 and 1
+        call random_number(yuni)
+        
+        ! Convert to normal distribution using the Box-Mueller algorithm
+        ynrm = mu + sigma * sqrt(-2.0*log(yuni(1))) * cos(2*pi*yuni(2))
+
+        return 
+
+    end subroutine gen_random_normal
+
 
 end module hyster
