@@ -13,13 +13,15 @@ module hyster
 
     type hyster_par_class  
         character(len=56) :: label 
-        character(len=56) :: method 
+        character(len=56) :: method
+        logical  :: with_noise  
         real(wp) :: dt_ave 
         real(wp) :: df_sign 
         real(wp) :: dv_dt_scale
         real(wp) :: df_dt_max
         real(wp) :: f_range(2)
         real(wp) :: dt_ramp    
+        real(wp) :: sigma 
 
         ! Internal parameters 
         real(wp) :: f_min 
@@ -43,6 +45,7 @@ module hyster
         real(wp) :: pi_eta(3)
 
         real(wp) :: f_now
+        real(wp) :: eta_now 
         logical  :: kill
         real(wp) :: time_init 
     end type 
@@ -107,11 +110,14 @@ contains
         hyst%pi_eta = hyst%par%dv_dt_scale 
 
         ! Initialize values of forcing 
-        if (hyst%par%df_sign .gt. 0) then 
+        if (hyst%par%df_sign .gt. 0.0_wp) then 
             hyst%f_now = hyst%par%f_min 
         else 
             hyst%f_now = hyst%par%f_max 
         end if 
+
+        ! Set noise to zero for now 
+        hyst%eta_now = 0.0_wp 
 
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
@@ -262,6 +268,13 @@ contains
             ! Once the rate is available, update the current forcing value 
             hyst%f_now = hyst%f_now + (hyst%df_dt*hyst%dt) 
             
+            ! If desired add some noise 
+            if (hyst%par%with_noise) then 
+                call gen_random_normal(hyst%eta_now,mu=0.0_wp,sigma=hyst%par%sigma)
+
+                hyst%f_now = hyst%f_now + hyst%eta_now 
+            end if 
+
         end if 
 
         ! Check if kill should be activated 
