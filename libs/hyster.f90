@@ -18,7 +18,8 @@ module hyster
         real(wp) :: df_sign 
         real(wp) :: dv_dt_scale
         real(wp) :: df_dt_max
-        real(wp) :: f_range(2)   
+        real(wp) :: f_range(2)
+        real(wp) :: dt_ramp    
 
         ! Internal parameters 
         real(wp) :: f_min 
@@ -43,6 +44,7 @@ module hyster
 
         real(wp) :: f_now
         logical  :: kill
+        real(wp) :: time_init 
     end type 
 
     private
@@ -114,12 +116,15 @@ contains
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
 
+        ! Store initial simulation time for reference (for ramp method)
+        hyst%time_init = time 
+
         return 
 
     end subroutine hyster_init
 
   
-    subroutine hyster_calc_forcing (hyst,time,var)
+    subroutine hyster_calc_forcing(hyst,time,var)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         ! Subroutine :  d t T r a n s 1
         ! Author     :  Alex Robinson
@@ -198,6 +203,23 @@ contains
                     ! Use the df_dt_max parameter as a constant.
 
                     hyst%df_dt = hyst%par%df_dt_max
+
+                case("ramp")
+                    ! Ramp up to the constant rate of change for the first N years. 
+                    ! Then maintain a constant anomaly. 
+
+                    if (time .ge. hyst%time_init+hyst%par%dt_ramp) then 
+                        ! Ramp-up complete, no more forcing change 
+
+                        hyst%df_dt = 0.0_wp 
+
+                    else 
+                        ! Linear rate of change from f_max to f_min (or vice versa) over 
+                        ! the time of interest dt_ramp. 
+                        
+                        hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+
+                    end if 
 
                 case("exp")
 
