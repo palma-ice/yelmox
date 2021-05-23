@@ -44,7 +44,9 @@ program yelmox
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
     logical :: lim_pd_ice 
-
+    logical :: with_ice_sheet 
+    logical :: optimize 
+    
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
@@ -70,6 +72,8 @@ program yelmox
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
     call nml_read(path_par,"ctrl","dTdt",        dTdt)                       ! Constant rate of temperature change when not using hyster
     call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
+    call nml_read(path_par,"ctrl","with_ice_sheet",with_ice_sheet)  ! Active ice sheet? 
+    call nml_read(path_par,"ctrl","optimize",optimize)              ! Optimize basal friction?
     
     ! Define input and output locations 
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
@@ -108,7 +112,8 @@ program yelmox
     conv_km3_Gt = rho_ice *1e-3
 
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
+    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
+                        domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
@@ -152,12 +157,12 @@ program yelmox
     end if 
 
     ! write(*,*) "To do..."
-!     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-!                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-!                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+    ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+    !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+    !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -253,12 +258,12 @@ if (calc_transient_climate) then
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         ! To do: currently no anomalies are calculated for the ocean with rembo active
-!         call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-!                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-!                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+        ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+        !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+        !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx*1e-3)
+                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
 
