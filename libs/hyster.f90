@@ -13,8 +13,8 @@ module hyster
 
     type hyster_par_class  
         character(len=56) :: label 
-        character(len=56) :: method
-        logical  :: with_noise  
+        character(len=56) :: method 
+        logical  :: with_kill  
         real(wp) :: dt_ave 
         real(wp) :: df_sign 
         real(wp) :: dv_dt_scale
@@ -73,11 +73,13 @@ contains
 
         ! Load parameters
         call nml_read(filename,trim(par_label),"method",      hyst%par%method)
-         
+        call nml_read(filename,trim(par_label),"with_kill",   hyst%par%with_kill)
         call nml_read(filename,trim(par_label),"dt_ave",      hyst%par%dt_ave)
+        call nml_read(filename,trim(par_label),"dt_ramp",     hyst%par%dt_ramp)
         call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
         call nml_read(filename,trim(par_label),"dv_dt_scale", hyst%par%dv_dt_scale)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
+        call nml_read(filename,trim(par_label),"sigma",       hyst%par%sigma)
         call nml_read(filename,trim(par_label),"f_min",       hyst%par%f_min)
         call nml_read(filename,trim(par_label),"f_max",       hyst%par%f_max)
 
@@ -109,17 +111,17 @@ contains
         hyst%pi_df  = hyst%par%df_dt_min 
         hyst%pi_eta = hyst%par%dv_dt_scale 
 
-        ! Initialize values of forcing 
+        ! Initialize base (mean) values of forcing 
         if (hyst%par%df_sign .gt. 0.0_wp) then 
-            hyst%f_now = hyst%par%f_min 
+            hyst%f_mean_now = hyst%par%f_min 
         else 
-            hyst%f_now = hyst%par%f_max 
+            hyst%f_mean_now = hyst%par%f_max 
         end if 
 
         ! Set noise to zero for now 
-        hyst%f_mean_now = hyst%f_now 
         hyst%eta_now = 0.0_wp 
-
+        hyst%f_now = hyst%f_mean_now 
+        
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
 
@@ -159,8 +161,12 @@ contains
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
 
-        ! Get current timestep 
-        hyst%dt = time - hyst%time(ntot) 
+        ! Get current timestep
+        if (hyst%time(ntot) .ne. MV) then  
+            hyst%dt = time - hyst%time(ntot) 
+        else 
+            hyst%dt = 0.0_wp 
+        end if 
 
         ! Remove oldest point from beginning and add current one to the end
         hyst%time = eoshift(hyst%time,1,boundary=time)
@@ -182,55 +188,56 @@ contains
         ! time has passed. 
         dt_tot = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
 
-        if (dt_tot .lt. hyst%par%dt_ave) then 
-            ! Not enough time has passed, maintain constant forcing 
-            ! (to avoid affects of noisy derivatives)
+        ! Calculate mean rate of change over time steps of interest
+        
+        ! Get current number of averaging points 
+        nk = kmax - kmin + 1 
+        allocate(dv_dt(nk-1)) 
 
-            hyst%df_dt = 0.0_wp 
+        dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
+                  (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
+        hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
+                                     (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
 
-        else 
-            ! Calculate forcing 
+        ! Determine the magnitude of rate of change (without sign)
+        ! depending on method to be used.
+        select case(trim(hyst%par%method))
 
-            ! Get current number of averaging points 
-            nk = kmax - kmin + 1 
-            
-            allocate(dv_dt(nk-1)) 
+            case("const") 
+                ! Apply a constant rate of change, independent of dv_dt.
+                ! Use the df_dt_max parameter as a constant.
 
-            ! Calculate mean rate of change over time steps of interest
-            dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
-                      (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
-            hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
-                                         (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
+                hyst%df_dt = hyst%par%df_dt_max
 
+            case("ramp")
+                ! Ramp up to the constant rate of change for the first N years. 
+                ! Then maintain a constant anomaly (independent of dv_dt). 
 
-            select case(trim(hyst%par%method))
+                !if (time .ge. hyst%time_init+hyst%par%dt_ramp) then
+                if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
+                    hyst%f_mean_now .gt. hyst%par%f_max) then  
+                    ! Ramp-up complete, no more forcing change 
 
-                case("const") 
-                    ! Apply a constant rate of change, independent of dv_dt.
-                    ! Use the df_dt_max parameter as a constant.
+                    hyst%df_dt = 0.0_wp 
 
-                    hyst%df_dt = hyst%par%df_dt_max
+                else 
+                    ! Linear rate of change from f_max to f_min (or vice versa) over 
+                    ! the time of interest dt_ramp. 
 
-                case("ramp")
-                    ! Ramp up to the constant rate of change for the first N years. 
-                    ! Then maintain a constant anomaly. 
+                    hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
 
-                    if (time .ge. hyst%time_init+hyst%par%dt_ramp) then 
-                        ! Ramp-up complete, no more forcing change 
+                end if 
 
-                        hyst%df_dt = 0.0_wp 
+            case("exp")
 
-                    else 
-                        ! Linear rate of change from f_max to f_min (or vice versa) over 
-                        ! the time of interest dt_ramp. 
+                if (dt_tot .lt. hyst%par%dt_ave) then 
+                    ! Not enough time has passed, maintain constant forcing 
+                    ! (to avoid affects of noisy derivatives)
 
-                        hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+                    hyst%df_dt = 0.0_wp 
 
-                    end if 
-
-                case("exp")
-
-                    ! Calculate the current df_dt
+                else 
+                    ! Calculate the current forcing rate, df_dt
                     ! BASED ON EXPONENTIAL (sharp transition, tuneable)
                     ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
                     ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
@@ -241,7 +248,18 @@ contains
                     ! Get forcing rate of change magnitude
                     hyst%df_dt = ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
 
-                case("PI42","H312b","H312PID","H321PID","PID1")
+                end if 
+
+            case("PI42","H312b","H312PID","H321PID","PID1")
+
+                if (dt_tot .lt. hyst%par%dt_ave) then 
+                    ! Not enough time has passed, maintain constant forcing 
+                    ! (to avoid affects of noisy derivatives)
+
+                    hyst%df_dt = 0.0_wp 
+
+                else 
+                    ! Calculate the current forcing rate, df_dt
 
                     ! Calculate adaptive dfdt value using proportional-integral (PI) methods
                     call set_adaptive_timestep_pc(pi_df_now,hyst%pi_df,hyst%pi_eta,hyst%par%dv_dt_scale, &
@@ -258,31 +276,38 @@ contains
                     ! Get forcing rate of change magnitude in [f/yr]
                     hyst%df_dt = hyst%pi_df(1) 
 
-            end select 
+                end if 
 
-            ! Apply sign of change
-            hyst%df_dt = hyst%par%df_sign*hyst%df_dt
+        end select 
 
-            ! Avoid underflow errors 
-            if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
+        ! Apply sign of change
+        hyst%df_dt = hyst%par%df_sign*hyst%df_dt
 
-            ! Once the rate is available, update the current forcing value 
-            hyst%f_now = hyst%f_now + (hyst%df_dt*hyst%dt) 
-            
-            ! Set this equal to mean value to save it 
-            hyst%f_mean_now = hyst%f_now 
-            
-            ! If desired add some noise 
-            if (hyst%par%with_noise) then 
+        ! Avoid underflow errors 
+        if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
+
+        if (hyst%dt .gt. 0.0_wp) then 
+            ! Update f_now, etc. if time step is non-zero. 
+
+            ! Update the mean forcing value 
+            hyst%f_mean_now = hyst%f_mean_now + (hyst%df_dt*hyst%dt) 
+
+            ! If desired, generate some noise 
+            if (hyst%par%sigma .gt. 0.0) then 
                 call gen_random_normal(hyst%eta_now,mu=0.0_wp,sigma=hyst%par%sigma)
-
-                hyst%f_now = hyst%f_mean_now + hyst%eta_now 
+            else 
+                hyst%eta_now = 0.0_wp 
             end if 
 
         end if 
+        
+        ! Update the real forcing value 
+        hyst%f_now = hyst%f_mean_now + hyst%eta_now 
 
         ! Check if kill should be activated 
-        if (hyst%f_mean_now .lt. hyst%par%f_min .or. hyst%f_mean_now .gt. hyst%par%f_max) then 
+        if ( hyst%par%with_kill .and. &
+            (hyst%f_mean_now .lt. hyst%par%f_min .or. &
+             hyst%f_mean_now .gt. hyst%par%f_max) ) then 
             hyst%kill = .TRUE. 
         end if 
 

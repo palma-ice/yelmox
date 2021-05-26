@@ -46,7 +46,7 @@ program yelmox
     logical :: lim_pd_ice 
     logical :: with_ice_sheet 
     logical :: optimize 
-    
+
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
@@ -84,6 +84,9 @@ program yelmox
 
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
+
+
+    time = time_init 
 
     ! === Initialize ice sheet model =====
 
@@ -136,9 +139,13 @@ program yelmox
         dT_summer = hyst1%f_now 
     end if 
 
-    ! Update REMBO, with ice sheet topography    
+    ! Update REMBO, with ice sheet topography, let it equilibrate for several years 
+    ! do n = 1, 100
+    !     time = time_init + real(n,8)    
+    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    ! end do 
     call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
-            
+    
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = rembo_ann%T_srf
@@ -186,9 +193,11 @@ program yelmox
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-    call yelmo_update_equil(yelmo1,time,time_tot=500.0_prec,dt=dtt,topo_fixed=.TRUE.)
-    
+    if (with_ice_sheet) then 
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=500.0_prec,dt=dtt,topo_fixed=.TRUE.)
+    end if 
+
     ! Now run steady-state for several thousand years
     !call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.FALSE.)
     
@@ -223,7 +232,9 @@ program yelmox
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
+        if (with_ice_sheet) then 
+            call yelmo_update(yelmo1,time)
+        end if 
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
