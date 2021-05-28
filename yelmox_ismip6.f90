@@ -79,8 +79,6 @@ program yelmox_ismip6
         real(wp) :: rel_time1
         real(wp) :: rel_time2
         real(wp) :: rel_m 
-
-        real(wp), allocatable :: cf_ref_dot(:,:) 
     end type 
 
     type(ctrl_params)   :: ctl
@@ -186,12 +184,6 @@ program yelmox_ismip6
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
-
-    ! === basal friction optimization ====
-    ! Define cf_ref_dot for later use 
-    allocate(opt%cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
-    opt%cf_ref_dot = 0.0 
-    ! ====================================
 
     ! === Initialize external models (forcing for ice sheet) ======
 
@@ -461,11 +453,11 @@ end if
                 yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
                 yelmo1%tpo%par%topo_rel     = 2
                 if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-                
+
                 ! === Optimization update step =========
 
                 ! Update cf_ref based on error metric(s) 
-                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,opt%cf_ref_dot,yelmo1%tpo%now%H_ice, &
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &

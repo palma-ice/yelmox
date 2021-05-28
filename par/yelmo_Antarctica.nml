@@ -2,12 +2,34 @@
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 1e3               ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
+    time_const      = -18e3             ! [yr CE] Assumed constant time for non-transient climate
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 50.0             ! [yr] Frequency of writing 2D output files 
-    transient       = True              ! Calculate transient climate? 
+    dt2D_out        = 50.0              ! [yr] Frequency of writing 2D output files 
+    dt_restart      = 20e3              ! [yr] Frequency of writing restart files
+    transient_clim  = True              ! Calculate transient climate? 
+    with_ice_sheet  = True              ! Is the ice sheet active?
+    optimize        = True              ! Should basal friction be optimized?
+    
 /
 
+&opt_L21
+    cf_init         = 0.2               ! Initial value of cf_ref everywhere
+    cf_min          = 1e-4              ! [--] Minimum allowed cf value
+    cf_max          = 1.0               ! [--] Maximum allowed cf value
+    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
+    H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
+    
+    sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
+    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
+    
+    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 5e3               ! [yr] Time limit for time period 1
+    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
+
+/
 &yelmo
     domain          = "Antarctica"
     grid_name       = "ANT-32KM"
