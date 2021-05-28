@@ -461,11 +461,7 @@ end if
                 yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
                 yelmo1%tpo%par%topo_rel     = 2
                 if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-
-                ! Diagnose mass balance correction term 
-                !call update_mb_corr(mb_corr,yelmo1%tpo%now%H_ice,yelmo1%dta%pd%H_ice,tau)
                 
-
                 ! === Optimization update step =========
 
                 ! Update cf_ref based on error metric(s) 
