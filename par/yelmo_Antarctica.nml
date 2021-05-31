@@ -1,6 +1,6 @@
 &ctrl
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 30e3              ! [yr] Ending time
+    time_end        = 20e3              ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
     time_const      = -18e3             ! [yr CE] Assumed constant time for non-transient climate
     dtt             = 5.0               ! [yr] Main loop timestep 
@@ -64,9 +64,9 @@
     topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
-    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_H_lim        = 275.0           ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau          = 1.0             ! [a] Characteristic calving time
-    H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_grnd        = 30.0            ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt         = 30.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
@@ -95,11 +95,11 @@
     cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
-    cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_z0               = -400.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.02            ! [--] Bed critical stress factor, stream (20e-3) 
+    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
@@ -115,7 +115,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
@@ -184,7 +184,7 @@
 &yelmo_masks
     basins_load     = True 
     basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin" "basin_mask"
+    basins_nms      = "basin_reese" "basin_mask"
     regions_load    = True 
     regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     regions_nms     = "mask" "None"
@@ -225,38 +225,8 @@
     sl_path            = "input/sl_deglaciation.dat"
 /
 
-&tclim_atm 
-
-/
-
-&tclim_ocn 
-
-/
-
-&tclim_noresm_rcp85_ts
-    filename    = "ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc"
-    name        = "ts"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
-/
-
-&tclim_noresm_rcp85_smb
-    filename    = "ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc"
-    name        = "smb"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34654.9492
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
-/
-
 &snap
-    atm_type           = "anom"
+    atm_type           = "snap_1ind"
     ocn_type           = "anom"
     fname_at           = "input/epica_deglaciation.dat"
     fname_ao           = "input/epica_deglaciation.dat"
@@ -267,8 +237,9 @@
     fname_bp           = "input/ones.dat"
     fname_bs           = "input/ones.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
+    dTa_const          = -10.0  
+    dTo_const          = -2.5
+    dSo_const          = 3.0 
     f_to               = 0.25 
     f_p                = 0.05
     f_stdev            = 0.0  
@@ -384,8 +355,8 @@
 /
 
 &marine_shelf
-    bmb_method      = "lin"         ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 0             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
+    bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -393,7 +364,7 @@
     ! Deep ocean bmb 
     c_deep          = -1.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
-    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depthconst
+    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depth=const
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
     depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
     
@@ -403,9 +374,9 @@
     lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
 
     ! bmb_method == [lin,quad,quad-nl] 
-    gamma_lin       = 630.0         ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad      = 30000.0       ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
-    gamma_quad_nl   = 40000.0       ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
+    gamma_lin       = 630.0         ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad      = 11100.0       ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
+    gamma_quad_nl   = 14500.0       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
     gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
 
     ! bmb_method == anom
