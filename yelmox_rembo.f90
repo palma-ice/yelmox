@@ -139,11 +139,13 @@ program yelmox
         dT_summer = hyst1%f_now 
     end if 
 
-    ! Update REMBO, with ice sheet topography, let it equilibrate for several years 
+    ! Update REMBO, with correct topography, let it equilibrate for several years 
     ! do n = 1, 100
     !     time = time_init + real(n,8)    
     !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
     ! end do 
+    ! rembo_ann%time_emb = time_init 
+    ! rembo_ann%time_smb = time_init  
     call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
     
     ! Update surface mass balance and surface temperature from REMBO
