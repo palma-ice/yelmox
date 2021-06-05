@@ -20,7 +20,8 @@
     method          =  "PI42"           ! const, ramp, exp, PI42, H312b, H312PID, H321PID, PID1
     with_kill       = False             ! Should kill signal be activated at limits of forcing?
     dt_ave          = 100.0             ! [yr] Number of years for averaging / ramping 
-    dt_ramp         = 100.0             ! [yr] Time window for ramp-up in method='ramp'.
+    t_ramp_init     = 100.0             ! [yr] Start time for for ramp-up time window in method='ramp'.
+    t_ramp_end      = 200.0             ! [yr] End time for for ramp-up time window in method='ramp'.
     df_sign         =  1                ! [-1/1] Determines direction of forcing
     dv_dt_scale     = 20.0              ! [Gt/yr] Ice sheets: eg 20 Gt/a for 100yr averaging.
     df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.

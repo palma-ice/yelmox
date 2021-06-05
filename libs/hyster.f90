@@ -20,13 +20,15 @@ module hyster
         real(wp) :: dv_dt_scale
         real(wp) :: df_dt_max
         real(wp) :: f_range(2)
-        real(wp) :: dt_ramp    
+        real(wp) :: t_ramp_init 
+        real(wp) :: t_ramp_end
         real(wp) :: sigma 
 
         ! Internal parameters 
         real(wp) :: f_min 
         real(wp) :: f_max
         real(wp) :: df_dt_min
+        real(wp) :: dt_ramp    
         
     end type 
 
@@ -75,7 +77,8 @@ contains
         call nml_read(filename,trim(par_label),"method",      hyst%par%method)
         call nml_read(filename,trim(par_label),"with_kill",   hyst%par%with_kill)
         call nml_read(filename,trim(par_label),"dt_ave",      hyst%par%dt_ave)
-        call nml_read(filename,trim(par_label),"dt_ramp",     hyst%par%dt_ramp)
+        call nml_read(filename,trim(par_label),"t_ramp_init", hyst%par%t_ramp_init)
+        call nml_read(filename,trim(par_label),"t_ramp_end",  hyst%par%t_ramp_end)
         call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
         call nml_read(filename,trim(par_label),"dv_dt_scale", hyst%par%dv_dt_scale)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
@@ -121,6 +124,9 @@ contains
         ! Set noise to zero for now 
         hyst%eta_now = 0.0_wp 
         hyst%f_now = hyst%f_mean_now 
+        
+        ! Determine ramp time window length 
+        hyst%par%dt_ramp = hyst%par%t_ramp_end - hyst%par%t_ramp_init 
         
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
@@ -213,18 +219,22 @@ contains
                 ! Ramp up to the constant rate of change for the first N years. 
                 ! Then maintain a constant anomaly (independent of dv_dt). 
 
-                !if (time .ge. hyst%time_init+hyst%par%dt_ramp) then
-                if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
-                    hyst%f_mean_now .gt. hyst%par%f_max) then  
-                    ! Ramp-up complete, no more forcing change 
+                if (time .gt. hyst%time_init+hyst%par%dt_ramp) then 
+                    ! If time window has begun, apply ramp-up 
 
-                    hyst%df_dt = 0.0_wp 
+                    if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
+                        hyst%f_mean_now .gt. hyst%par%f_max) then  
+                        ! Ramp-up complete, no more forcing change 
 
-                else 
-                    ! Linear rate of change from f_max to f_min (or vice versa) over 
-                    ! the time of interest dt_ramp. 
+                        hyst%df_dt = 0.0_wp 
 
-                    hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+                    else 
+                        ! Linear rate of change from f_max to f_min (or vice versa) over 
+                        ! the time of interest dt_ramp. 
+
+                        hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+
+                    end if 
 
                 end if 
 
