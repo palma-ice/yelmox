@@ -133,7 +133,7 @@ contains
 
         ! Store initial simulation time for reference (for ramp method)
         hyst%time_init = time 
-        
+
         return 
 
     end subroutine hyster_init
@@ -219,7 +219,7 @@ contains
                 ! Ramp up to the constant rate of change for the first N years. 
                 ! Then maintain a constant anomaly (independent of dv_dt). 
 
-                if (time .gt. hyst%time_init+hyst%par%dt_ramp) then 
+                if (time .gt. hyst%par%t_ramp_init) then 
                     ! If time window has begun, apply ramp-up 
 
                     if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
