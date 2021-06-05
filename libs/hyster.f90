@@ -133,7 +133,7 @@ contains
 
         ! Store initial simulation time for reference (for ramp method)
         hyst%time_init = time 
-
+        
         return 
 
     end subroutine hyster_init
@@ -235,6 +235,11 @@ contains
                         hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
 
                     end if 
+
+                else 
+                    ! No forcing change yet
+
+                    hyst%df_dt = 0.0_wp 
 
                 end if 
 
