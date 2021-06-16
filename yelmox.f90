@@ -300,7 +300,7 @@ program yelmox
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
 
             ! Run Yelmo for briefly to update surface topography 
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.,dyn_solver="sia")
+            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
             
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
@@ -315,9 +315,9 @@ program yelmox
             ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
-
-            ! Run with low maximum velocities only to smooth things out at first
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=2.0,topo_fixed=.FALSE.,dyn_solver="sia")
+            
+            ! Run with this forcing to get ice-sheet equilibrated
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
 
         else 
             ! Run simple startup equilibration step 
@@ -335,7 +335,7 @@ program yelmox
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
 !     call write_step_2D_small(yelmo1,file2D,time=time)  
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-
+    
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,file1D,time=time) 
