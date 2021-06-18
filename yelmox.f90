@@ -29,7 +29,8 @@ program yelmox
     type(isos_class)       :: isos1
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
-    character(len=512) :: path_par, path_const  
+    character(len=512) :: path_par, path_const
+    character(len=512) :: path_lgm  
     real(prec) :: time, time_bp 
     integer    :: n
     logical    :: calc_transient_climate
@@ -296,8 +297,21 @@ program yelmox
         if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
             ! Start with some ice thickness for testing
 
+if (.TRUE.) then
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
+            
+else
+            ! Load LGM reconstruction
+            path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
+                        "/"//trim(yelmo1%par%grid_name)//"_TOPO-ICE-6G_C.nc"
+            call nc_read(path_lgm,"dz",yelmo1%tpo%now%H_ice,start=[1,1,1], &
+                                count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
+
+            ! Set as reference topography
+            yelmo1%bnd%H_ice_ref = yelmo1%tpo%now%H_ice
+            
+end if 
 
             ! Run Yelmo for briefly to update surface topography 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
@@ -315,10 +329,16 @@ program yelmox
             ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
-            
-            ! Run with this forcing to get ice-sheet equilibrated
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
 
+            ! Run with this forcing to get thermodynamics equilibrated
+            yelmo1%mat%par%rf_method = -1 
+            yelmo1%mat%now%ATT = 1e-18 
+
+            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+
+            yelmo1%mat%par%rf_method = 1
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
+            
         else 
             ! Run simple startup equilibration step 
 
@@ -787,7 +807,7 @@ contains
 
     end subroutine write_step_2D_combined
 
-end program yelmox 
+end program yelmox
 
 
 
