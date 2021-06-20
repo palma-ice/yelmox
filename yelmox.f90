@@ -300,8 +300,8 @@ program yelmox
 if (.TRUE.) then
             ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
-            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
+            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 2000.0 
+            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 2000.0 
 else
             ! Load LGM reconstruction
             path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
@@ -333,10 +333,7 @@ end if
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
-            !yelmo1%par%dt_method=0
-            !call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0,topo_fixed=.FALSE.)
-            !yelmo1%par%dt_method=2
-            ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
 
         else 
             ! Run simple startup equilibration step 
