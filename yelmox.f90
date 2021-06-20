@@ -298,6 +298,7 @@ program yelmox
             ! Start with some ice thickness for testing
 
 if (.TRUE.) then
+            ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
             where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
@@ -313,9 +314,11 @@ else
             
 end if 
 
-            ! Run Yelmo for briefly to update surface topography 
+            ! Run Yelmo for briefly to update surface topography
+            yelmo1%par%dt_method=0 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
-            
+            yelmo1%par%dt_method=2 
+
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
@@ -330,14 +333,9 @@ end if
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
-            ! Run with this forcing to get thermodynamics equilibrated
-            ! yelmo1%mat%par%rf_method = -1 
-            ! yelmo1%mat%now%ATT = 1e-18 
-
-            yelmo1%par%dt_method=0
-            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0,topo_fixed=.FALSE.)
+            !yelmo1%par%dt_method=0
+            !call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0,topo_fixed=.FALSE.)
             !yelmo1%par%dt_method=2
-            ! yelmo1%mat%par%rf_method = 1
             ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
         else 
@@ -369,6 +367,18 @@ end if
     ! Advance timesteps
     do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
+        ! if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
+            
+        !     if (time .lt. 1e3) then 
+        !         yelmo1%par%dt_method = 0
+        !         ctl%dtt = 1.0 
+        !     else 
+        !         yelmo1%par%dt_method = 2 
+        !         ctl%dtt = 5.0 
+        !     end if 
+
+        ! end if 
+
         ! Get current time 
         time = ctl%time_init + n*ctl%dtt
 
@@ -378,18 +388,6 @@ end if
             time_bp = ctl%time_const - 1950.0_wp 
         end if
 
-        if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
-            
-            if (time .lt. 1e3) then 
-                yelmo1%par%dt_method = 0
-                ctl%dtt = 1.0 
-            else 
-                yelmo1%par%dt_method = 2 
-                ctl%dtt = 5.0 
-            end if 
-
-        end if 
-        
         ! ===== basal friction optimization ==================
         if (ctl%optimize) then 
 

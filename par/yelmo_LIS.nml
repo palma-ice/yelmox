@@ -33,14 +33,14 @@
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 3.0               ! Predictor-corrector tolerance 
+    pc_tol          = 20.0              ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 5.0               ! Predictor-corrector tolerance 
     
 /
 
 &ytopo
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
-    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "flux"            ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -49,11 +49,11 @@
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
-    topo_rel_field      = "H_ice_n"         ! "H_ref" or "H_ice_n"
-    calv_H_lim          = 150.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
+    calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau            = 1.0               ! [a] Characteristic calving time
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt           = 50.0              ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max            = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -88,7 +88,7 @@
     cb_z1               = 100.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.001           ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream (20e-3) 
+    cf_stream           = 0.02            ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
