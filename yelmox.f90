@@ -300,7 +300,7 @@ program yelmox
 if (.TRUE.) then
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
-            
+            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
 else
             ! Load LGM reconstruction
             path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
@@ -331,14 +331,15 @@ end if
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             ! Run with this forcing to get thermodynamics equilibrated
-            yelmo1%mat%par%rf_method = -1 
-            yelmo1%mat%now%ATT = 1e-18 
+            ! yelmo1%mat%par%rf_method = -1 
+            ! yelmo1%mat%now%ATT = 1e-18 
 
-            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+            yelmo1%par%dt_method=0
+            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=1.0,topo_fixed=.FALSE.)
+            !yelmo1%par%dt_method=2
+            ! yelmo1%mat%par%rf_method = 1
+            ! call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
-            yelmo1%mat%par%rf_method = 1
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
-            
         else 
             ! Run simple startup equilibration step 
 
@@ -377,6 +378,18 @@ end if
             time_bp = ctl%time_const - 1950.0_wp 
         end if
 
+        if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
+            
+            if (time .lt. 1e3) then 
+                yelmo1%par%dt_method = 0
+                ctl%dtt = 1.0 
+            else 
+                yelmo1%par%dt_method = 2 
+                ctl%dtt = 5.0 
+            end if 
+
+        end if 
+        
         ! ===== basal friction optimization ==================
         if (ctl%optimize) then 
 
