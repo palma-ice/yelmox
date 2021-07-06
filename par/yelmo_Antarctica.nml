@@ -58,7 +58,7 @@
 
 &ytopo
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
-    calv_flt_method     = "flux"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -79,7 +79,7 @@
     gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
     fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
-    kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
+    kt                  = 0.0001            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
 /
 
