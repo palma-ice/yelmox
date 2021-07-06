@@ -38,8 +38,6 @@ program yelmox
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
 
-    character(len=56) :: calv_flt_method
-
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
 
@@ -315,15 +313,11 @@ else
             yelmo1%bnd%H_ice_ref = yelmo1%tpo%now%H_ice
             
 end if 
-
+            
             ! Run Yelmo for briefly to update surface topography
             yelmo1%par%dt_method=0 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
             yelmo1%par%dt_method=2 
-
-            ! Store calving method and set initial calving method to kill 
-            calv_flt_method = trim(yelmo1%tpo%par%calv_flt_method)
-            yelmo1%tpo%par%calv_flt_method = "kill"
 
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
@@ -369,23 +363,6 @@ end if
 
     ! Advance timesteps
     do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
-
-        if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
-            
-        !     if (time .lt. 1e3) then 
-        !         yelmo1%par%dt_method = 0
-        !         ctl%dtt = 1.0 
-        !     else 
-        !         yelmo1%par%dt_method = 2 
-        !         ctl%dtt = 5.0 
-        !     end if 
-
-            if (time .gt. 1e3) then 
-                ! Restore calving method of choice 
-                yelmo1%tpo%par%calv_flt_method = trim(calv_flt_method) 
-            end if 
-            
-        end if 
 
         ! Get current time 
         time = ctl%time_init + n*ctl%dtt
