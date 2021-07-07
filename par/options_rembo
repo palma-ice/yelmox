@@ -46,9 +46,9 @@
    yr    :  year0                       =  0.0
    yr    :  yearf                       =  1000000.0
    yr    :  year_offset                 =  0
-   yr    :  dtime_emb                   =  100
-   yr    :  dtime_smb                   =  10
-   yr    :  dto_clim                    =  100
+   yr    :  dtime_emb                   =  1
+   yr    :  dtime_smb                   =  1
+   yr    :  dto_clim                    =  1
    yr    :  dto_clim2d                  =  10000 
    yr    :  dto_timer                   =  100
    yr    :  n_equili                    =  10

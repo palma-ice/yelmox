@@ -1,11 +1,34 @@
 &ctrl
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 1e3               ! [yr] Ending time
+    time_end        = 30e3              ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
+    time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 50.0             ! [yr] Frequency of writing 2D output files 
-    transient       = True              ! Calculate transient climate? 
+    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
+    dt_restart      = 20e3              ! [yr] Frequency of writing restart files
+    transient_clim  = False             ! Calculate transient climate? 
+    with_ice_sheet  = True              ! Is the ice sheet active?
+    optimize        = False             ! Should basal friction be optimized?
+    
+/
+
+&opt_L21
+    cf_init         = 0.2               ! Initial value of cf_ref everywhere
+    cf_min          = 1e-4              ! [--] Minimum allowed cf value
+    cf_max          = 1.0               ! [--] Maximum allowed cf value
+    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
+    H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
+    
+    sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
+    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
+    
+    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 5e3               ! [yr] Time limit for time period 1
+    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
+
 /
 
 &yelmo
@@ -29,30 +52,35 @@
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 3.0               ! Predictor-corrector tolerance 
+    pc_eps          = 5.0               ! Predictor-corrector tolerance 
     
 /
 
 &ytopo
-    solver            = "impl-upwind"   ! "expl", "impl-upwind"
-    calv_method       = "flux"          ! "zero", "simple", "flux", "kill"
-    surf_gl_method    = 0               ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
-    margin2nd         = False           ! Apply second-order upwind approximation to gradients at the margin
-    use_bmb           = True            ! Use basal mass balance in mass conservation equation
-    topo_fixed        = False           ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel          = 0               ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
-    topo_rel_tau      = 10.0            ! [a] Time scale for relaxation 
-    calv_H_lim        = 200.0           ! [m] Calving limit in ice thickness (thinner ice calves)
-    calv_tau          = 1.0             ! [a] Characteristic calving time
-    H_min_grnd        = 5.0             ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt         = 30.0            ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
-    sd_min            = 100.0           ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
-    sd_max            = 500.0           ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
-    calv_max          = 10.0            ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
-    grad_lim          = 0.1             ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
-    gl_sep            = 1               ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gl_sep_nx         = 15              ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf  = False           ! Allow bmb_shlf to permeate inland at the grounding line 
+    solver              = "impl-upwind"     ! "expl", "impl-upwind"
+    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
+    fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+    margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
+    use_bmb             = True              ! Use basal mass balance in mass conservation equation
+    topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
+    topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
+    calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    calv_tau            = 1.0               ! [a] Characteristic calving time
+    H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+    H_min_flt           = 100.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <  = sd_min)     = 0.0 
+    sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >  = sd_max)     = calv_max  
+    calv_max            = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    grad_lim            = 0.1               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
+    gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
+    fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+    kt                  = 0.0001            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
+    w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
 /
 
 &ydyn
@@ -64,7 +92,7 @@
     beta_q              = 0.2             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
-    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
+    beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling, 4: vel weighting 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
@@ -73,13 +101,13 @@
     cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
     cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
-    cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
+    cb_z0               = -400.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
+    cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.02            ! [--] Bed critical stress factor, stream (20e-3) 
+    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
-    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -93,7 +121,7 @@
 /
 
 &ydyn_neff 
-    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
@@ -162,7 +190,7 @@
 &yelmo_masks
     basins_load     = True 
     basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin" "basin_mask"
+    basins_nms      = "basin_reese" "basin_mask"
     regions_load    = True 
     regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     regions_nms     = "mask" "None"
@@ -203,38 +231,8 @@
     sl_path            = "input/sl_deglaciation.dat"
 /
 
-&tclim_atm 
-
-/
-
-&tclim_ocn 
-
-/
-
-&tclim_noresm_rcp85_ts
-    filename    = "ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc"
-    name        = "ts"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
-/
-
-&tclim_noresm_rcp85_smb
-    filename    = "ice_data/ISMIP6/Atmosphere/Antarctica/AIS-32KM/NorESM_RCP85/Atm_clim_1995-2014.nc"
-    name        = "smb"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34654.9492
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
-/
-
 &snap
-    atm_type           = "anom"
+    atm_type           = "snap_1ind"
     ocn_type           = "anom"
     fname_at           = "input/epica_deglaciation.dat"
     fname_ao           = "input/epica_deglaciation.dat"
@@ -245,8 +243,9 @@
     fname_bp           = "input/ones.dat"
     fname_bs           = "input/ones.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
+    dTa_const          = -10.0  
+    dTo_const          = -2.5
+    dSo_const          = 3.0 
     f_to               = 0.25 
     f_p                = 0.05
     f_stdev            = 0.0  
@@ -362,8 +361,8 @@
 /
 
 &marine_shelf
-    bmb_method      = "lin"         ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 0             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
+    bmb_method      = "anom"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -371,7 +370,7 @@
     ! Deep ocean bmb 
     c_deep          = -1.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
-    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depthconst
+    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depth=const
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
     depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
     
@@ -381,9 +380,9 @@
     lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
 
     ! bmb_method == [lin,quad,quad-nl] 
-    gamma_lin       = 630.0         ! [m/a] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad      = 30000.0       ! [m/a] Quadratic heat exchange velocity. Favier et al., (2019) suggest 31500.
-    gamma_quad_nl   = 40000.0       ! [m/a] Quadratic hnon-local heat exchange velocity. Favier et al., (2019) suggest 42000.
+    gamma_lin       = 630.0         ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad      = 11100.0       ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
+    gamma_quad_nl   = 14500.0       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
     gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
 
     ! bmb_method == anom
