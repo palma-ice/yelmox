@@ -223,14 +223,16 @@ contains
 
     end subroutine marshelf_update_shelf
 
-    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx)
+    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
         
         implicit none
-        
+       
+        ! jablasco: added regions 
         type(marshelf_class), intent(INOUT) :: mshlf
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: regions(:,:)
         real(wp), intent(IN) :: basins(:,:)
         real(wp), intent(IN) :: z_sl(:,:) 
         !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
@@ -340,7 +342,13 @@ contains
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
                 ! Set bmb_shlf to pico value 
-                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf 
+                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
+                where(f_grnd .eq. 0.0) mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
+                ! jablasco: to avoid ice shelves grwoing at the margin lets impose an averaged melt in region 2.1
+                select case(trim(mshlf%par%domain))
+                    case("Antarctica")
+                        where (regions .eq. 2.1) mshlf%now%bmb_shlf = 0.5*mshlf%now%bmb_shlf+0.5*mshlf%par%c_deep
+                end select 
 
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 
