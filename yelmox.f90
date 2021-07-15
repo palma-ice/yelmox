@@ -48,6 +48,18 @@ program yelmox
     character(len=512) :: reg1_fnm
     logical, allocatable :: reg1_mask(:,:) 
 
+    logical :: reg2_write
+    real(prec) :: reg2_val
+    character(len=56)  :: reg2_nm
+    character(len=512) :: reg2_fnm
+    logical, allocatable :: reg2_mask(:,:)
+
+    logical :: reg3_write
+    real(prec) :: reg3_val
+    character(len=56)  :: reg3_nm
+    character(len=512) :: reg3_fnm
+    logical, allocatable :: reg3_mask(:,:)
+
     type ctrl_params
         character(len=56) :: run_step
         real(wp) :: time_init
@@ -139,10 +151,20 @@ program yelmox
 
     ! Options for writing a specific region ====================
 
-    reg1_write = .FALSE. 
-    reg1_val   = 1.12     ! 1.12 == Hudson region 
-    reg1_nm    = "Hudson"
+    reg1_write = .True. 
+    reg1_val   = 3.0     ! 3.0 = APIS
+    reg1_nm    = "APIS"
     reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
+
+    reg2_write = .True. 
+    reg2_val   = 4.0     ! 4.0 = WAIS
+    reg2_nm    = "WAIS"
+    reg2_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
+
+    reg3_write = .True. 
+    reg3_val   = 5.0     ! 5.0 = EAIS
+    reg3_nm    = "EAIS"
+    reg3_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
 
     !  =========================================================
 
@@ -187,8 +209,22 @@ program yelmox
         allocate(reg1_mask(yelmo1%grd%nx,yelmo1%grd%ny))
         reg1_mask = .FALSE. 
         where(abs(yelmo1%bnd%regions - reg1_val) .lt. 1e-3) reg1_mask = .TRUE. 
+    end if
+
+    if (reg2_write) then
+        ! If writing a region, define a mask for it here to use later
+        allocate(reg2_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+        reg2_mask = .FALSE.
+        where(abs(yelmo1%bnd%regions - reg2_val) .lt. 1e-3) reg2_mask = .TRUE.
     end if 
     
+    if (reg3_write) then
+        ! If writing a region, define a mask for it here to use later
+        allocate(reg3_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+        reg3_mask = .FALSE.
+        where(abs(yelmo1%bnd%regions - reg3_val) .lt. 1e-3) reg3_mask = .TRUE.
+    end if
+
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
@@ -365,6 +401,17 @@ end if
         call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask)
     end if 
 
+    if (reg2_write) then
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=reg2_mask)
+        call yelmo_write_reg_step(yelmo1,reg2_fnm,time=time,mask=reg2_mask)
+    end if
+
+    if (reg3_write) then
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=reg3_mask)
+        call yelmo_write_reg_step(yelmo1,reg3_fnm,time=time,mask=reg3_mask)
+    end if
+
+
     ! Advance timesteps
     do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
@@ -452,7 +499,16 @@ end if
 
             if (reg1_write) then 
                 call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
-            end if  
+            end if
+
+            if (reg2_write) then
+                call yelmo_write_reg_step(yelmo1,reg2_fnm,time=time,mask=reg2_mask)
+            end if
+  
+            if (reg3_write) then
+                call yelmo_write_reg_step(yelmo1,reg3_fnm,time=time,mask=reg3_mask)
+            end if
+
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt_restart*100))==0) then 
