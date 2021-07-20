@@ -4,6 +4,7 @@ program yelmox
 
     use ncio 
     use yelmo 
+    use yelmo_tools, only : smooth_gauss_2D
     use ice_optimization
 
     ! External libraries
@@ -297,7 +298,7 @@ program yelmox
         if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
             ! Start with some ice thickness for testing
 
-if (.TRUE.) then
+if (.FALSE.) then
             ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 2000.0 
@@ -308,6 +309,10 @@ else
                         "/"//trim(yelmo1%par%grid_name)//"_TOPO-ICE-6G_C.nc"
             call nc_read(path_lgm,"dz",yelmo1%tpo%now%H_ice,start=[1,1,1], &
                                 count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
+
+            ! Apply Gaussian smoothing to keep things stable
+            call smooth_gauss_2D(yelmo1%tpo%now%H_ice,mask_apply=yelmo1%tpo%now%H_ice.gt.0, &
+                                                                    dx=yelmo1%grd%dx,n_smooth=2)
 
             ! Set as reference topography
             yelmo1%bnd%H_ice_ref = yelmo1%tpo%now%H_ice
