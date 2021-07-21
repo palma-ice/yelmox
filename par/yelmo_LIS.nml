@@ -88,7 +88,7 @@
     cb_z1               = 100.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.001           ! [Pa] Minimum allowed value of cb for grounded ice
     cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.02            ! [--] Bed critical stress factor, stream (20e-3) 
+    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
