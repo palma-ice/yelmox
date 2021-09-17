@@ -47,6 +47,9 @@ module marine_shelf
         real(wp)            :: obs_scale, obs_lim 
         character(len=56)   :: basin_name(50)
         real(wp)            :: basin_bmb(50)
+        logical             :: tf_correction
+        character(len=512)  :: tf_path
+        character(len=56)   :: tf_name
 
         real(wp)            :: c_deep
         real(wp)            :: depth_deep
@@ -315,6 +318,8 @@ contains
 
             case(1) 
                 ! Determine tf_shlf 
+
+                if (mshlf%par%tf_correction) call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr) 
 
                 where (mshlf%now%mask_ocn .gt. 0) 
                     mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
@@ -712,9 +717,14 @@ contains
         call nml_read(filename,group,"obs_lim",        par%obs_lim,        init=init_pars)
         call nml_read(filename,group,"basin_name",     par%basin_name,     init=init_pars)
         call nml_read(filename,group,"basin_bmb",      par%basin_bmb,      init=init_pars)
-        
+       
+        call nml_read(filename,group,"tf_correction",  par%tf_correction,  init=init_pars)
+        call nml_read(filename,group,"tf_path",        par%tf_path,        init=init_pars)
+        call nml_read(filename,group,"tf_name",        par%tf_name,        init=init_pars)
+ 
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
+        call parse_path(par%tf_path,domain,grid_name)
         par%domain = trim(domain)
 
         ! Consistency checks 

@@ -28,7 +28,7 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart, domain
     character(len=512) :: path_par, path_const
     character(len=512) :: path_lgm  
     real(prec) :: time, time_bp 
@@ -151,20 +151,20 @@ program yelmox
 
     ! Options for writing a specific region ====================
 
-    reg1_write = .True. 
+    reg1_write = .TRUE. 
     reg1_val   = 3.0     ! 3.0 = APIS
     reg1_nm    = "APIS"
     reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
 
-    reg2_write = .True. 
+    reg2_write = .TRUE. 
     reg2_val   = 4.0     ! 4.0 = WAIS
     reg2_nm    = "WAIS"
-    reg2_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
+    reg2_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2_nm)//".nc"
 
-    reg3_write = .True. 
+    reg3_write = .TRUE. 
     reg3_val   = 5.0     ! 5.0 = EAIS
     reg3_nm    = "EAIS"
-    reg3_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
+    reg3_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3_nm)//".nc"
 
     !  =========================================================
 
@@ -397,17 +397,17 @@ end if
     call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     if (reg1_write) then 
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=reg1_mask)
+        call yelmo_write_reg_init(yelmo1,reg1_fnm,time_init=time,units="years",mask=reg1_mask)
         call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask)
     end if 
 
     if (reg2_write) then
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=reg2_mask)
+        call yelmo_write_reg_init(yelmo1,reg2_fnm,time_init=time,units="years",mask=reg2_mask)
         call yelmo_write_reg_step(yelmo1,reg2_fnm,time=time,mask=reg2_mask)
     end if
 
     if (reg3_write) then
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=reg3_mask)
+        call yelmo_write_reg_init(yelmo1,reg3_fnm,time_init=time,units="years",mask=reg3_mask)
         call yelmo_write_reg_step(yelmo1,reg3_fnm,time=time,mask=reg3_mask)
     end if
 
