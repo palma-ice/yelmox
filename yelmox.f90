@@ -311,8 +311,7 @@ else
                                 count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
 
             ! Apply Gaussian smoothing to keep things stable
-            call smooth_gauss_2D(yelmo1%tpo%now%H_ice,mask_apply=yelmo1%tpo%now%H_ice.gt.0, &
-                                                                    dx=yelmo1%grd%dx,n_smooth=2)
+            call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
 
             ! Set as reference topography
             yelmo1%bnd%H_ice_ref = yelmo1%tpo%now%H_ice
