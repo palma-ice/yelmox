@@ -26,7 +26,7 @@
             "ismip6" : "par/ismip6.nml"
         },
 
-    "files" : [], 
+    "files" : ["par/options_rembo"], 
 
     "dir-special" : {},
 

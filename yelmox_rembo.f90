@@ -30,6 +30,7 @@ program yelmox
     type(hyster_class)     :: hyst1 
 
     character(len=256) :: outfldr, file1D, file2D, file1D_hyst, file_restart, domain 
+    character(len=256) :: file_rembo
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
     integer    :: n
@@ -44,6 +45,8 @@ program yelmox
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
     logical :: lim_pd_ice 
+    logical :: with_ice_sheet 
+    logical :: optimize 
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -70,6 +73,8 @@ program yelmox
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
     call nml_read(path_par,"ctrl","dTdt",        dTdt)                       ! Constant rate of temperature change when not using hyster
     call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
+    call nml_read(path_par,"ctrl","with_ice_sheet",with_ice_sheet)  ! Active ice sheet? 
+    call nml_read(path_par,"ctrl","optimize",optimize)              ! Optimize basal friction?
     
     ! Define input and output locations 
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
@@ -78,8 +83,13 @@ program yelmox
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
     file1D_hyst  = trim(outfldr)//"yelmo1D_hyst.nc" 
 
+    file_rembo   = trim(outfldr)//"yelmo-rembo.nc"
+
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
+
+
+    time = time_init 
 
     ! === Initialize ice sheet model =====
 
@@ -108,7 +118,8 @@ program yelmox
     conv_km3_Gt = rho_ice *1e-3
 
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
+    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
+                        domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
@@ -131,9 +142,15 @@ program yelmox
         dT_summer = hyst1%f_now 
     end if 
 
-    ! Update REMBO, with ice sheet topography    
+    ! Update REMBO, with correct topography, let it equilibrate for several years 
+    ! do n = 1, 100
+    !     time = time_init + real(n,8)    
+    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    ! end do 
+    ! rembo_ann%time_emb = time_init 
+    ! rembo_ann%time_smb = time_init  
     call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
-            
+    
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = rembo_ann%T_srf
@@ -152,12 +169,12 @@ program yelmox
     end if 
 
     ! write(*,*) "To do..."
-!     call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-!                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-!                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+    ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+    !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+    !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -181,9 +198,11 @@ program yelmox
 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-    call yelmo_update_equil(yelmo1,time,time_tot=500.0_prec,dt=dtt,topo_fixed=.TRUE.)
-    
+    if (with_ice_sheet) then 
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=500.0_prec,dt=dtt,topo_fixed=.TRUE.)
+    end if 
+
     ! Now run steady-state for several thousand years
     !call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.FALSE.)
     
@@ -202,10 +221,14 @@ program yelmox
     ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     ! 1D file hyst 
-    call write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
-                    mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
-    call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
+    ! call write_yelmo_init_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
+    !                 mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
+    ! call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
 
+
+    call write_yelmo_init_combined(yelmo1,file_rembo,time_init=time,units="years", &
+                    mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
+    call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
 
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -218,7 +241,9 @@ program yelmox
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == Yelmo ice sheet ===================================================
-        call yelmo_update(yelmo1,time)
+        if (with_ice_sheet) then 
+            call yelmo_update(yelmo1,time)
+        end if 
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
@@ -253,12 +278,12 @@ if (calc_transient_climate) then
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         ! To do: currently no anomalies are calculated for the ocean with rembo active
-!         call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-!                          yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-!                          dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+        ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+        !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+        !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx*1e-3)
+                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
 
@@ -273,7 +298,8 @@ end if
 
         if (mod(time,dt1D_out)==0) then 
             ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-            call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
+            !call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
+            call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
         end if 
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
@@ -310,6 +336,120 @@ end if
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
+    
+    subroutine write_step_2D_combined_small(ylmo,hyst,rembo,isos,mshlf,filename,time)
+
+        implicit none 
+        
+        type(yelmo_class),       intent(IN) :: ylmo
+        type(hyster_class),      intent(IN) :: hyst
+        type(rembo_class),       intent(IN) :: rembo
+        type(isos_class),        intent(IN) :: isos 
+        type(marshelf_class),    intent(IN) :: mshlf 
+        
+        character(len=*),  intent(IN) :: filename
+        real(prec), intent(IN) :: time
+
+        ! Local variables
+        integer    :: ncid, n, k
+        real(prec) :: time_prev 
+        real(prec) :: npmb, ntot, aar, smb_tot  
+        real(prec) :: dT_axis(1000)
+        type(yregions_class) :: reg
+
+        ! Assume region to write is the global region of yelmo 
+        reg = ylmo%reg 
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
+        if (abs(time-time_prev).gt.1e-5) n = n+1 
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+
+        ! ===== Hyst / forcing variables ===== 
+
+        call nc_write(filename,"hyst_f_now",hyst%f_now,units="K",long_name="hyst: forcing value", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 yr)",long_name="hyst: forcing rate of change", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/yr",long_name="hyst: volume rate of change", &
+                      dim1="time",start=[n],ncid=ncid)
+
+        ! Write volume in volume-dT phase space
+        call nc_read(filename,"dT_axis",dT_axis) 
+        k = minloc(abs(dT_axis-hyst%f_now),dim=1)
+        call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
+                      dim1="time",start=[k],ncid=ncid)
+        
+        ! == yelmo metrics ==
+
+        ! Write model metrics (model speed, dt, eta)
+        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+
+        ! Write present-day data metrics (rmse[H],etc)
+        ! call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        
+
+        ! == yelmo_topography ==
+
+        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/yr",long_name="Surface velocity magnitude", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        ! == rembo climate == 
+        call nc_write(filename,"ta_ann",rembo%T_ann,units="K",long_name="REMBO Near-surface air temperature (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"ta_sum",rembo%T_jja,units="K",long_name="REMBO Near-surface air temperature (sum)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"pr_ann",rembo%pr*1e-3,units="m/a water equiv.",long_name="REMBO Precipitation (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"smb",rembo%smb*1e-3,units="m/yr water equiv.",long_name="REMBO Surface mass balance (ann)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+
+        ! == ice-sheet wide metrics == 
+
+        ! Get integrated metrics (smb_tot [Gt/yr] and aar [unitless])
+        ntot = count(ylmo%tpo%now%H_ice .gt. 0.0)
+
+        if (ntot .gt. 0.0) then 
+            npmb = count(ylmo%tpo%now%H_ice .gt. 0.0 .and. rembo%smb .gt. 0.0)
+            aar  = real(npmb,prec) / real(ntot,prec) 
+
+            smb_tot = (ylmo%tpo%par%dx**2)*sum(rembo%smb*1e-3,mask=ylmo%tpo%now%H_ice .gt. 0.0)
+
+            ! Convert from m^3/yr => Gt/yr
+            ! [m^3/yr] * [1000 kg/m^3] * [1e-12 Gt/kg] == [Gt/yr]
+            smb_tot = smb_tot * (1000) *1e-12 
+        else
+            aar = 0.0
+        end if  
+
+        call nc_write(filename,"dT_jja",hyst%f_now,units="K",long_name="hyst: forcing value", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"smb_mean",smb_tot,units="Gt/yr",long_name="Mean smb over the ice sheet", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"aar",aar,units="1",long_name="Accumulation area ratio", &
+                      dim1="time",start=[n],ncid=ncid)
+        
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return 
+
+    end subroutine write_step_2D_combined_small
 
     subroutine write_step_2D_combined(ylmo,rembo,isos,mshlf,filename,time)
 
@@ -324,7 +464,7 @@ contains
         real(prec), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n
+        integer    :: ncid, n 
         real(prec) :: time_prev 
 
         ! Open the file for writing
@@ -715,7 +855,7 @@ contains
 
     end subroutine write_step_1D_combined
 
-    subroutine write_yelmo_init_1D_combined(dom,filename,time_init,units,mask,dT_min,dT_max)
+    subroutine write_yelmo_init_combined(dom,filename,time_init,units,mask,dT_min,dT_max)
 
         implicit none 
 
@@ -754,9 +894,9 @@ contains
         
         return
 
-    end subroutine write_yelmo_init_1D_combined
+    end subroutine write_yelmo_init_combined
 
-end program yelmox 
+end program yelmox
 
 
 
