@@ -300,7 +300,7 @@ program yelmox
 if (.TRUE.) then
             ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 2000.0 
+            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
             where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
 else
             ! Load LGM reconstruction
