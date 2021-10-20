@@ -297,11 +297,11 @@ program yelmox
         if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
             ! Start with some ice thickness for testing
 
-if (.FALSE.) then
+if (.TRUE.) then
             ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 2000.0 
-            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 2000.0 
+            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
 else
             ! Load LGM reconstruction
             path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
@@ -650,7 +650,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
         !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
