@@ -5,7 +5,7 @@
     time_const      = -18e3             ! [yr CE] Assumed constant time for non-transient climate
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 1e2               ! [yr] Frequency of writing 1D output files
-    dt2D_out        = 1e3               ! [yr] Frequency of writing 2D output files
+    dt2D_out        = 500               ! [yr] Frequency of writing 2D output files
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 
     with_ice_sheet  = True              ! Is the ice sheet active?
@@ -34,8 +34,8 @@
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 20.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 5.0               ! Predictor-corrector tolerance 
+    pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 3.0               ! Predictor-corrector tolerance 
     
 /
 
@@ -159,8 +159,8 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
-    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
+    till_rate       = 0.008             ! [m/a] Basal water till drainage rate (water equiv.)
+    H_w_max         = 0.4               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 
     rock_method     = "active"          ! "equil" (not active bedrock) or "active"
     nzr_aa          = 5                 ! Number of vertical points in bedrock 
@@ -408,8 +408,8 @@
 
 &geothermal
     use_obs   = True 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-D13.nc"
-    obs_name  = "ghf_mean"
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-S04.nc"
+    obs_name  = "ghf"
     ghf_const = 50.0           ! [mW/m^2]
 
 /
