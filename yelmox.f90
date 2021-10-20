@@ -209,13 +209,12 @@ program yelmox
     
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
-    
+
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
-
 
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
@@ -298,7 +297,7 @@ program yelmox
         if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
             ! Start with some ice thickness for testing
 
-if (.TRUE.) then
+if (.FALSE.) then
             ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 2000.0 
@@ -319,9 +318,11 @@ else
 end if 
             
             ! Run Yelmo for briefly to update surface topography
-            yelmo1%par%dt_method=0 
+            yelmo1%par%dt_method=0
+            !yelmo1%thrm%par%method = "fixed" 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
             yelmo1%par%dt_method=2 
+            !yelmo1%thrm%par%method = "temp" 
 
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
@@ -337,7 +338,7 @@ end if
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
+            !call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
 
         else 
             ! Run simple startup equilibration step 

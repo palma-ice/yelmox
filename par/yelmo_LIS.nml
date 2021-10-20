@@ -30,8 +30,9 @@
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
-    pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
+    pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
+    pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 20.0              ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 5.0               ! Predictor-corrector tolerance 
@@ -95,7 +96,7 @@
     ssa_lis_opt         = "-i bicgsafe -p jacobi -maxiter 100 -tol 1.0e-4 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
     ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
-    ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution (20)
+    ssa_iter_max        = 5               ! Number of maximum allowed iterations over ssa to converge on vel. solution (20)
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations (1e-2)
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
@@ -349,7 +350,8 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
-    ! Deep ocean bmb 
+    ! Deep ocean bmb
+    bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
     c_deep          = -1.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
     depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depth=const

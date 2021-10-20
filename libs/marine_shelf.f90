@@ -37,7 +37,7 @@ module marine_shelf
     type marshelf_param_class
 
         character(len=56)   :: bmb_method
-        integer             :: tf_method  
+        integer             :: tf_method 
         character(len=56)   :: interp_method 
         character(len=56)   :: interp_depth 
         logical             :: find_ocean 
@@ -48,6 +48,7 @@ module marine_shelf
         character(len=56)   :: basin_name(50)
         real(wp)            :: basin_bmb(50)
 
+        real(wp)            :: bmb_max  
         real(wp)            :: c_deep
         real(wp)            :: depth_deep
         real(wp)            :: depth_const
@@ -414,6 +415,11 @@ contains
 
                 end select 
                 
+                ! === Apply refreezing limitations if desired ====
+
+                where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
+                                        mshlf%now%bmb_shlf = mshlf%par%bmb_max
+
                 ! === Apply logical limitations =====
 
                 ! Set bmb to zero for grounded points 
@@ -674,6 +680,7 @@ contains
         call nml_read(filename,group,"interp_method",  par%interp_method,  init=init_pars)
         call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)   
         
+        call nml_read(filename,group,"bmb_max",        par%bmb_max,        init=init_pars)
         call nml_read(filename,group,"c_deep",         par%c_deep,         init=init_pars)
         call nml_read(filename,group,"depth_deep",     par%depth_deep,     init=init_pars)
         call nml_read(filename,group,"depth_const",    par%depth_const,    init=init_pars)
