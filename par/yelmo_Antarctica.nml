@@ -128,8 +128,8 @@
     neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
     neff_delta      = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
-    neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
-    neff_Cc         = 0.12              ! [--] *neff_method=3* Till compressibility    
+    neff_e0         = 0.53              ! [--] *neff_method=3* Reference void ratio at N0 
+    neff_Cc         = 0.014             ! [--] *neff_method=3* Till compressibility    
 /
 
 &ydyn_till
@@ -176,7 +176,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 5e-4              ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 
     rock_method     = "active"          ! "equil" (not active bedrock) or "active"
