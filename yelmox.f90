@@ -297,32 +297,30 @@ program yelmox
         if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
             ! Start with some ice thickness for testing
 
-if (.TRUE.) then
+            ! Load LGM reconstruction into reference ice thickness
+            path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
+                        "/"//trim(yelmo1%par%grid_name)//"_TOPO-ICE-6G_C.nc"
+            call nc_read(path_lgm,"dz",yelmo1%bnd%H_ice_ref,start=[1,1,1], &
+                                count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
+
+
+if (.FALSE.) then
             ! Start with some ice cover to speed up initialization
             yelmo1%tpo%now%H_ice = 0.0
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
             where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
+
 else
-            ! Load LGM reconstruction
-            path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
-                        "/"//trim(yelmo1%par%grid_name)//"_TOPO-ICE-6G_C.nc"
-            call nc_read(path_lgm,"dz",yelmo1%tpo%now%H_ice,start=[1,1,1], &
-                                count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
+            ! Set LGM reconstsruction as initial ice thickness 
+            yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
 
             ! Apply Gaussian smoothing to keep things stable
             call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
-
-            ! Set as reference topography
-            yelmo1%bnd%H_ice_ref = yelmo1%tpo%now%H_ice
             
 end if 
             
             ! Run Yelmo for briefly to update surface topography
-            yelmo1%par%dt_method=0
-            !yelmo1%thrm%par%method = "fixed" 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
-            yelmo1%par%dt_method=2 
-            !yelmo1%thrm%par%method = "temp" 
 
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
