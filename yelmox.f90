@@ -338,32 +338,14 @@ end if
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
-
-            ! Equilibrate thermodynamics
-            call yelmo_update_equil(yelmo1,time,time_tot=5e3,dt=5.0,topo_fixed=.TRUE.)
-
-            !call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
-
+            
         else 
             ! Run simple startup equilibration step 
             
-            ! Turn on relaxation first, to let thermodynamics equilibrate
-            ! without changing the topography too much. Important when 
-            ! interactive effective pressure = f(thermodynamics).
-            yelmo1%tpo%par%topo_rel     = 2
-            yelmo1%tpo%par%topo_rel_tau = 50.0 
-            write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
-            call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.FALSE.)
-            
-            ! Finally, disable relaxation and let program start.
-            yelmo1%tpo%par%topo_rel     = 0
-            write(*,*) "timelog, relation off..."
-        
-            ! ! Run yelmo for several years with constant boundary conditions and topo
-            ! ! to equilibrate thermodynamics and dynamics
-            ! call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-            ! call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
-        
+            ! Run yelmo for several years with constant boundary conditions and topo
+            ! to equilibrate thermodynamics and dynamics
+            call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+
         end if 
 
     end if 
@@ -394,8 +376,9 @@ end if
             time_bp = ctl%time_const - 1950.0_wp 
         end if
 
-        ! ===== basal friction optimization ==================
+        ! Spin-up procedure...
         if (ctl%optimize) then 
+            ! ===== basal friction optimization ==================
 
             ! === Optimization parameters =========
             
@@ -416,6 +399,27 @@ end if
                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                 yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                 fill_dist=80.0_prec,dt=ctl%dtt)
+        
+        else 
+            ! ===== relaxation spinup ==================
+
+            if ( (time-ctl%time_init) .le. ctl%time_equil) then 
+            ! Turn on relaxation first, to let thermodynamics equilibrate
+            ! without changing the topography too much. Important when 
+            ! interactive effective pressure = f(thermodynamics).
+
+                yelmo1%tpo%par%topo_rel     = 2
+                yelmo1%tpo%par%topo_rel_tau = 50.0 
+                write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+
+            else 
+                ! Finally, disable relaxation and continue as normal.
+
+                yelmo1%tpo%par%topo_rel     = 0
+                write(*,*) "timelog, relation off..."
+            
+            end if 
+
         end if 
         ! ====================================================
 
