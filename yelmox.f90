@@ -338,7 +338,7 @@ end if
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
             call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
-            
+
         else 
             ! Run simple startup equilibration step 
             
@@ -377,49 +377,50 @@ end if
         end if
 
         ! Spin-up procedure...
-        if (ctl%optimize) then 
-            ! ===== basal friction optimization ==================
-
-            ! === Optimization parameters =========
+        if ( (time-ctl%time_init) .lt. ctl%time_equil) then 
             
-            ! Update model relaxation time scale and error scaling (in [m])
-            opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                            p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
-            
-            ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-            yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-            yelmo1%tpo%par%topo_rel     = 2
-            if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-            
-            ! === Optimization update step =========
+            if (ctl%optimize) then 
+                ! ===== basal friction optimization ==================
 
-            ! Update cf_ref based on error metric(s) 
-            call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
-                                yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                fill_dist=80.0_prec,dt=ctl%dtt)
-        
-        else 
-            ! ===== relaxation spinup ==================
+                ! === Optimization parameters =========
+                
+                ! Update model relaxation time scale and error scaling (in [m])
+                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                
+                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                yelmo1%tpo%par%topo_rel     = 2
+                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+                
+                ! === Optimization update step =========
 
-            if ( (time-ctl%time_init) .le. ctl%time_equil) then 
-            ! Turn on relaxation first, to let thermodynamics equilibrate
-            ! without changing the topography too much. Important when 
-            ! interactive effective pressure = f(thermodynamics).
+                ! Update cf_ref based on error metric(s) 
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    fill_dist=80.0_prec,dt=ctl%dtt)
+            
+            else 
+                ! ===== relaxation spinup ==================
+
+                ! Turn on relaxation for now, to let thermodynamics equilibrate
+                ! without changing the topography too much. Important when 
+                ! interactive effective pressure = f(thermodynamics).
 
                 yelmo1%tpo%par%topo_rel     = 2
                 yelmo1%tpo%par%topo_rel_tau = 50.0 
                 write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-            else 
-                ! Finally, disable relaxation and continue as normal.
+            end if 
+
+        else if ( (time-ctl%time_init) .eq. ctl%time_equil) then
+            ! Finally, ensure all relaxation is disabled and continue as normal.
 
                 yelmo1%tpo%par%topo_rel     = 0
                 write(*,*) "timelog, relation off..."
-            
-            end if 
-
+              
         end if 
         ! ====================================================
 
