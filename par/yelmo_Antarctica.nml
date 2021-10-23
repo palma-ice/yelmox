@@ -1,7 +1,7 @@
 &ctrl
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 30e3              ! [yr] Ending time
-    time_equil      = 10.0              ! [yr] Equilibration time 
+    time_equil      = 5e3               ! [yr] Equilibration time 
     time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
@@ -62,6 +62,7 @@
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations

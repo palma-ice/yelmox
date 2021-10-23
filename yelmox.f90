@@ -312,7 +312,8 @@ if (.FALSE.) then
 
 else
             ! Set LGM reconstsruction as initial ice thickness 
-            yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
+            !yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
+            yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref * 0.50    ! 20% reduced!
 
             ! Apply Gaussian smoothing to keep things stable
             call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
@@ -336,15 +337,32 @@ end if
             where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
 
+            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+
+            ! Equilibrate thermodynamics
+            call yelmo_update_equil(yelmo1,time,time_tot=5e3,dt=5.0,topo_fixed=.TRUE.)
+
             !call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
 
         else 
             ! Run simple startup equilibration step 
-
-            ! Run yelmo for several years with constant boundary conditions and topo
-            ! to equilibrate thermodynamics and dynamics
-            call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-            call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
+            
+            ! Turn on relaxation first, to let thermodynamics equilibrate
+            ! without changing the topography too much. Important when 
+            ! interactive effective pressure = f(thermodynamics).
+            yelmo1%tpo%par%topo_rel     = 2
+            yelmo1%tpo%par%topo_rel_tau = 50.0 
+            write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+            call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.FALSE.)
+            
+            ! Finally, disable relaxation and let program start.
+            yelmo1%tpo%par%topo_rel     = 0
+            write(*,*) "timelog, relation off..."
+        
+            ! ! Run yelmo for several years with constant boundary conditions and topo
+            ! ! to equilibrate thermodynamics and dynamics
+            ! call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+            ! call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
         
         end if 
 
