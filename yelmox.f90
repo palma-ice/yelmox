@@ -41,7 +41,6 @@ program yelmox
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
-
     ! Define whether to write some additional 1D files from Yelmo 
     logical :: reg1_write 
     real(prec) :: reg1_val
@@ -49,18 +48,22 @@ program yelmox
     character(len=512) :: reg1_fnm
     logical, allocatable :: reg1_mask(:,:) 
 
+    real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
+
     type ctrl_params
         character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
         real(wp) :: time_equil      ! Only for spinup
-        real(wp) :: time_const      ! Only for spinup 
+        real(wp) :: time_const      ! Only for spinup
+        real(wp) :: time_lgm_step 
         real(wp) :: dtt
         real(wp) :: dt1D_out
         real(wp) :: dt2D_out
         real(wp) :: dt_restart
 
         logical  :: transient_clim
+        logical  :: use_lgm_step
         logical  :: with_ice_sheet 
         logical  :: optimize
     end type 
@@ -99,13 +102,28 @@ program yelmox
     call nml_read(path_par,"ctrl","time_end",       ctl%time_end)           ! [yr] Ending time
     call nml_read(path_par,"ctrl","time_equil",     ctl%time_equil)         ! [yr] Years to equilibrate first
     call nml_read(path_par,"ctrl","time_const",     ctl%time_const) 
+    call nml_read(path_par,"ctrl","time_lgm_step",  ctl%time_lgm_step) 
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt1D_out",       ctl%dt1D_out)           ! [yr] Frequency of 1D output 
     call nml_read(path_par,"ctrl","dt2D_out",       ctl%dt2D_out)           ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","optimize",       ctl%optimize)           ! Optimize basal friction cf_ref field
+
+    ! Consistency checks ===
+
+    ! transient_clim overrides use_lgm_step 
+    if (ctl%transient_clim) ctl%use_lgm_step = .FALSE. 
+
+    ! lgm step should only come after time_equil is finished...
+    if (ctl%time_lgm_step .lt. ctl%time_equil) then 
+        write(5,*) ""
+        write(5,*) "yelmox:: time_lgm_step must be greater than time_equil."
+        write(5,*) "Try again."
+        stop "Program stopped."
+    end if 
 
     if (ctl%optimize) then 
         ! Load optimization parameters 
@@ -150,6 +168,7 @@ program yelmox
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "transient_clim: ",  ctl%transient_clim
+    write(*,*) "use_lgm_step: ",    ctl%use_lgm_step
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
     write(*,*) "optimize:       ",  ctl%optimize
     write(*,*)
@@ -164,6 +183,10 @@ program yelmox
     if (.not. ctl%transient_clim) then 
         write(*,*) "time_equil: ",    ctl%time_equil 
         write(*,*) "time_const: ",    ctl%time_const 
+
+        if (ctl%use_lgm_step) then 
+            write(*,*) "time_lgm_step: ", ctl%time_lgm_step 
+        end if 
 
         ! Set time before present == to constant climate time 
         time_bp = ctl%time_const - 1950.0_wp
@@ -372,7 +395,12 @@ end if
 
         if (ctl%transient_clim) then 
             time_bp = time - 1950.0_wp
-        else 
+        else
+
+            if (ctl%use_lgm_step .and. time .ge. ctl%time_lgm_step) then 
+                ctl%time_const = time_lgm 
+            end if 
+
             time_bp = ctl%time_const - 1950.0_wp 
         end if
 
@@ -407,7 +435,7 @@ end if
 
                 ! Turn on relaxation for now, to let thermodynamics equilibrate
                 ! without changing the topography too much. Important when 
-                ! interactive effective pressure = f(thermodynamics).
+                ! effective pressure = f(thermodynamics).
 
                 yelmo1%tpo%par%topo_rel     = 2
                 yelmo1%tpo%par%topo_rel_tau = 50.0 
@@ -858,6 +886,8 @@ contains
         return 
 
     end subroutine write_step_2D_combined
+
+
 
 end program yelmox
 
