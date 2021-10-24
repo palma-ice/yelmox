@@ -83,7 +83,7 @@
     gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
     fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
-    kt                  = 0.0001            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
+    kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
 /
 
@@ -95,7 +95,7 @@
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
     beta_q              = 0.2             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
-    beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
+    beta_gl_scale       = 2               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 3               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling, 4: vel weighting 
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
@@ -104,14 +104,14 @@
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
     cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
     cb_margin_pmp       = True            ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
-    cb_scale            = "exp_zb"        ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
+    cb_scale            = "till_zb"       ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
     cb_z0               = -400.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
     cb_z1               = 0.0             ! [m] Bedrock elevation above which scaling goes to f_scale=1
     cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
-    cf_frozen           = 0.1             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream (20e-3) 
+    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
+    cf_stream           = 1.0             ! [--] Bed critical stress factor, stream (20e-3) 
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
-    beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-1 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -137,10 +137,10 @@
 
 &ydyn_till
     till_phi_const  =  10.0                 ! [degrees] Till friction angle, constant
-    till_phi_min    =   5.0                 ! [degrees] Till friction angle, minimum
+    till_phi_min    =   2.0                 ! [degrees] Till friction angle, minimum
     till_phi_max    =  40.0                 ! [degrees] Till friction angle, maximum
     till_phi_zmin   = -700.0                ! [m] Bedrock elevation for till_phi_min
-    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for phi_max 
+    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for till_phi_max 
 /
 
 &ymat
@@ -153,7 +153,7 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 1.0
+    enh_shear               = 3.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
@@ -179,7 +179,7 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 5e-4              ! [m/a] Basal water till drainage rate (water equiv.)
+    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
     H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 
     rock_method     = "active"          ! "equil" (not active bedrock) or "active"

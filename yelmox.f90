@@ -405,7 +405,7 @@ end if
         end if
 
         ! Spin-up procedure...
-        if ( (time-ctl%time_init) .lt. ctl%time_equil) then 
+        if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
             
             if (ctl%optimize) then 
                 ! ===== basal friction optimization ==================
