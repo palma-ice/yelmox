@@ -747,9 +747,9 @@ contains
             
             call nc_write(filename,"tau_eff",ylmo%tpo%now%tau_eff,units="Pa",long_name="Effective calving stress", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"tau_eig1",ylmo%mat%now%strs2D%teig1,units="Pa",long_name="Eigen stress 1", &
+            call nc_write(filename,"tau_eig_1",ylmo%mat%now%strs2D%tau_eig_1,units="Pa",long_name="Eigen stress 1", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"tau_eig2",ylmo%mat%now%strs2D%teig2,units="Pa",long_name="Eigen stress 1", &
+            call nc_write(filename,"tau_eig_2",ylmo%mat%now%strs2D%tau_eig_2,units="Pa",long_name="Eigen stress 2", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         end if 
 
