@@ -2,12 +2,14 @@
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 100e3             ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
-    time_const      = -18e3             ! [yr CE] Assumed constant time for non-transient climate
+    time_const      = -19050.0          ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
+    time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 1e2               ! [yr] Frequency of writing 1D output files
     dt2D_out        = 500               ! [yr] Frequency of writing 2D output files
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 
+    use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     optimize        = False             ! LIS friction cannot currently be optimized.
 
@@ -41,7 +43,7 @@
 
 &ytopo
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
-    calv_flt_method     = "flux"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -54,7 +56,7 @@
     calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau            = 1.0               ! [a] Characteristic calving time
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
-    H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt           = 75.0              ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_max            = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -120,7 +122,7 @@
     till_phi_min    =   5.0                 ! [degrees] Till friction angle, minimum
     till_phi_max    =  40.0                 ! [degrees] Till friction angle, maximum
     till_phi_zmin   = -700.0                ! [m] Bedrock elevation for till_phi_min
-    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for phi_max 
+    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for till_phi_max 
 /
 
 &ymat
