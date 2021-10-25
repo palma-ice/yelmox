@@ -230,7 +230,7 @@ program yelmox
         ctl%use_lgm_step        = .FALSE.
 
         running_laurentide      = .TRUE. 
-        laurentide_init_const_H = .TRUE.
+        laurentide_init_const_H = .FALSE.
 
         if (laurentide_init_const_H) then 
             ! Make sure relaxation spinup is short, but transient spinup
