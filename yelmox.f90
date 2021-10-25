@@ -237,7 +237,7 @@ program yelmox
             ! with modified positive smb over North America is reasonably long.
 
             ctl%time_equil        = 10.0 
-            laurentide_time_equil = 2e3 
+            laurentide_time_equil = 5e3 
 
         else 
             ! When starting from ice-6g, positive smb spinup is not necessary.
@@ -250,7 +250,7 @@ program yelmox
 
     else
         ! This is not the Laurentide domain, so disable switch 
-        
+
         running_laurentide = .FALSE. 
 
     end if 
