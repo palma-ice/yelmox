@@ -86,7 +86,12 @@ program yelmox
     end type 
 
     type(ctrl_params)   :: ctl
-    type(opt_params)    :: opt 
+    type(opt_params)    :: opt  
+
+    ! Internal parameters
+    logical  :: running_laurentide
+    logical  :: laurentide_init_const_H 
+    real(wp) :: laurentide_time_equil 
 
     ! Set optimize to False by default, unless it is loaded later 
     ctl%optimize = .FALSE. 
@@ -218,6 +223,38 @@ program yelmox
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
 
+
+    if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
+        ! Set local Laurentide parameters 
+
+        ctl%use_lgm_step        = .FALSE.
+
+        running_laurentide      = .TRUE. 
+        laurentide_init_const_H = .TRUE.
+
+        if (laurentide_init_const_H) then 
+            ! Make sure relaxation spinup is short, but transient spinup
+            ! with modified positive smb over North America is reasonably long.
+
+            ctl%time_equil        = 10.0 
+            laurentide_time_equil = 2e3 
+
+        else 
+            ! When starting from ice-6g, positive smb spinup is not necessary.
+            ! however ctl%time_equil should not be changed, as it may be useful
+            ! for spinning up thermodynamics.
+
+            laurentide_time_equil = 0.0 
+
+        end if 
+
+    else
+        ! This is not the Laurentide domain, so disable switch 
+        
+        running_laurentide = .FALSE. 
+
+    end if 
+
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
 
@@ -317,7 +354,7 @@ program yelmox
     if (ctl%with_ice_sheet .and. (.not. yelmo1%par%use_restart)) then 
         ! Ice sheet is active, and we have not loaded a restart file 
 
-        if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
+        if (running_laurentide) then 
             ! Start with some ice thickness for testing
 
             ! Load LGM reconstruction into reference ice thickness
@@ -327,21 +364,21 @@ program yelmox
                                 count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
 
 
-if (.FALSE.) then
+            if (laurentide_init_const_H) then
             ! Start with some ice cover to speed up initialization
-            yelmo1%tpo%now%H_ice = 0.0
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
-            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
 
-else
-            ! Set LGM reconstsruction as initial ice thickness 
-            !yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
-            yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref * 0.50    ! 20% reduced!
+                yelmo1%tpo%now%H_ice = 0.0
+                where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
+                where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
 
-            ! Apply Gaussian smoothing to keep things stable
-            call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
+            else
+                ! Set LGM reconstsruction as initial ice thickness 
+                yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
+
+                ! Apply Gaussian smoothing to keep things stable
+                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
             
-end if 
+            end if 
             
             ! Run Yelmo for briefly to update surface topography
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
@@ -355,10 +392,12 @@ end if
             yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
-            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
+            if (laurentide_init_const_H) then
+                ! Additionally ensure smb is postive for land above 50degN in Laurentide region
+                ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
+                where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+            end if 
 
             call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
@@ -479,6 +518,14 @@ end if
         ! yelmo1%bnd%smb   = yelmo1%dta%pd%smb
         ! yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
         
+        if (running_laurentide .and. laurentide_init_const_H  &
+                .and. (time-ctl%time_init) .lt. laurentide_time_equil ) then 
+            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
+            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
+            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
+                        yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+        end if 
+
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
@@ -575,14 +622,14 @@ contains
         
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Dragging coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa a",long_name="Vertically averaged viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
+        call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 !         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
@@ -674,7 +721,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m^-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"taud",ylmo%dyn%now%taud,units="Pa",long_name="Driving stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)        
@@ -682,7 +729,7 @@ contains
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Strain-rate and stress tensors 
-        if (.TRUE.) then
+        if (.FALSE.) then
 
             ! call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
             !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
