@@ -729,7 +729,7 @@ contains
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Strain-rate and stress tensors 
-        if (.FALSE.) then
+        if (.TRUE.) then
 
             ! call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
             !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -744,9 +744,12 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"te2D",ylmo%mat%now%strs2D%te,units="Pa",long_name="Effective stress", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"teig1",ylmo%mat%now%strs2D%teig1,units="Pa",long_name="Eigen stress 1", &
+            
+            call nc_write(filename,"tau_eff",ylmo%tpo%now%tau_eff,units="Pa",long_name="Effective calving stress", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"teig2",ylmo%mat%now%strs2D%teig2,units="Pa",long_name="Eigen stress 1", &
+            call nc_write(filename,"tau_eig1",ylmo%mat%now%strs2D%teig1,units="Pa",long_name="Eigen stress 1", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tau_eig2",ylmo%mat%now%strs2D%teig2,units="Pa",long_name="Eigen stress 1", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         end if 
 
