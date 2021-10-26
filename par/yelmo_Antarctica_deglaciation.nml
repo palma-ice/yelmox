@@ -149,7 +149,7 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 3.0
+    enh_shear               = 4.0
     enh_stream              = 1.0
     enh_shlf                = 1.0
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
@@ -366,7 +366,14 @@
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
-    
+    corr_method     = "tf"          ! "tf": corrected tf basin, "bmb": corrected bmb basin
+    basin_number    = 1             ! 1 2 3
+    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
+    basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
+    tf_correction   = False
+    tf_path         = "ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    tf_name         = "dT_nl"
+ 
     ! Deep ocean bmb 
     c_deep          = -5.0          ! [m/a] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
@@ -397,8 +404,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
