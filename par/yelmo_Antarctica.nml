@@ -65,7 +65,7 @@
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
-    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
+    margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
@@ -86,6 +86,7 @@
     fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
+    k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
 /
 
 &ydyn
