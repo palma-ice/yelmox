@@ -41,7 +41,7 @@ program yelmox
 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
-    real(4) :: dTo !mmr
+    real(4) :: dTo
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -115,8 +115,8 @@ program yelmox
 
     ! Initialize isostasy using present-day topography values to 
     ! calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
 
 
     call sealevel_update(sealev,year_bp=time_init)
@@ -282,7 +282,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-!mmr            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+            ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             call write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
         end if 
 
