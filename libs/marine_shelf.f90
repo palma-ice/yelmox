@@ -44,9 +44,14 @@ module marine_shelf
         logical             :: use_obs
         character(len=512)  :: obs_path
         character(len=56)   :: obs_name 
-        real(wp)            :: obs_scale, obs_lim 
-        character(len=56)   :: basin_name(50)
-        real(wp)            :: basin_bmb(50)
+        real(wp)            :: obs_scale, obs_lim
+        character(len=56)   :: corr_method 
+        real(wp)            :: basin_number(50)
+        real(wp)            :: basin_bmb_corr(50)
+        real(wp)            :: basin_tf_corr(50)
+        logical             :: tf_correction
+        character(len=512)  :: tf_path
+        character(len=56)   :: tf_name
 
         real(wp)            :: bmb_max  
         real(wp)            :: c_deep
@@ -69,6 +74,7 @@ module marine_shelf
     type marshelf_state_class 
         real(wp), allocatable :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
         real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
+        real(wp), allocatable :: bmb_corr(:,:)          ! Basal mass balance correction field
         
         real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
         real(wp), allocatable :: dT_shlf(:,:)           ! [K] Shelf temperature anomaly relative to ref. state
@@ -77,7 +83,8 @@ module marine_shelf
         
         real(wp), allocatable :: tf_shlf(:,:)           ! Thermal forcing at the ice-shelf interface
         real(wp), allocatable :: tf_basin(:,:)          ! Basin-average thermal forcing at the ice-shelf interface
-        real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface (by basin usually)
+        real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface by data (ismip6)
+        real(wp), allocatable :: tf_corr_basin(:,:)     ! Thermal correction at the ice-shelf interface by basin
         
         real(wp), allocatable :: z_base(:,:)            ! Ice-shelf base elevation (relative to sea level)
         real(wp), allocatable :: slope_base(:,:)        ! Ice-shelf base slope (slope=sin(theta)=length/hypotenuse)
@@ -224,14 +231,16 @@ contains
 
     end subroutine marshelf_update_shelf
 
-    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx)
+    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
         
         implicit none
-        
+       
+        ! jablasco: added regions 
         type(marshelf_class), intent(INOUT) :: mshlf
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: regions(:,:)
         real(wp), intent(IN) :: basins(:,:)
         real(wp), intent(IN) :: z_sl(:,:) 
         !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
@@ -315,6 +324,8 @@ contains
             case(1) 
                 ! Determine tf_shlf 
 
+                if (mshlf%par%tf_correction) call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr) 
+
                 where (mshlf%now%mask_ocn .gt. 0) 
                     mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
                 elsewhere 
@@ -337,16 +348,36 @@ contains
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
 
+                ! jablasco: correcting T_shlf with basin correction
+                mshlf%now%T_shlf = mshlf%now%T_shlf+mshlf%now%tf_corr_basin
                 call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
-                ! Set bmb_shlf to pico value 
-                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf 
+                ! Set bmb_shlf to pico value and correct with basin 
+                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf + mshlf%now%bmb_corr
+                
+                ! === Apply logical limitations =====
+
+                ! Set bmb to zero for grounded points 
+                where (mshlf%now%mask_ocn .eq. 0) mshlf%now%bmb_shlf = 0.0
+
+                ! Ensure that ice accretion only occurs where ice exists 
+                where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0
+
+                !where(f_grnd .eq. 0.0) mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
+                
+                ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
+                select case(trim(mshlf%par%domain))
+                    case("Antarctica")
+                        where (regions .eq. 2.1) mshlf%now%bmb_shlf = 0.5*mshlf%now%bmb_shlf+0.5*mshlf%par%c_deep
+                end select 
 
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 
                 ! Calculate bmb_shlf using other available parameterizations 
 
+                ! jablasco: correcting tf_shlf with baisn correction 
+                mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr_basin
                 ! Check whether slope is being applied here 
                 if (index(trim(mshlf%par%bmb_method),"slope") .gt. 0) then 
                     with_slope = .TRUE. 
@@ -414,6 +445,9 @@ contains
                                     is_grline,mshlf%par%grz_length,dx)
 
                 end select 
+
+                ! Apply basin correction
+                mshlf%now%bmb_shlf = mshlf%now%bmb_shlf + mshlf%now%bmb_corr
                 
                 ! === Apply refreezing limitations if desired ====
 
@@ -492,75 +526,44 @@ contains
         end if 
 
         ! Make domain specific initializations
+        ! Initialize basin correction
+        mshlf%now%bmb_corr      = 0.0
+        mshlf%now%tf_corr_basin = 0.0
         select case(trim(mshlf%par%domain))
 
             case("Antarctica")
 
-                ! Modify bmb_ref in specific basins according to parameter values 
-                do j = 1, size(mshlf%par%basin_name)
-                    
-                    select case(trim(mshlf%par%basin_name(j)))
+                ! Modify specific basins according to parameter values 
+                do j = 1, size(mshlf%par%basin_number)
 
-                        case("ronne")
-                            where(basins .ge.  1.0 .and. basins .le. 2.0) &
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("queen")
-                            where(basins .ge.  3.0 .and. basins .le.  5.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("amery")
-                            where(basins .ge.  6.0 .and. basins .le. 7.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("wilkes")
-                            where(basins .ge. 8.0 .and. basins .le. 10.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("ross")
-                            where(basins .ge. 11.0 .and. basins .le. 12.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("pine")
-                            where(basins .ge. 13.0 .and. basins .le. 15.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("peninsula")
-                            where(basins .ge. 16.0 .and. basins .le. 19.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("west")
-                            where((basins .ge. 12.0 .and. basins .le. 19.0) .or. (basins .eq. 1.0)) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        case("east")
-                            where(basins .ge.  2.0 .and. basins .le. 11.0) & 
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-                        
-                        case DEFAULT 
+                    select case(trim(mshlf%par%corr_method))
+                        case("bmb")
+                            where(basins .eq. mshlf%par%basin_number(j)) &
+                                mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
+                        case("tf")
+                            where(basins .eq. mshlf%par%basin_number(j)) &
+                                mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
+                        case DEFAULT
+                            ! DO NOTHING
+                    end select
 
-                            ! Basin name not recognized, do nothing 
-
-                    end select 
-
-                end do 
-                
+                end do               
+ 
             case("Greenland") 
 
                 ! Modify specific basins according to parameter values 
-                do j = 1, size(mshlf%par%basin_name)
+                do j = 1, size(mshlf%par%basin_number)
                     
-                    select case(trim(mshlf%par%basin_name(j)))
-
-                        case("east")
-                            where(basins .eq. 3.0) &
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-
-                        case("northeast")
-                            where(basins .eq. 2.0) &
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-
-                        case("northwest")
-                            where(basins .eq. 1.0 .or. basins .eq. 8.0) &
-                                mshlf%now%bmb_ref = mshlf%par%basin_bmb(j)
-
-                        case DEFAULT 
-
-                            ! Basin name not recognized, do nothing 
-
-                    end select 
+                    select case(trim(mshlf%par%corr_method))
+                        case("bmb")
+                            where(basins .eq. mshlf%par%basin_number(j)) &
+                                mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
+                        case("tf")
+                            where(basins .eq. mshlf%par%basin_number(j)) &
+                                mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
+                        case DEFAULT
+                            ! DO NOTHING
+                    end select
 
                 end do 
                 
@@ -640,7 +643,7 @@ contains
         write(*,*) "range mask_ocn_ref: ", minval(mshlf%now%mask_ocn_ref), maxval(mshlf%now%mask_ocn_ref)
         
         ! Initialize variables 
-        mshlf%now%bmb_shlf      = 0.0   
+        mshlf%now%bmb_shlf      = 0.0
         mshlf%now%tf_shlf       = 0.0
         mshlf%now%tf_basin      = 0.0 
 
@@ -678,8 +681,15 @@ contains
         call nml_read(filename,group,"tf_method",      par%tf_method,      init=init_pars)
         call nml_read(filename,group,"interp_depth",   par%interp_depth,   init=init_pars)
         call nml_read(filename,group,"interp_method",  par%interp_method,  init=init_pars)
-        call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)   
-        
+        call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)
+        call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
+        call nml_read(filename,group,"basin_number",   par%basin_number,   init=init_pars)
+        call nml_read(filename,group,"basin_bmb_corr", par%basin_bmb_corr, init=init_pars)
+        call nml_read(filename,group,"basin_tf_corr",  par%basin_tf_corr,  init=init_pars)       
+        call nml_read(filename,group,"tf_correction",  par%tf_correction,  init=init_pars)
+        call nml_read(filename,group,"tf_path",        par%tf_path,        init=init_pars)
+        call nml_read(filename,group,"tf_name",        par%tf_name,        init=init_pars)
+ 
         call nml_read(filename,group,"bmb_max",        par%bmb_max,        init=init_pars)
         call nml_read(filename,group,"c_deep",         par%c_deep,         init=init_pars)
         call nml_read(filename,group,"depth_deep",     par%depth_deep,     init=init_pars)
@@ -709,11 +719,10 @@ contains
         call nml_read(filename,group,"obs_name",       par%obs_name,       init=init_pars)
         call nml_read(filename,group,"obs_scale",      par%obs_scale,      init=init_pars)
         call nml_read(filename,group,"obs_lim",        par%obs_lim,        init=init_pars)
-        call nml_read(filename,group,"basin_name",     par%basin_name,     init=init_pars)
-        call nml_read(filename,group,"basin_bmb",      par%basin_bmb,      init=init_pars)
-        
+       
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
+        call parse_path(par%tf_path,domain,grid_name)
         par%domain = trim(domain)
 
         ! Consistency checks 
@@ -1170,6 +1179,7 @@ contains
         ! Allocate marshelf 
         allocate(now%bmb_shlf(nx,ny))
         allocate(now%bmb_ref(nx,ny))
+        allocate(now%bmb_corr(nx,ny))
         
         allocate(now%T_shlf(nx,ny))
         allocate(now%dT_shlf(nx,ny))
@@ -1179,6 +1189,7 @@ contains
         allocate(now%tf_shlf(nx,ny))
         allocate(now%tf_basin(nx,ny))
         allocate(now%tf_corr(nx,ny))
+        allocate(now%tf_corr_basin(nx,ny))
 
         allocate(now%z_base(nx,ny))
         allocate(now%slope_base(nx,ny))
@@ -1189,7 +1200,8 @@ contains
         ! Initialize variables 
         now%bmb_shlf        = 0.0  
         now%bmb_ref         = 0.0 
-        
+        now%bmb_corr        = 0.0       
+ 
         now%T_shlf          = 0.0
         now%dT_shlf         = 0.0
         now%S_shlf          = 0.0
@@ -1198,7 +1210,8 @@ contains
         now%tf_shlf         = 0.0
         now%tf_basin        = 0.0
         now%tf_corr         = 0.0
-        
+        now%tf_corr_basin   = 0.0     
+
         now%z_base          = 0.0 
         now%slope_base      = 0.0 
         
@@ -1219,7 +1232,8 @@ contains
         ! Allocate state objects
         if (allocated(now%bmb_shlf))        deallocate(now%bmb_shlf)
         if (allocated(now%bmb_ref))         deallocate(now%bmb_ref)
-        
+        if (allocated(now%bmb_corr))        deallocate(now%bmb_corr)       
+ 
         if (allocated(now%T_shlf))          deallocate(now%T_shlf)
         if (allocated(now%dT_shlf))         deallocate(now%dT_shlf)
         if (allocated(now%S_shlf))          deallocate(now%S_shlf)
@@ -1228,7 +1242,8 @@ contains
         if (allocated(now%tf_shlf))         deallocate(now%tf_shlf)
         if (allocated(now%tf_basin))        deallocate(now%tf_basin)
         if (allocated(now%tf_corr))         deallocate(now%tf_corr)
-        
+        if (allocated(now%tf_corr_basin))         deallocate(now%tf_corr_basin)       
+ 
         if (allocated(now%z_base))          deallocate(now%z_base)
         if (allocated(now%slope_base))      deallocate(now%slope_base)
         
