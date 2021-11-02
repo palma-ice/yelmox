@@ -132,6 +132,13 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
         call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+
+        call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
+        call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
+        call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
+        call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
+        
     end if 
 
     ! Set initial time 
