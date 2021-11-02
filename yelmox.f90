@@ -34,7 +34,7 @@ program yelmox
     character(len=512) :: path_lgm  
     real(prec) :: time, time_bp 
     integer    :: n
-    
+
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
 
@@ -48,6 +48,8 @@ program yelmox
     logical, allocatable :: reg1_mask(:,:) 
 
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
+
+    real(wp), parameter :: tf_corr_test = 0.0       ! [degC]
 
     type ctrl_params
         character(len=56) :: run_step
@@ -81,7 +83,14 @@ program yelmox
         real(wp) :: rel_tau2
         real(wp) :: rel_time1
         real(wp) :: rel_time2
-        real(wp) :: rel_m 
+        real(wp) :: rel_m
+
+        real(wp) :: H_grnd_lim
+        real(wp) :: tau_m 
+        real(wp) :: m_temp
+        real(wp) :: tf_min 
+        real(wp) :: tf_max
+         
     end type 
 
     type(ctrl_params)   :: ctl
@@ -145,6 +154,13 @@ program yelmox
         call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
         call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+
+        call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
+        call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
+        call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
+        call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
+
     end if 
 
     ! Set initial time 
@@ -311,6 +327,10 @@ program yelmox
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
+
+    ! ajr: test tf_corr 
+    mshlf1%now%tf_corr = tf_corr_test
+
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -467,7 +487,12 @@ program yelmox
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     fill_dist=80.0_prec,dt=ctl%dtt)
-            
+                
+                ! Update tf_corr based on error metric(s) 
+                call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                        opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+
             else 
                 ! ===== relaxation spinup ==================
 

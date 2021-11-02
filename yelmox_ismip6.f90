@@ -78,7 +78,14 @@ program yelmox_ismip6
         real(wp) :: rel_tau2
         real(wp) :: rel_time1
         real(wp) :: rel_time2
-        real(wp) :: rel_m 
+        real(wp) :: rel_m
+
+        real(wp) :: H_grnd_lim
+        real(wp) :: tau_m 
+        real(wp) :: m_temp
+        real(wp) :: tf_min 
+        real(wp) :: tf_max
+         
     end type 
 
     type(ctrl_params)   :: ctl
@@ -407,6 +414,10 @@ program yelmox_ismip6
                 yelmo1%dyn%now%cf_ref = opt%cf_init 
             end if 
 
+            ! Set tf_corr to zero initially 
+            mshlf1%now%tf_corr = 0.0_wp 
+            mshlf2%now%tf_corr = 0.0_wp 
+            
         end if 
         ! ========================================
 
@@ -462,6 +473,12 @@ end if
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     fill_dist=80.0_prec,dt=ctl%dtt)
+
+                ! Update tf_corr based on error metric(s) 
+                call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                        opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+
             end if 
             ! ====================================================
 
