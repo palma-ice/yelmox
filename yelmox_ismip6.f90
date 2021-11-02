@@ -138,7 +138,7 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
         call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
         call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
-        
+
     end if 
 
     ! Set initial time 
@@ -541,6 +541,9 @@ end if
                             dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
                             tf_ann=ismp1%tf%var(:,:,:,1))
 
+            ! Update temperature forcing field with tf_corr 
+            mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr
+            
             call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                  yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
@@ -962,6 +965,8 @@ contains
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,units="K",long_name="Shelf freezing temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         if (trim(mshlf%par%bmb_method) .eq. "pico") then 

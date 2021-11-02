@@ -328,7 +328,7 @@ contains
                 stop 
 
         end select 
-
+        
         ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
         ! calculated in ice-sheet model separately) ========
 
