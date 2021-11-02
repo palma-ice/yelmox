@@ -68,7 +68,7 @@
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  5.0              ! [degC] Maximum allowed tf_corr value 
+    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
        
 /
 
