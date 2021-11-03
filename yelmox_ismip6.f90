@@ -80,6 +80,7 @@ program yelmox_ismip6
         real(wp) :: rel_time2
         real(wp) :: rel_m
 
+        logical  :: opt_tf 
         real(wp) :: H_grnd_lim
         real(wp) :: tau_m 
         real(wp) :: m_temp
@@ -133,6 +134,7 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
 
+        call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
         call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
         call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
@@ -255,7 +257,7 @@ program yelmox_ismip6
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -349,7 +351,7 @@ program yelmox_ismip6
                             snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
             call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -481,9 +483,9 @@ end if
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     fill_dist=80.0_prec,dt=ctl%dtt)
 
-                if (time .gt. opt%rel_time1) then
+                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
                     ! Update tf_corr based on error metric(s) 
-                    
+
                     call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
                                             yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
                                             opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
@@ -549,7 +551,7 @@ end if
             mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr
 
             call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
             ! Overwrite original mshlf and snp with ismip6 derived ones 
             snp1    = snp2
@@ -663,7 +665,7 @@ end if
                                 snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
                 call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
                 
             end if 
@@ -710,7 +712,7 @@ end if
                                 tf_ann=ismp1%tf%var(:,:,:,1))
 
                 call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
             end if 
 
