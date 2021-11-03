@@ -411,7 +411,7 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
-    corr_method     = "tf"          ! "tf": corrected tf basin, "bmb": corrected bmb basin
+    corr_method     = "tf"          ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
     basin_number    = 1             ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
@@ -455,6 +455,13 @@
     basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
+
+&tf_corr_ant                        ! Antarctica specific tuning parameters
+    ronne   = 0.3                   ! [K] tf_corr for ronne basin (basin=1)
+    ross    = 0.1                   ! [K] tf_corr for ronne basin (basin=12)
+    pine    = 0.1                   ! [K] tf_corr for ronne basin (basin=14)
+/
+
 
 &pico
     n_box          = 5.0        ! Maximum number of boxes in PICO.  

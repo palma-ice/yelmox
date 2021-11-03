@@ -89,8 +89,8 @@ program yelmox_ismip6
          
     end type 
 
-    type(ctrl_params)   :: ctl
-    type(opt_params)    :: opt 
+    type(ctrl_params)     :: ctl
+    type(opt_params)      :: opt 
 
     ! Set optimize to False by default, unless it is loaded later 
     ctl%optimize = .FALSE. 
@@ -278,7 +278,6 @@ program yelmox_ismip6
 
     end if 
 
-
 ! ================= RUN STEPS ===============================================
 
 
@@ -304,7 +303,7 @@ program yelmox_ismip6
         write(*,*) "Initial equilibration complete."
 
         ! Initialize output files for checking progress 
-        
+
         ! Initialize output files for checking progress 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)

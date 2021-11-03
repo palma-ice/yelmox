@@ -502,8 +502,11 @@ contains
         real(wp), intent(IN)            :: basins(:,:)
         
         ! Local variables
-        integer :: j 
-        integer :: num
+        integer  :: j 
+        integer  :: num
+        character(len=56) :: group_now
+        real(wp) :: basin_number_now
+        real(wp) :: tf_corr_now 
 
         ! Load parameters
         call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
@@ -550,6 +553,7 @@ contains
                 end do 
 
             case("tf")
+                ! Modify specific basins according to parameter values 
 
                 do j = 1, size(mshlf%par%basin_number)
 
@@ -557,6 +561,34 @@ contains
                         mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
 
                 end do
+
+            case("tf-ant") 
+                ! Modify specific basins according to parameter values 
+                ! as defined in the parameter section 'tf_corr_ant'
+
+                group_now = "tf_corr_ant" 
+
+                ! Ronne 
+                basin_number_now = 1.0_wp 
+                call nml_read(filename,group_now,"ronne",tf_corr_now)
+                
+                where(basins .eq. basin_number_now) &
+                            mshlf%now%tf_corr_basin = tf_corr_now
+
+                ! Ross
+                basin_number_now = 12.0_wp 
+                call nml_read(filename,group_now,"ross",tf_corr_now)
+                
+                where(basins .eq. basin_number_now) &
+                            mshlf%now%tf_corr_basin = tf_corr_now
+
+                ! Pine Island
+                basin_number_now = 14.0_wp 
+                call nml_read(filename,group_now,"pine",tf_corr_now)
+                
+                where(basins .eq. basin_number_now) &
+                            mshlf%now%tf_corr_basin = tf_corr_now
+
 
             case DEFAULT ! eg, "none", "None", "zero"
 
