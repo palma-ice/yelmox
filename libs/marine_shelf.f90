@@ -571,7 +571,6 @@ contains
 
         end if  
 
-
         ! ==============================================
         ! Generate reference ocean mask 
         ! (0: land, 1: open ocean, 2: deep ocean) 
@@ -746,11 +745,11 @@ contains
         implicit none 
 
         type(marshelf_param_class) :: par 
-        real(wp), intent(INOUT)  :: bmb(:,:)  
-        integer,    intent(IN)     :: mask_ocn(:,:) 
-        real(wp), intent(IN)     :: z_bed(:,:) 
-        real(wp), intent(IN)     :: z_sl(:,:)
-        integer,    intent(IN)     :: n_smth       ! Smoothing neighborhood radius in grid points
+        real(wp), intent(INOUT)    :: bmb(:,:)  
+        integer,  intent(IN)       :: mask_ocn(:,:) 
+        real(wp), intent(IN)       :: z_bed(:,:) 
+        real(wp), intent(IN)       :: z_sl(:,:)
+        integer,  intent(IN)       :: n_smth       ! Smoothing neighborhood radius in grid points
 
         ! Local variables 
         integer :: i, j, nx, ny 
