@@ -316,21 +316,41 @@ contains
 
         ! Calculate the thermal forcing, if desired 
         ! (not used for pico, but good to diagnose anyway and needed for other methods)
+        
         select case(mshlf%par%tf_method)
 
             case(0)
                 ! tf_shlf defined externally, do nothing 
 
             case(1) 
-                ! Determine tf_shlf 
+                ! Determine tf_shlf via T_shlf - T_fp
 
-                if (mshlf%par%tf_correction) call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr) 
+                ! Consistency check 
+                if (trim(mshlf%par%bmb_method) .eq. "anom") then 
+                    write(5,*) "marshelf_update:: Error: for bmb_method='anom', &
+                    &tf_method=1 cannot be used."
+                    write(5,*) "bmb_method = ", trim(mshlf%par%bmb_method)
+                    write(5,*) "tf_method  = ", mshlf%par%tf_method
+                    stop 
+                end if 
 
                 where (mshlf%now%mask_ocn .gt. 0) 
-                    mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
+                    mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) &
+                            + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
                 elsewhere 
                     mshlf%now%tf_shlf = 0.0_wp 
                 end where 
+
+            case(2)
+                ! Calculate the thermal forcing specific to the anom method 
+                ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
+                ! Note: for bmb_method='anom', tf_method automatically set to 2. 
+
+                where (mshlf%now%mask_ocn .gt. 0) 
+                    mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
+                elsewhere 
+                    mshlf%now%tf_shlf = 0.0_wp 
+                end where
 
             case DEFAULT 
 
@@ -348,14 +368,9 @@ contains
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
 
-                ! jablasco: correcting T_shlf with basin correction
-                mshlf%now%T_shlf = mshlf%now%T_shlf+mshlf%now%tf_corr_basin
                 call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
-                ! Set bmb_shlf to pico value and correct with basin 
-                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf + mshlf%now%bmb_corr
-                
                 ! === Apply logical limitations =====
 
                 ! Set bmb to zero for grounded points 
@@ -376,8 +391,6 @@ contains
                     "quad-slope","quad-nl-slope","anom") 
                 ! Calculate bmb_shlf using other available parameterizations 
 
-                ! jablasco: correcting tf_shlf with baisn correction 
-                mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr_basin
                 ! Check whether slope is being applied here 
                 if (index(trim(mshlf%par%bmb_method),"slope") .gt. 0) then 
                     with_slope = .TRUE. 
@@ -435,10 +448,6 @@ contains
                             mshlf%par%gamma_quad_nl,omega)
                     
                     case("anom")
-
-                        ! Calculate the thermal forcing specific to the anom method 
-                        ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
-                        mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr 
 
                         call calc_bmb_anom(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%bmb_ref, &
                                     mshlf%par%kappa_grz,mshlf%par%c_grz,mshlf%par%f_grz_shlf, &
@@ -525,53 +534,43 @@ contains
 
         end if 
 
-        ! Make domain specific initializations
-        ! Initialize basin correction
+        ! Initialize basin-wide correction fields
         mshlf%now%bmb_corr      = 0.0
         mshlf%now%tf_corr_basin = 0.0
-        select case(trim(mshlf%par%domain))
 
-            case("Antarctica")
-
+        ! Define basin-wide corrections as needed     
+        select case(trim(mshlf%par%corr_method))
+            
+            case("bmb")
                 ! Modify specific basins according to parameter values 
+
                 do j = 1, size(mshlf%par%basin_number)
-
-                    select case(trim(mshlf%par%corr_method))
-                        case("bmb")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
-                        case("tf")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
-                        case DEFAULT
-                            ! DO NOTHING
-                    end select
-
-                end do               
- 
-            case("Greenland") 
-
-                ! Modify specific basins according to parameter values 
-                do j = 1, size(mshlf%par%basin_number)
-                    
-                    select case(trim(mshlf%par%corr_method))
-                        case("bmb")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
-                        case("tf")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
-                        case DEFAULT
-                            ! DO NOTHING
-                    end select
-
+                    where(basins .eq. mshlf%par%basin_number(j)) &
+                        mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
                 end do 
-                
-            case DEFAULT 
 
-                ! Pass - no basins defined for other domains yet 
+            case("tf")
 
-        end select 
+                do j = 1, size(mshlf%par%basin_number)
+
+                    where(basins .eq. mshlf%par%basin_number(j)) &
+                        mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
+
+                end do
+
+            case DEFAULT ! eg, "none", "None", "zero"
+
+                ! DO NOTHING
+
+        end select
+
+        ! Load tf_corr field from file if desired 
+        if (mshlf%par%tf_correction) then 
+
+            call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr)
+
+        end if  
+
 
         ! ==============================================
         ! Generate reference ocean mask 
@@ -1242,7 +1241,7 @@ contains
         if (allocated(now%tf_shlf))         deallocate(now%tf_shlf)
         if (allocated(now%tf_basin))        deallocate(now%tf_basin)
         if (allocated(now%tf_corr))         deallocate(now%tf_corr)
-        if (allocated(now%tf_corr_basin))         deallocate(now%tf_corr_basin)       
+        if (allocated(now%tf_corr_basin))   deallocate(now%tf_corr_basin)       
  
         if (allocated(now%z_base))          deallocate(now%z_base)
         if (allocated(now%slope_base))      deallocate(now%slope_base)
