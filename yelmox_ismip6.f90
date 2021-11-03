@@ -304,17 +304,18 @@ program yelmox_ismip6
         write(*,*) "Initial equilibration complete."
 
         ! Initialize output files for checking progress 
-
-        ! 2D file 
+        
+        ! Initialize output files for checking progress 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-
-        ! 1D file 
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-        call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+        
+        ! Write initial state to file 
+        ! (do so within the time loop below with n=0)
+        ! call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+        ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         
         ! Next perform 'coupled' model simulations for desired time
-        do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
@@ -443,17 +444,16 @@ end if
         write(*,*) "Initial equilibration complete."
 
         ! Initialize output files for checking progress 
-
-        ! 2D file 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-
-        ! 1D file 
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-        call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+        
+        ! Write initial state to file 
+        ! (do so within the time loop below with n=0)
+        ! call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+        ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         
         ! Next perform 'coupled' model simulations for desired time
-        do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
@@ -985,7 +985,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"slope_base",mshlf%now%slope_base,units="",long_name="Shelf-base slope", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         if (trim(mshlf%par%bmb_method) .eq. "pico") then 
             call nc_write(filename,"d_shlf",mshlf%pico%now%d_shlf,units="km",long_name="Shelf distance to grounding line", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
