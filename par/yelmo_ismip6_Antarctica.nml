@@ -24,7 +24,7 @@
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
-    optimize        = True              ! Should basal friction be optimized?
+    equil_method    = "opt"             ! "none", "relax", "opt"
     scenario        = "ctrl"            ! "ctrl" or "rcp85" 
 /
 

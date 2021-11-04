@@ -29,7 +29,7 @@ program yelmox_ismip6
     integer    :: n, m
     real(wp)   :: time, time_bp 
     real(wp)   :: time_wt 
-    
+
     type(yelmo_class)           :: yelmo1 
     type(sealevel_class)        :: sealev 
     type(snapclim_class)        :: snp1 
@@ -55,7 +55,7 @@ program yelmox_ismip6
         real(wp) :: dt2D_out
 
         logical  :: with_ice_sheet 
-        logical  :: optimize
+        character(len=56) :: equil_method
         real(wp) :: time0 
         real(wp) :: time1 
 
@@ -91,9 +91,6 @@ program yelmox_ismip6
     type(ctrl_params)     :: ctl
     type(opt_params)      :: opt 
 
-    ! Set optimize to False by default, unless it is loaded later 
-    ctl%optimize = .FALSE. 
-
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -112,11 +109,11 @@ program yelmox_ismip6
     call nml_read(path_par,trim(ctl%run_step),"dt2D_out",ctl%dt2D_out)          ! [yr] Frequency of 2D output 
     
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
-    call nml_read(path_par,trim(ctl%run_step),"optimize",ctl%optimize)              ! Optimize basal friction?
+    call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
     
-    call nml_read(path_par,trim(ctl%run_step),"scenario",ctl%scenario)              ! Optimize basal friction?
+    call nml_read(path_par,trim(ctl%run_step),"scenario",ctl%scenario)             
     
-    if (ctl%optimize) then 
+    if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
@@ -189,7 +186,7 @@ program yelmox_ismip6
     write(*,*) "time_bp = ", time_bp 
     write(*,*) 
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
-    write(*,*) "optimize:       ",  ctl%optimize
+    write(*,*) "equil_method:   ",  trim(ctl%equil_method)
     
 
     ! === Initialize ice sheet model =====
@@ -410,9 +407,8 @@ program yelmox_ismip6
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
         
-
         ! ===== basal friction optimization ======
-        if (ctl%optimize) then 
+        if (trim(ctl%equil_method) .eq. "opt") then 
             
             ! Ensure that cf_ref will be optimized (cb_method == set externally) 
             yelmo1%dyn%par%cb_method = -1  
@@ -459,7 +455,7 @@ end if
 
 
             ! ===== basal friction optimization ==================
-            if (ctl%optimize) then 
+            if (trim(ctl%equil_method) .eq. "opt") then 
 
                 ! === Optimization parameters =========
                 

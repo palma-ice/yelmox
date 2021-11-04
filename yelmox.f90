@@ -66,7 +66,8 @@ program yelmox
         logical  :: transient_clim
         logical  :: use_lgm_step
         logical  :: with_ice_sheet 
-        logical  :: optimize
+
+        character(len=56) :: equil_method
     end type 
 
     type opt_params
@@ -104,10 +105,6 @@ program yelmox
 
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
     
-
-    ! Set optimize to False by default, unless it is loaded later 
-    ctl%optimize = .FALSE. 
-
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -127,7 +124,7 @@ program yelmox
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
-    call nml_read(path_par,"ctrl","optimize",       ctl%optimize)           ! Optimize basal friction cf_ref field
+    call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
     ! Consistency checks ===
 
@@ -142,7 +139,7 @@ program yelmox
         stop "Program stopped."
     end if 
 
-    if (ctl%optimize) then 
+    if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
@@ -184,9 +181,9 @@ program yelmox
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "transient_clim: ",  ctl%transient_clim
-    write(*,*) "use_lgm_step: ",    ctl%use_lgm_step
+    write(*,*) "use_lgm_step:   ",  ctl%use_lgm_step
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
-    write(*,*) "optimize:       ",  ctl%optimize
+    write(*,*) "equil_method:   ",  trim(ctl%equil_method)
     write(*,*)
     write(*,*) "time_init:  ",      ctl%time_init 
     write(*,*) "time_end:   ",      ctl%time_end 
@@ -396,7 +393,7 @@ program yelmox
     end if 
 
     ! ===== basal friction optimization ======
-    if (ctl%optimize) then 
+    if (trim(ctl%equil_method) .eq. "opt") then 
         
         ! Ensure that cf_ref will be optimized (cb_method == set externally) 
         yelmo1%dyn%par%cb_method = -1  
@@ -457,45 +454,43 @@ program yelmox
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
             end if 
 
+            ! Run yelmo for several years with constant boundary conditions
+            ! to synchronize all model fields a bit
             call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
         else 
             ! Run simple startup equilibration step 
             
-            ! Run yelmo for several years with constant boundary conditions and topo
-            ! to equilibrate thermodynamics and dynamics
+            ! Run yelmo for a few years with constant boundary conditions
+            ! to synchronize all model fields a bit
             call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
 
         end if 
 
     end if 
 
-    ! 2D file 
-    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+    ! ===== Initialize output files ===== 
     
-    ! 1D file 
+    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
     if (reg1%write) then 
         call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
-        call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
     end if 
 
     if (reg2%write) then
         call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
-        call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
     end if
 
     if (reg3%write) then
         call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
-        call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
     end if
 
 
+    ! ==== Begin main time loop =====
+
     ! Advance timesteps
-    do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+    do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
         ! Get current time 
         time = ctl%time_init + n*ctl%dtt
@@ -511,62 +506,70 @@ program yelmox
             time_bp = ctl%time_const - 1950.0_wp 
         end if
 
-        ! Spin-up procedure...
-        if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
-            
-            if (ctl%optimize) then 
+        ! Spin-up procedure - only relevant for time-time_init <= time_equil
+        select case(trim(ctl%equil_method))
+        
+            case("opt") 
                 ! ===== basal friction optimization ==================
 
-                ! === Optimization parameters =========
+                if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
                 
-                ! Update model relaxation time scale and error scaling (in [m])
-                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
-                
-                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                yelmo1%tpo%par%topo_rel     = 2
-                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-                
-                ! === Optimization update step =========
+                    ! === Optimization parameters =========
+                    
+                    ! Update model relaxation time scale and error scaling (in [m])
+                    opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                    p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                    
+                    ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                    yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                    yelmo1%tpo%par%topo_rel     = 2
+                    if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+                    
+                    ! === Optimization update step =========
 
-                ! Update cf_ref based on error metric(s) 
-                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
-                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    fill_dist=80.0_prec,dt=ctl%dtt)
-                
-                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
-                    ! Update tf_corr based on error metric(s) 
+                    ! Update cf_ref based on error metric(s) 
+                    call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                                        yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                        yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                        fill_dist=80.0_prec,dt=ctl%dtt)
+                    
+                    if (opt%opt_tf .and. time .gt. opt%rel_time1) then
+                        ! Update tf_corr based on error metric(s) 
 
-                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                        call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                    end if 
+
                 end if 
 
-            else 
+            case("relax")
                 ! ===== relaxation spinup ==================
 
-                ! Turn on relaxation for now, to let thermodynamics equilibrate
-                ! without changing the topography too much. Important when 
-                ! effective pressure = f(thermodynamics).
+                if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
+                    ! Turn on relaxation for now, to let thermodynamics equilibrate
+                    ! without changing the topography too much. Important when 
+                    ! effective pressure = f(thermodynamics).
 
-                yelmo1%tpo%par%topo_rel     = 2
-                yelmo1%tpo%par%topo_rel_tau = 50.0 
-                write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+                    yelmo1%tpo%par%topo_rel     = 2
+                    yelmo1%tpo%par%topo_rel_tau = 50.0 
+                    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-            end if 
+                else if (ctl%with_ice_sheet .and. (time-ctl%time_init) .eq. ctl%time_equil) then 
+                    ! Disable relaxation now... 
 
-        else if ( (time-ctl%time_init) .eq. ctl%time_equil) then
-            ! Finally, ensure all relaxation is disabled and continue as normal.
+                    yelmo1%tpo%par%topo_rel     = 0
+                    write(*,*) "timelog, relation off..."
 
-                yelmo1%tpo%par%topo_rel     = 0
-                write(*,*) "timelog, relation off..."
-              
-        end if 
-        ! ====================================================
 
+                end if 
+
+            case DEFAULT   ! == "none", etc
+
+                ! Pass - do nothing 
+
+        end select 
 
         ! == SEA LEVEL ==========================================================
         call sealevel_update(sealev,year_bp=time_bp)

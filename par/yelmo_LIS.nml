@@ -11,7 +11,7 @@
     transient_clim  = False             ! Calculate transient climate? 
     use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
-    optimize        = False             ! LIS friction cannot currently be optimized.
+    equil_method    = "none"            ! "none", "relax", "opt"
 
 /
 

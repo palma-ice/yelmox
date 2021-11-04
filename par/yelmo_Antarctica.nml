@@ -11,8 +11,7 @@
     transient_clim  = False             ! Calculate transient climate? 
     use_lgm_step    = True              ! Activate LGM step in forcing at time=time_lgm_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
-    optimize        = False             ! Should basal friction be optimized?
-    
+    equil_method    = "relax"           ! "none", "relax", "opt"
 /
 
 &opt_L21
