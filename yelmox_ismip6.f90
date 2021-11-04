@@ -29,8 +29,7 @@ program yelmox_ismip6
     integer    :: n, m
     real(wp)   :: time, time_bp 
     real(wp)   :: time_wt 
-    logical    :: init_output_files 
-
+    
     type(yelmo_class)           :: yelmo1 
     type(sealevel_class)        :: sealev 
     type(snapclim_class)        :: snp1 
@@ -624,8 +623,10 @@ end if
         time    = ctl%time_init
         time_bp = time - 1950.0_wp 
 
-        init_output_files = .TRUE. 
-
+        ! Initialize output files 
+        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
+                
         ! Perform 'coupled' model simulations for desired time
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
@@ -758,13 +759,6 @@ end if
             end if
             
             ! == MODEL OUTPUT ===================================
-
-            if (init_output_files) then 
-                ! Initialize output files 
-                call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-                call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
-                init_output_files = .FALSE. 
-            end if
 
             if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
