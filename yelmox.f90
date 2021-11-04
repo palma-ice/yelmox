@@ -40,28 +40,16 @@ program yelmox
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
-    ! Define whether to write some additional 1D files from Yelmo 
-    logical :: reg1_write 
-    real(prec) :: reg1_val
-    character(len=56)  :: reg1_nm 
-    character(len=512) :: reg1_fnm
-    logical, allocatable :: reg1_mask(:,:) 
+    type reg_def_class 
+        character(len=56)  :: name 
+        character(len=512) :: fnm
+        logical, allocatable :: mask(:,:) 
+        logical :: write 
+    end type
 
-    real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
-
-    real(wp), parameter :: tf_corr_test = 0.0       ! [degC]
-
-    logical :: reg2_write
-    real(prec) :: reg2_val
-    character(len=56)  :: reg2_nm
-    character(len=512) :: reg2_fnm
-    logical, allocatable :: reg2_mask(:,:)
-
-    logical :: reg3_write
-    real(prec) :: reg3_val
-    character(len=56)  :: reg3_nm
-    character(len=512) :: reg3_fnm
-    logical, allocatable :: reg3_mask(:,:)
+    type(reg_def_class) :: reg1 
+    type(reg_def_class) :: reg2 
+    type(reg_def_class) :: reg3 
     
     type ctrl_params
         character(len=56) :: run_step
@@ -97,6 +85,7 @@ program yelmox
         real(wp) :: rel_time2
         real(wp) :: rel_m
 
+        logical  :: opt_tf 
         real(wp) :: H_grnd_lim
         real(wp) :: tau_m 
         real(wp) :: m_temp
@@ -112,6 +101,9 @@ program yelmox
     logical  :: running_laurentide
     logical  :: laurentide_init_const_H 
     real(wp) :: laurentide_time_equil 
+
+    real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
+    
 
     ! Set optimize to False by default, unless it is loaded later 
     ctl%optimize = .FALSE. 
@@ -167,6 +159,7 @@ program yelmox
         call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
 
+        call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
         call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
         call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
@@ -187,25 +180,6 @@ program yelmox
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
-
-    ! Options for writing a specific region ====================
-
-    reg1_write = .TRUE. 
-    reg1_val   = 3.0     ! 3.0 = APIS
-    reg1_nm    = "APIS"
-    reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
-
-    reg2_write = .TRUE. 
-    reg2_val   = 4.0     ! 4.0 = WAIS
-    reg2_nm    = "WAIS"
-    reg2_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2_nm)//".nc"
-
-    reg3_write = .TRUE. 
-    reg3_val   = 5.0     ! 5.0 = EAIS
-    reg3_nm    = "EAIS"
-    reg3_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3_nm)//".nc"
-
-    !  =========================================================
 
     ! Print summary of run settings 
     write(*,*)
@@ -248,32 +222,65 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
 
-    if (reg1_write) then 
-        ! If writing a region, define a mask for it here to use later 
-        allocate(reg1_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-        reg1_mask = .FALSE. 
-        where(abs(yelmo1%bnd%regions - reg1_val) .lt. 1e-3) reg1_mask = .TRUE. 
-    end if
-
-    if (reg2_write) then
-        ! If writing a region, define a mask for it here to use later
-        allocate(reg2_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-        reg2_mask = .FALSE.
-        where(abs(yelmo1%bnd%regions - reg2_val) .lt. 1e-3) reg2_mask = .TRUE.
-    end if 
-    
-    if (reg3_write) then
-        ! If writing a region, define a mask for it here to use later
-        allocate(reg3_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-        reg3_mask = .FALSE.
-        where(abs(yelmo1%bnd%regions - reg3_val) .lt. 1e-3) reg3_mask = .TRUE.
-    end if
-
-    ! === Initialize external models (forcing for ice sheet) ======
-
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
 
+    ! Define specific regions of interest =====================
+
+    select case(trim(domain))
+
+        case("Antarctica")
+
+            ! APIS region (region=3.0 in regions map)
+            reg1%write = .TRUE. 
+            reg1%name  = "APIS" 
+            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
+
+            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg1%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
+
+            ! WAIS region (region=4.0 in regions map)
+            reg2%write = .TRUE. 
+            reg2%name  = "WAIS" 
+            reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
+
+            allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg2%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 4.0) .lt. 1e-3) reg2%mask = .TRUE.
+
+            ! EAIS region (region=5.0 in regions map)
+            reg3%write = .TRUE. 
+            reg3%name  = "EAIS" 
+            reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
+
+            allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg3%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 5.0) .lt. 1e-3) reg3%mask = .TRUE.
+
+        case("Laurentide")
+
+            ! Hudson region (region=1.12 in regions map)
+            reg1%write = .TRUE. 
+            reg1%name  = "Hudson" 
+            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
+
+            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg1%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) reg1%mask = .TRUE.
+
+            reg2%write = .FALSE. 
+            reg3%write = .FALSE. 
+
+        case DEFAULT 
+
+            reg1%write = .FALSE. 
+            reg2%write = .FALSE. 
+            reg3%write = .FALSE. 
+
+    end select
+
+    ! === Initialize external models (forcing for ice sheet) ======
 
     if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
         ! Set local Laurentide parameters 
@@ -363,10 +370,6 @@ program yelmox
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
-
-    ! ajr: test tf_corr 
-    mshlf1%now%tf_corr = tf_corr_test
-
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -469,26 +472,25 @@ program yelmox
 
     ! 2D file 
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-!     call write_step_2D_small(yelmo1,file2D,time=time)  
     call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
     
     ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
-    if (reg1_write) then 
-        call yelmo_write_reg_init(yelmo1,reg1_fnm,time_init=time,units="years",mask=reg1_mask)
-        call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask)
+    if (reg1%write) then 
+        call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
+        call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
     end if 
 
-    if (reg2_write) then
-        call yelmo_write_reg_init(yelmo1,reg2_fnm,time_init=time,units="years",mask=reg2_mask)
-        call yelmo_write_reg_step(yelmo1,reg2_fnm,time=time,mask=reg2_mask)
+    if (reg2%write) then
+        call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
+        call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
     end if
 
-    if (reg3_write) then
-        call yelmo_write_reg_init(yelmo1,reg3_fnm,time_init=time,units="years",mask=reg3_mask)
-        call yelmo_write_reg_step(yelmo1,reg3_fnm,time=time,mask=reg3_mask)
+    if (reg3%write) then
+        call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
+        call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
     end if
 
 
@@ -535,10 +537,13 @@ program yelmox
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     fill_dist=80.0_prec,dt=ctl%dtt)
                 
-                ! Update tf_corr based on error metric(s) 
-                call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                        yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                        opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
+                    ! Update tf_corr based on error metric(s) 
+
+                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                end if 
 
             else 
                 ! ===== relaxation spinup ==================
@@ -618,16 +623,16 @@ program yelmox
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
 
-            if (reg1_write) then 
-                call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
+            if (reg1%write) then 
+                call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
+            end if 
+
+            if (reg2%write) then
+                call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
             end if
 
-            if (reg2_write) then
-                call yelmo_write_reg_step(yelmo1,reg2_fnm,time=time,mask=reg2_mask)
-            end if
-  
-            if (reg3_write) then
-                call yelmo_write_reg_step(yelmo1,reg3_fnm,time=time,mask=reg3_mask)
+            if (reg3%write) then
+                call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
             end if
 
         end if 

@@ -4,6 +4,8 @@ module marine_shelf
     ! Module to simulate the marine-shelf interface:
     ! Calculates the basal mass balance of an ice shelf (bmb_shlf)
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     use nml 
     use ncio 
 
@@ -327,10 +329,10 @@ contains
 
                 ! Consistency check 
                 if (trim(mshlf%par%bmb_method) .eq. "anom") then 
-                    write(5,*) "marshelf_update:: Error: for bmb_method='anom', &
+                    write(error_unit,*) "marshelf_update:: Error: for bmb_method='anom', &
                     &tf_method=1 cannot be used."
-                    write(5,*) "bmb_method = ", trim(mshlf%par%bmb_method)
-                    write(5,*) "tf_method  = ", mshlf%par%tf_method
+                    write(error_unit,*) "bmb_method = ", trim(mshlf%par%bmb_method)
+                    write(error_unit,*) "tf_method  = ", mshlf%par%tf_method
                     stop 
                 end if 
 

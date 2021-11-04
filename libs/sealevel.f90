@@ -46,24 +46,30 @@ contains
 
         ! Determine filename from which to load sea level time series 
         call nml_read(filename,"sealevel","sl_path",sl%series%filename,init=.TRUE.)
-        call nml_read(filename,"sealevel","sl_name",varname,init=.TRUE.)
         
         use_nc = .FALSE. 
         n = len_trim(sl%series%filename)
         if (sl%series%filename(n-1:n) .eq. "nc") use_nc = .TRUE. 
 
         if (use_nc) then 
+
+            ! Get the variable name of interest
+            call nml_read(filename,"sealevel","sl_name",varname,init=.TRUE.)
+            
             ! Read the time series from netcdf file 
             call read_series_nc(sl%series,sl%series%filename,varname)
-        else 
+
+        else
+
             ! Read the time series from ascii file
             call read_series(sl%series,sl%series%filename)
+
         end if 
     
 
         return 
 
-    end subroutine sealevel_init 
+    end subroutine sealevel_init
 
     subroutine sealevel_update(sl,year_bp)
 
