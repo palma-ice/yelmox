@@ -590,7 +590,7 @@ contains
    
         return
 
-    end subroutine litho 
+    end subroutine litho
         
     subroutine calc_litho_regional(w1,charge,we,z_bed,H_ice,z_sl)
         ! Previously known as `taubed`

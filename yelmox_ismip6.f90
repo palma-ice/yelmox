@@ -58,9 +58,11 @@ program yelmox_ismip6
         character(len=56) :: equil_method
         real(wp) :: time0 
         real(wp) :: time1 
-
         character(len=256) :: scenario 
 
+        logical           :: abumip_active 
+        character(len=56) :: abumip_scenario
+        
     end type 
 
     type opt_params
@@ -139,6 +141,20 @@ program yelmox_ismip6
 
     end if 
 
+    ! Check if abumip is being run, make parameter adjustments
+    if (trim(ctl%run_step) .eq. "abumip_proj") then 
+
+        ctl%abumip_active   = .TRUE.  
+        call nml_read(path_par,"abumip","scenario",     ctl%abumip_scenario)
+
+    else 
+
+        ctl%abumip_active   = .FALSE. 
+        ctl%abumip_scenario = "none"
+
+    end if 
+
+
     ! Set initial time 
     time    = ctl%time_init 
     time_bp = time - 1950.0_wp 
@@ -180,6 +196,10 @@ program yelmox_ismip6
 
         time_bp = ctl%time_const - 1950.0_wp
 
+    end if 
+
+    if (ctl%abumip_active) then 
+        write(*,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
     end if 
 
     write(*,*) "time    = ", time 
@@ -395,8 +415,9 @@ program yelmox_ismip6
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
                                                 domain="Antarctica",grid_name="ANT-32KM")
 
-        ! Update ismip6 forcing to current time
-        call ismip6_forcing_update(ismp1,time)
+        ! Update ismip6 forcing to constant time of interest
+        call ismip6_forcing_update(ismp1,ctl%time_const, &
+                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
         
@@ -440,11 +461,6 @@ end if
         ! Initialize output files for checking progress 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-        
-        ! Write initial state to file 
-        ! (do so within the time loop below with n=0)
-        ! call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-        ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
         
         ! Next perform 'coupled' model simulations for desired time
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
@@ -502,7 +518,7 @@ end if
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
 
-            ! Update ismip6 forcing to current time
+            ! Update ismip6 forcing
             call ismip6_forcing_update(ismp1,ctl%time_const, &
                                     use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
 
@@ -706,6 +722,9 @@ end if
                                 ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
                                 dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
                                 tf_ann=ismp1%tf%var(:,:,:,1))
+
+                ! Update temperature forcing field with tf_corr and tf_corr_basin
+                mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
 
                 call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                      yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
