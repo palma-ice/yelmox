@@ -62,6 +62,7 @@ program yelmox_ismip6
 
         logical           :: abumip_active 
         character(len=56) :: abumip_scenario
+        real(wp)          :: abumip_bmb 
         
     end type 
 
@@ -146,6 +147,7 @@ program yelmox_ismip6
 
         ctl%abumip_active   = .TRUE.  
         call nml_read(path_par,"abumip","scenario",     ctl%abumip_scenario)
+        call nml_read(path_par,"abumip","bmb",          ctl%abumip_bmb)
 
     else 
 
@@ -604,7 +606,7 @@ end if
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
-    case("transient_lgm_to_proj","transient_proj")
+    case("transient_lgm_to_proj","transient_proj","abumip_proj")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
@@ -645,7 +647,38 @@ end if
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
             time_bp = time - 1950.0_wp 
- 
+            
+            ! == ABUMIP =========================================================
+            if (ctl%abumip_active) then 
+                ! Make parameter changes relevant to abumip 
+
+                select case(trim(ctl%abumip_scenario))
+
+                    case("abuc")
+
+                        ! Do nothing - control experiment 
+
+                    case("abuk")
+                        ! Ensure ice shelves are killed 
+
+                        yelmo1%tpo%par%calv_flt_method = "kill"
+
+                    case("abum") 
+                        ! Apply 400 m/yr melt rate on shelves
+
+                        yelmo1%bnd%bmb_shlf = ctl%abumip_bmb     ! [m/yr]
+
+                    case DEFAULT 
+
+                        write(io_unit_err,*) ""
+                        write(io_unit_err,*) "yelmox_ismip6:: error: abumip scenario not recognized."
+                        write(io_unit_err,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
+                        stop 1 
+
+                end select
+
+            end if 
+
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
@@ -772,6 +805,29 @@ end if
 
             
             end if
+
+            if (ctl%abumip_active) then 
+
+                ! Overwrite original mshlf and snp with ismip6 derived ones 
+                snp1    = snp2
+                smbpal1 = smbpal2  
+                mshlf1  = mshlf2 
+                
+                yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
+                yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
+
+                yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
+                yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
+
+                if (trim(ctl%abumip_scenario) .eq. "abum") then 
+                    ! Ensure bmb_shlf output is consistent with what is applied 
+
+                    yelmo1%bnd%bmb_shlf = ctl%abumip_bmb     ! [m/yr]
+
+                end if 
+                
+            end if 
+
             
             ! == MODEL OUTPUT ===================================
 

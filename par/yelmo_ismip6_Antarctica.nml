@@ -69,6 +69,7 @@
 
 &abumip
     scenario        = "abuc"            ! "abuc", "abuk", "abum"
+    bmb             = -400.0            ! [m/yr] Shelf basal mass balance to apply in abum
 /
 
 &opt_L21
