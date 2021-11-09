@@ -895,35 +895,6 @@ end if
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
-
-if (.FALSE.) then 
-            if (time .le. ctl%time1) then 
-
-                ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-
-                if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-                    ! Update snapclim
-                    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
-                end if 
-
-                ! == SURFACE MASS BALANCE ==============================================
-
-                call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-                
-                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-                call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                                snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-                call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-                
-            end if 
-end if 
-
-            ! if (time .ge. ctl%time0) then 
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
@@ -934,6 +905,7 @@ end if
 
                 ! == SURFACE MASS BALANCE ==============================================
 
+if (n .eq. 0) then 
                 ! Calculate smb for present day 
                 call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
                                            yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ctl%time_const) 
@@ -956,7 +928,9 @@ end if
                     snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
                 end if 
                 snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-                
+
+end if 
+
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
@@ -969,52 +943,6 @@ end if
 
                 call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                      yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-            ! end if 
-
-            ! Determine which forcing to use based on time period 
-            ! LGM to time0 CE      == snapclim 
-            ! time0 CE to time1 CE == linear transition from snapclim to ismip6 
-            ! time1 CE to future   == ismip6 
-if (.FALSE.) then 
-            if (time .le. ctl%time0) then 
-                ! Only snapclim-based forcing 
-
-                yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-                yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-                yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-                yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-            else if (time .gt. ctl%time0 .and. time .le. ctl%time1) then 
-                ! Linear-weighted average between snapclim and ismip6 forcing 
-
-                time_wt = (time-ctl%time0) / (ctl%time1 - ctl%time0)
-
-                yelmo1%bnd%smb      = (time_wt*smbpal2%ann%smb  + (1.0-time_wt)*smbpal1%ann%smb)  * conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    =  time_wt*smbpal2%ann%tsrf + (1.0-time_wt)*smbpal1%ann%tsrf
-
-                yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
-                yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
-
-            else    ! time > ctl%time1
-                ! Only ISMIP6 forcing 
-
-                ! Overwrite original mshlf and snp with ismip6 derived ones 
-                snp1    = snp2
-                smbpal1 = smbpal2  
-                mshlf1  = mshlf2 
-                
-                yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
-
-                yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
-                yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
-
-            
-            end if
-
-end if 
 
             ! === ABUMIP === 
 
@@ -1175,6 +1103,9 @@ contains
         call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically-averaged velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"duxydt",ylmo%dyn%now%duxydt,units="m/yr^2",long_name="Velocity rate of change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         !call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
