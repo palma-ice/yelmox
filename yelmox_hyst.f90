@@ -33,16 +33,15 @@ program yelmox
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small, file1D_hyst, file_restart, domain 
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt2D_small_out, dt_restart   
-    integer    :: n
-    logical    :: calc_transient_climate
+    real(wp) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt2D_small_out, dt_restart   
+    integer  :: n
+    logical  :: calc_transient_climate
 
     logical, parameter :: use_hyster = .TRUE. 
-    logical, parameter :: init_no_ice = .TRUE.
 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
-    real(4) :: dTo !mmr
+    real(4) :: dTo
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -84,19 +83,6 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
-
-!mmr ! ensure your initial state is for an ice-free, isostatically rebounded bedrock
-
-
-    if (init_no_ice) then          !mmr
-        yelmo1%bnd%z_bed = yelmo1%bnd%z_bed_ref + (rho_ice/rho_w)*yelmo1%tpo%now%H_ice !mmr
-        yelmo1%tpo%now%H_ice = 0.0
-!mmr
-        yelmo1%tpo%now%z_srf = yelmo1%bnd%z_bed
-!mmr
-        where(yelmo1%tpo%now%z_srf .lt. yelmo1%bnd%z_sl) yelmo1%tpo%now%z_srf = 0.0    !mmr
-    endif !mmr
-
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
@@ -127,21 +113,10 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-
-
-!mmr    ! This was using as reference H_ref and z_bed the initial H_ref and z_bed, which 
-!mmr    ! is only correct when initializing from PD values; for a restart these were not
-!mmr    ! set, z_bed_ref was zero and the bedrock bounced instantaneously
-
-!mmr    ! Initialize isostasy - note this should use present-day topography values to 
-!mmr    ! calibrate the reference rebound   
-!mmr    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed, &
-!mmr          H_ice_ref=yelmo1%tpo%now%H_ice,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
-
-!mmr   ! Initialize isostasy using present-day topography values to 
-!mmr   ! calibrate the reference rebound
-       call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
+    ! Initialize isostasy using present-day topography values to 
+    ! calibrate the reference rebound
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
 
 
     call sealevel_update(sealev,year_bp=time_init)
@@ -152,9 +127,11 @@ program yelmox
 
         ! snapclim call using anomaly from the hyster package 
         call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-!mmr        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now,dTo=hyst1%f_now*0.25) !mmr
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain, &
+                                                        dTa=hyst1%f_now,dTo=hyst1%f_now*0.25)
+
     else
+
         ! Normal snapclim call 
         call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
 
@@ -213,8 +190,8 @@ program yelmox
 if (.TRUE.) then 
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
-    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
+    call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,   dt=1.0_wp,topo_fixed=.FALSE.)
+    call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
 end if 
 
     ! 2D file 
@@ -225,10 +202,6 @@ end if
     call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
     call write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=time)
     
-    ! 1D file 
-!mmr    call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-!mmr    call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-    
     ! 1D file hyst 
     ! call yelmo_write_reg_init(yelmo1,file1D_hyst,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     call write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
@@ -237,18 +210,7 @@ end if
     
 !     ! Testing smb ======
 !     stop "Done."
-
-!     ! Testing hyster ======
-!     var = 0.0 
-!     do n = 1, 200
-!         time = time_init + n*dtt 
-!         var  = var + max(0.0,real(100-n,prec)*dtt)
-!         if (use_hyster) call hyster_calc_forcing(hyst1,time=time,var=var)
-!         write(*,*) "hyst: ", time, hyst1%dv_dt, hyst1%df_dt, hyst1%f_now 
-!     end do 
-
-!     stop 
-
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -270,17 +232,23 @@ end if
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         if (mod(time,dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-!mmr        if (use_hyster) then
-            if ( (use_hyster.and.time.gt.100000).or.(use_hyster.and.init_no_ice)) then
+     
+            if (use_hyster) then
+            !if ( (use_hyster.and.time.gt.100000).or.(use_hyster.and.init_no_ice)) then
+
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
                 write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-!mmr                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now)
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dTa=hyst1%f_now,dTo=hyst1%f_now*0.25) !mmr
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain, &
+                                                                dTa=hyst1%f_now,dTo=hyst1%f_now*0.25)
+
             else
+
                 ! Normal snapclim call 
                 call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
+            
             end if 
+
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
@@ -290,9 +258,6 @@ if (calc_transient_climate) then
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-!         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
-!         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-    
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
@@ -317,7 +282,7 @@ end if
         end if 
 
         if (mod(time,dt1D_out)==0) then 
-!mmr            call yelmo_write_reg_step(yelmo1,file1D,time=time) 
+            ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             call write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
         end if 
 
@@ -830,10 +795,10 @@ contains
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
-        call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,      units="kilometers")
-        call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,      units="kilometers")
-        call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,      units="1")
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
+        call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,    units="kilometers")
+        call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,    units="kilometers")
+        call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,    units="1")
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
         
         !============================================================
         ! Add temperature axis to 1D hysteresis file 
@@ -855,7 +820,7 @@ contains
 
     end subroutine write_yelmo_init_1D_combined
 
-end program yelmox 
+end program yelmox
 
 
 

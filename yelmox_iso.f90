@@ -864,7 +864,7 @@ contains
 
         return 
 
-    end subroutine modify_tas 
+    end subroutine modify_tas
 
     subroutine modify_pr(pr,pr_ann,dpr_now,dpr_hol,grd,time)
 
@@ -930,9 +930,9 @@ contains
         
         return 
 
-    end subroutine modify_pr 
+    end subroutine modify_pr
 
-        subroutine modify_smb(smb,dsmb_now,dsmb_negis,bnd,grd,time)
+    subroutine modify_smb(smb,dsmb_now,dsmb_negis,bnd,grd,time)
 
         implicit none 
 
@@ -1049,9 +1049,9 @@ contains
 
         return 
 
-    end subroutine modify_smb 
+    end subroutine modify_smb
 
-        subroutine set_cf_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
+    subroutine set_cf_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
         ! Set cf_ref [unitless] with location specific tuning 
 
         implicit none

@@ -29,40 +29,45 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart, domain
     character(len=512) :: path_par, path_const
     character(len=512) :: path_lgm  
     real(prec) :: time, time_bp 
     integer    :: n
-    logical    :: calc_transient_climate
 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa 
 
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
+    type reg_def_class 
+        character(len=56)  :: name 
+        character(len=512) :: fnm
+        logical, allocatable :: mask(:,:) 
+        logical :: write 
+    end type
 
-    ! Define whether to write some additional 1D files from Yelmo 
-    logical :: reg1_write 
-    real(prec) :: reg1_val
-    character(len=56)  :: reg1_nm 
-    character(len=512) :: reg1_fnm
-    logical, allocatable :: reg1_mask(:,:) 
-
+    type(reg_def_class) :: reg1 
+    type(reg_def_class) :: reg2 
+    type(reg_def_class) :: reg3 
+    
     type ctrl_params
         character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
         real(wp) :: time_equil      ! Only for spinup
-        real(wp) :: time_const      ! Only for spinup 
+        real(wp) :: time_const      ! Only for spinup
+        real(wp) :: time_lgm_step 
         real(wp) :: dtt
         real(wp) :: dt1D_out
         real(wp) :: dt2D_out
         real(wp) :: dt_restart
 
         logical  :: transient_clim
+        logical  :: use_lgm_step
         logical  :: with_ice_sheet 
-        logical  :: optimize
+
+        character(len=56) :: equil_method
     end type 
 
     type opt_params
@@ -79,15 +84,27 @@ program yelmox
         real(wp) :: rel_tau2
         real(wp) :: rel_time1
         real(wp) :: rel_time2
-        real(wp) :: rel_m 
+        real(wp) :: rel_m
+
+        logical  :: opt_tf 
+        real(wp) :: H_grnd_lim
+        real(wp) :: tau_m 
+        real(wp) :: m_temp
+        real(wp) :: tf_min 
+        real(wp) :: tf_max
+         
     end type 
 
     type(ctrl_params)   :: ctl
-    type(opt_params)    :: opt 
+    type(opt_params)    :: opt  
 
-    ! Set optimize to False by default, unless it is loaded later 
-    ctl%optimize = .FALSE. 
+    ! Internal parameters
+    logical  :: running_laurentide
+    logical  :: laurentide_init_const_H 
+    real(wp) :: laurentide_time_equil 
 
+    real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
+    
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -99,15 +116,30 @@ program yelmox
     call nml_read(path_par,"ctrl","time_end",       ctl%time_end)           ! [yr] Ending time
     call nml_read(path_par,"ctrl","time_equil",     ctl%time_equil)         ! [yr] Years to equilibrate first
     call nml_read(path_par,"ctrl","time_const",     ctl%time_const) 
+    call nml_read(path_par,"ctrl","time_lgm_step",  ctl%time_lgm_step) 
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt1D_out",       ctl%dt1D_out)           ! [yr] Frequency of 1D output 
     call nml_read(path_par,"ctrl","dt2D_out",       ctl%dt2D_out)           ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
-    call nml_read(path_par,"ctrl","optimize",       ctl%optimize)           ! Optimize basal friction cf_ref field
+    call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
-    if (ctl%optimize) then 
+    ! Consistency checks ===
+
+    ! transient_clim overrides use_lgm_step 
+    if (ctl%transient_clim) ctl%use_lgm_step = .FALSE. 
+
+    ! lgm step should only come after time_equil is finished...
+    if (ctl%time_lgm_step .lt. ctl%time_equil) then 
+        write(5,*) ""
+        write(5,*) "yelmox:: time_lgm_step must be greater than time_equil."
+        write(5,*) "Try again."
+        stop "Program stopped."
+    end if 
+
+    if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
@@ -123,6 +155,14 @@ program yelmox
         call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
         call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+
+        call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
+        call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
+        call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
+        call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
+        call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
+
     end if 
 
     ! Set initial time 
@@ -138,20 +178,12 @@ program yelmox
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
 
-    ! Options for writing a specific region ====================
-
-    reg1_write = .FALSE. 
-    reg1_val   = 1.12     ! 1.12 == Hudson region 
-    reg1_nm    = "Hudson"
-    reg1_fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1_nm)//".nc"
-
-    !  =========================================================
-
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "transient_clim: ",  ctl%transient_clim
+    write(*,*) "use_lgm_step:   ",  ctl%use_lgm_step
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
-    write(*,*) "optimize:       ",  ctl%optimize
+    write(*,*) "equil_method:   ",  trim(ctl%equil_method)
     write(*,*)
     write(*,*) "time_init:  ",      ctl%time_init 
     write(*,*) "time_end:   ",      ctl%time_end 
@@ -164,6 +196,10 @@ program yelmox
     if (.not. ctl%transient_clim) then 
         write(*,*) "time_equil: ",    ctl%time_equil 
         write(*,*) "time_const: ",    ctl%time_const 
+
+        if (ctl%use_lgm_step) then 
+            write(*,*) "time_lgm_step: ", ctl%time_lgm_step 
+        end if 
 
         ! Set time before present == to constant climate time 
         time_bp = ctl%time_const - 1950.0_wp
@@ -183,17 +219,96 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
 
-    if (reg1_write) then 
-        ! If writing a region, define a mask for it here to use later 
-        allocate(reg1_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-        reg1_mask = .FALSE. 
-        where(abs(yelmo1%bnd%regions - reg1_val) .lt. 1e-3) reg1_mask = .TRUE. 
-    end if 
-    
-    ! === Initialize external models (forcing for ice sheet) ======
-
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
+
+    ! Define specific regions of interest =====================
+
+    select case(trim(domain))
+
+        case("Antarctica")
+
+            ! APIS region (region=3.0 in regions map)
+            reg1%write = .TRUE. 
+            reg1%name  = "APIS" 
+            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
+
+            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg1%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
+
+            ! WAIS region (region=4.0 in regions map)
+            reg2%write = .TRUE. 
+            reg2%name  = "WAIS" 
+            reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
+
+            allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg2%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 4.0) .lt. 1e-3) reg2%mask = .TRUE.
+
+            ! EAIS region (region=5.0 in regions map)
+            reg3%write = .TRUE. 
+            reg3%name  = "EAIS" 
+            reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
+
+            allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg3%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 5.0) .lt. 1e-3) reg3%mask = .TRUE.
+
+        case("Laurentide")
+
+            ! Hudson region (region=1.12 in regions map)
+            reg1%write = .TRUE. 
+            reg1%name  = "Hudson" 
+            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
+
+            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg1%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) reg1%mask = .TRUE.
+
+            reg2%write = .FALSE. 
+            reg3%write = .FALSE. 
+
+        case DEFAULT 
+
+            reg1%write = .FALSE. 
+            reg2%write = .FALSE. 
+            reg3%write = .FALSE. 
+
+    end select
+
+    ! === Initialize external models (forcing for ice sheet) ======
+
+    if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
+        ! Set local Laurentide parameters 
+
+        ctl%use_lgm_step        = .FALSE.
+
+        running_laurentide      = .TRUE. 
+        laurentide_init_const_H = .FALSE.
+
+        if (laurentide_init_const_H) then 
+            ! Make sure relaxation spinup is short, but transient spinup
+            ! with modified positive smb over North America is reasonably long.
+
+            ctl%time_equil        = 10.0 
+            laurentide_time_equil = 5e3 
+
+        else 
+            ! When starting from ice-6g, positive smb spinup is not necessary.
+            ! however ctl%time_equil should not be changed, as it may be useful
+            ! for spinning up thermodynamics.
+
+            laurentide_time_equil = 0.0 
+
+        end if 
+
+    else
+        ! This is not the Laurentide domain, so disable switch 
+
+        running_laurentide = .FALSE. 
+
+    end if 
 
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
@@ -215,7 +330,6 @@ program yelmox
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
-
 
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
@@ -258,9 +372,9 @@ program yelmox
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
-    yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+    yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
     yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
@@ -279,7 +393,7 @@ program yelmox
     end if 
 
     ! ===== basal friction optimization ======
-    if (ctl%optimize) then 
+    if (trim(ctl%equil_method) .eq. "opt") then 
         
         ! Ensure that cf_ref will be optimized (cb_method == set externally) 
         yelmo1%dyn%par%cb_method = -1  
@@ -295,33 +409,34 @@ program yelmox
     if (ctl%with_ice_sheet .and. (.not. yelmo1%par%use_restart)) then 
         ! Ice sheet is active, and we have not loaded a restart file 
 
-        if (trim(yelmo1%par%domain) .eq. "Laurentide" .or. trim(yelmo1%par%domain) .eq. "North") then 
+        if (running_laurentide) then 
             ! Start with some ice thickness for testing
 
-if (.TRUE.) then
-            ! Start with some ice cover to speed up initialization
-            yelmo1%tpo%now%H_ice = 0.0
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 2000.0 
-            where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 2000.0 
-else
-            ! Load LGM reconstruction
+            ! Load LGM reconstruction into reference ice thickness
             path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
                         "/"//trim(yelmo1%par%grid_name)//"_TOPO-ICE-6G_C.nc"
-            call nc_read(path_lgm,"dz",yelmo1%tpo%now%H_ice,start=[1,1,1], &
+            call nc_read(path_lgm,"dz",yelmo1%bnd%H_ice_ref,start=[1,1,1], &
                                 count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
 
-            ! Apply Gaussian smoothing to keep things stable
-            call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
 
-            ! Set as reference topography
-            yelmo1%bnd%H_ice_ref = yelmo1%tpo%now%H_ice
+            if (laurentide_init_const_H) then
+            ! Start with some ice cover to speed up initialization
+
+                yelmo1%tpo%now%H_ice = 0.0
+                where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
+                where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
+
+            else
+                ! Set LGM reconstsruction as initial ice thickness 
+                yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
+
+                ! Apply Gaussian smoothing to keep things stable
+                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
             
-end if 
+            end if 
             
             ! Run Yelmo for briefly to update surface topography
-            yelmo1%par%dt_method=0 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
-            yelmo1%par%dt_method=2 
 
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
@@ -332,76 +447,129 @@ end if
             yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
-            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
+            if (laurentide_init_const_H) then
+                ! Additionally ensure smb is postive for land above 50degN in Laurentide region
+                ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
+                where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+            end if 
 
-            call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
+            ! Run yelmo for several years with constant boundary conditions
+            ! to synchronize all model fields a bit
+            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
         else 
             ! Run simple startup equilibration step 
-
-            ! Run yelmo for several years with constant boundary conditions and topo
-            ! to equilibrate thermodynamics and dynamics
+            
+            ! Run yelmo for a few years with constant boundary conditions
+            ! to synchronize all model fields a bit
             call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-            call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_prec,topo_fixed=.TRUE.)
-        
+
         end if 
 
     end if 
 
-    ! 2D file 
+    ! ===== Initialize output files ===== 
+    
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
-!     call write_step_2D_small(yelmo1,file2D,time=time)  
-    call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-    
-    ! 1D file 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    call yelmo_write_reg_step(yelmo1,file1D,time=time) 
     
-    if (reg1_write) then 
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=reg1_mask)
-        call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask)
+    if (reg1%write) then 
+        call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
     end if 
 
+    if (reg2%write) then
+        call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
+    end if
+
+    if (reg3%write) then
+        call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
+    end if
+
+
+    ! ==== Begin main time loop =====
+
     ! Advance timesteps
-    do n = 1, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+    do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
         ! Get current time 
         time = ctl%time_init + n*ctl%dtt
 
         if (ctl%transient_clim) then 
             time_bp = time - 1950.0_wp
-        else 
+        else
+
+            if (ctl%use_lgm_step .and. time .ge. ctl%time_lgm_step) then 
+                ctl%time_const = time_lgm 
+            end if 
+
             time_bp = ctl%time_const - 1950.0_wp 
         end if
 
-        ! ===== basal friction optimization ==================
-        if (ctl%optimize) then 
+        ! Spin-up procedure - only relevant for time-time_init <= time_equil
+        select case(trim(ctl%equil_method))
+        
+            case("opt") 
+                ! ===== basal friction optimization ==================
 
-            ! === Optimization parameters =========
-            
-            ! Update model relaxation time scale and error scaling (in [m])
-            opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                            p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
-            
-            ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-            yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-            yelmo1%tpo%par%topo_rel     = 2
-            if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-            
-            ! === Optimization update step =========
+                if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
+                
+                    ! === Optimization parameters =========
+                    
+                    ! Update model relaxation time scale and error scaling (in [m])
+                    opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                    p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                    
+                    ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                    yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                    yelmo1%tpo%par%topo_rel     = 2
+                    if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+                    
+                    ! === Optimization update step =========
 
-            ! Update cf_ref based on error metric(s) 
-            call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
-                                yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                fill_dist=80.0_prec,dt=ctl%dtt)
-        end if 
-        ! ====================================================
+                    ! Update cf_ref based on error metric(s) 
+                    call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                                        yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                        yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                        fill_dist=80.0_prec,dt=ctl%dtt)
+                    
+                    if (opt%opt_tf .and. time .gt. opt%rel_time1) then
+                        ! Update tf_corr based on error metric(s) 
 
+                        call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                    end if 
+
+                end if 
+
+            case("relax")
+                ! ===== relaxation spinup ==================
+
+                if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
+                    ! Turn on relaxation for now, to let thermodynamics equilibrate
+                    ! without changing the topography too much. Important when 
+                    ! effective pressure = f(thermodynamics).
+
+                    yelmo1%tpo%par%topo_rel     = 2
+                    yelmo1%tpo%par%topo_rel_tau = 50.0 
+                    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+
+                else if (ctl%with_ice_sheet .and. (time-ctl%time_init) .eq. ctl%time_equil) then 
+                    ! Disable relaxation now... 
+
+                    yelmo1%tpo%par%topo_rel     = 0
+                    write(*,*) "timelog, relation off..."
+
+
+                end if 
+
+            case DEFAULT   ! == "none", etc
+
+                ! Pass - do nothing 
+
+        end select 
 
         ! == SEA LEVEL ==========================================================
         call sealevel_update(sealev,year_bp=time_bp)
@@ -429,15 +597,23 @@ end if
         ! yelmo1%bnd%smb   = yelmo1%dta%pd%smb
         ! yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
         
+        if (running_laurentide .and. laurentide_init_const_H  &
+                .and. (time-ctl%time_init) .lt. laurentide_time_equil ) then 
+            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
+            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
+            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
+                        yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+        end if 
+
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                             yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
         
         ! == MODEL OUTPUT =======================================================
@@ -450,9 +626,18 @@ end if
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
 
-            if (reg1_write) then 
-                call yelmo_write_reg_step(yelmo1,reg1_fnm,time=time,mask=reg1_mask) 
-            end if  
+            if (reg1%write) then 
+                call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
+            end if 
+
+            if (reg2%write) then
+                call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
+            end if
+
+            if (reg3%write) then
+                call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
+            end if
+
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt_restart*100))==0) then 
@@ -525,14 +710,14 @@ contains
         
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Dragging coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff",ylmo%dyn%now%visc_eff,units="Pa a m",long_name="Effective viscosity (SSA)", &
+        call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa a",long_name="Vertically averaged viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
+        call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 !         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
@@ -624,12 +809,45 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m^-1",long_name="Basal friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
+        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"taud",ylmo%dyn%now%taud,units="Pa",long_name="Driving stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)        
         call nc_write(filename,"taub",ylmo%dyn%now%taub,units="Pa",long_name="Basal stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        ! Strain-rate and stress tensors 
+        if (.TRUE.) then
+
+            ! call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
+            !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+            ! call nc_write(filename,"te",ylmo%mat%now%strs%te,units="Pa",long_name="Effective stress", &
+            !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+            ! call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
+            !           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+         
+            call nc_write(filename,"de2D",ylmo%mat%now%strn2D%de,units="yr^-1",long_name="Effective strain rate", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"div2D",ylmo%mat%now%strn2D%div,units="yr^-1",long_name="Divergence strain rate", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"te2D",ylmo%mat%now%strs2D%te,units="Pa",long_name="Effective stress", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            
+            call nc_write(filename,"eps_eig_1",ylmo%mat%now%strn2D%eps_eig_1,units="1/yr",long_name="Eigen strain 1", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"eps_eig_2",ylmo%mat%now%strn2D%eps_eig_2,units="1/yr",long_name="Eigen strain 2", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"eps_eff",ylmo%tpo%now%eps_eff,units="yr^-1",long_name="Effective calving strain", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            
+            call nc_write(filename,"tau_eig_1",ylmo%mat%now%strs2D%tau_eig_1,units="Pa",long_name="Eigen stress 1", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tau_eig_2",ylmo%mat%now%strs2D%tau_eig_2,units="Pa",long_name="Eigen stress 2", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tau_eff",ylmo%tpo%now%tau_eff,units="Pa",long_name="Effective calving stress", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            
+        end if 
 
 !         call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
 !                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -643,9 +861,11 @@ contains
         !call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
         !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
-        !call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
-        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+                     dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
@@ -812,6 +1032,8 @@ contains
         return 
 
     end subroutine write_step_2D_combined
+
+
 
 end program yelmox
 

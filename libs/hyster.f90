@@ -15,23 +15,21 @@ module hyster
         character(len=56) :: label 
         character(len=56) :: method 
         logical  :: with_kill  
+        real(wp) :: dt_init 
+        real(wp) :: dt_ramp
         real(wp) :: dt_ave 
         real(wp) :: df_sign 
-        real(wp) :: dv_dt_scale
+        real(wp) :: eps
         real(wp) :: df_dt_max
-        real(wp) :: f_range(2)
-        real(wp) :: t_ramp_init 
-        real(wp) :: t_ramp_end
         real(wp) :: sigma 
-
-        ! Internal parameters 
         real(wp) :: f_min 
         real(wp) :: f_max
-        real(wp) :: df_dt_min
-        real(wp) :: dt_ramp    
+        
+        ! Internal parameters 
+        real(wp) :: df_dt_min    
         
     end type 
-
+    
     type hyster_class
 
         type(hyster_par_class) :: par 
@@ -77,10 +75,10 @@ contains
         call nml_read(filename,trim(par_label),"method",      hyst%par%method)
         call nml_read(filename,trim(par_label),"with_kill",   hyst%par%with_kill)
         call nml_read(filename,trim(par_label),"dt_ave",      hyst%par%dt_ave)
-        call nml_read(filename,trim(par_label),"t_ramp_init", hyst%par%t_ramp_init)
-        call nml_read(filename,trim(par_label),"t_ramp_end",  hyst%par%t_ramp_end)
+        call nml_read(filename,trim(par_label),"dt_init",     hyst%par%dt_init)
+        call nml_read(filename,trim(par_label),"dt_ramp",     hyst%par%dt_ramp)
         call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
-        call nml_read(filename,trim(par_label),"dv_dt_scale", hyst%par%dv_dt_scale)
+        call nml_read(filename,trim(par_label),"dv_dt_scale", hyst%par%eps)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
         call nml_read(filename,trim(par_label),"sigma",       hyst%par%sigma)
         call nml_read(filename,trim(par_label),"f_min",       hyst%par%f_min)
@@ -112,7 +110,7 @@ contains
         hyst%df_dt = 0.0_wp
 
         hyst%pi_df  = hyst%par%df_dt_min 
-        hyst%pi_eta = hyst%par%dv_dt_scale 
+        hyst%pi_eta = hyst%par%eps 
 
         ! Initialize base (mean) values of forcing 
         if (hyst%par%df_sign .gt. 0.0_wp) then 
@@ -124,9 +122,6 @@ contains
         ! Set noise to zero for now 
         hyst%eta_now = 0.0_wp 
         hyst%f_now = hyst%f_mean_now 
-        
-        ! Determine ramp time window length 
-        hyst%par%dt_ramp = hyst%par%t_ramp_end - hyst%par%t_ramp_init 
         
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
@@ -205,95 +200,97 @@ contains
         hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
                                      (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
 
-        ! Determine the magnitude of rate of change (without sign)
-        ! depending on method to be used.
-        select case(trim(hyst%par%method))
+        if ( (time-hyst%time_init) .le. hyst%par%dt_init) then 
+            ! Initialization time period, no transient methods applied
 
-            case("const") 
-                ! Apply a constant rate of change, independent of dv_dt.
-                ! Use the df_dt_max parameter as a constant.
+            hyst%df_dt = 0.0_wp 
 
-                hyst%df_dt = hyst%par%df_dt_max
+        else 
+            ! Initialization time has passed, apply transient methods
 
-            case("ramp")
-                ! Ramp up to the constant rate of change for the first N years. 
-                ! Then maintain a constant anomaly (independent of dv_dt). 
 
-                if ( (time-hyst%time_init) .gt. hyst%par%t_ramp_init) then 
-                    ! If time window has begun, apply ramp-up 
+            ! Determine the magnitude of rate of change (without sign)
+            ! depending on method to be used.
+            select case(trim(hyst%par%method))
 
-                    if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
-                        hyst%f_mean_now .gt. hyst%par%f_max) then  
-                        ! Ramp-up complete, no more forcing change 
+                case("const") 
+                    ! Apply a constant rate of change, independent of dv_dt.
+                    ! Use the df_dt_max parameter as a constant.
+
+                    hyst%df_dt = hyst%par%df_dt_max
+
+                case("ramp")
+                    ! Ramp up to the constant rate of change for the first N years. 
+                    ! Then maintain a constant anomaly (independent of dv_dt). 
+
+                    
+                        if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
+                            hyst%f_mean_now .gt. hyst%par%f_max) then  
+                            ! Ramp-up complete, no more forcing change 
+
+                            hyst%df_dt = 0.0_wp 
+
+                        else 
+                            ! Linear rate of change from f_max to f_min (or vice versa) over 
+                            ! the time of interest dt_ramp. 
+
+                            hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+
+                        end if 
+
+                case("exp")
+
+                    if (dt_tot .lt. hyst%par%dt_ave) then 
+                        ! Not enough time has passed, maintain constant forcing 
+                        ! (to avoid affects of noisy derivatives)
 
                         hyst%df_dt = 0.0_wp 
 
                     else 
-                        ! Linear rate of change from f_max to f_min (or vice versa) over 
-                        ! the time of interest dt_ramp. 
+                        ! Calculate the current forcing rate, df_dt
+                        ! BASED ON EXPONENTIAL (sharp transition, tuneable)
+                        ! Returns scalar in range [0-1], 0.6 at dv_dt==eps
+                        ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
+                        ! that exp function doesn't explode (exp(-10)=>0.0)
+                        dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%eps,10.0_wp)
+                        f_scale  = exp(-dvdt_fac)
 
-                        hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+                        ! Get forcing rate of change magnitude
+                        hyst%df_dt = ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
 
                     end if 
 
-                else 
-                    ! No forcing change yet
+                case("PI42","H312b","H312PID","H321PID","PID1")
 
-                    hyst%df_dt = 0.0_wp 
+                    if (dt_tot .lt. hyst%par%dt_ave) then 
+                        ! Not enough time has passed, maintain constant forcing 
+                        ! (to avoid affects of noisy derivatives)
 
-                end if 
+                        hyst%df_dt = 0.0_wp 
 
-            case("exp")
+                    else 
+                        ! Calculate the current forcing rate, df_dt
 
-                if (dt_tot .lt. hyst%par%dt_ave) then 
-                    ! Not enough time has passed, maintain constant forcing 
-                    ! (to avoid affects of noisy derivatives)
+                        ! Calculate adaptive dfdt value using proportional-integral (PI) methods
+                        call set_adaptive_timestep_pc(pi_df_now,hyst%pi_df,hyst%pi_eta,hyst%par%eps, &
+                                            hyst%par%df_dt_min,hyst%par%df_dt_max,pi_order,hyst%par%method)
 
-                    hyst%df_dt = 0.0_wp 
+                        ! Remove oldest point from the end and insert latest point in beginning
+                        hyst%pi_eta = eoshift(hyst%pi_eta,-1,boundary=abs(hyst%dv_dt))
+                        hyst%pi_df  = eoshift(hyst%pi_df, -1,boundary=abs(pi_df_now))
 
-                else 
-                    ! Calculate the current forcing rate, df_dt
-                    ! BASED ON EXPONENTIAL (sharp transition, tuneable)
-                    ! Returns scalar in range [0-1], 0.6 at dv_dt==dv_dt_scale
-                    ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
-                    ! that exp function doesn't explode (exp(-10)=>0.0)
-                    dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%dv_dt_scale,10.0_wp)
-                    f_scale  = exp(-dvdt_fac)
+                        ! Apply limits to eta so that algorithm works well. 
+                        ! pi_eta should be greater than zero
+                        hyst%pi_eta(1) = max(hyst%pi_eta(1),1e-3)
 
-                    ! Get forcing rate of change magnitude
-                    hyst%df_dt = ( hyst%par%df_dt_min + f_scale*(hyst%par%df_dt_max-hyst%par%df_dt_min) )
+                        ! Get forcing rate of change magnitude in [f/yr]
+                        hyst%df_dt = hyst%pi_df(1) 
 
-                end if 
+                    end if 
 
-            case("PI42","H312b","H312PID","H321PID","PID1")
+            end select 
 
-                if (dt_tot .lt. hyst%par%dt_ave) then 
-                    ! Not enough time has passed, maintain constant forcing 
-                    ! (to avoid affects of noisy derivatives)
-
-                    hyst%df_dt = 0.0_wp 
-
-                else 
-                    ! Calculate the current forcing rate, df_dt
-
-                    ! Calculate adaptive dfdt value using proportional-integral (PI) methods
-                    call set_adaptive_timestep_pc(pi_df_now,hyst%pi_df,hyst%pi_eta,hyst%par%dv_dt_scale, &
-                                        hyst%par%df_dt_min,hyst%par%df_dt_max,pi_order,hyst%par%method)
-
-                    ! Remove oldest point from the end and insert latest point in beginning
-                    hyst%pi_eta = eoshift(hyst%pi_eta,-1,boundary=abs(hyst%dv_dt))
-                    hyst%pi_df  = eoshift(hyst%pi_df, -1,boundary=abs(pi_df_now))
-
-                    ! Apply limits to eta so that algorithm works well. 
-                    ! pi_eta should be greater than zero
-                    hyst%pi_eta(1) = max(hyst%pi_eta(1),1e-3)
-
-                    ! Get forcing rate of change magnitude in [f/yr]
-                    hyst%df_dt = hyst%pi_df(1) 
-
-                end if 
-
-        end select 
+        end if 
 
         ! Apply sign of change
         hyst%df_dt = hyst%par%df_sign*hyst%df_dt

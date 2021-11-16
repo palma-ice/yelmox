@@ -358,6 +358,7 @@
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
     ! Deep ocean bmb 
+    bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
     c_deep          = -1.0          ! [m/yr] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
     depth_const     =    0.0        ! [m] Constant shelf depth for interp_depthconst

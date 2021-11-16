@@ -33,6 +33,7 @@ print( "".join(["\n\nMakefile configuration complete for configuration file: ",c
 instructions = '''==== How to run yelmo ====\n
 # Make a link to the ice_data path, if available.
 ln -s path/to/ice_data ice_data 
+ln -s path/to/ice_data_javi ice_data_javi
 
 # Compile a test program
 make clean 
