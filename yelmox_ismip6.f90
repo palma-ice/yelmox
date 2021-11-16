@@ -813,7 +813,192 @@ end if
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
-    case("abumip_proj")
+    case("hysteresis_proj")
+        ! Here it is assumed that the model has gone through spinup 
+        ! and is ready for transient simulations 
+
+        write(*,*)
+        write(*,*) "Performing transient. [hysteresis]"
+        write(*,*) 
+ 
+        ! Initialize variables inside of ismip6 object 
+        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
+                                                domain="Antarctica",grid_name="ANT-32KM")
+
+        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
+        
+        snp2    = snp1 
+        smbpal2 = smbpal1
+        mshlf2  = mshlf1
+        
+        ! Make sure that tf is prescribed externally
+        mshlf2%par%tf_method = 0 
+
+        ! Additionally make sure isostasy is update every timestep 
+        isos1%par%dt = 1.0_wp 
+
+        ! Start timing 
+        call yelmo_cpu_time(cpu_start_time)
+        
+        ! Get current time 
+        time    = ctl%time_init
+        time_bp = time - 1950.0_wp 
+
+        ! Initialize output files 
+        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
+                
+        ! Perform 'coupled' model simulations for desired time
+        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+
+            ! Get current time 
+            time    = ctl%time_init + n*ctl%dtt
+            time_bp = time - 1950.0_wp 
+            
+            ! == HYSTERESIS =========================================================
+
+            ! Make parameter changes relevant to abumip 
+
+            select case(trim(ctl%hyst_scenario))
+
+                case("ctrl")
+
+                    ! Do nothing - control experiment 
+
+                case("scenario1")
+                    ! Possible scenario 1
+                    
+                    ! To do 
+
+                case("scenario2") 
+                    ! Possible scenario 2
+
+                    ! To do 
+
+                case DEFAULT 
+
+                    write(io_unit_err,*) ""
+                    write(io_unit_err,*) "yelmox_ismip6:: error: hyst_scenario not recognized."
+                    write(io_unit_err,*) "hyst_scenario: ", trim(ctl%hyst_scenario)
+                    stop 1 
+
+            end select
+
+            ! == SEA LEVEL ==========================================================
+            call sealevel_update(sealev,year_bp=0.0_wp)
+            yelmo1%bnd%z_sl  = sealev%z_sl
+
+            ! == Yelmo ice sheet ===================================================
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+ 
+            ! == ISOSTASY ==========================================================
+            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+
+                ! ISMIP6 forcing 
+
+                ! Update ismip6 forcing to current time
+                call ismip6_forcing_update(ismp1,ctl%time_const)
+
+                ! Set climate to present day 
+                snp2%now = snp2%clim0
+
+                ! == SURFACE MASS BALANCE ==============================================
+
+! if (n .eq. 0) then
+    ! Only update smb at first timestep 
+
+                ! Calculate smb for present day 
+                call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
+                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ctl%time_const) 
+                
+                ! Apply ISMIP6 anomalies
+                ! (apply to climate just for consistency)
+
+                smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+                smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
+
+                do m = 1,12
+                    snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
+                    snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
+                end do 
+
+                snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
+                if (trim(domain) .eq. "Antarctica") then 
+                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+                else 
+                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
+                end if 
+                snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+
+! end if 
+
+                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+                call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
+                                ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
+                                dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
+                                tf_ann=ismp1%tf%var(:,:,:,1))
+
+                ! Update temperature forcing field with tf_corr and tf_corr_basin
+                mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
+
+                call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+
+            ! Overwrite original mshlf and snp with ismip6 derived ones 
+            snp1    = snp2
+            smbpal1 = smbpal2  
+            mshlf1  = mshlf2 
+            
+            yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
+            yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
+
+            yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
+            
+            ! == MODEL OUTPUT ===================================
+
+            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
+                                                  file2D,time,snp2,mshlf2,smbpal2)
+            end if
+
+            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+                call yelmo_write_reg_step(yelmo1,file1D,time=time)
+                 
+            end if 
+
+            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            end if 
+            
+            if (time == ctl%time0) then 
+                ! Write restart file at start of transition period
+                call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
+            end if 
+
+            if (time == 1950.0_wp) then 
+                ! Write restart file at start of hist period
+                call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
+            end if 
+
+        end do 
+
+        write(*,*)
+        write(*,*) "Transient complete."
+        write(*,*)
+
+        ! Write the restart file for the end of the transient simulation
+        call yelmo_restart_write(yelmo1,file_restart,time=time) 
+
+        ! Stop timing 
+        call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
+
+        write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+        
+        case("abumip_proj")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
