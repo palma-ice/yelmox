@@ -78,7 +78,7 @@ contains
         call nml_read(filename,trim(par_label),"dt_init",     hyst%par%dt_init)
         call nml_read(filename,trim(par_label),"dt_ramp",     hyst%par%dt_ramp)
         call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
-        call nml_read(filename,trim(par_label),"dv_dt_scale", hyst%par%eps)
+        call nml_read(filename,trim(par_label),"eps",         hyst%par%eps)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
         call nml_read(filename,trim(par_label),"sigma",       hyst%par%sigma)
         call nml_read(filename,trim(par_label),"f_min",       hyst%par%f_min)
