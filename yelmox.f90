@@ -452,12 +452,18 @@ program yelmox
                 ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
                 where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+                
+                ! Run yelmo for several years to ensure stable central ice dome
+                call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
+
+            else 
+
+                ! Run yelmo for several years with constant boundary conditions to stabilize fields
+                call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+
             end if 
 
-            ! Run yelmo for several years with constant boundary conditions
-            ! to synchronize all model fields a bit
-            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
-
+                
         else 
             ! Run simple startup equilibration step 
             
