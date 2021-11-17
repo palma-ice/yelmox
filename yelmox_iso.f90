@@ -33,7 +33,8 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart
+    character(len=256) :: domain, grid_name 
     character(len=256) :: file_cf_ref 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart 
@@ -67,6 +68,59 @@ program yelmox
     
 ! ====================
     
+    type ctrl_params
+        character(len=56) :: run_step
+        real(wp) :: time_init
+        real(wp) :: time_end
+        real(wp) :: time_equil      ! Only for spinup
+        real(wp) :: time_const      ! Only for spinup 
+        real(wp) :: dtt
+        real(wp) :: dt1D_out
+        real(wp) :: dt2D_out
+        real(wp) :: dt2D_small_out
+
+        logical  :: with_ice_sheet 
+        character(len=56) :: equil_method
+        real(wp) :: time0 
+        real(wp) :: time1 
+        character(len=256) :: scenario 
+        
+        character(len=56) :: abumip_scenario
+        real(wp)          :: abumip_bmb 
+        
+        character(len=56) :: hyst_scenario 
+        real(wp)          :: hyst_f_to 
+
+    end type 
+
+    type opt_params
+        real(wp) :: cf_init
+        real(wp) :: cf_min
+        real(wp) :: cf_max 
+        real(wp) :: tau_c 
+        real(wp) :: H0
+        real(wp) :: sigma_err 
+        real(wp) :: sigma_vel 
+
+        real(wp) :: rel_tau 
+        real(wp) :: rel_tau1 
+        real(wp) :: rel_tau2
+        real(wp) :: rel_time1
+        real(wp) :: rel_time2
+        real(wp) :: rel_m
+
+        logical  :: opt_tf 
+        real(wp) :: H_grnd_lim
+        real(wp) :: tau_m 
+        real(wp) :: m_temp
+        real(wp) :: tf_min 
+        real(wp) :: tf_max
+         
+    end type 
+
+    type(ctrl_params)     :: ctl
+    type(opt_params)      :: opt 
+
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
@@ -154,7 +208,8 @@ program yelmox
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Store domain name as a shortcut 
-    domain = yelmo1%par%domain 
+    domain    = yelmo1%par%domain 
+    grid_name = yelmo1%par%grid_name 
 
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
@@ -175,7 +230,7 @@ program yelmox
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
     
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
+    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
@@ -221,12 +276,12 @@ program yelmox
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
-    call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-                         dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+    call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -431,17 +486,52 @@ if (calc_ice_sheet) then
 
                 !err_scale = get_opt_param(time,time1=-2e3,time2=0.0,p1=2000.0,p2=500.0,m=1.0)
             
-            if (time .eq. 0.0) then 
-                ! Update cf_ref at present day 
+            ! if (time .eq. 0.0) then 
+            !     ! Update cf_ref at present day 
 
-                call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
-                                        yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s,yelmo1%dta%pd%H_ice, &
-                                            yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%grd%dx, &
-                                            cf_min=yelmo1%dyn%par%cb_min,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
-                                            err_scale=err_scale,fill_dist=fill_dist,optvar="ice")
+            !     call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+            !                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s,yelmo1%dta%pd%H_ice, &
+            !                                 yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%grd%dx, &
+            !                                 cf_min=yelmo1%dyn%par%cb_min,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
+            !                                 err_scale=err_scale,fill_dist=fill_dist,optvar="ice")
+
+            ! end if 
+
+
+            ! ===== basal friction optimization ==================
+            if (trim(ctl%equil_method) .eq. "opt") then 
+
+                ! === Optimization parameters =========
+                
+                ! Update model relaxation time scale and error scaling (in [m])
+                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                
+                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                yelmo1%tpo%par%topo_rel     = 2
+                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+
+                ! === Optimization update step =========
+
+                ! Update cf_ref based on error metric(s) 
+                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    fill_dist=80.0_prec,dt=ctl%dtt)
+
+                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
+                    ! Update tf_corr based on error metric(s) 
+
+                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                
+                end if 
 
             end if 
-
+            ! ====================================================
 
         end if 
 
@@ -481,12 +571,12 @@ if (calc_transient_climate) then
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
     
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        call marshelf_calc_Tshlf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,depth=snp1%now%depth,to_ann=snp1%now%to_ann, &
-                         dto_ann=snp1%now%to_ann - snp1%clim0%to_ann)
+        call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%z_sl,dx=yelmo1%grd%dx*1e-3)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
 
