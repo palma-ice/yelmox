@@ -429,7 +429,7 @@ program yelmox_ismip6
 
         ! Initialize variables inside of ismip6 object 
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
-                                                domain="Antarctica",grid_name="ANT-32KM")
+                                                domain=domain,grid_name=grid_name)
 
         ! Update ismip6 forcing to constant time of interest
         call ismip6_forcing_update(ismp1,ctl%time_const, &
@@ -468,8 +468,8 @@ program yelmox_ismip6
 if (ctl%with_ice_sheet) then 
         ! Run yelmo alone for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,       dt=1.0_wp,topo_fixed=.FALSE.)
-        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,       dt=1.0_wp,topo_fixed=.FALSE.)
+        !call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
 end if 
 
         write(*,*) "Initial equilibration complete."
