@@ -76,9 +76,9 @@
     time_init       = 0.0               ! [yr] Starting time (years CE)
     time_end        = 500.0             ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
-    dtt             = 1.0               ! [yr] Main loop timestep 
+    dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 1e3               ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
@@ -87,7 +87,7 @@
 
 &hysteresis
     scenario        = "ctrl"            ! Scenario to run
-    dt2D_small_out  = 20                ! [yr] Frequency of writing small 2D output
+    dt2D_small_out  = 50                ! [yr] Frequency of writing small 2D output
     f_to            = 0.25              ! Ratio of ocean warming to atm warming
 /
 
@@ -99,7 +99,7 @@
     dt_ave          = 100.0             ! [yr] Number of years for averaging to diagnose system rate of change 
     df_sign         =  1                ! [-1/1] Determines direction of forcing
     eps             = 20.0              ! [Gt/yr] Target system rate of change (set point). Ice sheets: eg 20 Gt/a for 100yr averaging.
-    df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.
+    df_dt_max       = 1e-3              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.
     sigma           = 0.0               ! [f] Noise signal 
     f_min           =  0.0              ! [f] Forcing value minimum 
     f_max           =  5.0              ! [f] Forcing value maximum 
@@ -382,7 +382,7 @@
 
 &snap_clim1
     clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
     clim_monthly    = False
     clim_time       = 0
     clim_stdev_path = "None"
@@ -395,7 +395,7 @@
 
 &snap_clim2
     clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
     clim_monthly    = False
     clim_time       = -21000
     clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
