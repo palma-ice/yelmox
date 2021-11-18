@@ -49,7 +49,7 @@ program yelmox
     real(prec), allocatable :: dpr_now(:,:) 
 
     logical, parameter :: check_init     = .FALSE. 
-    logical, parameter :: calc_ice_sheet = .TRUE. 
+    logical, parameter :: calc_ice_sheet = .FALSE. 
 
 ! === optimization ===
     
@@ -153,6 +153,32 @@ program yelmox
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","fill_dist",    fill_dist)                 ! [km] Distance to fill cf_ref with minimum value instead of neighborhood mean
 
+    if (optimize_cf) then 
+        ! Load optimization parameters 
+
+        call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
+        call nml_read(path_par,"opt_L21","H0",          opt%H0)
+        call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        
+        call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+
+        call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
+        call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
+        call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
+        call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
+        call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
+
+    end if 
+
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -167,7 +193,7 @@ program yelmox
     dt_restart   = 20e3                 ! [yr] 
 
 
-    if (check_init) time_init = -7e3
+    !if (check_init) time_init = -7e3
 
     ! === opt ======
 
@@ -258,20 +284,14 @@ program yelmox
     call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time_init)
     call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time_init)
     
-    ! Equilibrate snowpack for itm
-    if (trim(smbpal1%par%abl_method) .eq. "itm") then 
-        call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init,time_equil=100.0)
-    end if 
-
-    ! Update snowpack again 
-    call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
+    ! Initialize smb and potentially snowpack by running for several years
+    call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
+                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init,time_equil=100.0) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
     ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
+    !call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time_init)
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -291,37 +311,20 @@ program yelmox
 
     time = time_init 
     
-    ! ============================================================
-    ! Load or define cf_ref (this will be overwritten if loading from restart file)
-
-    if (yelmo1%dyn%par%cb_method .eq. -1) then 
-    
-        if (load_cf_ref) then 
-
-            ! Parse filename with grid information
-            call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
-
-            ! Load cf_ref from specified file 
-            call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
-
-            ! Additionally modify cf_ref 
-            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
-            
-            ! Make sure minimum is consistent with parameter settings
-            where (yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
-
-        else
-            ! Define cf_ref inline 
-
-            !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
-
-            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
-
-        end if 
+    ! ===== basal friction optimization ======
+    if (optimize_cf) then 
+        
+        ! Ensure that cf_ref will be optimized (cb_method == set externally) 
+        yelmo1%dyn%par%cb_method = -1  
+        yelmo1%dyn%par%cb_min    = opt%cf_min
 
     end if 
-
-    ! ============================================================
+    ! ========================================
+    
+    ! If not using restart, prescribe cf_ref to an initial guess 
+    if (.not. yelmo1%par%use_restart) then
+        yelmo1%dyn%now%cf_ref = opt%cf_init 
+    end if 
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -344,19 +347,12 @@ program yelmox
     ! GHF 
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
-    ! SMB and T_srf
-    yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-    yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-    ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
-    
     ! ============================================================
-    ! Load or define cf_ref again, in case of restart file
+    ! Load pre-tuned cf_ref from file if desired
 
-    if (yelmo1%dyn%par%cb_method .eq. -1) then 
+    if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref) then 
     
-        if (load_cf_ref) then 
+        ! if (load_cf_ref) then 
 
             ! Parse filename with grid information
             call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
@@ -370,14 +366,14 @@ program yelmox
             ! Make sure minimum is consistent with parameter settings
             where (yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
             
-        else
-            ! Define cf_ref inline 
+        ! else
+        !     ! Define cf_ref inline 
 
-            !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+        !     !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
 
-            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
+        !     call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
             
-        end if 
+        ! end if 
 
     end if 
 
@@ -388,18 +384,13 @@ program yelmox
 
         ! Run yelmo for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=20e3,dt=dtt,topo_fixed=.FALSE.,dyn_solver="sia")
-        call yelmo_update_equil(yelmo1,time,time_tot=10e3,dt=dtt,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,dt=dtt,topo_fixed=.FALSE.)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time)
-!         stop "**** Done ****"
+        !stop "**** Done ****"
 
     end if 
-
-if (.not. check_init) then 
-    call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=dtt,topo_fixed=.FALSE.)
-end if 
 
     ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
     yelmo1%mat%now%dep_time = time_init 
@@ -472,13 +463,8 @@ if (check_init) stop
         
 if (calc_ice_sheet) then 
 
-        ! Update cf_ref if desired
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cf_ref) ) then
-!             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
-            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
-        end if 
         
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. iter .lt. n_iter) then
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. optimize_cf .and. iter .lt. n_iter) then
             ! If using tuned cf, perform additional optimization here 
 
             !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
@@ -499,40 +485,25 @@ if (calc_ice_sheet) then
 
 
             ! ===== basal friction optimization ==================
-            if (trim(ctl%equil_method) .eq. "opt") then 
-
-                ! === Optimization parameters =========
-                
-                ! Update model relaxation time scale and error scaling (in [m])
-                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
-                
-                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                yelmo1%tpo%par%topo_rel     = 2
-                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-
-                ! === Optimization update step =========
+            if (time .gt. -500.0 .and. time .le. 0.0) then 
+                ! Update cf_ref for the last 500 years to present day 
 
                 ! Update cf_ref based on error metric(s) 
                 call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    fill_dist=80.0_prec,dt=ctl%dtt)
-
-                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
-                    ! Update tf_corr based on error metric(s) 
-
-                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
-                
-                end if 
+                                    fill_dist=80.0_prec,dt=dtt)
 
             end if 
             ! ====================================================
 
+        else if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cf_ref) ) then
+            ! Update cf_ref with function
+
+!             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
+        
         end if 
 
 
@@ -547,16 +518,14 @@ end if
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,5.0)==0) then
-            ! Normal snapclim call 
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
-            ! Modify tas and precip
-            call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
-            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
-    
-        end if 
+        ! Normal snapclim call 
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
+        ! Modify tas and precip
+        call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
+        call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
+        
         ! == SURFACE MASS BALANCE ==============================================
 
         call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -565,7 +534,7 @@ if (calc_transient_climate) then
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
         ! Impose flux correction to smb 
-        call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
+        ! call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
 
 !         yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !         yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -621,6 +590,9 @@ end if
 
     ! Write the restart file for the end of the simulation
     call yelmo_restart_write(yelmo1,file_restart,time=time) 
+
+    ! Exit iteration loop afer first one if ice-sheet is not being calculated.
+    if (.not. calc_ice_sheet) exit 
 
 end do ! end iter 
 

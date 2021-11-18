@@ -4,7 +4,7 @@
     time_equil      = 10.0              ! [yr] Equilibration time 
     time_const      = -19050.0          ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
-    dtt             = 5.0               ! [yr] Main loop timestep 
+    dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 1e2               ! [yr] Frequency of writing 1D output files
     dt2D_out        = 500               ! [yr] Frequency of writing 2D output files
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files

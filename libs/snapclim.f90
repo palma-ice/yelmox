@@ -416,6 +416,7 @@ contains
         end if 
 
         !write(*,"(6f12.2)") time, at, ap, ao, bt, bp, bo
+        !stop "snapclim" 
 
         ! Determine whether the domain is in the south or not, by checking
         ! for the substrings ANT/ant in the domain name 
