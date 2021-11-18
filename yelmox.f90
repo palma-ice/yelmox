@@ -874,6 +874,9 @@ contains
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
+        call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Vertical velocity (z)", &
+                       dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
         call nc_write(filename,"uz_star",ylmo%thrm%now%uz_star,units="m yr-1",long_name="Advection-adjusted vertical velocity", &
                       dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
         
