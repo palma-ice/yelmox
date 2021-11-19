@@ -529,6 +529,7 @@ program yelmox
                     ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
                     yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
                     yelmo1%tpo%par%topo_rel     = 2
+                    if (trim(domain) .eq. "Greenland") yelmo1%tpo%par%topo_rel = 3
                     if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
                     
                     ! === Optimization update step =========

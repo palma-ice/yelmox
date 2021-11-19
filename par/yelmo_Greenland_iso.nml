@@ -51,6 +51,7 @@
     tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
        
 /
+
 &yelmo
     domain          = "Greenland"
     grid_name       = "GRL-32KM"
