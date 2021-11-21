@@ -111,6 +111,7 @@
     cf_max          = 1.0               ! [--] Maximum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
+    fill_method     = "analog"          ! nearest, analog, cf_min
     
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
