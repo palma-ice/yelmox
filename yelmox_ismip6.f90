@@ -85,6 +85,7 @@ program yelmox_ismip6
         real(wp) :: H0
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
+        character(len=56) :: fill_method 
 
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
@@ -137,6 +138,7 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
         call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,"opt_L21","fill_method", opt%fill_method)   
         
         call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
         call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
@@ -447,12 +449,12 @@ program yelmox_ismip6
         ! ===== basal friction optimization ======
         if (trim(ctl%equil_method) .eq. "opt") then 
             
-            ! Ensure that cf_ref will be optimized (cb_method == set externally) 
+            ! Ensure that cb_ref will be optimized (cb_method == set externally) 
             yelmo1%dyn%par%cb_method = -1  
 
-            ! If not using restart, prescribe cf_ref to initial guess 
+            ! If not using restart, prescribe cb_ref to initial guess 
             if (.not. yelmo1%par%use_restart) then
-                yelmo1%dyn%now%cf_ref = opt%cf_init 
+                yelmo1%dyn%now%cb_ref = opt%cf_init 
             end if 
 
             ! Set tf_corr to zero initially 
@@ -502,12 +504,12 @@ end if
 
                 ! === Optimization update step =========
 
-                ! Update cf_ref based on error metric(s) 
-                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                ! Update cb_ref based on error metric(s) 
+                call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    fill_dist=80.0_prec,dt=ctl%dtt)
+                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
                 if (opt%opt_tf .and. time .gt. opt%rel_time1) then
                     ! Update tf_corr based on error metric(s) 
@@ -1303,7 +1305,7 @@ contains
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
+        call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

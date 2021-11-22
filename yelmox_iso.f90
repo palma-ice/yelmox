@@ -35,12 +35,12 @@ program yelmox
     
     character(len=256) :: outfldr, file1D, file2D, file_restart_init, file_restart
     character(len=256) :: domain, grid_name 
-    character(len=256) :: file_cf_ref 
+    character(len=256) :: file_cb_ref 
     character(len=512) :: path_par, path_const  
     real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart 
     real(prec) :: time_init_final   
     integer    :: k, n
-    logical    :: calc_transient_climate, load_cf_ref 
+    logical    :: calc_transient_climate, load_cb_ref 
     real(prec) :: f_cf, f_cf_lim, f_hol, dtas_hol, dpr_hol, dsmb_negis   
     logical    :: write2D_now 
 
@@ -57,7 +57,7 @@ program yelmox
     logical                 :: overwrite_files
     real(prec)              :: err_scale 
     real(prec)              :: fill_dist 
-    real(prec), allocatable :: cf_ref_dot(:,:) 
+    real(prec), allocatable :: cb_ref_dot(:,:) 
     integer                 :: n_iter 
     character(len=12)       :: iter_str
     integer                 :: iter 
@@ -101,7 +101,8 @@ program yelmox
         real(wp) :: H0
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
-
+        character(len=56) :: fill_method 
+        
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
         real(wp) :: rel_tau2
@@ -139,9 +140,9 @@ program yelmox
     call nml_read(path_par,"ctrl","dt2D_out",     dt2D_out)                  ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","transient",    calc_transient_climate)    ! Calculate transient climate? 
 
-    call nml_read(path_par,"ctrl","load_cf_ref",  load_cf_ref)               ! Load cf_ref from file? Otherwise define from cf_stream + inline tuning
-    call nml_read(path_par,"ctrl","file_cf_ref",  file_cf_ref)               ! Filename holding cf_ref to load 
-    call nml_read(path_par,"ctrl","optimize_cf",  optimize_cf)               ! Run optimization iterations on cf_ref?
+    call nml_read(path_par,"ctrl","load_cb_ref",  load_cb_ref)               ! Load cb_ref from file? Otherwise define from cf_stream + inline tuning
+    call nml_read(path_par,"ctrl","file_cb_ref",  file_cb_ref)               ! Filename holding cb_ref to load 
+    call nml_read(path_par,"ctrl","optimize_cf",  optimize_cf)               ! Run optimization iterations on cb_ref?
     call nml_read(path_par,"ctrl","overwrite_files",overwrite_files)         ! Overwrite files from optimization iterations?
     call nml_read(path_par,"ctrl","n_iter",       n_iter)                    ! Number of optimization iterations
     
@@ -151,7 +152,34 @@ program yelmox
     call nml_read(path_par,"ctrl","dtas_hol",     dtas_hol)                  ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dpr_hol",      dpr_hol)                   ! Anomaly to apply to default climate during the Holocene
     call nml_read(path_par,"ctrl","dsmb_negis",   dsmb_negis)                ! Anomaly to apply to default climate during the Holocene
-    call nml_read(path_par,"ctrl","fill_dist",    fill_dist)                 ! [km] Distance to fill cf_ref with minimum value instead of neighborhood mean
+    call nml_read(path_par,"ctrl","fill_dist",    fill_dist)                 ! [km] Distance to fill cb_ref with minimum value instead of neighborhood mean
+
+    if (optimize_cf) then 
+        ! Load optimization parameters 
+
+        call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
+        call nml_read(path_par,"opt_L21","H0",          opt%H0)
+        call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,"opt_L21","fill_method", opt%fill_method)   
+        
+        call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+
+        call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
+        call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
+        call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
+        call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
+        call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
+
+    end if 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -167,7 +195,7 @@ program yelmox
     dt_restart   = 20e3                 ! [yr] 
 
 
-    if (check_init) time_init = -7e3
+    !if (check_init) time_init = -7e3
 
     ! === opt ======
 
@@ -201,9 +229,9 @@ program yelmox
     allocate(dpr_now(yelmo1%grd%nx,yelmo1%grd%ny))
     dpr_now = 0.0_prec 
 
-    ! Define cf_ref_dot for later use 
-    allocate(cf_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
-    cf_ref_dot = 0.0 
+    ! Define cb_ref_dot for later use 
+    allocate(cb_ref_dot(yelmo1%grd%nx,yelmo1%grd%ny))
+    cb_ref_dot = 0.0 
     
     ! === Initialize external models (forcing for ice sheet) ======
 
@@ -258,15 +286,9 @@ program yelmox
     call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time_init)
     call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time_init)
     
-    ! Equilibrate snowpack for itm
-    if (trim(smbpal1%par%abl_method) .eq. "itm") then 
-        call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init,time_equil=100.0)
-    end if 
-
-    ! Update snowpack again 
-    call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init) 
+    ! Initialize smb and potentially snowpack by running for several years
+    call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
+                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_init,time_equil=100.0) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
@@ -291,37 +313,20 @@ program yelmox
 
     time = time_init 
     
-    ! ============================================================
-    ! Load or define cf_ref (this will be overwritten if loading from restart file)
-
-    if (yelmo1%dyn%par%cb_method .eq. -1) then 
-    
-        if (load_cf_ref) then 
-
-            ! Parse filename with grid information
-            call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
-
-            ! Load cf_ref from specified file 
-            call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
-
-            ! Additionally modify cf_ref 
-            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
-            
-            ! Make sure minimum is consistent with parameter settings
-            where (yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
-
-        else
-            ! Define cf_ref inline 
-
-            !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
-
-            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
-
-        end if 
+    ! ===== basal friction optimization ======
+    if (optimize_cf) then 
+        
+        ! Ensure that cb_ref will be optimized (cb_method == set externally) 
+        yelmo1%dyn%par%cb_method = -1  
+        yelmo1%dyn%par%cb_min    = opt%cf_min
 
     end if 
-
-    ! ============================================================
+    ! ========================================
+    
+    ! If not using restart, prescribe cb_ref to an initial guess 
+    if (.not. yelmo1%par%use_restart) then
+        yelmo1%dyn%now%cb_ref = opt%cf_init 
+    end if 
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
@@ -344,40 +349,33 @@ program yelmox
     ! GHF 
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
-    ! SMB and T_srf
-    yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-    yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-    ! Impose flux correction to smb 
-    call modify_smb(yelmo1%bnd%smb,dsmb_now,dsmb_negis,yelmo1%bnd,yelmo1%grd,time)
-    
     ! ============================================================
-    ! Load or define cf_ref again, in case of restart file
+    ! Load pre-tuned cb_ref from file if desired
 
-    if (yelmo1%dyn%par%cb_method .eq. -1) then 
+    if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cb_ref) then 
     
-        if (load_cf_ref) then 
+        ! if (load_cb_ref) then 
 
             ! Parse filename with grid information
-            call yelmo_parse_path(file_cf_ref,yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_parse_path(file_cb_ref,yelmo1%par%domain,yelmo1%par%grid_name)
 
-            ! Load cf_ref from specified file 
-            call nc_read(file_cf_ref,"cf_ref",yelmo1%dyn%now%cf_ref)
+            ! Load cb_ref from specified file 
+            call nc_read(file_cb_ref,"cb_ref",yelmo1%dyn%now%cb_ref)
 
-            ! Additionally modify cf_ref 
-            !call modify_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
+            ! Additionally modify cb_ref 
+            !call modify_cb_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
             ! Make sure minimum is consistent with parameter settings
-            where (yelmo1%dyn%now%cf_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cf_ref = yelmo1%dyn%par%cb_min
+            where (yelmo1%dyn%now%cb_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%cb_min
             
-        else
-            ! Define cf_ref inline 
+        ! else
+        !     ! Define cb_ref inline 
 
-            !call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+        !     !call set_cb_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
 
-            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
+        !     call set_cb_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
             
-        end if 
+        ! end if 
 
     end if 
 
@@ -388,18 +386,13 @@ program yelmox
 
         ! Run yelmo for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=20e3,dt=dtt,topo_fixed=.FALSE.,dyn_solver="sia")
-        call yelmo_update_equil(yelmo1,time,time_tot=10e3,dt=dtt,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,dt=dtt,topo_fixed=.FALSE.)
 
         ! Write a restart file 
         call yelmo_restart_write(yelmo1,file_restart_init,time)
-!         stop "**** Done ****"
+        !stop "**** Done ****"
 
     end if 
-
-if (.not. check_init) then 
-    call yelmo_update_equil(yelmo1,time,time_tot=1e3,dt=dtt,topo_fixed=.FALSE.)
-end if 
 
     ! Reset dep_time to time_init everywhere to avoid complications related to equilibration 
     yelmo1%mat%now%dep_time = time_init 
@@ -419,7 +412,7 @@ do iter = 1, n_iter
     isos1   = isos0 
     isos1%par%time = time_init 
 
-    yelmo0%dyn%now%cf_ref = yelmo1%dyn%now%cf_ref
+    yelmo0%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref
     yelmo1  = yelmo0 
     call yelmo_set_time(yelmo1,time_init)   ! For safety
 
@@ -472,24 +465,19 @@ if (check_init) stop
         
 if (calc_ice_sheet) then 
 
-        ! Update cf_ref if desired
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cf_ref) ) then
-!             call set_cf_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
-            call set_cf_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
-        end if 
         
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cf_ref .and. iter .lt. n_iter) then
+        if (yelmo1%dyn%par%cb_method .eq. -1 .and. optimize_cf .and. iter .lt. n_iter) then
             ! If using tuned cf, perform additional optimization here 
 
             !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
-                ! Update cf_ref every 500yr for the last 2000 yrs, except for year 0.
+                ! Update cb_ref every 500yr for the last 2000 yrs, except for year 0.
 
                 !err_scale = get_opt_param(time,time1=-2e3,time2=0.0,p1=2000.0,p2=500.0,m=1.0)
             
             ! if (time .eq. 0.0) then 
-            !     ! Update cf_ref at present day 
+            !     ! Update cb_ref at present day 
 
-            !     call update_cf_ref_errscaling(yelmo1%dyn%now%cf_ref,cf_ref_dot,yelmo1%tpo%now%H_ice, &
+            !     call update_cb_ref_errscaling(yelmo1%dyn%now%cb_ref,cb_ref_dot,yelmo1%tpo%now%H_ice, &
             !                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s,yelmo1%dta%pd%H_ice, &
             !                                 yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%grd%dx, &
             !                                 cf_min=yelmo1%dyn%par%cb_min,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
@@ -499,40 +487,25 @@ if (calc_ice_sheet) then
 
 
             ! ===== basal friction optimization ==================
-            if (trim(ctl%equil_method) .eq. "opt") then 
+            if (time .gt. -500.0 .and. time .lt. 0.0) then 
+                ! Update cb_ref for the last 500 years to present day 
 
-                ! === Optimization parameters =========
-                
-                ! Update model relaxation time scale and error scaling (in [m])
-                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
-                
-                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                yelmo1%tpo%par%topo_rel     = 2
-                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-
-                ! === Optimization update step =========
-
-                ! Update cf_ref based on error metric(s) 
-                call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                ! Update cb_ref based on error metric(s) 
+                call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    fill_dist=80.0_prec,dt=ctl%dtt)
-
-                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
-                    ! Update tf_corr based on error metric(s) 
-
-                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
-                
-                end if 
+                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
             end if 
             ! ====================================================
 
+        else if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cb_ref) ) then
+            ! Update cb_ref with function
+
+!             call set_cb_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
+            call set_cb_ref_new(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,yelmo1%par%grid_name,f_cf)
+        
         end if 
 
 
@@ -547,16 +520,14 @@ end if
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-        if (mod(time,5.0)==0) then
-            ! Normal snapclim call 
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
-            ! Modify tas and precip
-            call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
-            call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
-    
-        end if 
+        ! Normal snapclim call 
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
 
+        ! Modify tas and precip
+        call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)
+        call modify_pr(snp1%now%pr,snp1%now%pr_ann,dpr_now,dpr_hol,yelmo1%grd,time)
+        
         ! == SURFACE MASS BALANCE ==============================================
 
         call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -621,6 +592,9 @@ end if
 
     ! Write the restart file for the end of the simulation
     call yelmo_restart_write(yelmo1,file_restart,time=time) 
+
+    ! Exit iteration loop afer first one if ice-sheet is not being calculated.
+    if (.not. calc_ice_sheet) exit 
 
 end do ! end iter 
 
@@ -718,7 +692,7 @@ contains
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
+        call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m^-1",long_name="Basal friction coefficient", &
@@ -1141,8 +1115,8 @@ contains
 
     end subroutine modify_smb
 
-    subroutine set_cf_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
-        ! Set cf_ref [unitless] with location specific tuning 
+    subroutine set_cb_ref_new(dyn,tpo,thrm,bnd,grd,domain,grid_name,f_cf)
+        ! Set cb_ref [unitless] with location specific tuning 
 
         implicit none
         
@@ -1167,46 +1141,46 @@ contains
         call nc_read(file_vel,"uxy_srf",uxy_srf,missing_value=MV)
 
         ! Initial value everywhere 
-        dyn%now%cf_ref = 0.4 
-        where (uxy_srf .gt.  10.0) dyn%now%cf_ref = 0.4
-        where (uxy_srf .gt.  20.0) dyn%now%cf_ref = 0.2
-        where (uxy_srf .gt.  50.0) dyn%now%cf_ref = 0.08
-        where (uxy_srf .gt. 100.0) dyn%now%cf_ref = 0.002
-        where (uxy_srf .gt. 200.0) dyn%now%cf_ref = 0.001
-        where (uxy_srf .eq. MV) dyn%now%cf_ref = dyn%par%cb_min 
+        dyn%now%cb_ref = 0.4 
+        where (uxy_srf .gt.  10.0) dyn%now%cb_ref = 0.4
+        where (uxy_srf .gt.  20.0) dyn%now%cb_ref = 0.2
+        where (uxy_srf .gt.  50.0) dyn%now%cb_ref = 0.08
+        where (uxy_srf .gt. 100.0) dyn%now%cb_ref = 0.002
+        where (uxy_srf .gt. 200.0) dyn%now%cb_ref = 0.001
+        where (uxy_srf .eq. MV) dyn%now%cb_ref = dyn%par%cb_min 
 
 
         ! Additional tuning 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0=-350.0, y0=-1450.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0=-250.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.2  ,x0= -50.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.1  ,x0=-250.0, y0=-2000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.2  ,x0=-350.0, y0=-1450.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.2  ,x0=-250.0, y0=-1600.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.2  ,x0= -50.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.1  ,x0=-250.0, y0=-2000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dyn%now%cf_ref,0.2,  x0=-150.0, y0=-2850.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.2,  x0=-150.0, y0=-2850.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dyn%now%cf_ref,0.1,  x0= -50.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.1,  x0= -50.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.05, x0=-200.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
         
-        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 330.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 300.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.005,x0= 330.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.005,x0= 300.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
                      
 
         ! Finally multiply the whole thing by f_cf to scale field up or down 
-        dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
+        dyn%now%cb_ref = f_cf * dyn%now%cb_ref 
 
         ! Ensure minimum value for PD ice-free points 
-        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cb_ref = dyn%par%cb_min
         
         ! Eliminate extreme values 
-        where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
+        where (dyn%now%cb_ref .lt. dyn%par%cb_min) dyn%now%cb_ref = dyn%par%cb_min
 
         return 
 
-    end subroutine set_cf_ref_new
+    end subroutine set_cb_ref_new
 
-    subroutine modify_cf_ref(dyn,tpo,thrm,bnd,grd,domain,f_cf,f_cf_lim)
-        ! Set cf_ref [unitless] with location specific tuning 
+    subroutine modify_cb_ref(dyn,tpo,thrm,bnd,grd,domain,f_cf,f_cf_lim)
+        ! Set cb_ref [unitless] with location specific tuning 
 
         implicit none
         
@@ -1220,75 +1194,75 @@ contains
         real(prec),         intent(IN)    :: f_cf_lim 
 
         ! First reduce maximum value everywhere 
-        where (dyn%now%cf_ref .gt. 0.3) dyn%now%cf_ref = 0.3 
+        where (dyn%now%cb_ref .gt. 0.3) dyn%now%cb_ref = 0.3 
 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-150.0, y0=-1700.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0= -50.0, y0=-1800.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.05, x0=-150.0, y0=-1700.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.05, x0= -50.0, y0=-1800.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.1,  x0=   0.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.1,  x0=   0.0, y0=-1200.0,sigma=200.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
 
-        call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-150.0, y0= -950.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= 300.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.01, x0=-150.0, y0= -950.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.01, x0= 300.0, y0=-1000.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
     
-        call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-100.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-        call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=-240.0, y0=-2400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.01, x0=-100.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+        call scale_cf_gaussian(dyn%now%cb_ref,0.05, x0=-240.0, y0=-2400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
     
 
-        ! Modify cf_ref
+        ! Modify cb_ref
         if (trim(domain) .eq. "Greenland") then
 
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=-100.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1500.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-1700.0,sigma= 70.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-1800.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 400.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0=-100.0, y0=-1400.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0=   0.0, y0=-1500.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0=   0.0, y0=-1700.0,sigma= 70.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0= 400.0, y0=-1800.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0= 100.0, y0=-1900.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0= 400.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0= 150.0, y0=-2000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0= 100.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  80.0, y0=-2400.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=  50.0, y0=-2550.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0=   0.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.30, x0= -50.0, y0=-2800.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0=  80.0, y0=-2400.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0=  50.0, y0=-2550.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0=   0.0, y0=-2700.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.30, x0= -50.0, y0=-2800.0,sigma=50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-1000.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.10, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.10, x0= 300.0, y0=-1000.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.10, x0= 300.0, y0=-2200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.05, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.03, x0= 450.0, y0=-1950.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.05, x0=   0.0, y0=-1300.0,sigma=300.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.05, x0= 400.0, y0=-2200.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.03, x0=-300.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.03, x0= 400.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.03, x0= 450.0, y0=-1650.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.03, x0= 450.0, y0=-1950.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.02, x0= -80.0, y0=-1200.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.01, x0= -80.0, y0=-1000.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.01, x0=-250.0, y0=-1050.0,sigma= 80.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.005,x0= 450.0, y0=-2250.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.005,x0= 450.0, y0=-1150.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.005,x0= 400.0, y0=-1250.0,sigma=100.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.005,x0= 450.0, y0=-2250.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
-!             call scale_cf_gaussian(dyn%now%cf_ref,0.002,x0= 500.0, y0=-2300.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
+!             call scale_cf_gaussian(dyn%now%cb_ref,0.002,x0= 500.0, y0=-2300.0,sigma= 50.0,xx=grd%x*1e-3,yy=grd%y*1e-3)
             
         end if 
 
         ! Finally multiply the whole thing by f_cf to scale field up or down, for 
-        ! cf_ref values above a threshold 
-        where (dyn%now%cf_ref .gt. f_cf_lim) dyn%now%cf_ref = f_cf * dyn%now%cf_ref 
+        ! cb_ref values above a threshold 
+        where (dyn%now%cb_ref .gt. f_cf_lim) dyn%now%cb_ref = f_cf * dyn%now%cb_ref 
 
         ! Ensure minimum value for PD ice-free points 
-        !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cf_ref = dyn%par%cb_min
+        !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cb_ref = dyn%par%cb_min
         
         ! Eliminate extreme values 
-        where (dyn%now%cf_ref .lt. dyn%par%cb_min) dyn%now%cf_ref = dyn%par%cb_min
+        where (dyn%now%cb_ref .lt. dyn%par%cb_min) dyn%now%cb_ref = dyn%par%cb_min
         
         return 
 
-    end subroutine modify_cf_ref
+    end subroutine modify_cb_ref
 
-    subroutine set_cf_ref(dyn,tpo,thrm,bnd,grd,domain)
-        ! Set cf_ref [unitless] with location specific tuning 
+    subroutine set_cb_ref(dyn,tpo,thrm,bnd,grd,domain)
+        ! Set cb_ref [unitless] with location specific tuning 
 
         implicit none
         
@@ -1314,7 +1288,7 @@ contains
         
         lambda1 = 1.0_prec 
 
-            ! Additionally modify cf_ref
+            ! Additionally modify cb_ref
             if (trim(domain) .eq. "Greenland") then
 
                 ! Reduction
@@ -1326,7 +1300,7 @@ contains
             end if 
 
             ! =============================================================================
-            ! Step 2: calculate lambda functions to scale cf_ref from default value 
+            ! Step 2: calculate lambda functions to scale cb_ref from default value 
             
             !------------------------------------------------------------------------------
             ! lambda_bed: scaling as a function of bedrock elevation
@@ -1366,19 +1340,19 @@ contains
 
 
             ! =============================================================================
-            ! Step 3: calculate cf_ref [non-dimensional]
+            ! Step 3: calculate cb_ref [non-dimensional]
             
-            dyn%now%cf_ref = dyn%par%cf_stream*lambda1*lambda_bed
+            dyn%now%cb_ref = dyn%par%cf_stream*lambda1*lambda_bed
             
         return 
 
-    end subroutine set_cf_ref
+    end subroutine set_cb_ref
 
-    subroutine scale_cf_gaussian(cf_ref,cf_new,x0,y0,sigma,xx,yy)
+    subroutine scale_cf_gaussian(cb_ref,cf_new,x0,y0,sigma,xx,yy)
 
         implicit none 
 
-        real(prec), intent(INOUT) :: cf_ref(:,:)
+        real(prec), intent(INOUT) :: cb_ref(:,:)
         real(prec), intent(IN) :: cf_new
         real(prec), intent(IN) :: x0
         real(prec), intent(IN) :: y0
@@ -1390,8 +1364,8 @@ contains
         integer :: nx, ny 
         real(prec), allocatable :: wts(:,:)
         
-        nx = size(cf_ref,1)
-        ny = size(cf_ref,2)
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2)
 
         allocate(wts(nx,ny))
 
@@ -1399,8 +1373,8 @@ contains
         wts = 1.0/(2.0*pi*sigma**2)*exp(-((xx-x0)**2+(yy-y0)**2)/(2.0*sigma**2))
         wts = wts / maxval(wts)
 
-        ! Scale cf_ref
-        cf_ref = cf_ref*(1.0-wts) + cf_new*wts
+        ! Scale cb_ref
+        cb_ref = cb_ref*(1.0-wts) + cf_new*wts
 
         return 
 

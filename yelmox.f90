@@ -78,6 +78,7 @@ program yelmox
         real(wp) :: H0
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
+        character(len=56) :: fill_method 
 
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
@@ -149,6 +150,7 @@ program yelmox
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
         call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,"opt_L21","fill_method", opt%fill_method)   
         
         call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
         call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
@@ -395,12 +397,12 @@ program yelmox
     ! ===== basal friction optimization ======
     if (trim(ctl%equil_method) .eq. "opt") then 
         
-        ! Ensure that cf_ref will be optimized (cb_method == set externally) 
+        ! Ensure that cb_ref will be optimized (cb_method == set externally) 
         yelmo1%dyn%par%cb_method = -1  
 
-        ! If not using restart, prescribe cf_ref to initial guess 
+        ! If not using restart, prescribe cb_ref to initial guess 
         if (.not. yelmo1%par%use_restart) then
-            yelmo1%dyn%now%cf_ref = opt%cf_init 
+            yelmo1%dyn%now%cb_ref = opt%cf_init 
         end if 
 
     end if 
@@ -452,12 +454,18 @@ program yelmox
                 ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
                 where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
+                
+                ! Run yelmo for several years to ensure stable central ice dome
+                call yelmo_update_equil(yelmo1,time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
+
+            else 
+
+                ! Run yelmo for several years with constant boundary conditions to stabilize fields
+                call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+
             end if 
 
-            ! Run yelmo for several years with constant boundary conditions
-            ! to synchronize all model fields a bit
-            call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
-
+                
         else 
             ! Run simple startup equilibration step 
             
@@ -523,16 +531,17 @@ program yelmox
                     ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
                     yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
                     yelmo1%tpo%par%topo_rel     = 2
+                    if (trim(domain) .eq. "Greenland") yelmo1%tpo%par%topo_rel = 3
                     if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
                     
                     ! === Optimization update step =========
 
-                    ! Update cf_ref based on error metric(s) 
-                    call update_cf_ref_errscaling_l21(yelmo1%dyn%now%cf_ref,yelmo1%tpo%now%H_ice, &
+                    ! Update cb_ref based on error metric(s) 
+                    call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                         yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                         yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                        fill_dist=80.0_prec,dt=ctl%dtt)
+                                        dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
                     
                     if (opt%opt_tf .and. time .gt. opt%rel_time1) then
                         ! Update tf_corr based on error metric(s) 
@@ -803,7 +812,7 @@ contains
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
+        call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -858,8 +867,8 @@ contains
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        !call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
-        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
+                     dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
         call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -868,10 +877,26 @@ contains
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="J a-1 m-2",long_name="Basal frictional heating", &
+        call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Vertical velocity (z)", &
+                       dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"uz_star",ylmo%thrm%now%uz_star,units="m yr-1",long_name="Advection-adjusted vertical velocity", &
+                      dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
+                      dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"Q_rock",ylmo%thrm%now%Q_rock,units="mW m-2",long_name="Bedrock surface heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer thickness", &
