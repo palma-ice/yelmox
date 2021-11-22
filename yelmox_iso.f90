@@ -101,7 +101,8 @@ program yelmox
         real(wp) :: H0
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
-
+        character(len=56) :: fill_method 
+        
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
         real(wp) :: rel_tau2
@@ -163,6 +164,7 @@ program yelmox
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
         call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,"opt_L21","fill_method", opt%fill_method)   
         
         call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
         call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
@@ -493,7 +495,7 @@ if (calc_ice_sheet) then
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                     yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    fill_dist=80.0_prec,dt=dtt)
+                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
             end if 
             ! ====================================================
