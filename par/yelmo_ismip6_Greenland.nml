@@ -489,7 +489,7 @@
     grz_length      = 32.0          ! [km] Length scale of assumed grounding zone
 
     ! bmb_method == anom, bmb_ref parameters 
-    use_obs         = True          ! Load obs for bmb_ref
+    use_obs         = False         ! Load obs for bmb_ref
     obs_path        = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
