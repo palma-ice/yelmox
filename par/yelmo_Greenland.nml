@@ -9,7 +9,7 @@
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 
-    use_lgm_step    = True              ! Activate LGM step in forcing at time=time_lgm_step?
+    use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"             ! "none", "relax", "opt"
 /
@@ -23,7 +23,7 @@
     
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
     sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
-    fill_method     = "analog"          ! nearest, analog, cf_min
+    fill_method     = "cf_min"          ! nearest, analog, cf_min
     
     rel_tau1        = 50.0              ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
@@ -42,7 +42,7 @@
 
 &yelmo
     domain          = "Greenland"
-    grid_name       = "GRL-32KM"
+    grid_name       = "GRL-16KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "None"
