@@ -224,8 +224,8 @@ contains
                     ! Then maintain a constant anomaly (independent of dv_dt). 
 
                     
-                        if (hyst%f_mean_now .lt. hyst%par%f_min .or. &
-                            hyst%f_mean_now .gt. hyst%par%f_max) then  
+                        if (hyst%f_mean_now .le. hyst%par%f_min .or. &
+                            hyst%f_mean_now .ge. hyst%par%f_max) then  
                             ! Ramp-up complete, no more forcing change 
 
                             hyst%df_dt = 0.0_wp 
