@@ -304,6 +304,12 @@ contains
             ! Update the mean forcing value 
             hyst%f_mean_now = hyst%f_mean_now + (hyst%df_dt*hyst%dt) 
 
+            ! Ensure f_min/f_max bounds are not exceeded (ramp method)
+            if (trim(hyst%par%method) .eq. "ramp") then 
+                if (hyst%f_mean_now .lt. hyst%par%f_min) hyst%f_mean_now = hyst%par%f_min 
+                if (hyst%f_mean_now .gt. hyst%par%f_max) hyst%f_mean_now = hyst%par%f_max 
+            end if 
+
             ! If desired, generate some noise 
             if (hyst%par%sigma .gt. 0.0) then 
                 call gen_random_normal(hyst%eta_now,mu=0.0_wp,sigma=hyst%par%sigma)
@@ -317,6 +323,7 @@ contains
         hyst%f_now = hyst%f_mean_now + hyst%eta_now 
 
         ! Check if kill should be activated 
+        ! Note: for ramp method, condition will never be reached because f_now is limited to valid range.
         if ( hyst%par%with_kill .and. &
             (hyst%f_mean_now .lt. hyst%par%f_min .or. &
              hyst%f_mean_now .gt. hyst%par%f_max) ) then 
