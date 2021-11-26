@@ -6,7 +6,8 @@
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 500               ! [yr] Frequency of writing 2D output files
+    dt2D_small_out  = 100               ! [yr] Frequency of writing 2D output files
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 
     use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
