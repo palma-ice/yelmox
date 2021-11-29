@@ -1443,10 +1443,6 @@ contains
         ! CF map conventions can be found here:
         ! http://cfconventions.org/Data/cf-conventions/cf-conventions-1.6/build/cf-conventions.html#appendix-grid-mappings
         
-        ! ajr: note this is deprecated, as it won't work for generating 
-        ! a grid description file using eg, cdo -griddes. Better to use 
-        ! the projection specific functions below nc_write_map_stereographic, etc...
-
         implicit none
 
         character(len=*), intent(IN) :: filename, grid_mapping_name
