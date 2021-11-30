@@ -3,6 +3,8 @@ module sealevel
     use nml 
     use ncio 
 
+    use, intrinsic :: iso_fortran_env, only: error_unit
+
     implicit none 
 
     ! Internal constants
@@ -86,9 +88,9 @@ contains
 
             case DEFAULT 
 
-                write(*,*) ""
-                write(*,*) "sealevel_init:: Error: method not recognized."
-                write(*,*) "method = ", sl%method
+                write(error_unit,*) ""
+                write(error_unit,*) "sealevel_init:: Error: method not recognized."
+                write(error_unit,*) "method = ", sl%method
                 stop 
 
         end select
@@ -120,9 +122,9 @@ contains
             
             case DEFAULT 
 
-                write(*,*) ""
-                write(*,*) "sealevel_update:: Error: method not recognized."
-                write(*,*) "method = ", sl%method
+                write(error_unit,*) ""
+                write(error_unit,*) "sealevel_update:: Error: method not recognized."
+                write(error_unit,*) "method = ", sl%method
                 stop 
 
         end select
