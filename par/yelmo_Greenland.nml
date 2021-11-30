@@ -247,8 +247,10 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    sl_path            = "input/paleo300ka_hybrid_aicc2012.nc"
-    sl_name            = "rsl"
+    method              = 1                             ! 0: use z_sl_const, 1: read time series from sl_path
+    z_sl_const          = 0.0                           ! [m] Sea-level relative to present day
+    sl_path             = "input/paleo300ka_hybrid_aicc2012.nc" ! Input time series filename
+    sl_name             = "rsl"                         ! Variable name in netcdf file, if relevant
 /
 
 &ice_enh
