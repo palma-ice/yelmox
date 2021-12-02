@@ -30,6 +30,7 @@ program yelmox
     type(isos_class)       :: isos1
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain
+    character(len=256) :: file2D_small
     character(len=512) :: path_par, path_const
     character(len=512) :: path_lgm  
     real(prec) :: time, time_bp 
@@ -61,6 +62,7 @@ program yelmox
         real(wp) :: dtt
         real(wp) :: dt1D_out
         real(wp) :: dt2D_out
+        real(wp) :: dt2D_small_out
         real(wp) :: dt_restart
 
         logical  :: transient_clim
@@ -121,6 +123,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt1D_out",       ctl%dt1D_out)           ! [yr] Frequency of 1D output 
     call nml_read(path_par,"ctrl","dt2D_out",       ctl%dt2D_out)           ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","dt2D_small_out", ctl%dt2D_small_out)     ! [yr] Frequency of small 2D output 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
@@ -180,6 +183,8 @@ program yelmox
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
 
+    file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
+    
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "transient_clim: ",  ctl%transient_clim
@@ -482,6 +487,8 @@ program yelmox
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     
+    call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years") 
+    
     if (reg1%write) then 
         call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
     end if 
@@ -631,6 +638,10 @@ program yelmox
 !             call write_step_2D_small(yelmo1,file2D,time=time)
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if
+
+        if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
+                call yelmo_write_step(yelmo1,file2D_small,time)
+            end if
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
