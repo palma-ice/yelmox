@@ -438,7 +438,7 @@ program yelmox
                 yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
 
                 ! Apply Gaussian smoothing to keep things stable
-                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
+                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,f_sigma=2.0)
             
             end if 
             
