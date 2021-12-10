@@ -480,6 +480,11 @@ program yelmox
 
         end if 
 
+    else 
+        ! Starting from restart file 
+
+        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.,tpo_solver="none")
+
     end if 
 
     ! ===== Initialize output files ===== 
