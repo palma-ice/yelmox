@@ -438,7 +438,7 @@ program yelmox
                 yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
 
                 ! Apply Gaussian smoothing to keep things stable
-                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,n_smooth=2)
+                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,f_sigma=2.0)
             
             end if 
             
@@ -635,7 +635,6 @@ program yelmox
         ! == MODEL OUTPUT =======================================================
 
         if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
-!             call write_step_2D_small(yelmo1,file2D,time=time)
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if
 
@@ -683,76 +682,7 @@ program yelmox
     write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
-
-    subroutine write_step_2D_small(ylmo,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class),      intent(IN) :: ylmo
-!         type(snapclim_class),   intent(IN) :: snp 
-!         type(marshelf_class),   intent(IN) :: mshlf 
-!         type(smbpal_class),     intent(IN) :: srf  
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
-        
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
-
-        ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
-
-        ! Write present-day data metrics (rmse[H],etc)
-        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        
-        ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Dragging coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_bar",ylmo%mat%now%visc_bar,units="Pa a",long_name="Vertically averaged viscosity", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! call nc_write(filename,"uxy_i_bar",ylmo%dyn%now%uxy_i_bar,units="m/a",long_name="Internal shear velocity magnitude", &
-        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine write_step_2D_small
-
+    
     subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none 
