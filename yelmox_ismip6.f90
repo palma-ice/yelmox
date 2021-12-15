@@ -51,6 +51,17 @@ program yelmox_ismip6
 
     type(hyster_class)          :: hyst1 
 
+    type reg_def_class 
+        character(len=56)  :: name 
+        character(len=512) :: fnm
+        logical, allocatable :: mask(:,:) 
+        logical :: write 
+    end type
+
+    type(reg_def_class) :: reg_base
+    type(reg_def_class) :: reg1 
+    type(reg_def_class) :: reg2 
+    type(reg_def_class) :: reg3 
 
     type ctrl_params
         character(len=56) :: run_step
@@ -235,11 +246,77 @@ program yelmox_ismip6
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
 
-    ! === Initialize external models (forcing for ice sheet) ======
-
     ! Store domain and grid_name as shortcuts 
     domain    = yelmo1%par%domain 
     grid_name = yelmo1%par%grid_name 
+
+    ! Define specific regions of interest =====================
+
+    select case(trim(domain))
+
+        case("Antarctica")
+
+            ! Define base regions for whole domain first 
+            reg_base%name = "Antarctica" 
+            reg_base%fnm  = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
+                        "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
+            allocate(reg_base%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            
+            ! Load mask from file 
+            call nc_read(reg_base%fnm,"mask_regions",reg_base%mask)
+
+            ! APIS region (region=3.0 in regions map)
+            reg1%write = .TRUE. 
+            reg1%name  = "APIS" 
+            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
+
+            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg1%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
+
+            ! WAIS region (region=4.0 in regions map)
+            reg2%write = .TRUE. 
+            reg2%name  = "WAIS" 
+            reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
+
+            allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg2%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 4.0) .lt. 1e-3) reg2%mask = .TRUE.
+
+            ! EAIS region (region=5.0 in regions map)
+            reg3%write = .TRUE. 
+            reg3%name  = "EAIS" 
+            reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
+
+            allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg3%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 5.0) .lt. 1e-3) reg3%mask = .TRUE.
+
+        case("Laurentide")
+
+            ! Hudson region (region=1.12 in regions map)
+            reg1%write = .TRUE. 
+            reg1%name  = "Hudson" 
+            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
+
+            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            reg1%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) reg1%mask = .TRUE.
+
+            reg2%write = .FALSE. 
+            reg3%write = .FALSE. 
+
+        case DEFAULT 
+
+            reg1%write = .FALSE. 
+            reg2%write = .FALSE. 
+            reg3%write = .FALSE. 
+
+    end select
+
+
+    ! === Initialize external models (forcing for ice sheet) ======
+
 
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
@@ -1064,6 +1141,18 @@ end if
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
 
+        if (reg1%write) then 
+            call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
+        end if 
+
+        if (reg2%write) then
+            call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
+        end if
+
+        if (reg3%write) then
+            call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
+        end if
+
         ! Perform 'coupled' model simulations for desired time
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
@@ -1107,7 +1196,7 @@ end if
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
-
+            
             ! == Yelmo ice sheet ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
  
@@ -1205,6 +1294,19 @@ end if
 
             if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
                 call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,file1D,time=time)
+                
+                if (reg1%write) then 
+                    call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
+                end if 
+
+                if (reg2%write) then
+                    call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
+                end if
+
+                if (reg3%write) then
+                    call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
+                end if
+
             end if 
 
 

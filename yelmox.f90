@@ -34,6 +34,7 @@ program yelmox
     character(len=512) :: path_par, path_const
     character(len=512) :: path_lgm  
     real(prec) :: time, time_bp 
+    real(wp)   :: dT_now 
     integer    :: n
 
     real(4) :: conv_km3_Gt, var 
@@ -598,7 +599,7 @@ program yelmox
 
         ! == Yelmo ice sheet ===================================================
         if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
+        
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
@@ -610,7 +611,11 @@ program yelmox
 
         ! == SURFACE MASS BALANCE ==============================================
 
-        call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+        ! ajr: just testing...
+        !dT_now = 0.0 
+        !if (time .gt. 7000.0) dT_now = 4.0 
+
+        call smbpal_update_monthly(smbpal1,snp1%now%tas+dT_now,snp1%now%pr, &
                                    yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
