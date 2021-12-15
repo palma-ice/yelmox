@@ -58,10 +58,12 @@ program yelmox_ismip6
         logical :: write 
     end type
 
-    type(reg_def_class) :: reg_base
     type(reg_def_class) :: reg1 
     type(reg_def_class) :: reg2 
     type(reg_def_class) :: reg3 
+
+    character(len=512)    :: regions_mask_fnm
+    real(wp), allocatable :: regions_mask(:,:) 
 
     type ctrl_params
         character(len=56) :: run_step
@@ -257,13 +259,12 @@ program yelmox_ismip6
         case("Antarctica")
 
             ! Define base regions for whole domain first 
-            reg_base%name = "Antarctica" 
-            reg_base%fnm  = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
-                        "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
-            allocate(reg_base%mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            regions_mask_fnm = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
+                                "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
+            allocate(regions_mask(yelmo1%grd%nx,yelmo1%grd%ny))
             
             ! Load mask from file 
-            call nc_read(reg_base%fnm,"mask_regions",reg_base%mask)
+            call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
 
             ! APIS region (region=3.0 in regions map)
             reg1%write = .TRUE. 
@@ -272,25 +273,25 @@ program yelmox_ismip6
 
             allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
             reg1%mask = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
+            where(abs(regions_mask - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
 
-            ! WAIS region (region=4.0 in regions map)
+            ! WAIS region (region=1.0 in regions map)
             reg2%write = .TRUE. 
             reg2%name  = "WAIS" 
             reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
 
             allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
             reg2%mask = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 4.0) .lt. 1e-3) reg2%mask = .TRUE.
+            where(abs(regions_mask - 1.0) .lt. 1e-3) reg2%mask = .TRUE.
 
-            ! EAIS region (region=5.0 in regions map)
+            ! EAIS region (region=2.0 in regions map)
             reg3%write = .TRUE. 
             reg3%name  = "EAIS" 
             reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
 
             allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
             reg3%mask = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 5.0) .lt. 1e-3) reg3%mask = .TRUE.
+            where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
 
         case("Laurentide")
 
@@ -1196,7 +1197,7 @@ end if
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
-            
+
             ! == Yelmo ice sheet ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
  
