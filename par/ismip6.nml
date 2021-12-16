@@ -168,25 +168,25 @@
 /
 
 &noresm_rcp85_to_hist
-    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_CLIM_1995-2014.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_ANOM_1850-1994.nc"
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0
     unit_offset = 273.15 
     with_time   = True 
-    time_par    = 1995, 2014, 1
+    time_par    = 1850, 1994, 1
 /
 
 &noresm_rcp85_so_hist
-    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_CLIM_1995-2014.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_ANOM_1850-1994.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2014, 1
+    time_par    = 1850, 1994, 1
 /
 
 &noresm_rcp85_tf_hist
