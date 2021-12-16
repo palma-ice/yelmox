@@ -10,7 +10,7 @@ program yelmox
     use isostasy  
     
     use rembo_sclimate 
-    
+    use snapclim
     use marine_shelf 
     use sediments 
     use geothermal
@@ -20,7 +20,7 @@ program yelmox
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
-    
+    type(snapclim_class)   :: snp1 
     type(sealevel_class)   :: sealev 
     type(marshelf_class)   :: mshlf1 
     type(sediments_class)  :: sed1 
@@ -40,7 +40,6 @@ program yelmox
     logical :: write_restart 
     real(4) :: conv_km3_Gt, var 
     real(4) :: dTa, dT_summer
-    real(4) :: dTdt 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -71,7 +70,6 @@ program yelmox
     call nml_read(path_par,"ctrl","transient",   calc_transient_climate)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_hyster",  use_hyster)                 ! Use hyster?
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
-    call nml_read(path_par,"ctrl","dTdt",        dTdt)                       ! Constant rate of temperature change when not using hyster
     call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
     call nml_read(path_par,"ctrl","with_ice_sheet",with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,"ctrl","optimize",optimize)              ! Optimize basal friction?
@@ -117,6 +115,9 @@ program yelmox
     call hyster_init(hyst1,path_par,time_init) 
     conv_km3_Gt = rho_ice *1e-3
 
+    ! Initialize "climate" model (here for ocean forcing)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
                         domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
@@ -168,11 +169,13 @@ program yelmox
 
     end if 
     
-    ! write(*,*) "To do..."
-    ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-    !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-    !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-    
+    ! Update snapclim
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+
+    call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                          yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
@@ -277,12 +280,14 @@ if (calc_transient_climate) then
         end if 
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        ! To do: currently no anomalies are calculated for the ocean with rembo active
-        ! write(*,*) "To do..."
-        ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-        !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-        !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-    
+        
+        ! Update snapclim
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain) 
+
+        call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                              yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
