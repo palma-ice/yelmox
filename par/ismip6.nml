@@ -12,7 +12,7 @@
 ! ====== ATMOSPHERE ================
 
 &noresm_rcp85_ts_ref
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_clim_1995-2014.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_CLIM_1995-2014.nc"
     name        = "ts"
     units_in    = "K"
     units_out   = "K"
@@ -23,7 +23,7 @@
 /
 
 &noresm_rcp85_pr_ref
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_clim_1995-2014.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_CLIM_1995-2014.nc"
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -34,7 +34,7 @@
 /
 
 &noresm_rcp85_smb_ref
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_clim_1995-2014.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_CLIM_1995-2014.nc"
     name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
@@ -45,7 +45,7 @@
 /
 
 &noresm_rcp85_ts_hist
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_anom_1950-1994.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_ANOM_1950-1994.nc"
     name        = "ts"
     units_in    = "K"
     units_out   = "K"
@@ -56,7 +56,7 @@
 /
 
 &noresm_rcp85_pr_hist
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_anom_1950-1994.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_ANOM_1950-1994.nc"
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -67,7 +67,7 @@
 /
 
 &noresm_rcp85_smb_hist
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_anom_1950-1994.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_ANOM_1950-1994.nc"
     name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
@@ -78,7 +78,7 @@
 /
 
 &noresm_rcp85_ts_proj
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_anom_1995-2100.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_ANOM_1995-2100.nc"
     name        = "ts"
     units_in    = "K"
     units_out   = "K"
@@ -89,7 +89,7 @@
 /
 
 &noresm_rcp85_pr_proj
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_anom_1995-2100.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_ANOM_1995-2100.nc"
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -100,7 +100,7 @@
 /
 
 &noresm_rcp85_smb_proj
-    filename    = "ice_data/ISMIP6/Atmosphere/{domain}/{grid_name}/NorESM_RCP85/Atm_anom_1995-2100.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM-rcp85_ANOM_1995-2100.nc"
     name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
@@ -113,7 +113,7 @@
 ! ====== OCEAN ================
 
 &imbie_basins
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/imbie2_basin_numbers.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
     name        = "basinNumber"
     units_in    = "1"
     units_out   = "1"
@@ -124,7 +124,7 @@
 /
 
 &to_ref
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
@@ -135,7 +135,7 @@
 /
 
 &so_ref
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -146,7 +146,7 @@
 /
 
 &tf_ref
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "tf"
     units_in    = "K"
     units_out   = "K"
@@ -157,7 +157,7 @@
 /
 
 &tf_cor
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "dT_nl"
     units_in    = "K"
     units_out   = "K"
@@ -168,7 +168,7 @@
 /
 
 &noresm_rcp85_to_hist
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/NorESM_RCP85/Ocean_1850-1994.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_CLIM_1850-1994.nc"
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
@@ -179,7 +179,7 @@
 /
 
 &noresm_rcp85_so_hist
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/NorESM_RCP85/Ocean_1850-1994.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_CLIM_1850-1994.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -190,7 +190,7 @@
 /
 
 &noresm_rcp85_tf_hist
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/NorESM_RCP85/Thermal_forcing_1850-1994.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_ANOM_1850-1994.nc"
     name        = "tf"
     units_in    = "K"
     units_out   = "K"
@@ -201,7 +201,7 @@
 /
 
 &noresm_rcp85_to_proj
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/NorESM_RCP85/Ocean_1995-2100.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_CLIM_1995-2100.nc"
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
@@ -212,7 +212,7 @@
 /
 
 &noresm_rcp85_so_proj
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/NorESM_RCP85/Ocean_1995-2100.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_CLIM_1995-2100.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -222,7 +222,7 @@
     time_par    = 1995, 2100, 1
 /
 &noresm_rcp85_tf_proj
-    filename    = "ice_data/ISMIP6/Ocean/{domain}/{grid_name}/NorESM_RCP85/Thermal_forcing_1995-2100.nc"
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM-rcp85_ANOM_1995-2100.nc"
     name        = "tf"
     units_in    = "K"
     units_out   = "K"
