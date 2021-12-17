@@ -5,8 +5,8 @@
     time_end        = 400.0             ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
-    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 0.0               ! [yr] Frequency of writing 2D output files 
+    dt1D_out        = 10.0              ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 1e3               ! [yr] Frequency of writing 2D output files 
     write_restart   = False             ! Write restart files
     transient       = True              ! Calculate transient climate? 
     use_hyster      = True              ! Use hysteresis module? 
@@ -26,7 +26,7 @@
     eps             = 20.0              ! [Gt/yr] Target system rate of change (set point). Ice sheets: eg 20 Gt/a for 100yr averaging.
     df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.
     sigma           = 0.0               ! [f] Noise signal 
-    f_min           = -3.0              ! [f] Forcing value minimum 
+    f_min           =  0.0              ! [f] Forcing value minimum 
     f_max           =  4.0              ! [f] Forcing value maximum 
 /
 
