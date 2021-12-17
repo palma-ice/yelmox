@@ -2,9 +2,9 @@
     
     ! Timing parameters 
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 400.0             ! [yr] Ending time
+    time_end        = 200e3             ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
-    dtt             = 1.0               ! [yr] Main loop timestep 
+    dtt             = 2.0               ! [yr] Main loop timestep 
     dt1D_out        = 10.0              ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 1e3               ! [yr] Frequency of writing 2D output files 
     write_restart   = False             ! Write restart files
