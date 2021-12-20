@@ -219,7 +219,7 @@ contains
 
                     hyst%df_dt = hyst%par%df_dt_max
 
-                case("ramp")
+                case("ramp-time")
                     ! Ramp up to the constant rate of change for the first N years. 
                     ! Then maintain a constant anomaly (independent of dv_dt). 
 
@@ -237,6 +237,27 @@ contains
                             ! the time of interest dt_ramp. 
 
                             hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
+
+                        end if 
+
+                case("ramp-slope")
+                    ! Ramp up to the constant rate of change for the first N years. 
+                    ! Then maintain a constant anomaly (independent of dv_dt). 
+
+                    
+                        if ( (hyst%par%df_sign .lt. 0.0 .and.&
+                                    hyst%f_mean_now .le. hyst%par%f_min) .or. &
+                             (hyst%par%df_sign .gt. 0.0 .and.&
+                                    hyst%f_mean_now .ge. hyst%par%f_max) ) then  
+                            ! Ramp-up complete, no more forcing change 
+
+                            hyst%df_dt = 0.0_wp 
+
+                        else 
+                            ! Linear rate of change from f_max to f_min (or vice versa) over 
+                            ! the time of interest dt_ramp. 
+
+                            hyst%df_dt = hyst%par%df_dt_max
 
                         end if 
 

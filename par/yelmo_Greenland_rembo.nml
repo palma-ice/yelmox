@@ -17,7 +17,7 @@
 /
 
 &hyster
-    method          =  "PI42"           ! const, ramp, exp, PI42, H312b, H312PID, H321PID, PID1
+    method          =  "PI42"           ! const, ramp-time, ramp-slope, exp, PI42, H312b, H312PID, H321PID, PID1
     with_kill       = True              ! Should kill signal be activated at limits of forcing?
     dt_init         = 200.0             ! [yr] Initialization time window: no transient methods applied.
     dt_ramp         = 300.0             ! [yr] Duration of ramp-up time window in method='ramp'.
