@@ -493,7 +493,7 @@
     ! Deep ocean bmb 
     c_deep          = -1.0          ! [m/yr] Melt rate in deep ocean, should be negative but not huge
     depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
-    depth_const     =    0.0        ! [m] Constant shelf depth for interp_depthconst
+    depth_const     = 1000.0        ! [m] Constant shelf depth for interp_depth=const
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
     depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
     
