@@ -63,6 +63,7 @@ program yelmox
         real(wp) :: time_equil      ! Only for spinup
         real(wp) :: time_const      ! Only for spinup
         real(wp) :: time_lgm_step 
+        real(wp) :: time_pd_step
         real(wp) :: dtt
         real(wp) :: dt1D_out
         real(wp) :: dt2D_out
@@ -71,6 +72,7 @@ program yelmox
 
         logical  :: transient_clim
         logical  :: use_lgm_step
+        logical  :: use_pd_step
         logical  :: with_ice_sheet 
 
         character(len=56) :: equil_method
@@ -102,8 +104,20 @@ program yelmox
          
     end type 
 
+    type stats_class
+        logical  :: defined
+        real(wp) :: pd_rmse_H
+        real(wp) :: pd_rmse_H_flt
+        real(wp) :: V
+        real(wp) :: A
+        real(wp) :: A_grnd
+        real(wp) :: A_flt
+    end type
+
+
     type(ctrl_params)   :: ctl
     type(opt_params)    :: opt  
+    type(stats_class)   :: stats_pd_1, stats_lgm, stats_pd_2
 
     ! Internal parameters
     logical  :: running_laurentide
@@ -111,6 +125,7 @@ program yelmox
     real(wp) :: laurentide_time_equil 
 
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
+    real(wp), parameter :: time_pd  =   1950.0_wp  ! [yr CE] ==  0 kyr ago 
     
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
@@ -124,6 +139,7 @@ program yelmox
     call nml_read(path_par,"ctrl","time_equil",     ctl%time_equil)         ! [yr] Years to equilibrate first
     call nml_read(path_par,"ctrl","time_const",     ctl%time_const) 
     call nml_read(path_par,"ctrl","time_lgm_step",  ctl%time_lgm_step) 
+    call nml_read(path_par,"ctrl","time_pd_step",   ctl%time_pd_step) 
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt1D_out",       ctl%dt1D_out)           ! [yr] Frequency of 1D output 
     call nml_read(path_par,"ctrl","dt2D_out",       ctl%dt2D_out)           ! [yr] Frequency of 2D output 
@@ -131,6 +147,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
+    call nml_read(path_par,"ctrl","use_pd_step",    ctl%use_pd_step)        ! Use pd_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
@@ -143,6 +160,14 @@ program yelmox
     if (ctl%time_lgm_step .lt. ctl%time_equil) then 
         write(5,*) ""
         write(5,*) "yelmox:: time_lgm_step must be greater than time_equil."
+        write(5,*) "Try again."
+        stop "Program stopped."
+    end if 
+
+    ! pd step should only come after lgm step 
+    if (ctl%time_pd_step .lt. ctl%time_lgm_step) then 
+        write(5,*) ""
+        write(5,*) "yelmox:: time_pd_step must be greater than time_lgm_step."
         write(5,*) "Try again."
         stop "Program stopped."
     end if 
@@ -193,6 +218,7 @@ program yelmox
     write(*,*)
     write(*,*) "transient_clim: ",  ctl%transient_clim
     write(*,*) "use_lgm_step:   ",  ctl%use_lgm_step
+    write(*,*) "use_pd_step:    ",  ctl%use_pd_step
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
     write(*,*) "equil_method:   ",  trim(ctl%equil_method)
     write(*,*)
@@ -210,6 +236,10 @@ program yelmox
 
         if (ctl%use_lgm_step) then 
             write(*,*) "time_lgm_step: ", ctl%time_lgm_step 
+        end if 
+
+        if (ctl%use_pd_step) then 
+            write(*,*) "time_pd_step: ", ctl%time_pd_step 
         end if 
 
         ! Set time before present == to constant climate time 
@@ -302,6 +332,7 @@ program yelmox
         ! Set local Laurentide parameters 
 
         ctl%use_lgm_step        = .FALSE.
+        ctl%use_pd_step         = .FALSE.
 
         running_laurentide      = .TRUE. 
         laurentide_init_const_H = .FALSE.
@@ -518,7 +549,11 @@ program yelmox
         call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
     end if
 
-
+    ! Set stats
+    stats_pd_1%defined = .FALSE. 
+    stats_lgm%defined  = .FALSE. 
+    stats_pd_2%defined = .FALSE. 
+    
     ! ==== Begin main time loop =====
 
     ! Advance timesteps
@@ -535,7 +570,12 @@ program yelmox
                 ctl%time_const = time_lgm 
             end if 
 
+            if (ctl%use_pd_step .and. time .ge. ctl%time_pd_step) then 
+                ctl%time_const = time_pd 
+            end if 
+
             time_bp = ctl%time_const - 1950.0_wp 
+
         end if
 
         ! Spin-up procedure - only relevant for time-time_init <= time_equil
