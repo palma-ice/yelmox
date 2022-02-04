@@ -92,8 +92,8 @@ program yelmox_ismip6
 
     type opt_params
         real(wp) :: cf_init
-        real(wp) :: cf_min
-        real(wp) :: cf_max 
+        real(wp) :: cf_min_par
+        real(wp) :: cf_max_par 
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
@@ -113,7 +113,10 @@ program yelmox_ismip6
         real(wp) :: m_temp
         real(wp) :: tf_min 
         real(wp) :: tf_max
-         
+        
+        real(wp), allocatable :: cf_min(:,:) 
+        real(wp), allocatable :: cf_max(:,:) 
+        
     end type 
 
     type(ctrl_params)     :: ctl
@@ -145,8 +148,8 @@ program yelmox_ismip6
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
-        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
         call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
@@ -252,6 +255,12 @@ program yelmox_ismip6
     domain    = yelmo1%par%domain 
     grid_name = yelmo1%par%grid_name 
 
+    ! Ensure optimization fields are allocated and preassigned
+    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    opt%cf_min = opt%cf_min_par 
+    opt%cf_max = opt%cf_max_par 
+
     ! Define specific regions of interest =====================
 
     select case(trim(domain))
@@ -292,6 +301,13 @@ program yelmox_ismip6
             allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
             reg3%mask = .FALSE. 
             where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
+
+
+            ! Adjust optimization cf_min field for Antarctica
+            ! (higher friction in Pine Island)
+            opt%cf_min = opt%cf_min_par 
+            where (yelmo1%bnd%basins .eq. 14.0) opt%cf_min = 10.0*opt%cf_min_par 
+            where (yelmo1%bnd%basins .eq. 15.0) opt%cf_min = 10.0*opt%cf_min_par 
 
         case("Laurentide")
 
@@ -586,7 +602,7 @@ end if
                 call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
                 if (opt%opt_tf .and. time .gt. opt%rel_time1) then
