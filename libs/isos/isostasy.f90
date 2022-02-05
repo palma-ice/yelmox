@@ -127,15 +127,17 @@ contains
 
     end subroutine isos_init
 
-    subroutine isos_init_state(isos,z_bed,z_bed_ref,H_ice_ref,z_sl,time)
+    subroutine isos_init_state(isos,z_bed,H_ice,z_sl,z_bed_ref,H_ice_ref,z_sl_ref,time)
 
         implicit none 
 
         type(isos_class), intent(INOUT) :: isos 
         real(prec), intent(IN) :: z_bed(:,:)            ! [m] Current bedrock elevation 
+        real(prec), intent(IN) :: H_ice(:,:)            ! [m] Current ice thickness  
+        real(prec), intent(IN) :: z_sl(:,:)             ! [m] Current sea level 
         real(prec), intent(IN) :: z_bed_ref(:,:)        ! [m] Reference bedrock elevation (with known load)
         real(prec), intent(IN) :: H_ice_ref(:,:)        ! [m] Reference ice thickness (associated with reference z_bed)
-        real(prec), intent(IN) :: z_sl(:,:)             ! [m] Sea level 
+        real(prec), intent(IN) :: z_sl_ref(:,:)         ! [m] Reference sea level (associated with reference z_bed)
         real(prec), intent(IN) :: time                  ! [a] Initial time 
         
         ! Store reference bedrock field
@@ -143,7 +145,7 @@ contains
         isos%now%dzbdt    = 0.0 
 
         ! Initialize the charge field to match reference topography
-        call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl,isos%par%lbloc)
+        call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%lbloc)
 
         select case(isos%par%method)
 
@@ -167,6 +169,10 @@ contains
 
         ! Store initial bedrock field 
         isos%now%z_bed = z_bed 
+
+        ! Call isos_update to diagnose rate of change
+        ! (no change to z_bed will be applied since isos%par%time==time)
+        call isos_update(isos,H_ice,z_sl,time)
 
         write(*,*) "isos_init_state:: "
         write(*,*) "  Initial time:  ", isos%par%time 
@@ -193,45 +199,45 @@ contains
         ! Step 0: determine current timestep 
         dt = time - isos%par%time 
 
-        ! Step 1: diagnose rate of bedrock uplift, if timestep is large enough
+        ! Step 1: diagnose rate of bedrock uplift
+        
+        select case(isos%par%method)
+
+            case(0)
+                ! Steady-state lithosphere
+
+                isos%now%w1     = isos%now%w0
+                isos%now%dzbdt = 0.0 
+
+            case(1)
+                ! Local lithosphere, relaxing aesthenosphere (LLRA)
+
+                ! Local lithosphere (LL)
+                call calc_litho_local(isos%now%w1,isos%now%z_bed,H_ice,z_sl)
+
+                ! Relaxing aesthenosphere (RA)
+                isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
+
+            case(2)
+                ! Elastic lithosphere, relaxing aesthenosphere (ELRA)
+                
+                ! Regional elastic lithosphere (EL)
+                call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
+
+                ! Relaxing aesthenosphere (RA)
+                isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
+                
+        end select 
+
+        ! Step 2: update bedrock elevation (every timestep > 0)
         if (dt .ge. isos%par%dt) then 
 
-           
-            select case(isos%par%method)
-
-                case(0)
-                    ! Steady-state lithosphere
-
-                    isos%now%w1     = isos%now%w0
-                    isos%now%dzbdt = 0.0 
-
-                case(1)
-                    ! Local lithosphere, relaxing aesthenosphere (LLRA)
-
-                    ! Local lithosphere (LL)
-                    call calc_litho_local(isos%now%w1,isos%now%z_bed,H_ice,z_sl)
-
-                    ! Relaxing aesthenosphere (RA)
-                    isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
-
-                case(2)
-                    ! Elastic lithosphere, relaxing aesthenosphere (ELRA)
-                    
-                    ! Regional elastic lithosphere (EL)
-                    call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
-
-                    ! Relaxing aesthenosphere (RA)
-                    isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
-                    
-            end select 
+            isos%now%z_bed = isos%now%z_bed + isos%now%dzbdt*dt 
 
             isos%par%time  = time 
 
         end if 
-
-        ! Step 2: update bedrock elevation (every timestep)
-        isos%now%z_bed = isos%now%z_bed + isos%now%dzbdt*dt 
-
+            
         return 
 
     end subroutine isos_update

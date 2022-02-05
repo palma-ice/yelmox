@@ -80,8 +80,8 @@ program yelmox
 
     type opt_params
         real(wp) :: cf_init
-        real(wp) :: cf_min
-        real(wp) :: cf_max 
+        real(wp) :: cf_min_par
+        real(wp) :: cf_max_par 
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
@@ -101,7 +101,10 @@ program yelmox
         real(wp) :: m_temp
         real(wp) :: tf_min 
         real(wp) :: tf_max
-         
+        
+        real(wp), allocatable :: cf_min(:,:) 
+        real(wp), allocatable :: cf_max(:,:) 
+        
     end type 
 
     type stats_class
@@ -176,8 +179,8 @@ program yelmox
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
-        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
         call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
@@ -263,6 +266,12 @@ program yelmox
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
 
+    ! Ensure optimization fields are allocated and preassigned
+    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    opt%cf_min = opt%cf_min_par 
+    opt%cf_max = opt%cf_max_par 
+    
     ! Define specific regions of interest =====================
 
     select case(trim(domain))
@@ -383,9 +392,11 @@ program yelmox
 
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                           H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time)    !mmr
-
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
+                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
+                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
+                                       
 
     call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -604,7 +615,7 @@ program yelmox
                     call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                         yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                        yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                        opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                         dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
                     
                     if (opt%opt_tf .and. time .gt. opt%rel_time1) then
