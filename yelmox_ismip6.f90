@@ -306,11 +306,12 @@ program yelmox_ismip6
             ! Adjust optimization cf_min field for Antarctica
             ! (higher friction in Pine Island)
             opt%cf_min = opt%cf_min_par 
-            !where (yelmo1%bnd%basins .eq. 14.0) opt%cf_min = 10.0*opt%cf_min_par 
-            !where (yelmo1%bnd%basins .eq. 15.0) opt%cf_min = 10.0*opt%cf_min_par 
-
-            where (yelmo1%dta%pd%H_grnd .gt. 0.0) opt%cf_min = 1e-2
             
+            where (yelmo1%bnd%basins .eq. 14.0) opt%cf_min = 10.0*opt%cf_min_par 
+            where (yelmo1%bnd%basins .eq. 15.0) opt%cf_min = 10.0*opt%cf_min_par 
+
+            !where (yelmo1%dta%pd%H_grnd .gt. 0.0) opt%cf_min = 1e-2
+
         case("Laurentide")
 
             ! Hudson region (region=1.12 in regions map)
