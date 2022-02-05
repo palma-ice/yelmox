@@ -545,72 +545,6 @@ program yelmox_ismip6
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
         
-
-        ! Calculate climate initially ....
-
-            time = ctl%time_init 
-
-            ! == CLIMATE ===========================================================
-
-            ! Update ismip6 forcing
-            call ismip6_forcing_update(ismp1,ctl%time_const, &
-                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
-
-            ! Set climate to present day 
-            snp2%now = snp2%clim0
-
-            ! == SURFACE MASS BALANCE ==============================================
-
-            ! Calculate smb for present day 
-            call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-
-            ! ajr: consider just using RACMO SMB here instead of calculating our own? 
-
-            ! Apply ISMIP6 anomalies
-            ! (apply to climate too, just for consistency)
-
-            smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-            smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
-
-            do m = 1,12
-                snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
-            end do 
-
-            snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
-            if (trim(domain) .eq. "Antarctica") then 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0     ! Antarctica summer
-            else 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0      ! NH summer 
-            end if 
-            snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-            
-            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-            call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
-                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
-                            tf_ann=ismp1%tf%var(:,:,:,1))
-
-            ! Update temperature forcing field with tf_corr and tf_corr_basin
-            mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
-
-            call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-            ! Overwrite original mshlf and snp with ismip6 derived ones 
-            snp1    = snp2
-            smbpal1 = smbpal2  
-            mshlf1  = mshlf2 
-
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-
         ! ===== basal friction optimization ======
         if (trim(ctl%equil_method) .eq. "opt") then 
             
@@ -838,13 +772,14 @@ end if
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
 
-            ! == Yelmo ice sheet ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
- 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
+            ! == ICE SHEET ===================================================
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+ 
+if (.FALSE.) then 
             if (time .le. ctl%time1) then 
 
                 ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -960,6 +895,71 @@ end if
 
             
             end if
+
+else 
+    ! ISMIP6 only - to make sure it's working well.
+
+            ! == CLIMATE ===========================================================
+
+            ! Update ismip6 forcing
+            call ismip6_forcing_update(ismp1,ctl%time_const, &
+                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
+
+            ! Set climate to present day 
+            snp2%now = snp2%clim0
+
+            ! == SURFACE MASS BALANCE ==============================================
+
+            ! Calculate smb for present day 
+            call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+
+            ! ajr: consider just using RACMO SMB here instead of calculating our own? 
+
+            ! Apply ISMIP6 anomalies
+            ! (apply to climate too, just for consistency)
+
+            smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+            smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
+
+            do m = 1,12
+                snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
+                snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
+            end do 
+
+            snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
+            if (trim(domain) .eq. "Antarctica") then 
+                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0     ! Antarctica summer
+            else 
+                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0      ! NH summer 
+            end if 
+            snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+            
+            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+            call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
+                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
+                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
+                            tf_ann=ismp1%tf%var(:,:,:,1))
+
+            ! Update temperature forcing field with tf_corr and tf_corr_basin
+            mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
+
+            call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+
+            ! Overwrite original mshlf and snp with ismip6 derived ones 
+            snp1    = snp2
+            smbpal1 = smbpal2  
+            mshlf1  = mshlf2 
+
+            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+end if 
 
             ! == MODEL OUTPUT ===================================
 
@@ -1604,6 +1604,10 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,units="K",long_name="Shelf freezing temperature", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn,units="", &
+                     long_name="Ocean mask (0: land, 1: grline, 2: fltline, 3: open ocean, 4: deep ocean, 5: lakes)", &
+                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"tf_basin",mshlf%now%tf_basin,units="K",long_name="Mean basin thermal forcing", &
                   dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

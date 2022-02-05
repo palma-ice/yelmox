@@ -271,7 +271,7 @@ program yelmox
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
     opt%cf_min = opt%cf_min_par 
     opt%cf_max = opt%cf_max_par 
-    
+
     ! Define specific regions of interest =====================
 
     select case(trim(domain))
@@ -659,13 +659,14 @@ program yelmox
         call sealevel_update(sealev,year_bp=time_bp)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
-        ! == Yelmo ice sheet ===================================================
-        if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
          
+        ! == ICE SHEET ===================================================
+        if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+
+        
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! Update snapclim
