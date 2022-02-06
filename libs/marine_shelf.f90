@@ -354,17 +354,6 @@ contains
 
                 call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
-
-                ! === Apply logical limitations =====
-
-                ! ajr: disable for now, calcualte bmb_shlf everywhere
-                ! Set bmb to zero for grounded points 
-                !where (mshlf%now%mask_ocn .eq. 0) mshlf%now%bmb_shlf = 0.0
-
-                ! Ensure that ice accretion only occurs where ice exists 
-                where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0
-
-                !where(f_grnd .eq. 0.0) mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
                 
                 ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
                 select case(trim(mshlf%par%domain))
@@ -443,20 +432,6 @@ contains
                 ! Apply basin correction
                 mshlf%now%bmb_shlf = mshlf%now%bmb_shlf + mshlf%now%bmb_corr
                 
-                ! === Apply refreezing limitations if desired ====
-
-                where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
-                                        mshlf%now%bmb_shlf = mshlf%par%bmb_max
-
-                ! === Apply logical limitations =====
-
-                ! ajr: disable for now, calculate bmb_shlf everywhere for safety
-                ! Set bmb to zero for grounded points 
-                !where (mshlf%now%mask_ocn .eq. 0) mshlf%now%bmb_shlf = 0.0 
-
-                ! Ensure that ice accretion only occurs where ice exists 
-                where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0 
-
             case DEFAULT 
 
                 write(*,*) "marshelf_update:: Error: bmb_method not recognized."
@@ -465,6 +440,25 @@ contains
 
         end select 
 
+        ! === Apply limitations ====
+
+        ! The above routines calculate bmb_shlf everywhere with no limitations
+        ! (ie, also for grounded ice and lakes if tf_shlf is defined). 
+        ! Below we should apply specific limitations. 
+
+        ! Apply maximum refreezing rate 
+        where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
+                                mshlf%now%bmb_shlf = mshlf%par%bmb_max
+
+        ! Set bmb to zero for grounded and lake points 
+        where (mshlf%now%mask_ocn .eq. mask_val_land .or. &
+               mshlf%now%mask_ocn .eq. mask_val_lake)     &
+                                            mshlf%now%bmb_shlf = 0.0 
+
+        ! Ensure that ice accretion only occurs where ice exists 
+        where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) &
+                                            mshlf%now%bmb_shlf = 0.0 
+        
         ! Apply c_deep melt value to deep ocean points
         ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
         ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
@@ -954,9 +948,10 @@ contains
         ! (ie, when f_grnd < 1) connected to
         ! the open ocean as defined in mask_ocn_ref. 
 
-        ! Mask returned should give 0 for land points, -1 for 'closed ocean' points
-        ! and 1 for open ocean points. 
-        
+        ! Mask returned should be the same as original mask_ocn,
+        ! except with floating points and ground-line points that are not
+        ! connected to the open ocean set to lakes. 
+
         implicit none 
 
         integer, intent(INOUT) :: mask_ocn(:,:)
@@ -968,6 +963,7 @@ contains
         integer :: n_unfilled 
 
         integer, allocatable :: mask(:,:) 
+        integer, allocatable :: mask0(:,:) 
 
         integer, parameter :: qmax = 1000 
 
@@ -976,13 +972,16 @@ contains
 
         ! Allocate local mask object for diagnosing points of interest
         allocate(mask(nx,ny))
+        allocate(mask0(nx,ny))
 
         ! Initially assume all points are 'closed ocean' points (mask==-1)
-        ! This includes grounding line and floating line points too
         mask = -1 
 
         ! Set purely land points to zero 
         where (mask_ocn .eq. mask_val_land) mask = 0 
+
+        ! Set grounding-line points to specific value too (mask==-2)
+        where (mask_ocn .eq. mask_val_grounding_line)  mask = -2
 
         ! Now populate our ocean mask to be consistent 
         ! with known open ocean points that can be 
@@ -1042,11 +1041,45 @@ contains
 
         end do 
 
-        ! Mask returned should give 0 for land points, -1 for 'closed ocean' points
-        ! and 1 for open ocean points. 
+        ! Update the ocean mask to reflect open ocean and lakes
+        ! (deep ocean remains deep ocean always)
+        where(mask .eq. -1.0 .and. mask_ocn .eq. mask_val_ocean) &
+                                            mask_ocn = mask_val_lake
 
-        ! Finally, update the ocean mask 
-        where(mask .eq. -1.0) mask_ocn = mask_val_lake
+        where(mask .eq. -1.0 .and. mask_ocn .eq. mask_val_floating_line) &
+                                            mask_ocn = mask_val_lake
+
+        ! Finally, check which grounding-line points should also
+        ! be connected to the open ocean.
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (mask(i,j) .eq. -2) then 
+                ! This is a grounding-line point.
+                ! If no neighbors are open ocean, set it to a lake point
+
+                if ( mask(im1,j) .ne. 1 .and. &
+                     mask(ip1,j) .ne. 1 .and. &
+                     mask(i,jm1) .ne. 1 .and. &
+                     mask(i,jp1) .ne. 1 ) then 
+                    ! No neighbors are open ocean, set
+                    ! this point to 'closed ocean' (lake)
+
+                    mask_ocn(i,j) = mask_val_lake
+
+                end if 
+                
+            end if 
+
+        end do
+        end do
 
         return 
 
