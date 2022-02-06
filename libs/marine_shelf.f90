@@ -166,17 +166,17 @@ contains
                         ! Floating ice, depth == z_ice_base
                         depth_shlf = H_ice(i,j)*rho_ice_sw
                     else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
-                        ! Grounded ice, depth == z_bed 
-                        depth_shlf = z_bed(i,j)
+                        ! Grounded ice, depth == H_ocn = z_sl-z_bed 
+                        depth_shlf = z_sl(i,j) - z_bed(i,j)
                     else 
                         ! Open ocean, depth == constant value, eg 2000 m. 
                         depth_shlf = mshlf%par%depth_const
                     end if
 
                 case("bed")
-                    ! Assign the depth of the bedrock 
+                    ! Assign the depth corresponding to the bedrock 
 
-                    depth_shlf = z_bed(i,j)
+                    depth_shlf = z_sl(i,j) - z_bed(i,j)
 
                 case("const")
 
@@ -354,7 +354,7 @@ contains
 
                 call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
-                
+
                 ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
                 select case(trim(mshlf%par%domain))
                     case("Antarctica")
@@ -450,10 +450,11 @@ contains
         where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
                                 mshlf%now%bmb_shlf = mshlf%par%bmb_max
 
-        ! Set bmb to zero for grounded and lake points 
-        where (mshlf%now%mask_ocn .eq. mask_val_land .or. &
-               mshlf%now%mask_ocn .eq. mask_val_lake)     &
-                                            mshlf%now%bmb_shlf = 0.0 
+        ! ajr: disable for testing!!
+        ! ! Set bmb to zero for grounded and lake points 
+        ! where (mshlf%now%mask_ocn .eq. mask_val_land .or. &
+        !        mshlf%now%mask_ocn .eq. mask_val_lake)     &
+        !                                     mshlf%now%bmb_shlf = 0.0 
 
         ! Ensure that ice accretion only occurs where ice exists 
         where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) &
