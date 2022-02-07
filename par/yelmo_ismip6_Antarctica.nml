@@ -119,7 +119,7 @@
     rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
     rel_time1       = 5e3               ! [yr] Time limit for time period 1
-    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_time2       = 6e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = False             ! Should thermal forcing be optimized too?

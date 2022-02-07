@@ -137,8 +137,8 @@ program yelmox_ismip6
     call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
     call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
     call nml_read(path_par,trim(ctl%run_step),"time_const", ctl%time_const) 
-    call nml_read(path_par,trim(ctl%run_step),"dt1D_out",ctl%dt1D_out)          ! [yr] Frequency of 1D output 
-    call nml_read(path_par,trim(ctl%run_step),"dt2D_out",ctl%dt2D_out)          ! [yr] Frequency of 2D output 
+    call nml_read(path_par,trim(ctl%run_step),"dt1D_out",   ctl%dt1D_out)          ! [yr] Frequency of 1D output 
+    call nml_read(path_par,trim(ctl%run_step),"dt2D_out",   ctl%dt2D_out)          ! [yr] Frequency of 2D output 
     
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
@@ -1492,7 +1492,7 @@ contains
         
         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km",long_name="Distance to grounding line", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/yr",long_name="Ice thickness rate of change", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
