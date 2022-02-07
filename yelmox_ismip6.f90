@@ -599,9 +599,9 @@ end if
                     opt%rel_tau = get_opt_param(time_elapsed,time1=opt%rel_time1,time2=opt%rel_time2, &
                                                     p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
                     
-                    ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                    ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
                     yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                    yelmo1%tpo%par%topo_rel     = 2
+                    yelmo1%tpo%par%topo_rel     = 4
                     
                     ! === Optimization update step =========
 
