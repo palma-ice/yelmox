@@ -30,7 +30,8 @@ program yelmox_ismip6
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
     integer    :: n, m
-    real(wp)   :: time, time_bp 
+    real(wp)   :: time, time_bp
+    real(wp)   :: time_elapsed
     real(wp)   :: time_wt 
 
     real(sp)   :: conv_km3_Gt
@@ -307,8 +308,8 @@ program yelmox_ismip6
             ! (higher friction in Pine Island)
             opt%cf_min = opt%cf_min_par 
             
-            where (yelmo1%bnd%basins .eq. 14.0) opt%cf_min = 10.0*opt%cf_min_par 
-            where (yelmo1%bnd%basins .eq. 15.0) opt%cf_min = 10.0*opt%cf_min_par 
+            !where (yelmo1%bnd%basins .eq. 14.0) opt%cf_min = 10.0*opt%cf_min_par 
+            !where (yelmo1%bnd%basins .eq. 15.0) opt%cf_min = 10.0*opt%cf_min_par 
 
             !where (yelmo1%dta%pd%H_grnd .gt. 0.0) opt%cf_min = 1e-2
 
@@ -585,39 +586,48 @@ end if
             ! Get current time 
             time    = ctl%time_init + n*ctl%dtt
             time_bp = ctl%time_const - 1950.0_wp 
-
+            time_elapsed = time - ctl%time_init 
 
             ! ===== basal friction optimization ==================
             if (trim(ctl%equil_method) .eq. "opt") then 
 
-                ! === Optimization parameters =========
-                
-                ! Update model relaxation time scale and error scaling (in [m])
-                opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
-                                                p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
-                
-                ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
-                yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                yelmo1%tpo%par%topo_rel     = 2
-                if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
+                if (time_elapsed .le. opt%rel_time2) then 
 
-                ! === Optimization update step =========
+                    ! === Optimization parameters =========
+                    
+                    ! Update model relaxation time scale and error scaling (in [m])
+                    opt%rel_tau = get_opt_param(time_elapsed,time1=opt%rel_time1,time2=opt%rel_time2, &
+                                                    p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                    
+                    ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                    yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
+                    yelmo1%tpo%par%topo_rel     = 2
+                    
+                    ! === Optimization update step =========
 
-                ! Update cb_ref based on error metric(s) 
-                call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
-                                    yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
+                    ! Update cb_ref based on error metric(s) 
+                    call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
+                                        yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
+                                        opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                        dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
-                if (opt%opt_tf .and. time .gt. opt%rel_time1) then
-                    ! Update tf_corr based on error metric(s) 
+                    if (opt%opt_tf .and. time_elapsed .gt. opt%rel_time1) then
+                        ! Update tf_corr based on error metric(s) 
 
-                    call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
-                
-                end if 
+                        call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                    
+                    end if 
+
+                else 
+                    ! Turn-off relaxation at the end of optimization
+                    ! At this point, cb_ref will not be optimized further.
+
+                    yelmo1%tpo%par%topo_rel = 0 
+
+                end if
 
             end if 
             ! ====================================================

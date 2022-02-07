@@ -285,7 +285,7 @@ contains
             else 
                 ! Grounded ice, define for completeness
 
-                mshlf%now%z_base(i,j) = z_bed(i,j))
+                mshlf%now%z_base(i,j) = z_bed(i,j)
 
             end if 
             
