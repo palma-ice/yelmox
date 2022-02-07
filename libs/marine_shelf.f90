@@ -284,8 +284,8 @@ contains
                 
             else 
                 ! Grounded ice, define for completeness
-            
-                mshlf%now%z_base(i,j) = z_bed(i,j) 
+
+                mshlf%now%z_base(i,j) = z_bed(i,j))
 
             end if 
             
@@ -1236,6 +1236,7 @@ contains
     elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
         ! Favier et al (2019), Eq. 3
+        ! z_base is ice-base elevation, which is negative below sea level
 
         implicit none 
 
