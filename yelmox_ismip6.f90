@@ -612,7 +612,7 @@ end if
                                         opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                         dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
-                    if (opt%opt_tf .and. time_elapsed .gt. opt%rel_time1) then
+                    if (opt%opt_tf) then
                         ! Update tf_corr based on error metric(s) 
 
                         call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
