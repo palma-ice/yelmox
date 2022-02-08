@@ -109,6 +109,7 @@ program yelmox_ismip6
         real(wp) :: rel_m
 
         logical  :: opt_tf 
+        real(wp) :: tf_time
         real(wp) :: H_grnd_lim
         real(wp) :: tau_m 
         real(wp) :: m_temp
@@ -164,6 +165,7 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
 
         call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
+        call nml_read(path_par,"opt_L21","tf_time",     opt%tf_time)
         call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
         call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
@@ -612,15 +614,6 @@ end if
                                         opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                         dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
-                    if (opt%opt_tf) then
-                        ! Update tf_corr based on error metric(s) 
-
-                        call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
-                    
-                    end if 
-
                 else 
                     ! Turn-off relaxation at the end of optimization
                     ! At this point, cb_ref will not be optimized further.
@@ -628,6 +621,15 @@ end if
                     yelmo1%tpo%par%topo_rel = 0 
 
                 end if
+
+                if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
+                    ! Update tf_corr based on error metric(s) 
+
+                    call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                
+                end if 
 
             end if 
             ! ====================================================

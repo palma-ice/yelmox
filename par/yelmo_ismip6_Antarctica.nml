@@ -118,11 +118,12 @@
     
     rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 5e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
+    rel_time1       = 4e3               ! [yr] Time limit for time period 1
+    rel_time2       = 8e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = False             ! Should thermal forcing be optimized too?
+    tf_time         = 10e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
