@@ -92,6 +92,7 @@ program yelmox_ismip6
     end type 
 
     type opt_params
+        real(wp) :: cf_time
         real(wp) :: cf_init
         real(wp) :: cf_min_par
         real(wp) :: cf_max_par 
@@ -149,6 +150,7 @@ program yelmox_ismip6
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
+        call nml_read(path_par,"opt_L21","cf_time",     opt%cf_time)
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
         call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
         call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
@@ -594,9 +596,8 @@ end if
             if (trim(ctl%equil_method) .eq. "opt") then 
 
                 if (time_elapsed .le. opt%rel_time2) then 
+                    ! Apply relaxation to the model 
 
-                    ! === Optimization parameters =========
-                    
                     ! Update model relaxation time scale and error scaling (in [m])
                     opt%rel_tau = get_opt_param(time_elapsed,time1=opt%rel_time1,time2=opt%rel_time2, &
                                                     p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
@@ -604,9 +605,19 @@ end if
                     ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
                     yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
                     yelmo1%tpo%par%topo_rel     = 4
-                    
-                    ! === Optimization update step =========
+                
+                else 
+                    ! Turn-off relaxation now
 
+                    yelmo1%tpo%par%topo_rel = 0 
+
+                end if 
+
+                ! === Optimization update step =========
+
+                if (time_elapsed .le. opt%cf_time) then 
+                    ! Perform cf_ref optimization
+                
                     ! Update cb_ref based on error metric(s) 
                     call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                         yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
@@ -614,16 +625,10 @@ end if
                                         opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                         dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
-                else 
-                    ! Turn-off relaxation at the end of optimization
-                    ! At this point, cb_ref will not be optimized further.
-
-                    yelmo1%tpo%par%topo_rel = 0 
-
                 end if
 
                 if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
-                    ! Update tf_corr based on error metric(s) 
+                    ! Perform tf_corr optimization
 
                     call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
                                             yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
