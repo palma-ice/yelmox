@@ -1098,8 +1098,8 @@ contains
         real(wp), intent(IN)  :: H_ice(:,:)
 
         ! Local variables
-        integer :: i, j, m, nx, ny 
-        real(wp) :: n_pts, var_mean
+        integer :: i, j, m, nx, ny, npts 
+        real(wp) :: var_mean
 
         nx = size(var_basin,1)
         ny = size(var_basin,2) 
@@ -1107,29 +1107,60 @@ contains
         ! Initially assign to shelf values real ocean values
         var_basin = var2D 
 
+        ! Loop over each basin
         do m=1, int(maxval(basins))
-            n_pts  = 0.0
+            
+            ! First calculate the basin-wide average variable value,
+            ! limited to floating ice shelf points
+
             var_mean = 0.0
+            npts     = 0
+            
+            do j = 1, ny
             do i = 1, nx
-                do j = 1, ny
-                    ! Floating ice point
-                    if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        !var_mean = var_mean+(1.0-f_grnd(i,j))*var2D(i,j)
-                        var_mean = var_mean + var2D(i,j)
-                        !n_pts = n_pts + (1.0-f_grnd(i,j))
-                        n_pts = n_pts + 1.0
-                    end if
-                end do
+                
+                ! Floating ice point (or near floating, to avoid shocks)
+                if (basins(i,j) .eq. m .and. &
+                     (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0) ) then
+                    
+                    var_mean = var_mean + var2D(i,j)
+                    npts     = npts + 1
+                end if
+            
+            end do
             end do
 
-            ! Assign shelf value
+             
+            if (npts .gt. 0) then
+                ! Get mean basin value
+                
+                var_mean = var_mean / real(npts,wp)
+
+            else
+                ! Set to zero for now and print a warning for safety.
+                ! This case is unlikely to happen.
+
+                var_mean = 0.0_wp 
+                
+                write(*,*) "Warning:: calc_variable_basin:: no floating ice points &
+                &available in this basin for calculating the basin-wide mean."
+                write(*,*) "basin = ", m 
+                write(*,*) "n_flt = ", count(basins .eq. m .and. &
+                            (f_grnd .lt. 1.0 .and. H_ice .gt. 0.0) )
+                write(*,*) "n_ice = ", count(basins .eq. m .and. &
+                            (H_ice .gt. 0.0) )
+            end if 
+
+            ! Assign shelf value to all points in the basin
+            do j = 1, ny
             do i = 1, nx
-                do j = 1, ny
-                    ! Basin floating ice point
-                    if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        var_basin(i,j) = var_mean / n_pts
-                    end if
-                end do
+                
+                ! Basin point
+                if (basins(i,j) .eq. m) then
+                    var_basin(i,j) = var_mean
+                end if
+            
+            end do
             end do
 
         end do
