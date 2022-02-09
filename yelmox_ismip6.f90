@@ -796,7 +796,7 @@ end if
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
  
-if (.FALSE.) then 
+if (.TRUE.) then 
             if (time .le. ctl%time1) then 
 
                 ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
