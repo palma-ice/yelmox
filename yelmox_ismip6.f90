@@ -1106,6 +1106,17 @@ end if
 
         ! =====================
 
+        ! Update forcing to constant reference time with initial hyst forcing
+        call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
+                    time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
+                    dTa=hyst1%f_now,dTo=hyst1%f_now*ctl%hyst_f_to)
+
+        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
         ! Initialize hysteresis output files
         call yx_hyst_write_yelmo_init_1D_combined(yelmo1,file1D,time,units="years",mask=yelmo1%bnd%ice_allowed, &
                                                 dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
@@ -1176,7 +1187,6 @@ end if
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
  
-            
 
             ! === HYST ============
             
@@ -1186,6 +1196,21 @@ end if
             ! =====================
 
             ! == CLIMATE (ATMOSPHERE, OCEAN and SMB) ====================================
+
+if (.TRUE.) then 
+            ! Update forcing to initial time with initial hyst forcing
+            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
+                        time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
+                        dTa=hyst1%f_now,dTo=hyst1%f_now*ctl%hyst_f_to)
+            
+            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+else 
+    ! Old method 
 
             ! These will be used as anomalies against ISMIP6 control forcing
             
@@ -1246,13 +1271,15 @@ end if
 
 
             ! Store new boundary data in yelmo1 boundary fields
-
+            
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-            
+
+end if 
+
             ! == MODEL OUTPUT ===================================
 
             ! ** Using routines from yelmox_hysteresis_help **
@@ -1775,7 +1802,7 @@ end if
         
         ! Step 1: udpate the climate to the present time 
 
-        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=domain)
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=ylmo%par%domain)
 
         ! Step 2: update the smb fields 
 
@@ -1795,7 +1822,7 @@ end if
 
     end subroutine calc_climate_standard
 
-    subroutine calc_climate_ismip6(snp,smbp,mshlf,ismp,ylmo,time,time_bp)
+    subroutine calc_climate_ismip6(snp,smbp,mshlf,ismp,ylmo,time,time_bp,dTa,dTo)
 
         implicit none 
 
@@ -1806,24 +1833,29 @@ end if
         type(yelmo_class),          intent(IN)    :: ylmo
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp 
+        real(wp), intent(IN), optional :: dTa
+        real(wp), intent(IN), optional :: dTo
         
         ! Step 1: set climate to present day from input fields
         ! and calculate present-day smb based on this climate.
 
         ! Set present-day climate
-        snp%now = snp%clim0
+        !snp%now = snp%clim0
 
+        ! Set present-day climate with optional constant atmospheric anomaly
+        call snapclim_update(snp1,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp, &
+                                        domain=ylmo%par%domain,dTa=dTa,dTo=0.0_wp)
+
+        
         ! Calculate smb for present day 
         call smbpal_update_monthly(smbp,snp%now%tas,snp%now%pr, &
-                                   yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+                                   ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time) 
         
         
         ! Step 2: update the ISMIP6 forcing to the current year
 
         call ismip6_forcing_update(ismp,time)
-
-
-        
+                
         ! Step 3: apply ISMIP6 anomalies to climate and smb fields
         ! (apply to climate just for consistency)
 
@@ -1859,6 +1891,14 @@ end if
 
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
+
+        
+        if (present(dTo)) then 
+            ! Update temperature fields with hysteresis anomaly 
+            mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo
+            mshlf1%now%dT_shlf = mshlf1%now%dT_shlf + dTo
+            mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + dTo
+        end if 
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
