@@ -137,6 +137,9 @@ contains
         character(len=256) :: grp_so_proj 
         character(len=256) :: grp_tf_proj 
         
+        integer  :: k 
+        real(wp) :: tmp 
+        
         ! Define the current experiment characteristics
         ism%gcm        = trim(gcm)
         ism%scen       = trim(scen) 
@@ -223,6 +226,28 @@ contains
         call varslice_update(ism%so_ref)
         call varslice_update(ism%tf_ref)
         call varslice_update(ism%tf_cor)
+
+        ! Remove missing values from the ocean, if possible
+        do k = 1, size(ism%to_ref%var,3)
+            if (count(ism%to_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = minval(ism%to_ref%var(:,:,k,1),mask=ism%to_ref%var(:,:,k,1) .ne. mv)
+                where(ism%to_ref%var(:,:,k,1) .eq. mv) 
+                    ism%to_ref%var(:,:,k,1) = tmp
+                end where 
+            end if
+            if (count(ism%so_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%so_ref%var(:,:,k,1),mask=ism%so_ref%var(:,:,k,1) .ne. mv)
+                where(ism%so_ref%var(:,:,k,1) .eq. mv) 
+                    ism%so_ref%var(:,:,k,1) = tmp
+                end where 
+            end if
+            if (count(ism%tf_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%tf_ref%var(:,:,k,1),mask=ism%tf_ref%var(:,:,k,1) .ne. mv)
+                where(ism%tf_ref%var(:,:,k,1) .eq. mv) 
+                    ism%tf_ref%var(:,:,k,1) = tmp
+                end where 
+            end if
+        end do
 
         return 
 
