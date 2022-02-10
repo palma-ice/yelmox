@@ -463,13 +463,14 @@ program yelmox_ismip6
             call sealevel_update(sealev,year_bp=time_bp)
             yelmo1%bnd%z_sl  = sealev%z_sl 
 
-            ! == Yelmo ice sheet ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
+            ! == ICE SHEET ===================================================
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+
+            
 
             ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
             if (mod(time,ctl%dtt)==0) then
@@ -954,13 +955,14 @@ end if
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
 
-            ! == Yelmo ice sheet ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
- 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
+            ! == ICE SHEET ===================================================
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+ 
+            
                 ! ISMIP6 forcing 
 
                 ! Update ismip6 forcing to current time
@@ -1167,13 +1169,14 @@ end if
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
 
-            ! == Yelmo ice sheet ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
- 
             ! == ISOSTASY ==========================================================
             call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
+            ! == ICE SHEET ===================================================
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+ 
+            
 
             ! === HYST ============
             
