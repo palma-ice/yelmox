@@ -413,7 +413,7 @@ contains
                         
                         ! Calculate basin-average thermal forcing 
                         call calc_variable_basin(mshlf%now%tf_basin,mshlf%now%tf_shlf, &
-                                                                        f_grnd,basins,H_ice)
+                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
 
                         ! Ensure tf_basin is non-negative following Lipscomb et al (2021)
                         where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp 
@@ -1086,7 +1086,7 @@ contains
 
     end subroutine find_open_ocean_and_lakes
 
-    subroutine calc_variable_basin(var_basin,var2D,f_grnd,basins,H_ice)
+    subroutine calc_variable_basin(var_basin,var2D,f_grnd,basins,H_ice,mask_ocn)
         ! Compute mean ocean temperature of ice-shelf basin
 
         implicit none
@@ -1096,6 +1096,7 @@ contains
         real(wp), intent(IN)  :: f_grnd(:,:)
         real(wp), intent(IN)  :: basins(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
+        integer,  intent(IN)  :: mask_ocn(:,:)
 
         ! Local variables
         integer :: i, j, m, nx, ny, npts 
@@ -1119,12 +1120,16 @@ contains
             do j = 1, ny
             do i = 1, nx
                 
-                ! Floating ice point (or near floating, to avoid shocks)
-                if (basins(i,j) .eq. m .and. &
-                     (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0) ) then
+                ! Grounding-line or floating ice point, or if none available,
+                ! then any floating line points available in the basin.
+                if (basins(i,j) .eq. m .and. f_grnd(i,j) .lt. 1.0 .and.  &
+                     (H_ice(i,j) .gt. 0.0 .or. &
+                      mask_ocn(i,j) .eq. mask_val_floating_line .or. &
+                      mask_ocn(i,j) .eq. mask_val_grounding_line) ) then
                     
                     var_mean = var_mean + var2D(i,j)
                     npts     = npts + 1
+
                 end if
             
             end do
