@@ -537,11 +537,7 @@ program yelmox_ismip6
         ! Initialize variables inside of ismip6 object 
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
-
-        ! Update ismip6 forcing to constant time of interest
-        call ismip6_forcing_update(ismp1,ctl%time_const, &
-                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
-
+        
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
         
         snp2    = snp1 
@@ -551,6 +547,21 @@ program yelmox_ismip6
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
         
+        ! Update forcing to present-day reference
+        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+                    time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+
+        ! Overwrite original mshlf and snp with ismip6 derived ones 
+        snp1    = snp2
+        smbpal1 = smbpal2  
+        mshlf1  = mshlf2 
+
+        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
         ! ===== basal friction optimization ======
         if (trim(ctl%equil_method) .eq. "opt") then 
             
@@ -657,50 +668,10 @@ end if
 
             ! == CLIMATE ===========================================================
 
-            ! Update ismip6 forcing
-            call ismip6_forcing_update(ismp1,ctl%time_const, &
-                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
-
-            ! Set climate to present day 
-            snp2%now = snp2%clim0
-
-            ! == SURFACE MASS BALANCE ==============================================
-
-            ! Calculate smb for present day 
-            call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-
-            ! Apply ISMIP6 anomalies
-            ! (apply to climate too, just for consistency)
-
-            smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-            smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
-
-            do m = 1,12
-                snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
-            end do 
-
-            snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
-            if (trim(domain) .eq. "Antarctica") then 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0     ! Antarctica summer
-            else 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0      ! NH summer 
-            end if 
-            snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-            
-            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-            call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
-                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
-                            tf_ann=ismp1%tf%var(:,:,:,1))
-
-            ! Update temperature forcing field with tf_corr and tf_corr_basin
-            mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
-
-            call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+            ! Update forcing to present-day reference, but 
+            ! adjusting to ice topography
+            call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+                        time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
 
             ! Overwrite original mshlf and snp with ismip6 derived ones 
             snp1    = snp2
@@ -779,6 +750,20 @@ end if
 
         end if 
 
+        ! Update forcing to present-day reference 
+        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+                                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+
+        ! Overwrite original mshlf and snp with ismip6 derived ones 
+        snp1    = snp2
+        smbpal1 = smbpal2  
+        mshlf1  = mshlf2 
+
+        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
@@ -813,173 +798,17 @@ end if
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
  
 if (.TRUE.) then 
-            if (time .le. ctl%time1) then 
-
-                ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-
-                if (mod(time,ctl%dtt)==0) then !mmr - this gives problems with restart when dtt is small if (mod(time,2.0)==0) then
-                    ! Update snapclim
-                    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
-                end if 
-
-                ! == SURFACE MASS BALANCE ==============================================
-
-                call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-                
-                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-                call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                                snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-                call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-                
-            end if 
-
-            if (time .ge. ctl%time0) then 
-                ! ISMIP6 forcing 
-
-                ! Update ismip6 forcing to current time
-                call ismip6_forcing_update(ismp1,time)
-
-                ! Set climate to present day 
-                snp2%now = snp2%clim0
-
-                ! == SURFACE MASS BALANCE ==============================================
-
-                ! Calculate smb for present day 
-                call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
-                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-                
-                ! Apply ISMIP6 anomalies
-                ! (apply to climate just for consistency)
-
-                smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-                smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
-
-                do m = 1,12
-                    snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                    snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
-                end do 
-
-                snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
-                if (trim(domain) .eq. "Antarctica") then 
-                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
-                else 
-                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
-                end if 
-                snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-                
-                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-                call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
-                                ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                                dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
-                                tf_ann=ismp1%tf%var(:,:,:,1))
-
-                ! Update temperature forcing field with tf_corr and tf_corr_basin
-                mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
-
-                call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-            end if 
-
-            ! Determine which forcing to use based on time period 
-            ! LGM to time0 CE      == snapclim 
-            ! time0 CE to time1 CE == linear transition from snapclim to ismip6 
-            ! time1 CE to future   == ismip6 
-
-            if (time .le. ctl%time0) then 
-                ! Only snapclim-based forcing 
-
-                yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-                yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-                yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-                yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-            else if (time .gt. ctl%time0 .and. time .le. ctl%time1) then 
-                ! Linear-weighted average between snapclim and ismip6 forcing 
-
-                time_wt = (time-ctl%time0) / (ctl%time1 - ctl%time0)
-
-                yelmo1%bnd%smb      = (time_wt*smbpal2%ann%smb  + (1.0-time_wt)*smbpal1%ann%smb)  * conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    =  time_wt*smbpal2%ann%tsrf + (1.0-time_wt)*smbpal1%ann%tsrf
-
-                yelmo1%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
-                yelmo1%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
-
-            else    ! time > ctl%time1
-                ! Only ISMIP6 forcing 
-
-                ! Overwrite original mshlf and snp with ismip6 derived ones 
-                snp1    = snp2
-                smbpal1 = smbpal2  
-                mshlf1  = mshlf2 
-                
-                yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
-                yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
-
-                yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
-                yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
-
             
-            end if
+            ! Get hybrid snapclim + ISMIP6 climatic forcing 
+
+            call calc_climate_hybrid(snp1,smbpal1,mshlf1,snp2,smbpal2,mshlf2, &
+                                     ismp1,yelmo1,time,time_bp,ctl%time0,ctl%time1)
 
 else 
     ! ISMIP6 only - to make sure it's working well.
 
-            ! == CLIMATE ===========================================================
-
-            ! Update ismip6 forcing
-            call ismip6_forcing_update(ismp1,ctl%time_const, &
-                                    use_ref_atm=.TRUE.,use_ref_ocn=.TRUE.)
-
-            ! Set climate to present day 
-            snp2%now = snp2%clim0
-
-            ! == SURFACE MASS BALANCE ==============================================
-
-            ! Calculate smb for present day 
-            call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-
-            ! ajr: consider just using RACMO SMB here instead of calculating our own? 
-
-            ! Apply ISMIP6 anomalies
-            ! (apply to climate too, just for consistency)
-
-            smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-            smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
-
-            do m = 1,12
-                snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
-            end do 
-
-            snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
-            if (trim(domain) .eq. "Antarctica") then 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0     ! Antarctica summer
-            else 
-                snp2%now%ta_sum = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0      ! NH summer 
-            end if 
-            snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-            
-            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-            call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
-                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
-                            tf_ann=ismp1%tf%var(:,:,:,1))
-
-            ! Update temperature forcing field with tf_corr and tf_corr_basin
-            mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
-
-            call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+            call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+                            time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
 
             ! Overwrite original mshlf and snp with ismip6 derived ones 
             snp1    = snp2
@@ -1055,6 +884,21 @@ end if
         
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
+
+        ! Update forcing to present-day reference 
+        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+                                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+            
+        ! Overwrite original mshlf and snp with ismip6 derived ones 
+        snp1    = snp2
+        smbpal1 = smbpal2  
+        mshlf1  = mshlf2 
+
+        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
@@ -1911,6 +1755,200 @@ end if
         return 
 
     end subroutine write_step_2D_small
+
+
+    ! === CLIMATE ====
+
+    subroutine calc_climate_standard(snp,smbp,mshlf,ylmo,time,time_bp)
+
+        implicit none 
+
+        type(snapclim_class),       intent(INOUT) :: snp 
+        type(smbpal_class),         intent(INOUT) :: smbp 
+        type(marshelf_class),       intent(INOUT) :: mshlf
+        type(yelmo_class),          intent(IN)    :: ylmo
+        real(wp),                   intent(IN)    :: time 
+        real(wp),                   intent(IN)    :: time_bp 
+        
+        ! Step 1: udpate the climate to the present time 
+
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=domain)
+
+        ! Step 2: update the smb fields 
+
+        call smbpal_update_monthly(smbp,snp%now%tas,snp%now%pr, &
+                                   ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time) 
+        
+        ! Step 3: update the marine_shelf fields 
+
+        call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,snp%now%depth, &
+                        snp%now%to_ann,snp%now%so_ann,dto_ann=snp%now%to_ann-snp1%clim0%to_ann)
+
+        call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+                             ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=yelmo1%grd%dx)
+
+        return
+
+    end subroutine calc_climate_standard
+
+    subroutine calc_climate_ismip6(snp,smbp,mshlf,ismp,ylmo,time,time_bp)
+
+        implicit none 
+
+        type(snapclim_class),       intent(INOUT) :: snp 
+        type(smbpal_class),         intent(INOUT) :: smbp
+        type(marshelf_class),       intent(INOUT) :: mshlf 
+        type(ismip6_forcing_class), intent(INOUT) :: ismp
+        type(yelmo_class),          intent(IN)    :: ylmo
+        real(wp),                   intent(IN)    :: time 
+        real(wp),                   intent(IN)    :: time_bp 
+        
+        ! Step 1: set climate to present day from input fields
+        ! and calculate present-day smb based on this climate.
+
+        ! Set present-day climate
+        snp%now = snp%clim0
+
+        ! Calculate smb for present day 
+        call smbpal_update_monthly(smbp,snp%now%tas,snp%now%pr, &
+                                   yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
+        
+        
+        ! Step 2: update the ISMIP6 forcing to the current year
+
+        call ismip6_forcing_update(ismp,time)
+
+
+        
+        ! Step 3: apply ISMIP6 anomalies to climate and smb fields
+        ! (apply to climate just for consistency)
+
+        ! Update climatic fields 
+        do m = 1,12
+            snp%now%tas(:,:,m) = snp%now%tas(:,:,m) + ismp%ts%var(:,:,1,1)
+            snp%now%pr(:,:,m)  = snp%now%pr(:,:,m)  + ismp%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
+        end do 
+
+        snp%now%ta_ann = sum(snp%now%tas,dim=3) / 12.0_wp 
+        if (trim(domain) .eq. "Antarctica") then 
+            snp%now%ta_sum  = sum(snp%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+        else 
+            snp%now%ta_sum  = sum(snp%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
+        end if 
+        snp%now%pr_ann = sum(snp%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+        
+        ! Update smb fields
+        smbp%ann%smb  = smbp%ann%smb  + ismp%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+        smbp%ann%tsrf = smbp%ann%tsrf + ismp%ts%var(:,:,1,1)
+
+
+        ! Step 4: update marine_shelf based on ISMIP6 fields 
+        ! (no need to mix with present-day climate, since ismip6 includes the
+        !  reference ocean fields with internal depth dimension) 
+
+        ! Update marine_shelf shelf fields
+        call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%lev, &
+                        ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
+                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
+                        tf_ann=ismp%tf%var(:,:,:,1))
+
+        ! Update temperature forcing field with tf_corr and tf_corr_basin
+        mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
+
+        ! Update bmb_shlf and mask_ocn
+        call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+                             ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
+
+
+        return
+
+    end subroutine calc_climate_ismip6
+
+
+
+    subroutine calc_climate_hybrid(snp1,smbp1,mshlf1,snp2,smbp2,mshlf2, &
+                                        ismp,ylmo,time,time_bp,time0,time1)
+
+        implicit none 
+
+        type(snapclim_class),       intent(INOUT) :: snp1
+        type(smbpal_class),         intent(INOUT) :: smbp1
+        type(marshelf_class),       intent(INOUT) :: mshlf1
+        type(snapclim_class),       intent(INOUT) :: snp2 
+        type(smbpal_class),         intent(INOUT) :: smbp2
+        type(marshelf_class),       intent(INOUT) :: mshlf2 
+        type(ismip6_forcing_class), intent(INOUT) :: ismp
+        type(yelmo_class),          intent(INOUT) :: ylmo
+        real(wp),                   intent(IN)    :: time 
+        real(wp),                   intent(IN)    :: time_bp 
+        real(wp),                   intent(IN)    :: time0 
+        real(wp),                   intent(IN)    :: time1 
+
+        ! Local variables 
+        real(wp) :: time_wt 
+
+        if (time .le. time1) then 
+
+            call calc_climate_standard(snp1,smbp1,mshlf1,ylmo,time,time_bp)
+
+        end if 
+
+        if (time .ge. time0) then 
+            ! ISMIP6 forcing 
+
+            call calc_climate_ismip6(snp2,smbp2,mshlf2,ismp,ylmo,time,time_bp)
+
+        end if
+
+
+        ! Determine which forcing to use based on time period 
+        ! LGM to time0 CE      == snapclim 
+        ! time0 CE to time1 CE == linear transition from snapclim to ismip6 
+        ! time1 CE to future   == ismip6 
+
+
+        if (time .le. time0) then 
+            ! Only snapclim-based forcing 
+
+            ylmo%bnd%smb      = smbp1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
+            ylmo%bnd%T_srf    = smbp1%ann%tsrf 
+
+            ylmo%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            ylmo%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+        else if (time .gt. time0 .and. time .le. time1) then 
+            ! Linear-weighted average between snapclim and ismip6 forcing 
+
+            time_wt = (time-time0) / (time1 - time0)
+
+            ylmo%bnd%smb      = (time_wt*smbp2%ann%smb  + (1.0-time_wt)*smbp1%ann%smb)  * conv_we_ie*1e-3
+            ylmo%bnd%T_srf    =  time_wt*smbp2%ann%tsrf + (1.0-time_wt)*smbp1%ann%tsrf
+
+            ylmo%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
+            ylmo%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
+
+        else    ! time > time1
+            ! Only ISMIP6 forcing 
+
+            ! Overwrite original mshlf and snp with ismip6 derived ones 
+            snp1   = snp2
+            smbp1  = smbp2  
+            mshlf1 = mshlf2 
+            
+            ylmo%bnd%smb      = smbp1%ann%smb*conv_we_ie*1e-3
+            ylmo%bnd%T_srf    = smbp1%ann%tsrf 
+
+            ylmo%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            ylmo%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+        
+        end if
+
+        return
+
+    end subroutine calc_climate_hybrid
 
 end program yelmox_ismip6
 
