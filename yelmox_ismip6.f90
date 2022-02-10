@@ -29,6 +29,7 @@ program yelmox_ismip6
     character(len=256) :: file_restart_trans
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
+    character(len=512) :: path_tf_corr 
     integer    :: n, m
     real(wp)   :: time, time_bp
     real(wp)   :: time_elapsed
@@ -763,6 +764,21 @@ end if
         
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
+
+        if (yelmo1%par%use_restart) then 
+            ! Load tf_corr field from file 
+
+            path_tf_corr = yelmo1%par%restart
+            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
+
+            n = nc_size(path_tf_corr,"time")
+            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
+                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
+
+            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
+
+        end if 
+
 
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
