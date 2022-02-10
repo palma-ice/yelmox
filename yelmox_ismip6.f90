@@ -537,7 +537,7 @@ program yelmox_ismip6
         ! Initialize variables inside of ismip6 object 
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
-        
+
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
         
         snp2    = snp1 

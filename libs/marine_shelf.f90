@@ -344,6 +344,14 @@ contains
 
         end select 
         
+
+        ! Check consistency of tf_shlf field here. Make sure that 
+        ! warmer water inland cannot be accessed below grounded ice. 
+
+        ! To do: maybe this is not necessary?? ajr, 2022-02-10
+
+
+
         ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
         ! calculated in ice-sheet model separately) ========
 
