@@ -1271,7 +1271,7 @@ else
 
 
             ! Store new boundary data in yelmo1 boundary fields
-            
+
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
@@ -1843,10 +1843,9 @@ end if
         !snp%now = snp%clim0
 
         ! Set present-day climate with optional constant atmospheric anomaly
-        call snapclim_update(snp1,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp, &
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp, &
                                         domain=ylmo%par%domain,dTa=dTa,dTo=0.0_wp)
 
-        
         ! Calculate smb for present day 
         call smbpal_update_monthly(smbp,snp%now%tas,snp%now%pr, &
                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time) 
@@ -1876,7 +1875,6 @@ end if
         ! Update smb fields
         smbp%ann%smb  = smbp%ann%smb  + ismp%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
         smbp%ann%tsrf = smbp%ann%tsrf + ismp%ts%var(:,:,1,1)
-
 
         ! Step 4: update marine_shelf based on ISMIP6 fields 
         ! (no need to mix with present-day climate, since ismip6 includes the
@@ -1942,9 +1940,8 @@ end if
             ! ISMIP6 forcing 
 
             call calc_climate_ismip6(snp2,smbp2,mshlf2,ismp,ylmo,time,time_bp)
-
+            
         end if
-
 
         ! Determine which forcing to use based on time period 
         ! LGM to time0 CE      == snapclim 
