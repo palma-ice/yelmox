@@ -569,16 +569,38 @@ program yelmox_ismip6
             ! Ensure that cb_ref will be optimized (cb_method == set externally) 
             yelmo1%dyn%par%cb_method = -1  
 
-            ! If not using restart, prescribe cb_ref to initial guess 
+            ! If not using restart...
             if (.not. yelmo1%par%use_restart) then
+
+                ! Prescribe cb_ref to initial guess 
                 yelmo1%dyn%now%cb_ref = opt%cf_init 
+                
             end if 
+
+        end if 
+
+        ! ===== tf_corr initialization ======
+        if (.not. yelmo1%par%use_restart) then
 
             ! Set tf_corr to zero initially 
             mshlf1%now%tf_corr = 0.0_wp 
             mshlf2%now%tf_corr = 0.0_wp 
+        
+        else 
+            ! Assume cf_ref was loaded in restart file.
+            ! Load tf_corr field from file 
+
+            path_tf_corr = yelmo1%par%restart
+            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
+
+            n = nc_size(path_tf_corr,"time")
+            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
+                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
+
+            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
             
         end if 
+
         ! ========================================
 
         ! Start timing 
@@ -1940,7 +1962,7 @@ end if
             ! ISMIP6 forcing 
 
             call calc_climate_ismip6(snp2,smbp2,mshlf2,ismp,ylmo,time,time_bp)
-            
+
         end if
 
         ! Determine which forcing to use based on time period 
