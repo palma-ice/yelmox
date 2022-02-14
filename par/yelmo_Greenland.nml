@@ -4,6 +4,7 @@
     time_equil      = 12e3              ! [yr] Equilibration time 
     time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
+    time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500               ! [yr] Frequency of writing 2D output files
@@ -11,35 +12,39 @@
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 
     use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
+    use_pd_step     = False             ! Activate PD step-return in forcing at time=time_pd_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
 /
 
 &opt_L21
-    cf_init         = 0.2               ! Initial value of cf_ref everywhere
-    cf_min          = 1e-2              ! [--] Minimum allowed cf value
-    cf_max          = 1.0               ! [--] Maximum allowed cf value
+    cf_time         = 8e3               ! [yr] When should optimization of basal friction stop?
+    cf_init         = 0.1               ! Initial value of cf_ref everywhere
+    cf_min          = 1e-3              ! [--] Minimum allowed cf value
+    cf_max          = 0.5               ! [--] Maximum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
+    sigma_vel       = 10.0              ! [m/a] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, cf_min
     
-    rel_tau1        = 50.0              ! [yr] Relaxation timescale in time period 1
+    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 5e3               ! [yr] Time limit for time period 1
-    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_time1       = 4e3               ! [yr] Time limit for time period 1
+    rel_time2       = 8e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = False             ! Should thermal forcing be optimized too?
+    tf_time         = 25e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
+    tf_min          = -0.5              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
        
 /
+
 
 &yelmo
     domain          = "Greenland"
@@ -92,10 +97,11 @@
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >  = sd_max)     = calv_max  
     calv_max            = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim            = 0.1               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
-    fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+    fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
     k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
