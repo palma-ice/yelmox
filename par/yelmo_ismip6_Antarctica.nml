@@ -114,7 +114,7 @@
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
+    sigma_vel       = 10.0              ! [m/a] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, cf_min
     
     rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
