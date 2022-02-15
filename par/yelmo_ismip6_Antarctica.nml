@@ -17,7 +17,7 @@
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 30e3              ! [yr] Ending time (model years)
+    time_end        = 40e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
@@ -106,7 +106,7 @@
 /
 
 &opt_L21
-    cf_time         = 8e3               ! [yr] When should optimization of basal friction stop?
+    cf_time         = 20e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 0.1               ! Initial value of cf_ref everywhere
     cf_min          = 1e-3              ! [--] Minimum allowed cf value
     cf_max          = 0.5               ! [--] Maximum allowed cf value
@@ -124,11 +124,11 @@
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = True              ! Should thermal forcing be optimized too?
-    tf_time         = 25e3              ! [yr] When should optimization of thermal forcing stop?
+    tf_time         = 20e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -0.5              ! [degC] Minimum allowed tf_corr value 
+    tf_min          = -1.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14         ! Basin numbers to optimize (-1 for all basins)
 /
