@@ -117,7 +117,8 @@ program yelmox_ismip6
         real(wp) :: m_temp
         real(wp) :: tf_min 
         real(wp) :: tf_max
-        
+        integer  :: tf_basins(100) 
+
         real(wp), allocatable :: cf_min(:,:) 
         real(wp), allocatable :: cf_max(:,:) 
         
@@ -174,6 +175,7 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
         call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
         call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
+        call nml_read(path_par,"opt_L21","tf_basins",   opt%tf_basins)
 
     end if 
 
@@ -574,7 +576,7 @@ program yelmox_ismip6
 
                 ! Prescribe cb_ref to initial guess 
                 yelmo1%dyn%now%cb_ref = opt%cf_init 
-                
+
             end if 
 
         end if 
@@ -667,7 +669,7 @@ end if
 
                     call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
                                             yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                 
                 end if 
 
