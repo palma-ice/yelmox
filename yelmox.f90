@@ -101,7 +101,7 @@ program yelmox
         real(wp) :: m_temp
         real(wp) :: tf_min 
         real(wp) :: tf_max
-        
+        integer  :: tf_basins(100)
         real(wp), allocatable :: cf_min(:,:) 
         real(wp), allocatable :: cf_max(:,:) 
         
@@ -130,6 +130,9 @@ program yelmox
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
     real(wp), parameter :: time_pd  =   1950.0_wp  ! [yr CE] ==  0 kyr ago 
     
+    ! Initially set to zero 
+    opt%tf_basins = 0 
+
     ! Start timing 
     call yelmo_cpu_time(cpu_start_time)
     
@@ -200,6 +203,8 @@ program yelmox
         call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
         call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
 
+        call nml_read(path_par,"opt_L21","tf_basins",   opt%tf_basins)
+        
     end if 
 
     ! Set initial time 
@@ -623,7 +628,7 @@ program yelmox
 
                         call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,dt=ctl%dtt)
+                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                     end if 
 
                 end if 
