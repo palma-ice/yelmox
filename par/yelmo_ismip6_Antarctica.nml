@@ -130,7 +130,7 @@
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -1.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = 1, 12, 14         ! Basin numbers to optimize (-1 for all basins)
+    tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
 /
 
 &yelmo
@@ -531,8 +531,9 @@
 
 &tf_corr_ant
     ronne   = 0.0                   ! [K] tf_corr for ronne basin (basin=1)
-    ross    = 0.0                   ! [K] tf_corr for ronne ross  (basin=12)
-    pine    = 0.0                   ! [K] tf_corr for ronne pine  (basin=14)
+    ross    = 0.0                   ! [K] tf_corr for ross basin (basin=12)
+    pine    = 0.0                   ! [K] tf_corr for pine island (basin=14)
+    abbott  = 0.0                   ! [K] tf_corr for Abbott glacier (basin=15)
 /
 
 

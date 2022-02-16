@@ -229,7 +229,7 @@ contains
             mshlf%now%T_shlf(i,j)  = sum(to_ann(i,j,:) *wt_shlf)
             mshlf%now%S_shlf(i,j)  = sum(so_ann(i,j,:) *wt_shlf)
             mshlf%now%dT_shlf(i,j) = sum(dto_ann(i,j,:)*wt_shlf)
-            
+
             if (present(tf_ann)) then 
                 mshlf%now%tf_shlf(i,j) = sum(tf_ann(i,j,:)*wt_shlf)
             end if 
@@ -579,6 +579,14 @@ contains
                             mshlf%now%tf_corr_basin = tf_corr_now
 
 
+                ! Abbott
+                basin_number_now = 15.0_wp 
+                call nml_read(filename,group_now,"abbott",tf_corr_now)
+                
+                where(basins .eq. basin_number_now) &
+                            mshlf%now%tf_corr_basin = tf_corr_now
+
+                            
             case DEFAULT ! eg, "none", "None", "zero"
 
                 ! DO NOTHING
