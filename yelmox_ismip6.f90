@@ -910,6 +910,20 @@ end if
         ! Make sure that tf is prescribed externally
         mshlf2%par%tf_method = 0 
 
+        if (yelmo1%par%use_restart) then 
+            ! Load tf_corr field from file 
+
+            path_tf_corr = yelmo1%par%restart
+            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
+
+            n = nc_size(path_tf_corr,"time")
+            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
+                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
+
+            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
+
+        end if 
+
         ! Update forcing to present-day reference 
         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
@@ -1111,6 +1125,20 @@ end if
         
         ! Make sure that tf is prescribed externally
         mshlf1%par%tf_method = 0 
+
+        if (yelmo1%par%use_restart) then 
+            ! Load tf_corr field from file 
+
+            path_tf_corr = yelmo1%par%restart
+            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
+
+            n = nc_size(path_tf_corr,"time")
+            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
+                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
+
+            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
+
+        end if 
 
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
