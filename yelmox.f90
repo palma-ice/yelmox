@@ -36,10 +36,7 @@ program yelmox
     real(prec) :: time, time_bp 
     real(wp)   :: dT_now 
     integer    :: n
-
-    real(4) :: conv_km3_Gt, var 
-    real(4) :: dTa 
-
+    
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     type reg_def_class 

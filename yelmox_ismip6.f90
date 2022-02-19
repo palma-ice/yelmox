@@ -35,7 +35,7 @@ program yelmox_ismip6
     real(wp)   :: time_elapsed
     real(wp)   :: time_wt 
 
-    real(sp)   :: conv_km3_Gt
+    real(sp)   :: convert_km3_Gt
 
     type(yelmo_class)           :: yelmo1 
     type(sealevel_class)        :: sealev 
@@ -1126,7 +1126,7 @@ end if
         
         ! Initialize hysteresis module for transient forcing experiments 
         call hyster_init(hyst1,path_par,time) 
-        conv_km3_Gt = rho_ice *1e-3
+        convert_km3_Gt = rho_ice *1e-3
 
         ! =====================
 
@@ -1215,7 +1215,7 @@ end if
             ! === HYST ============
             
             ! snapclim call using anomaly from the hyster package 
-            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
             
             ! =====================
 
