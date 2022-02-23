@@ -930,7 +930,7 @@ contains
 
                 mask_ocn(i,j) = mask_val_land
 
-            else if (f_grnd(i,j) .eq. 0.0 .and. mask_ocn_ref(i,j) .eq. 2) then
+            else if (f_grnd(i,j) .eq. 0.0 .and. mask_ocn_ref(i,j) .eq. mask_val_deep_ocean) then
 
                 mask_ocn(i,j) = mask_val_deep_ocean
 
