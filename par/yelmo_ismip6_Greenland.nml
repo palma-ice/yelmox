@@ -96,7 +96,7 @@
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 10.0              ! [m/a] Speed at which smoothing diminishes to zero
+    sigma_vel       = 100.0             ! [m/a] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, cf_min
     
     rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
@@ -112,7 +112,8 @@
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -0.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-       
+    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
+
 /
 
 &yelmo
@@ -170,7 +171,7 @@
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
-    fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+    fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     kt                  = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
     k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
