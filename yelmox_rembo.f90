@@ -38,7 +38,7 @@ program yelmox
     
     logical :: use_hyster
     logical :: write_restart 
-    real(4) :: conv_km3_Gt, var 
+    real(4) :: convert_km3_Gt, var 
     real(4) :: dTa, dT_summer
 
     ! No-ice mask (to impose additional melting)
@@ -113,7 +113,7 @@ program yelmox
 
     ! Initialize hysteresis module for transient forcing experiments 
     call hyster_init(hyst1,path_par,time_init) 
-    conv_km3_Gt = rho_ice *1e-3
+    convert_km3_Gt = rho_ice *1e-3
 
     ! Initialize "climate" model (here for ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
@@ -141,7 +141,7 @@ program yelmox
     
     if (use_hyster) then
         ! Update hysteresis variable 
-        call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+        call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
         dT_summer = hyst1%f_now 
     end if 
 
@@ -260,7 +260,7 @@ if (calc_transient_climate) then
         
         if (use_hyster) then
             ! Update forcing based on hysteresis module
-            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
             
             dT_summer = hyst1%f_now 

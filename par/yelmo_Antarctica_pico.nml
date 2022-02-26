@@ -93,24 +93,25 @@
     
 /
 
-&ydyn_neff 
-    neff_method     = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
-    neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
-    neff_p          = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
-    neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
-    neff_w_max      = 2.0               ! [m]  *neff_method=3* Maximum allowed water layer thickness for Till pressure 
-    neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    neff_delta      = 0.02              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
-    neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
-    neff_Cc         = 0.12              ! [--] *neff_method=3* Till compressibility    
+&ytill
+    method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
+    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
+    is_angle        = False             ! cb_ref is a till strength angle?
+    z0              = -400.0            ! [m] Bedrock rel. to sea level, lower limit
+    z1              =    0.0            ! [m] Bedrock rel. to sea level, upper limit
+    cf_min          =  0.001            ! [-- or deg] Minimum value of cf
+    cf_ref          =  0.2              ! [-- or deg] Reference/const/max value of cf
 /
 
-&ydyn_till
-    till_phi_const  =  10.0                 ! [degrees] Till friction angle, constant
-    till_phi_min    =   5.0                 ! [degrees] Till friction angle, minimum
-    till_phi_max    =  40.0                 ! [degrees] Till friction angle, maximum
-    till_phi_zmin   = -700.0                ! [m] Bedrock elevation for till_phi_min
-    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for phi_max 
+&yneff 
+    method          = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
+    p               = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    set_water       = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
+    N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
+    delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
+    Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
 /
 
 &ymat

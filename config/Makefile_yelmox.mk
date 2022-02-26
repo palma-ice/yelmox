@@ -96,7 +96,7 @@ $(objdir)/pico.o: $(libdir)/pico/pico.f90 $(objdir)/pico_geometry.o $(objdir)/pi
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 # General yelmox helper modules for different applications 
-$(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90
+$(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -c -o $@ $^
 
 #############################################################

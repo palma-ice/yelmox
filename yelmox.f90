@@ -462,8 +462,8 @@ program yelmox
     ! ===== basal friction optimization ======
     if (trim(ctl%equil_method) .eq. "opt") then 
         
-        ! Ensure that cb_ref will be optimized (cb_method == set externally) 
-        yelmo1%dyn%par%cb_method = -1  
+        ! Ensure that cb_ref will be optimized (till_method == set externally) 
+        yelmo1%dyn%par%till_method = -1  
 
         ! If not using restart, prescribe cb_ref to initial guess 
         if (.not. yelmo1%par%use_restart) then

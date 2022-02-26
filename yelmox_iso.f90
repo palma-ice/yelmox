@@ -95,8 +95,8 @@ program yelmox
 
     type opt_params
         real(wp) :: cf_init
-        real(wp) :: cf_min
-        real(wp) :: cf_max 
+        real(wp) :: cf_min_par
+        real(wp) :: cf_max_par 
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
@@ -116,7 +116,10 @@ program yelmox
         real(wp) :: m_temp
         real(wp) :: tf_min 
         real(wp) :: tf_max
-         
+        
+        real(wp), allocatable :: cf_min(:,:) 
+        real(wp), allocatable :: cf_max(:,:) 
+        
     end type 
 
     type(ctrl_params)     :: ctl
@@ -158,8 +161,8 @@ program yelmox
         ! Load optimization parameters 
 
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min)
-        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max)
+        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
+        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
         call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
         call nml_read(path_par,"opt_L21","H0",          opt%H0)
         call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
@@ -219,6 +222,16 @@ program yelmox
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)
 
+    ! Store domain name as a shortcut 
+    domain    = yelmo1%par%domain 
+    grid_name = yelmo1%par%grid_name 
+
+    ! Ensure optimization fields are allocated and preassigned
+    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    opt%cf_min = opt%cf_min_par 
+    opt%cf_max = opt%cf_max_par 
+
     ! Allocate smb, temp and precip anomaly field for writing 
     allocate(dsmb_now(yelmo1%grd%nx,yelmo1%grd%ny))
     dsmb_now = 0.0_prec 
@@ -234,10 +247,6 @@ program yelmox
     cb_ref_dot = 0.0 
     
     ! === Initialize external models (forcing for ice sheet) ======
-
-    ! Store domain name as a shortcut 
-    domain    = yelmo1%par%domain 
-    grid_name = yelmo1%par%grid_name 
 
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
@@ -268,9 +277,11 @@ program yelmox
 
     ! Initialize isostasy - note this should use present-day topography values to 
     ! calibrate the reference rebound!
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &
-                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
-
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
+                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
+                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time_init)
+                                       
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
@@ -316,9 +327,9 @@ program yelmox
     ! ===== basal friction optimization ======
     if (optimize_cf) then 
         
-        ! Ensure that cb_ref will be optimized (cb_method == set externally) 
-        yelmo1%dyn%par%cb_method = -1  
-        yelmo1%dyn%par%cb_min    = opt%cf_min
+        ! Ensure that cb_ref will be optimized (till_method == set externally) 
+        yelmo1%dyn%par%till_method = -1  
+        yelmo1%dyn%par%till_cf_min = opt%cf_min_par
 
     end if 
     ! ========================================
@@ -352,7 +363,7 @@ program yelmox
     ! ============================================================
     ! Load pre-tuned cb_ref from file if desired
 
-    if (yelmo1%dyn%par%cb_method .eq. -1 .and. load_cb_ref) then 
+    if (yelmo1%dyn%par%till_method .eq. -1 .and. load_cb_ref) then 
     
         ! if (load_cb_ref) then 
 
@@ -366,7 +377,7 @@ program yelmox
             !call modify_cb_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain,f_cf,f_cf_lim)
             
             ! Make sure minimum is consistent with parameter settings
-            where (yelmo1%dyn%now%cb_ref .lt. yelmo1%dyn%par%cb_min) yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%cb_min
+            where (yelmo1%dyn%now%cb_ref .lt. yelmo1%dyn%par%till_cf_min) yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%till_cf_min
             
         ! else
         !     ! Define cb_ref inline 
@@ -466,7 +477,7 @@ if (check_init) stop
 if (calc_ice_sheet) then 
 
         
-        if (yelmo1%dyn%par%cb_method .eq. -1 .and. optimize_cf .and. iter .lt. n_iter) then
+        if (yelmo1%dyn%par%till_method .eq. -1 .and. optimize_cf .and. iter .lt. n_iter) then
             ! If using tuned cf, perform additional optimization here 
 
             !if (time .ge. -2e3 .and. time .lt. 0.0 .and. mod(time,500.0)==0 ) then
@@ -480,7 +491,7 @@ if (calc_ice_sheet) then
             !     call update_cb_ref_errscaling(yelmo1%dyn%now%cb_ref,cb_ref_dot,yelmo1%tpo%now%H_ice, &
             !                             yelmo1%bnd%z_bed,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s,yelmo1%dta%pd%H_ice, &
             !                                 yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec,yelmo1%grd%dx, &
-            !                                 cf_min=yelmo1%dyn%par%cb_min,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
+            !                                 cf_min=yelmo1%dyn%par%till_cf_min,cf_max=1.0,sigma_err=1.0,sigma_vel=200.0, &
             !                                 err_scale=err_scale,fill_dist=fill_dist,optvar="ice")
 
             ! end if 
@@ -489,18 +500,18 @@ if (calc_ice_sheet) then
             ! ===== basal friction optimization ==================
             if (time .gt. -500.0 .and. time .lt. 0.0) then 
                 ! Update cb_ref for the last 500 years to present day 
-
+                
                 ! Update cb_ref based on error metric(s) 
                 call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                     yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
-                                    yelmo1%tpo%par%dx,opt%cf_min,opt%cf_max,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                     dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
 
             end if 
             ! ====================================================
 
-        else if (yelmo1%dyn%par%cb_method .eq. -1 .and. (.not. load_cb_ref) ) then
+        else if (yelmo1%dyn%par%till_method .eq. -1 .and. (.not. load_cb_ref) ) then
             ! Update cb_ref with function
 
 !             call set_cb_ref(yelmo1%dyn,yelmo1%tpo,yelmo1%thrm,yelmo1%bnd,yelmo1%grd,domain)
@@ -1147,7 +1158,7 @@ contains
         where (uxy_srf .gt.  50.0) dyn%now%cb_ref = 0.08
         where (uxy_srf .gt. 100.0) dyn%now%cb_ref = 0.002
         where (uxy_srf .gt. 200.0) dyn%now%cb_ref = 0.001
-        where (uxy_srf .eq. MV) dyn%now%cb_ref = dyn%par%cb_min 
+        where (uxy_srf .eq. MV) dyn%now%cb_ref = dyn%par%till_cf_min 
 
 
         ! Additional tuning 
@@ -1170,10 +1181,10 @@ contains
         dyn%now%cb_ref = f_cf * dyn%now%cb_ref 
 
         ! Ensure minimum value for PD ice-free points 
-        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cb_ref = dyn%par%cb_min
+        where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cb_ref = dyn%par%till_cf_min
         
         ! Eliminate extreme values 
-        where (dyn%now%cb_ref .lt. dyn%par%cb_min) dyn%now%cb_ref = dyn%par%cb_min
+        where (dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min
 
         return 
 
@@ -1252,10 +1263,10 @@ contains
         where (dyn%now%cb_ref .gt. f_cf_lim) dyn%now%cb_ref = f_cf * dyn%now%cb_ref 
 
         ! Ensure minimum value for PD ice-free points 
-        !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cb_ref = dyn%par%cb_min
+        !where (bnd%H_ice_ref .eq. 0.0 .and. bnd%z_bed_ref .lt. 0.0) dyn%now%cb_ref = dyn%par%till_cf_min
         
         ! Eliminate extreme values 
-        where (dyn%now%cb_ref .lt. dyn%par%cb_min) dyn%now%cb_ref = dyn%par%cb_min
+        where (dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min
         
         return 
 
@@ -1299,51 +1310,44 @@ contains
                 
             end if 
 
-            ! =============================================================================
-            ! Step 2: calculate lambda functions to scale cb_ref from default value 
-            
-            !------------------------------------------------------------------------------
+            ! Calculate cb_ref following parameter choices 
             ! lambda_bed: scaling as a function of bedrock elevation
 
-            select case(trim(dyn%par%cb_scale))
+            select case(trim(dyn%par%till_scale))
 
-                case("lin_zb")
+                case("none")
+                    ! No scaling with elevation, set reference value 
+
+                    dyn%now%cb_ref = dyn%par%till_cf_ref
+                    
+                case("lin")
                     ! Linear scaling function with bedrock elevation
-                    
-                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
 
-                case("exp_zb")
-                    ! Exponential scaling function with bedrock elevation
-                    
-                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,dyn%par%cb_z0,dyn%par%cb_z1)
+                    lambda_bed = calc_lambda_bed_lin(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-                case("till_const")
-                    ! Constant till friction angle
+                    ! Calculate cb_ref 
+                    dyn%now%cb_ref = dyn%par%till_cf_min + (dyn%par%till_cf_ref-dyn%par%till_cf_min)*lambda_bed
 
-                    lambda_bed = calc_lambda_till_const(dyn%par%till_phi_const)
+                case("exp") 
 
-                case("till_zb")
-                    ! Linear till friction angle versus elevation
+                    lambda_bed = calc_lambda_bed_exp(bnd%z_bed,bnd%z_sl,dyn%par%till_z0,dyn%par%till_z1)
 
-                    lambda_bed = calc_lambda_till_linear(bnd%z_bed,bnd%z_sl,dyn%par%till_phi_min,dyn%par%till_phi_max, &
-                                                            dyn%par%till_phi_zmin,dyn%par%till_phi_zmax)
+                    dyn%now%cb_ref = dyn%par%till_cf_ref * lambda_bed 
+                    where(dyn%now%cb_ref .lt. dyn%par%till_cf_min) dyn%now%cb_ref = dyn%par%till_cf_min 
 
                 case DEFAULT
-                    ! No scaling
+                    ! Scaling not recognized.
 
-                    lambda_bed = 1.0_prec
+                    write(io_unit_err,*) "calc_ydyn_cbref:: Error: scaling of cb_ref with &
+                    &elevation not recognized."
+                    write(io_unit_err,*) "ydyn.till_scale = ", dyn%par%till_scale 
+                    stop 
 
             end select 
             
-            ! Ensure lambda_bed is not below lower limit [default range 0:1] 
-            where (lambda_bed .lt. dyn%par%cb_min) lambda_bed = dyn%par%cb_min
+            ! Additionally scale by lambda1
+            dyn%now%cb_ref = dyn%now%cb_ref * lambda1 
 
-
-            ! =============================================================================
-            ! Step 3: calculate cb_ref [non-dimensional]
-            
-            dyn%now%cb_ref = dyn%par%cf_stream*lambda1*lambda_bed
-            
         return 
 
     end subroutine set_cb_ref
