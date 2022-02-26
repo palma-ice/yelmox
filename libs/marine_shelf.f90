@@ -112,9 +112,9 @@ module marine_shelf
 
     private
     public :: marshelf_class
-    public :: marshelf_init
     public :: marshelf_update_shelf
     public :: marshelf_update
+    public :: marshelf_init
     public :: marshelf_end 
 
 contains 
@@ -551,6 +551,35 @@ contains
 
                 end do
 
+            case("tf-grl") 
+                ! Modify specific basins according to parameter values 
+                ! as defined in the parameter section 'tf_corr_grl'
+
+                group_now = "tf_corr_grl" 
+
+                ! ne = northeast
+                call nml_read(filename,group_now,"ne",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[2.0_wp])
+                
+                ! e = east
+                call nml_read(filename,group_now,"e",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[3.0_wp])
+                
+                
+                ! se = southeast 
+                call nml_read(filename,group_now,"se",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[4.0_wp])
+
+                
+                ! w = west
+                call nml_read(filename,group_now,"w",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[6.0_wp,7.0_wp,8.0_wp])
+                
+
             case("tf-ant") 
                 ! Modify specific basins according to parameter values 
                 ! as defined in the parameter section 'tf_corr_ant'
@@ -558,35 +587,25 @@ contains
                 group_now = "tf_corr_ant" 
 
                 ! Ronne 
-                basin_number_now = 1.0_wp 
                 call nml_read(filename,group_now,"ronne",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[1.0_wp])
                 
-                where(basins .eq. basin_number_now) &
-                            mshlf%now%tf_corr_basin = tf_corr_now
-
                 ! Ross
-                basin_number_now = 12.0_wp 
                 call nml_read(filename,group_now,"ross",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[12.0_wp])
                 
-                where(basins .eq. basin_number_now) &
-                            mshlf%now%tf_corr_basin = tf_corr_now
-
-                ! Pine Island
-                basin_number_now = 14.0_wp 
+                ! Pine Island 
                 call nml_read(filename,group_now,"pine",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[14.0_wp])
                 
-                where(basins .eq. basin_number_now) &
-                            mshlf%now%tf_corr_basin = tf_corr_now
-
-
-                ! Abbott
-                basin_number_now = 15.0_wp 
+                ! Abbott 
                 call nml_read(filename,group_now,"abbott",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[15.0_wp])
                 
-                where(basins .eq. basin_number_now) &
-                            mshlf%now%tf_corr_basin = tf_corr_now
-
-                            
             case DEFAULT ! eg, "none", "None", "zero"
 
                 ! DO NOTHING
@@ -677,6 +696,32 @@ contains
         return 
 
     end subroutine marshelf_init
+
+    subroutine apply_tf_corr_by_basin(tf_corr,basins,tf_corr_now,basin_numbers)
+        ! Apply the value of tf_corr_now in the basins that correspond
+        ! to the given basin_numbers of interest. 
+
+        implicit none
+
+        real(wp), intent(INOUT) :: tf_corr(:,:) 
+        real(wp), intent(IN)    :: basins(:,:) 
+        real(wp), intent(IN)    :: tf_corr_now
+        real(wp), intent(IN)    :: basin_numbers(:) 
+
+        ! Local variables 
+        integer :: b, nb 
+        real(wp) :: basin_number_now
+
+        nb = size(basin_numbers)
+
+        do b = 1, nb 
+            basin_number_now = basin_numbers(b) 
+            where(basins .eq. basin_number_now) tf_corr = tf_corr_now
+        end do 
+
+        return
+
+    end subroutine apply_tf_corr_by_basin
 
     subroutine marshelf_end(mshlf)
 

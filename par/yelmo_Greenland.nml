@@ -1,7 +1,7 @@
 &ctrl
-    time_init       = 2e3               ! [yr] Starting time 
+    time_init       = 0.0               ! [yr] Starting time 
     time_end        = 20e3              ! [yr] Ending time
-    time_equil      = 12e3              ! [yr] Equilibration time 
+    time_equil      = 2e3               ! [yr] Equilibration time 
     time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
     time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
@@ -19,32 +19,32 @@
 
 &opt_L21
     cf_time         = 8e3               ! [yr] When should optimization of basal friction stop?
-    cf_init         = 0.1               ! Initial value of cf_ref everywhere
+    cf_init         = 0.5               ! Initial value of cf_ref everywhere
     cf_min          = 1e-3              ! [--] Minimum allowed cf value
-    cf_max          = 0.5               ! [--] Maximum allowed cf value
+    cf_max          = 1.0               ! [--] Maximum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
     sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 10.0              ! [m/a] Speed at which smoothing diminishes to zero
+    sigma_vel       = 100.0             ! [m/a] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, cf_min
     
     rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 4e3               ! [yr] Time limit for time period 1
-    rel_time2       = 8e3               ! [yr] Time limit for time period 2
+    rel_time1       = 0e3               ! [yr] Time limit for time period 1
+    rel_time2       = 0e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
-    opt_tf          = False             ! Should thermal forcing be optimized too?
-    tf_time         = 25e3              ! [yr] When should optimization of thermal forcing stop?
+    opt_tf          = True              ! Should thermal forcing be optimized too?
+    tf_time         = 8e3               ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -0.5              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-       
-/
+    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
+    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
 
+/
 
 &yelmo
     domain          = "Greenland"
@@ -58,7 +58,7 @@
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 10                ! Vertical resolution in ice
+    nz_aa           = 6                 ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.01              ! [a] Minimum timestep 
     cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
@@ -122,14 +122,6 @@
     H_grnd_lim          = 500.0           ! [m] For For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     H_sed_sat           = 250.0           ! [m] Sediment thickness at which sediment effect is saturated
     cb_method           = 1               ! -1: set externally; 1: calculate cb online  
-    cb_with_pmp         = False           ! Weighted cb_frozen/cb_stream as a function of f_pmp 
-    cb_margin_pmp       = False           ! If using cb_with_pmp, additionally impose cb_stream at ice margins 
-    cb_scale            = "till_zb"       ! "none", "lin_zb", "exp_zb", "till_const", "till_zb", scaling of cb spatially
-    cb_z0               = -200.0          ! [m] Bedrock elevation at which scaling goes to f_scale=e(-1)
-    cb_z1               = 200.0           ! [m] Bedrock elevation above which scaling goes to f_scale=1
-    cb_min              = 0.0             ! [Pa] Minimum allowed value of cb for grounded ice
-    cf_frozen           = 1.0             ! [--] Bed critical stress factor, frozen 
-    cf_stream           = 0.1             ! [--] Bed critical stress factor, stream  
     n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
@@ -145,23 +137,25 @@
     
 /
 
-&ydyn_neff 
-    neff_method     = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
-    neff_const      = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
-    neff_p          = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
-    neff_set_water  = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
-    neff_N0         = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    neff_delta      = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
-    neff_e0         = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
-    neff_Cc         = 0.12              ! [--] *neff_method=3* Till compressibility    
+&ytill
+    scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
+    is_angle        = False             ! cb_ref is a till strength angle?
+    z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
+    z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
+    cf0             =  0.1              ! [-- or deg] Minimum value of cf
+    cf1             =  0.8              ! [-- or deg] Maximum value of cf
+    cf_ref          =  0.4              ! [-- or deg] Reference/const value of cf
 /
 
-&ydyn_till
-    till_phi_const  =  10.0                 ! [degrees] Till friction angle, constant
-    till_phi_min    =   5.0                 ! [degrees] Till friction angle, minimum
-    till_phi_max    =  40.0                 ! [degrees] Till friction angle, maximum
-    till_phi_zmin   = -700.0                ! [m] Bedrock elevation for till_phi_min
-    till_phi_zmax   =  700.0                ! [m] Bedrock elevation for phi_max 
+&yneff 
+    method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
+    p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    set_water       = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
+    N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
+    delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
+    Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
 /
 
 &ymat
@@ -174,7 +168,7 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 3.0
+    enh_shear               = 1.0
     enh_stream              = 1.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
@@ -412,7 +406,7 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
-    corr_method     = "none"        ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
+    corr_method     = "tf-grl"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-grl": use values in tf_corr_grl parameter section
     basin_number    = 1             ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
@@ -455,6 +449,13 @@
     basin_name      = "none"        !"northwest" "northeast" "east"
     basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
+/
+
+&tf_corr_grl
+    ne      = 0.0                   ! [K] tf_corr for northwest/negis basin (basin=2)
+    e       = 0.0                   ! [K] tf_corr for western basin (basin=3)
+    se      = 0.0                   ! [K] tf_corr for southwest basin (basin=4)
+    w       = 0.0                   ! [K] tf_corr for eastern basin (basins=[6,7,8])
 /
 
 

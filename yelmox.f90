@@ -33,7 +33,7 @@ program yelmox
     character(len=256) :: file2D_small
     character(len=512) :: path_par, path_const
     character(len=512) :: path_lgm  
-    real(prec) :: time, time_bp 
+    real(prec) :: time, time_bp, time_elapsed
     real(wp)   :: dT_now 
     integer    :: n
     
@@ -76,6 +76,7 @@ program yelmox
     end type 
 
     type opt_params
+        real(wp) :: cf_time
         real(wp) :: cf_init
         real(wp) :: cf_min_par
         real(wp) :: cf_max_par 
@@ -93,12 +94,14 @@ program yelmox
         real(wp) :: rel_m
 
         logical  :: opt_tf 
+        real(wp) :: tf_time
         real(wp) :: H_grnd_lim
         real(wp) :: tau_m 
         real(wp) :: m_temp
         real(wp) :: tf_min 
         real(wp) :: tf_max
-        integer  :: tf_basins(100)
+        integer  :: tf_basins(100) 
+
         real(wp), allocatable :: cf_min(:,:) 
         real(wp), allocatable :: cf_max(:,:) 
         
@@ -178,6 +181,7 @@ program yelmox
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
+        call nml_read(path_par,"opt_L21","cf_time",     opt%cf_time)
         call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
         call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
         call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
@@ -194,14 +198,14 @@ program yelmox
         call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
 
         call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
+        call nml_read(path_par,"opt_L21","tf_time",     opt%tf_time)
         call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
         call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
         call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
         call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
-
         call nml_read(path_par,"opt_L21","tf_basins",   opt%tf_basins)
-        
+
     end if 
 
     ! Set initial time 
@@ -591,58 +595,67 @@ program yelmox
 
         end if
 
+        time_elapsed = time - ctl%time_init 
+
         ! Spin-up procedure - only relevant for time-time_init <= time_equil
         select case(trim(ctl%equil_method))
-        
-            case("opt") 
-                ! ===== basal friction optimization ==================
+            
+            case("opt")
 
-                if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
-                
-                    ! === Optimization parameters =========
-                    
+                if (time_elapsed .le. opt%rel_time2) then 
+                    ! Apply relaxation to the model 
+
                     ! Update model relaxation time scale and error scaling (in [m])
-                    opt%rel_tau = get_opt_param(time,time1=opt%rel_time1,time2=opt%rel_time2, &
+                    opt%rel_tau = get_opt_param(time_elapsed,time1=opt%rel_time1,time2=opt%rel_time2, &
                                                     p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
                     
-                    ! Set model tau, and set yelmo relaxation switch (2: gl-line and shelves relaxing; 0: no relaxation)
+                    ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
                     yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                    yelmo1%tpo%par%topo_rel     = 2
-                    if (trim(domain) .eq. "Greenland") yelmo1%tpo%par%topo_rel = 3
-                    if (time .gt. opt%rel_time2) yelmo1%tpo%par%topo_rel = 0 
-                    
-                    ! === Optimization update step =========
+                    yelmo1%tpo%par%topo_rel     = 4
+                
+                else 
+                    ! Turn-off relaxation now
 
+                    yelmo1%tpo%par%topo_rel = 0 
+
+                end if 
+
+                ! === Optimization update step =========
+
+                if (time_elapsed .le. opt%cf_time) then 
+                    ! Perform cf_ref optimization
+                
                     ! Update cb_ref based on error metric(s) 
                     call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                         yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                         yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd.le.0.0_prec, &
                                         opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                         dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp)
-                    
-                    if (opt%opt_tf .and. time .gt. opt%rel_time1) then
-                        ! Update tf_corr based on error metric(s) 
 
-                        call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
-                    end if 
+                end if
 
+                if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
+                    ! Perform tf_corr optimization
+
+                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
+                
                 end if 
 
             case("relax")
                 ! ===== relaxation spinup ==================
 
-                if (ctl%with_ice_sheet .and. (time-ctl%time_init) .lt. ctl%time_equil) then 
+                if (ctl%with_ice_sheet .and. time_elapsed .lt. ctl%time_equil) then 
                     ! Turn on relaxation for now, to let thermodynamics equilibrate
                     ! without changing the topography too much. Important when 
                     ! effective pressure = f(thermodynamics).
 
-                    yelmo1%tpo%par%topo_rel     = 2
+                    yelmo1%tpo%par%topo_rel     = 3
                     yelmo1%tpo%par%topo_rel_tau = 50.0 
                     write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-                else if (ctl%with_ice_sheet .and. (time-ctl%time_init) .eq. ctl%time_equil) then 
+                else if (ctl%with_ice_sheet .and. time_elapsed .eq. ctl%time_equil) then 
                     ! Disable relaxation now... 
 
                     yelmo1%tpo%par%topo_rel     = 0
@@ -967,6 +980,13 @@ contains
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
+        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn,units="", &
+                     long_name="Ocean mask (0: land, 1: grline, 2: fltline, 3: open ocean, 4: deep ocean, 5: lakes)", &
+                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf,units="K",long_name="Shelf thermal forcing", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         if (trim(mshlf%par%bmb_method) .eq. "pico") then 
