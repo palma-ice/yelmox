@@ -1125,18 +1125,24 @@ end if
         
         ! Make sure that tf is prescribed externally
         mshlf1%par%tf_method = 0 
-
+        
         if (yelmo1%par%use_restart) then 
             ! Load tf_corr field from file 
 
             path_tf_corr = yelmo1%par%restart
             call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
 
-            n = nc_size(path_tf_corr,"time")
-            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
-                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
+            if (nc_exists_var(path_tf_corr,"tf_corr")) then 
+                n = nc_size(path_tf_corr,"time")
+                call nc_read(path_tf_corr,"tf_corr",mshlf1%now%tf_corr, &
+                                start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
+            else 
+                write(*,*) "tf_corr: variable not found in restart folder yelmo2D.nc file!"
+                write(*,*) "path_tf_corr: ", trim(path_tf_corr)
+                stop 
+            end if 
 
-            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
+            write(*,*) "tf_corr: ", minval(mshlf1%now%tf_corr), maxval(mshlf1%now%tf_corr)
 
         end if 
 
