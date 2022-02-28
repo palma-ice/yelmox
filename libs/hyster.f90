@@ -11,6 +11,9 @@ module hyster
 
     real(wp), parameter :: MV  = -9999.0_wp 
 
+    ! Mathematical constants
+    real(wp), parameter :: pi  = real(2._dp*acos(0.0_dp),wp)
+    
     type hyster_par_class  
         character(len=56) :: label 
         character(len=56) :: method 
@@ -87,6 +90,14 @@ contains
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
         
+        ! Consistency check 
+        if (hyst%par%df_sign .eq. -1.0_wp .and. trim(hyst%par%method) .eq. "sin") then 
+            write(*,*) "hyster:: Error: method='sin' can only be used with &
+            &df_sign=1.0 (non-negative). Please set df_sign=1.0 or use &
+            &a different method." 
+            stop
+        end if 
+
         ! Prescribe a very small, but nonzero minimum value 
         ! (important to be nonzero for the pi controller methods)
         hyst%par%df_dt_min = 1e-9   ! [f/yr]
@@ -112,11 +123,22 @@ contains
         hyst%pi_df  = hyst%par%df_dt_min 
         hyst%pi_eta = hyst%par%eps 
 
-        ! Initialize base (mean) values of forcing 
-        if (hyst%par%df_sign .gt. 0.0_wp) then 
-            hyst%f_mean_now = hyst%par%f_min 
+        ! Override above choice for sin forcing 
+        if (trim(hyst%par%method) .eq. "sin") then 
+
+            ! Calculate initial forcing value based on sin function
+            call calc_sin_now(hyst%f_mean_now,0.0_wp,hyst%par%dt_ramp, &
+                                hyst%par%f_min,hyst%par%f_max,x_offset=0.0_wp)
+
         else 
-            hyst%f_mean_now = hyst%par%f_max 
+            ! Determine initial forcing value from parameters 
+
+            if (hyst%par%df_sign .gt. 0.0_wp) then 
+                hyst%f_mean_now = hyst%par%f_min 
+            else 
+                hyst%f_mean_now = hyst%par%f_max 
+            end if 
+
         end if 
 
         ! Set noise to zero for now 
@@ -147,13 +169,21 @@ contains
         real(wp),           intent(IN)    :: var 
 
         ! Local variables 
-        real(wp), allocatable :: dv_dt(:)
+        real(wp) :: time_elapsed
         real(wp) :: dv_dt_now 
         real(wp) :: f_scale 
         integer  :: ntot, kmin, kmax, nk, k 
         real(wp) :: dt_tot 
         real(wp) :: dvdt_fac 
         real(wp) :: pi_df_now 
+        real(wp), allocatable :: dv_dt(:)
+        
+        ! For periodic forcing 
+        real(wp) :: p 
+        real(wp) :: amp
+        real(wp) :: x_offset
+        real(wp) :: y_offset 
+        real(wp) :: f_tmp 
 
         ! Since dv_dt is typically calculated over an averaging period,
         ! assume second-order PI controller parameters are needed. 
@@ -189,6 +219,9 @@ contains
         ! time has passed. 
         dt_tot = hyst%time(kmax) - minval(hyst%time,mask=hyst%time.ne.MV)
 
+        ! Get currently elapsed time overall
+        time_elapsed = time - hyst%time_init 
+
         ! Calculate mean rate of change over time steps of interest
         
         ! Get current number of averaging points 
@@ -200,7 +233,7 @@ contains
         hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
                                      (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
 
-        if ( (time-hyst%time_init) .le. hyst%par%dt_init) then 
+        if ( time_elapsed .le. hyst%par%dt_init) then 
             ! Initialization time period, no transient methods applied
 
             hyst%df_dt = 0.0_wp 
@@ -261,6 +294,20 @@ contains
 
                         end if 
 
+                case("sin")
+                    ! Apply periodic forcing with a given period, amplitude and x/y offset
+
+                    ! Calculate expected current forcing value based on time elapsed
+                    call calc_sin_now(f_tmp,time_elapsed,hyst%par%dt_ramp, &
+                                        hyst%par%f_min,hyst%par%f_max,x_offset=0.0_wp)
+
+                    ! Get rate of change to apply later 
+                    if (hyst%dt .ne. 0.0_wp) then 
+                        hyst%df_dt = (f_tmp-hyst%f_mean_now)/hyst%dt
+                    else 
+                        hyst%df_dt = 0.0_wp 
+                    end if 
+                    
                 case("exp")
 
                     if (dt_tot .lt. hyst%par%dt_ave) then 
@@ -610,6 +657,33 @@ contains
         return 
 
     end function calc_pi_rho_PID1
+
+
+    subroutine calc_sin_now(f_now,time_now,p,f_min,f_max,x_offset)
+
+        implicit none 
+
+        real(wp), intent(OUT) :: f_now 
+        real(wp), intent(IN)  :: time_now 
+        real(wp), intent(IN)  :: p
+        real(wp), intent(IN)  :: f_min
+        real(wp), intent(IN)  :: f_max 
+        real(wp), intent(IN)  :: x_offset
+
+        ! Local variables 
+        real(wp) :: amp 
+        real(wp) :: y_offset 
+
+        ! Get sinusoidal parameters
+        amp      = 0.5_wp * (f_max - f_min)
+        y_offset = 0.5_wp * (f_max + f_min)
+
+        ! Calculate expected current forcing value based on time elapsed
+        f_now = amp*sin(2.0_wp*pi*(time_now+x_offset)/p) + y_offset
+
+        return 
+
+    end subroutine calc_sin_now
 
 
     subroutine gen_random_normal(ynrm,mu,sigma)
