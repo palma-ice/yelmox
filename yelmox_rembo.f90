@@ -10,7 +10,7 @@ program yelmox
     use isostasy  
     
     use rembo_sclimate 
-    
+    use snapclim
     use marine_shelf 
     use sediments 
     use geothermal
@@ -20,7 +20,7 @@ program yelmox
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
-    
+    type(snapclim_class)   :: snp1 
     type(sealevel_class)   :: sealev 
     type(marshelf_class)   :: mshlf1 
     type(sediments_class)  :: sed1 
@@ -38,9 +38,8 @@ program yelmox
     
     logical :: use_hyster
     logical :: write_restart 
-    real(4) :: conv_km3_Gt, var 
+    real(4) :: convert_km3_Gt, var 
     real(4) :: dTa, dT_summer
-    real(4) :: dTdt 
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -71,7 +70,6 @@ program yelmox
     call nml_read(path_par,"ctrl","transient",   calc_transient_climate)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_hyster",  use_hyster)                 ! Use hyster?
     call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
-    call nml_read(path_par,"ctrl","dTdt",        dTdt)                       ! Constant rate of temperature change when not using hyster
     call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
     call nml_read(path_par,"ctrl","with_ice_sheet",with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,"ctrl","optimize",optimize)              ! Optimize basal friction?
@@ -115,8 +113,11 @@ program yelmox
 
     ! Initialize hysteresis module for transient forcing experiments 
     call hyster_init(hyst1,path_par,time_init) 
-    conv_km3_Gt = rho_ice *1e-3
+    convert_km3_Gt = rho_ice *1e-3
 
+    ! Initialize "climate" model (here for ocean forcing)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
                         domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
@@ -127,18 +128,20 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Initialize isostasy using present-day topography values to 
-    ! calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &                !mmr
-                         H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)    !mmr
-
+    ! Initialize isostasy using present-day topography 
+    ! values to calibrate the reference rebound
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
+                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
+                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
+                                    
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
     yelmo1%bnd%H_sed = sed1%now%H 
     
     if (use_hyster) then
         ! Update hysteresis variable 
-        call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+        call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
         dT_summer = hyst1%f_now 
     end if 
 
@@ -167,14 +170,16 @@ program yelmox
         where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 2.0 
 
     end if 
+    
+    ! Update snapclim
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
 
-    ! write(*,*) "To do..."
-    ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-    !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-    !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+    call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -255,7 +260,7 @@ if (calc_transient_climate) then
         
         if (use_hyster) then
             ! Update forcing based on hysteresis module
-            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
+            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
             
             dT_summer = hyst1%f_now 
@@ -277,13 +282,16 @@ if (calc_transient_climate) then
         end if 
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        ! To do: currently no anomalies are calculated for the ocean with rembo active
-        ! call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-        !                     yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-        !                     snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
+        
+        ! Update snapclim
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain) 
+
+        call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
         call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                             yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
 
@@ -511,7 +519,7 @@ contains
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"cf_ref",ylmo%dyn%now%cf_ref,units="--",long_name="Bed friction scalar", &
+        call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

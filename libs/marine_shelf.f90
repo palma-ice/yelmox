@@ -4,6 +4,8 @@ module marine_shelf
     ! Module to simulate the marine-shelf interface:
     ! Calculates the basal mass balance of an ice shelf (bmb_shlf)
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     use nml 
     use ncio 
 
@@ -34,10 +36,18 @@ module marine_shelf
     real(wp), parameter :: rho_ice_sw = rho_ice / rho_sw 
     real(wp), parameter :: omega      = (rho_sw*cp_o) / (rho_ice*L_ice)     ! [1/K]
 
+    ! Global mask value definitions
+    integer, parameter :: mask_val_land           = 0 
+    integer, parameter :: mask_val_grounding_line = 1
+    integer, parameter :: mask_val_floating_line  = 2
+    integer, parameter :: mask_val_ocean          = 3
+    integer, parameter :: mask_val_deep_ocean     = 4
+    integer, parameter :: mask_val_lake           = 5
+        
     type marshelf_param_class
 
         character(len=56)   :: bmb_method
-        integer             :: tf_method  
+        integer             :: tf_method 
         character(len=56)   :: interp_method 
         character(len=56)   :: interp_depth 
         logical             :: find_ocean 
@@ -53,6 +63,7 @@ module marine_shelf
         character(len=512)  :: tf_path
         character(len=56)   :: tf_name
 
+        real(wp)            :: bmb_max  
         real(wp)            :: c_deep
         real(wp)            :: depth_deep
         real(wp)            :: depth_const
@@ -101,9 +112,9 @@ module marine_shelf
 
     private
     public :: marshelf_class
-    public :: marshelf_init
     public :: marshelf_update_shelf
     public :: marshelf_update
+    public :: marshelf_init
     public :: marshelf_end 
 
 contains 
@@ -155,17 +166,17 @@ contains
                         ! Floating ice, depth == z_ice_base
                         depth_shlf = H_ice(i,j)*rho_ice_sw
                     else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
-                        ! Grounded ice, depth == z_bed 
-                        depth_shlf = z_bed(i,j)
+                        ! Grounded ice, depth == H_ocn = z_sl-z_bed 
+                        depth_shlf = z_sl(i,j) - z_bed(i,j)
                     else 
                         ! Open ocean, depth == constant value, eg 2000 m. 
                         depth_shlf = mshlf%par%depth_const
                     end if
 
                 case("bed")
-                    ! Assign the depth of the bedrock 
+                    ! Assign the depth corresponding to the bedrock 
 
-                    depth_shlf = z_bed(i,j)
+                    depth_shlf = z_sl(i,j) - z_bed(i,j)
 
                 case("const")
 
@@ -248,7 +259,6 @@ contains
         ! Local variables
         integer :: i, j, nx, ny, ngr 
 
-        real(wp), allocatable :: H_ocn(:,:)
         logical,  allocatable :: is_grline(:,:)   
         real(wp), allocatable :: gamma2D(:,:)
         logical :: with_slope 
@@ -256,7 +266,6 @@ contains
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
-        allocate(H_ocn(nx,ny)) 
         allocate(is_grline(nx,ny))
         allocate(gamma2D(nx,ny))
 
@@ -265,20 +274,18 @@ contains
         do j = 1, ny
         do i = 1, nx
 
-            if (f_grnd(i,j) .eq. 0.0) then 
+            if (f_grnd(i,j) .lt. 1.0) then 
                 ! Floating ice shelves
+                ! (even assume floating at grounding line to allow
+                ! reasonable calculations for non-binary f_grnd)
                 
                 ! Calculate height of ice-shelf base relative to sea level 
                 mshlf%now%z_base(i,j) = z_sl(i,j) - (H_ice(i,j)*rho_ice_sw)
                 
-                ! Calculate ocean depth
-                H_ocn(i,j) = max(mshlf%now%z_base(i,j) - z_bed(i,j),0.0) 
-
             else 
                 ! Grounded ice, define for completeness
-            
-                mshlf%now%z_base(i,j)       = z_bed(i,j) 
-                H_ocn(i,j)                  = 0.0 
+
+                mshlf%now%z_base(i,j) = z_bed(i,j)
 
             end if 
             
@@ -286,25 +293,11 @@ contains
         end do 
 
         ! Calculate slope of ice-shelf base 
-        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,f_grnd,dx)
+        call calc_shelf_slope(mshlf%now%slope_base,mshlf%now%z_base,dx)
         
-        ! Determine location of grounding line 
-        call calc_grline(is_grline,f_grnd)
+        ! Define the ocean mask (land, grounding line, floating line, ocean, deep ocean, lakes)
+        call set_ocean_mask(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref,mshlf%par%find_ocean)
 
-        if (mshlf%par%find_ocean) then 
-            ! Determine which floating or partially floating points
-            ! are connected to the open-ocean
-
-            call find_open_ocean(mshlf%now%mask_ocn,f_grnd,mshlf%now%mask_ocn_ref)
-
-        else 
-            ! Set any floating or partially floating points to ocean points
-
-            mshlf%now%mask_ocn = 0 
-            where (f_grnd .lt. 1.0) mshlf%now%mask_ocn = 1
-            where (f_grnd .lt. 1.0 .and. mshlf%now%mask_ocn_ref .eq. 2) mshlf%now%mask_ocn = 2
-
-        end if
 
         ! 2. Calculate various fields of interest ============================
 
@@ -315,21 +308,33 @@ contains
 
         ! Calculate the thermal forcing, if desired 
         ! (not used for pico, but good to diagnose anyway and needed for other methods)
+        
         select case(mshlf%par%tf_method)
 
             case(0)
                 ! tf_shlf defined externally, do nothing 
 
             case(1) 
-                ! Determine tf_shlf 
+                ! Determine tf_shlf via T_shlf - T_fp
 
-                if (mshlf%par%tf_correction) call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr) 
+                ! Consistency check 
+                if (trim(mshlf%par%bmb_method) .eq. "anom") then 
+                    write(error_unit,*) "marshelf_update:: Error: for bmb_method='anom', &
+                    &tf_method=1 cannot be used."
+                    write(error_unit,*) "bmb_method = ", trim(mshlf%par%bmb_method)
+                    write(error_unit,*) "tf_method  = ", mshlf%par%tf_method
+                    stop 
+                end if 
 
-                where (mshlf%now%mask_ocn .gt. 0) 
-                    mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) + mshlf%now%tf_corr 
-                elsewhere 
-                    mshlf%now%tf_shlf = 0.0_wp 
-                end where 
+                mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) &
+                            + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
+
+            case(2)
+                ! Calculate the thermal forcing specific to the anom method 
+                ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
+                ! Note: for bmb_method='anom', tf_method automatically set to 2. 
+
+                mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
             case DEFAULT 
 
@@ -338,6 +343,14 @@ contains
                 stop 
 
         end select 
+        
+
+        ! Check consistency of tf_shlf field here. Make sure that 
+        ! warmer water inland cannot be accessed below grounded ice. 
+
+        ! To do: maybe this is not necessary?? ajr, 2022-02-10
+
+
 
         ! 3. Calculate current ice shelf bmb field (grounded-ice bmb is
         ! calculated in ice-sheet model separately) ========
@@ -347,24 +360,9 @@ contains
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
 
-                ! jablasco: correcting T_shlf with basin correction
-                mshlf%now%T_shlf = mshlf%now%T_shlf+mshlf%now%tf_corr_basin
                 call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
-                ! Set bmb_shlf to pico value and correct with basin 
-                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf + mshlf%now%bmb_corr
-                
-                ! === Apply logical limitations =====
-
-                ! Set bmb to zero for grounded points 
-                where (mshlf%now%mask_ocn .eq. 0) mshlf%now%bmb_shlf = 0.0
-
-                ! Ensure that ice accretion only occurs where ice exists 
-                where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0
-
-                !where(f_grnd .eq. 0.0) mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
-                
                 ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
                 select case(trim(mshlf%par%domain))
                     case("Antarctica")
@@ -375,8 +373,6 @@ contains
                     "quad-slope","quad-nl-slope","anom") 
                 ! Calculate bmb_shlf using other available parameterizations 
 
-                ! jablasco: correcting tf_shlf with baisn correction 
-                mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr_basin
                 ! Check whether slope is being applied here 
                 if (index(trim(mshlf%par%bmb_method),"slope") .gt. 0) then 
                     with_slope = .TRUE. 
@@ -425,7 +421,7 @@ contains
                         
                         ! Calculate basin-average thermal forcing 
                         call calc_variable_basin(mshlf%now%tf_basin,mshlf%now%tf_shlf, &
-                                                                        f_grnd,basins,H_ice)
+                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
 
                         ! Ensure tf_basin is non-negative following Lipscomb et al (2021)
                         where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp 
@@ -435,27 +431,15 @@ contains
                     
                     case("anom")
 
-                        ! Calculate the thermal forcing specific to the anom method 
-                        ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
-                        mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr 
-
                         call calc_bmb_anom(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%bmb_ref, &
                                     mshlf%par%kappa_grz,mshlf%par%c_grz,mshlf%par%f_grz_shlf, &
-                                    is_grline,mshlf%par%grz_length,dx)
+                                    mshlf%now%mask_ocn,mshlf%par%grz_length,dx)
 
                 end select 
-               
+
                 ! Apply basin correction
                 mshlf%now%bmb_shlf = mshlf%now%bmb_shlf + mshlf%now%bmb_corr
- 
-                ! === Apply logical limitations =====
-
-                ! Set bmb to zero for grounded points 
-                where (mshlf%now%mask_ocn .eq. 0) mshlf%now%bmb_shlf = 0.0 
-
-                ! Ensure that ice accretion only occurs where ice exists 
-                where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) mshlf%now%bmb_shlf = 0.0 
-
+                
             case DEFAULT 
 
                 write(*,*) "marshelf_update:: Error: bmb_method not recognized."
@@ -464,6 +448,26 @@ contains
 
         end select 
 
+        ! === Apply limitations ====
+
+        ! The above routines calculate bmb_shlf everywhere with no limitations
+        ! (ie, also for grounded ice and lakes if tf_shlf is defined). 
+        ! Below we should apply specific limitations. 
+
+        ! Apply maximum refreezing rate 
+        where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
+                                mshlf%now%bmb_shlf = mshlf%par%bmb_max
+
+        ! ajr: disable for testing!!
+        ! ! Set bmb to zero for grounded and lake points 
+        ! where (mshlf%now%mask_ocn .eq. mask_val_land .or. &
+        !        mshlf%now%mask_ocn .eq. mask_val_lake)     &
+        !                                     mshlf%now%bmb_shlf = 0.0 
+
+        ! Ensure that ice accretion only occurs where ice exists 
+        where (mshlf%now%bmb_shlf .gt. 0.0 .and. H_ice .eq. 0.0) &
+                                            mshlf%now%bmb_shlf = 0.0 
+        
         ! Apply c_deep melt value to deep ocean points
         ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
         ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
@@ -487,8 +491,11 @@ contains
         real(wp), intent(IN)            :: basins(:,:)
         
         ! Local variables
-        integer :: j 
-        integer :: num
+        integer  :: j 
+        integer  :: num
+        character(len=56) :: group_now
+        real(wp) :: basin_number_now
+        real(wp) :: tf_corr_now 
 
         ! Load parameters
         call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
@@ -519,53 +526,98 @@ contains
 
         end if 
 
-        ! Make domain specific initializations
-        ! Initialize basin correction
+        ! Initialize basin-wide correction fields
         mshlf%now%bmb_corr      = 0.0
         mshlf%now%tf_corr_basin = 0.0
-        select case(trim(mshlf%par%domain))
 
-            case("Antarctica")
-
+        ! Define basin-wide corrections as needed     
+        select case(trim(mshlf%par%corr_method))
+            
+            case("bmb")
                 ! Modify specific basins according to parameter values 
+
                 do j = 1, size(mshlf%par%basin_number)
-
-                    select case(trim(mshlf%par%corr_method))
-                        case("bmb")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
-                        case("tf")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
-                        case DEFAULT
-                            ! DO NOTHING
-                    end select
-
-                end do               
- 
-            case("Greenland") 
-
-                ! Modify specific basins according to parameter values 
-                do j = 1, size(mshlf%par%basin_number)
-                    
-                    select case(trim(mshlf%par%corr_method))
-                        case("bmb")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
-                        case("tf")
-                            where(basins .eq. mshlf%par%basin_number(j)) &
-                                mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
-                        case DEFAULT
-                            ! DO NOTHING
-                    end select
-
+                    where(basins .eq. mshlf%par%basin_number(j)) &
+                        mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
                 end do 
+
+            case("tf")
+                ! Modify specific basins according to parameter values 
+
+                do j = 1, size(mshlf%par%basin_number)
+
+                    where(basins .eq. mshlf%par%basin_number(j)) &
+                        mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
+
+                end do
+
+            case("tf-grl") 
+                ! Modify specific basins according to parameter values 
+                ! as defined in the parameter section 'tf_corr_grl'
+
+                group_now = "tf_corr_grl" 
+
+                ! ne = northeast
+                call nml_read(filename,group_now,"ne",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[2.0_wp])
                 
-            case DEFAULT 
+                ! e = east
+                call nml_read(filename,group_now,"e",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[3.0_wp])
+                
+                
+                ! se = southeast 
+                call nml_read(filename,group_now,"se",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[4.0_wp])
 
-                ! Pass - no basins defined for other domains yet 
+                
+                ! w = west
+                call nml_read(filename,group_now,"w",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[6.0_wp,7.0_wp,8.0_wp])
+                
 
-        end select 
+            case("tf-ant") 
+                ! Modify specific basins according to parameter values 
+                ! as defined in the parameter section 'tf_corr_ant'
+
+                group_now = "tf_corr_ant" 
+
+                ! Ronne 
+                call nml_read(filename,group_now,"ronne",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[1.0_wp])
+                
+                ! Ross
+                call nml_read(filename,group_now,"ross",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[12.0_wp])
+                
+                ! Pine Island 
+                call nml_read(filename,group_now,"pine",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[14.0_wp])
+                
+                ! Abbott 
+                call nml_read(filename,group_now,"abbott",tf_corr_now)
+                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                                                basin_numbers=[15.0_wp])
+                
+            case DEFAULT ! eg, "none", "None", "zero"
+
+                ! DO NOTHING
+
+        end select
+
+        ! Load tf_corr field from file if desired 
+        if (mshlf%par%tf_correction) then 
+
+            call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr)
+
+        end if  
 
         ! ==============================================
         ! Generate reference ocean mask 
@@ -573,16 +625,16 @@ contains
 
         ! Define mask_ocn_ref based on regions mask 
         ! (these definitions should work for all North and Antarctica domains)
-        mshlf%now%mask_ocn_ref = 0 
-        where (regions .eq. 1.0_wp) mshlf%now%mask_ocn_ref = 1   
-        where (regions .eq. 2.0_wp) mshlf%now%mask_ocn_ref = 1 
+        mshlf%now%mask_ocn_ref = mask_val_land 
+        where (regions .eq. 1.0_wp) mshlf%now%mask_ocn_ref = mask_val_ocean
+        where (regions .eq. 2.0_wp) mshlf%now%mask_ocn_ref = mask_val_ocean
 
         select case(trim(mshlf%par%domain))
 
             case("Greenland") 
                 ! Greenland specific ocean kill regions
 
-                where (regions .ne. 1.3) mshlf%now%mask_ocn_ref = 2 
+                where (regions .ne. 1.3) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
 
                 ! ajr: not used anymore now with mask_ocn_ref formulation,
                 ! keeping code here just to see if Greenland domain still calculated well.
@@ -600,19 +652,19 @@ contains
                 ! Antarctica specific ocean kill regions
 
                 ! Omit regions==2.11 which means c_deep is not applied to deep points within continental shelf
-                where (regions .ne. 2.11) mshlf%now%mask_ocn_ref = 2 
+                where (regions .ne. 2.11) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
 
             ! case("North") 
             !     ! North specific ocean kill regions
 
             !     ! Apply only in purely open-ocean regions  
-            !     where (regions .eq. 1.0) mshlf%now%mask_ocn_ref = 2 
+            !     where (regions .eq. 1.0) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
 
             case DEFAULT 
                 ! Other domains: c_deep potentially applied everywhere 
                 ! with deep ocean points 
 
-                mshlf%now%mask_ocn_ref = 2 
+                mshlf%now%mask_ocn_ref = mask_val_deep_ocean
 
         end select 
 
@@ -644,6 +696,32 @@ contains
         return 
 
     end subroutine marshelf_init
+
+    subroutine apply_tf_corr_by_basin(tf_corr,basins,tf_corr_now,basin_numbers)
+        ! Apply the value of tf_corr_now in the basins that correspond
+        ! to the given basin_numbers of interest. 
+
+        implicit none
+
+        real(wp), intent(INOUT) :: tf_corr(:,:) 
+        real(wp), intent(IN)    :: basins(:,:) 
+        real(wp), intent(IN)    :: tf_corr_now
+        real(wp), intent(IN)    :: basin_numbers(:) 
+
+        ! Local variables 
+        integer :: b, nb 
+        real(wp) :: basin_number_now
+
+        nb = size(basin_numbers)
+
+        do b = 1, nb 
+            basin_number_now = basin_numbers(b) 
+            where(basins .eq. basin_number_now) tf_corr = tf_corr_now
+        end do 
+
+        return
+
+    end subroutine apply_tf_corr_by_basin
 
     subroutine marshelf_end(mshlf)
 
@@ -684,6 +762,7 @@ contains
         call nml_read(filename,group,"tf_path",        par%tf_path,        init=init_pars)
         call nml_read(filename,group,"tf_name",        par%tf_name,        init=init_pars)
  
+        call nml_read(filename,group,"bmb_max",        par%bmb_max,        init=init_pars)
         call nml_read(filename,group,"c_deep",         par%c_deep,         init=init_pars)
         call nml_read(filename,group,"depth_deep",     par%depth_deep,     init=init_pars)
         call nml_read(filename,group,"depth_const",    par%depth_const,    init=init_pars)
@@ -740,11 +819,11 @@ contains
         implicit none 
 
         type(marshelf_param_class) :: par 
-        real(wp), intent(INOUT)  :: bmb(:,:)  
-        integer,    intent(IN)     :: mask_ocn(:,:) 
-        real(wp), intent(IN)     :: z_bed(:,:) 
-        real(wp), intent(IN)     :: z_sl(:,:)
-        integer,    intent(IN)     :: n_smth       ! Smoothing neighborhood radius in grid points
+        real(wp), intent(INOUT)    :: bmb(:,:)  
+        integer,  intent(IN)       :: mask_ocn(:,:) 
+        real(wp), intent(IN)       :: z_bed(:,:) 
+        real(wp), intent(IN)       :: z_sl(:,:)
+        integer,  intent(IN)       :: n_smth       ! Smoothing neighborhood radius in grid points
 
         ! Local variables 
         integer :: i, j, nx, ny 
@@ -766,7 +845,7 @@ contains
 
         ! Apply c_deep to appropriate regions or keep bmb, whichever is more negative
 
-        where(mask_ocn .eq. 2 .and. z_sl-z_bed .ge. par%depth_deep) bmb = par%c_deep 
+        where(mask_ocn .eq. mask_val_deep_ocean .and. z_sl-z_bed .ge. par%depth_deep) bmb = par%c_deep 
 
         ! Make sure bmb transitions smoothly to c_deep value from neighbors 
         
@@ -796,7 +875,7 @@ contains
 
     end subroutine apply_c_deep
 
-    subroutine calc_shelf_slope(slope,z_base,f_grnd,dx)
+    subroutine calc_shelf_slope(slope,z_base,dx)
         ! Calculate the slope of the ice shelf base centered on aa-node, 
         ! where slope = sin(theta) = height/hypotenuse
 
@@ -804,7 +883,6 @@ contains
 
         real(wp), intent(OUT) :: slope(:,:) 
         real(wp), intent(IN)  :: z_base(:,:) 
-        real(wp), intent(IN)  :: f_grnd(:,:) 
         real(wp), intent(IN)  :: dx 
 
         ! Local variables 
@@ -840,42 +918,236 @@ contains
 
     end subroutine calc_shelf_slope
 
-    subroutine calc_grline(is_grline,f_grnd)
-        ! Determine the grounding line given the grounded fraction f_grnd
-        ! ie, is_grline is true for a floating point or partially floating  
-        ! point with grounded neighbors
+    subroutine set_ocean_mask(mask_ocn,f_grnd,mask_ocn_ref,find_ocean)
+        ! Define a mask of topographic properties
+        ! 0: Land
+        ! 1: Grounding line (grounded side, including partially floating points)
+        ! 2: Floating line  (first fully floating points adjacent to grounding line)
+        ! 3: Open ocean 
+        ! 4: Lakes 
 
-        implicit none 
+        implicit none
 
-        logical,  intent(OUT) :: is_grline(:,:) 
+        integer,  intent(OUT) :: mask_ocn(:,:) 
         real(wp), intent(IN)  :: f_grnd(:,:)
+        integer,  intent(IN)  :: mask_ocn_ref(:,:)
+        logical,  intent(IN)  :: find_ocean         ! Should open-ocean and lake points be determined?
 
         ! Local variables 
         integer :: i, j, nx, ny  
+        integer :: im1, ip1, jm1, jp1 
 
-        nx = size(is_grline,1)
-        ny = size(is_grline,2)
+        integer, allocatable :: mask_open_ocn(:,:) 
 
-        is_grline = .FALSE. 
-        do i = 2, nx-1 
-        do j = 2, ny-1 
+        nx = size(mask_ocn,1)
+        ny = size(mask_ocn,2) 
+
+        ! First, by default set everything to open ocean
+        mask_ocn = mask_val_ocean 
+
+        do j = 1, ny 
+        do i = 1, nx 
+        
+            ! Get neighbor indices
+            im1 = max(i-1,1) 
+            ip1 = min(i+1,nx) 
+            jm1 = max(j-1,1) 
+            jp1 = min(j+1,ny) 
             
-            ! Floating point or partially floating point with grounded neighbors
-            if (f_grnd(i,j) .lt. 1.0 .and. &
-                (f_grnd(i-1,j) .eq. 1.0 .or. f_grnd(i+1,j) .eq. 1.0 .or. &
-                 f_grnd(i,j-1) .eq. 1.0 .or. f_grnd(i,j+1) .eq. 1.0) ) then 
-                is_grline(i,j) = .TRUE. 
+            ! Determine cases (land, grounding line, floating line)
+
+            if (f_grnd(i,j) .gt. 0.0 .and. &
+                (f_grnd(im1,j) .eq. 0.0 .or. f_grnd(ip1,j) .eq. 0.0 .or. &
+                 f_grnd(i,jm1) .eq. 0.0 .or. f_grnd(i,jp1) .eq. 0.0) ) then 
+                ! Grounded point or partially floating point with fully floating neighbors
+                
+                mask_ocn(i,j) = mask_val_grounding_line
+
+            else if (f_grnd(i,j) .eq. 0.0 .and. &
+                (f_grnd(im1,j) .eq. 1.0 .or. f_grnd(ip1,j) .eq. 1.0 .or. &
+                 f_grnd(i,jm1) .eq. 1.0 .or. f_grnd(i,jp1) .eq. 1.0) ) then 
+                ! Fully floating point with partially floating or grounded neighbors
+                
+                mask_ocn(i,j) = mask_val_floating_line
+
+            else if (f_grnd(i,j) .eq. 1.0) then 
+                ! Land point 
+
+                mask_ocn(i,j) = mask_val_land
+
+            else if (f_grnd(i,j) .eq. 0.0 .and. mask_ocn_ref(i,j) .eq. mask_val_deep_ocean) then
+
+                mask_ocn(i,j) = mask_val_deep_ocean
+
+            else
+
+                mask_ocn(i,j) = mask_val_ocean 
 
             end if 
             
         end do 
         end do 
 
+        ! Diagnose further cases
+
+            
+        if (find_ocean) then 
+            ! If desired, determine which floating or partially 
+            ! floating points are connected to the open-ocean
+            ! (otherwise all ocean points are assumed to be open-ocean points)
+
+            call find_open_ocean_and_lakes(mask_ocn,mask_ocn_ref)
+
+        end if 
+
+        return
+
+    end subroutine set_ocean_mask
+
+
+    subroutine find_open_ocean_and_lakes(mask_ocn,mask_ocn_ref)
+        ! Brute-force routine to find all ocean points 
+        ! (ie, when f_grnd < 1) connected to
+        ! the open ocean as defined in mask_ocn_ref. 
+
+        ! Mask returned should be the same as original mask_ocn,
+        ! except with floating points and ground-line points that are not
+        ! connected to the open ocean set to lakes. 
+
+        implicit none 
+
+        integer, intent(INOUT) :: mask_ocn(:,:)
+        integer, intent(IN)    :: mask_ocn_ref(:,:) 
+
+        ! Local variables 
+        integer :: i, j, q, nx, ny
+        integer :: im1, ip1, jm1, jp1 
+        integer :: n_unfilled 
+
+        integer, allocatable :: mask(:,:) 
+        integer, allocatable :: mask0(:,:) 
+
+        integer, parameter :: qmax = 1000 
+
+        nx = size(mask_ocn,1)
+        ny = size(mask_ocn,2) 
+
+        ! Allocate local mask object for diagnosing points of interest
+        allocate(mask(nx,ny))
+        allocate(mask0(nx,ny))
+
+        ! Initially assume all points are 'closed ocean' points (mask==-1)
+        mask = -1 
+
+        ! Set purely land points to zero 
+        where (mask_ocn .eq. mask_val_land) mask = 0 
+
+        ! Set grounding-line points to specific value too (mask==-2)
+        where (mask_ocn .eq. mask_val_grounding_line)  mask = -2
+
+        ! Now populate our ocean mask to be consistent 
+        ! with known open ocean points that can be 
+        ! normal open ocean (1) or deep ocean (2) 
+        where (mask .eq. -1 .and. &
+            (mask_ocn_ref .eq. mask_val_ocean .or. &
+             mask_ocn_ref .eq. mask_val_deep_ocean) )  mask = 1 
+         
+        ! Iteratively fill in open-ocean points that are found
+        ! next to known open-ocean points
+        do q = 1, qmax 
+
+            n_unfilled = 0 
+
+            do j = 1, ny 
+            do i = 1, nx 
+
+                ! Get neighbor indices 
+                im1 = max(i-1,1)
+                ip1 = min(i+1,nx)
+                jm1 = max(j-1,1)
+                jp1 = min(j+1,ny)
+                
+                if (mask(i,j) .eq. 1) then 
+                    ! This is an open-ocean point 
+                    ! Define any neighbor ocean points as open-ocean points
+                    
+                    if (mask(im1,j) .eq. -1) then 
+                        mask(im1,j) = 1
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                    if (mask(ip1,j) .eq. -1) then 
+                        mask(ip1,j) = 1 
+                        n_unfilled = n_unfilled + 1
+                    end if
+
+                    if (mask(i,jm1) .eq. -1) then 
+                        mask(i,jm1) = 1 
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                    if (mask(i,jp1) .eq. -1) then 
+                        mask(i,jp1) = 1 
+                        n_unfilled = n_unfilled + 1
+                    end if 
+
+                end if
+                    
+            end do 
+            end do  
+
+            !write(*,*) q, n_unfilled, count(mask .eq. -1) 
+
+            ! Exit loop if no more open-ocean points are found 
+            if (n_unfilled .eq. 0) exit 
+
+        end do 
+
+        ! Update the ocean mask to reflect open ocean and lakes
+        ! (deep ocean remains deep ocean always)
+        where(mask .eq. -1.0 .and. mask_ocn .eq. mask_val_ocean) &
+                                            mask_ocn = mask_val_lake
+
+        where(mask .eq. -1.0 .and. mask_ocn .eq. mask_val_floating_line) &
+                                            mask_ocn = mask_val_lake
+
+        ! Finally, check which grounding-line points should also
+        ! be connected to the open ocean.
+
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! Get neighbor indices 
+            im1 = max(i-1,1)
+            ip1 = min(i+1,nx)
+            jm1 = max(j-1,1)
+            jp1 = min(j+1,ny)
+            
+            if (mask(i,j) .eq. -2) then 
+                ! This is a grounding-line point.
+                ! If no neighbors are open ocean, set it to a lake point
+
+                if ( mask(im1,j) .ne. 1 .and. &
+                     mask(ip1,j) .ne. 1 .and. &
+                     mask(i,jm1) .ne. 1 .and. &
+                     mask(i,jp1) .ne. 1 ) then 
+                    ! No neighbors are open ocean, set
+                    ! this point to 'closed ocean' (lake)
+
+                    mask_ocn(i,j) = mask_val_lake
+
+                end if 
+                
+            end if 
+
+        end do
+        end do
+
         return 
 
-    end subroutine calc_grline
+    end subroutine find_open_ocean_and_lakes
 
-    subroutine calc_variable_basin(var_basin,var2D,f_grnd,basins,H_ice)
+    subroutine calc_variable_basin(var_basin,var2D,f_grnd,basins,H_ice,mask_ocn)
         ! Compute mean ocean temperature of ice-shelf basin
 
         implicit none
@@ -885,10 +1157,11 @@ contains
         real(wp), intent(IN)  :: f_grnd(:,:)
         real(wp), intent(IN)  :: basins(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
+        integer,  intent(IN)  :: mask_ocn(:,:)
 
         ! Local variables
-        integer :: i, j, m, nx, ny 
-        real(wp) :: n_pts, var_mean
+        integer :: i, j, m, nx, ny, npts 
+        real(wp) :: var_mean
 
         nx = size(var_basin,1)
         ny = size(var_basin,2) 
@@ -896,29 +1169,64 @@ contains
         ! Initially assign to shelf values real ocean values
         var_basin = var2D 
 
+        ! Loop over each basin
         do m=1, int(maxval(basins))
-            n_pts  = 0.0
+            
+            ! First calculate the basin-wide average variable value,
+            ! limited to floating ice shelf points
+
             var_mean = 0.0
+            npts     = 0
+            
+            do j = 1, ny
             do i = 1, nx
-                do j = 1, ny
-                    ! Floating ice point
-                    if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        !var_mean = var_mean+(1.0-f_grnd(i,j))*var2D(i,j)
-                        var_mean = var_mean + var2D(i,j)
-                        !n_pts = n_pts + (1.0-f_grnd(i,j))
-                        n_pts = n_pts + 1.0
-                    end if
-                end do
+                
+                ! Grounding-line or floating ice point, or if none available,
+                ! then any floating line points available in the basin.
+                if (basins(i,j) .eq. m .and. f_grnd(i,j) .lt. 1.0 .and.  &
+                     (H_ice(i,j) .gt. 0.0 .or. &
+                      mask_ocn(i,j) .eq. mask_val_floating_line .or. &
+                      mask_ocn(i,j) .eq. mask_val_grounding_line) ) then
+                    
+                    var_mean = var_mean + var2D(i,j)
+                    npts     = npts + 1
+
+                end if
+            
+            end do
             end do
 
-            ! Assign shelf value
+             
+            if (npts .gt. 0) then
+                ! Get mean basin value
+                
+                var_mean = var_mean / real(npts,wp)
+
+            else
+                ! Set to zero for now and print a warning for safety.
+                ! This case is unlikely to happen.
+
+                var_mean = 0.0_wp 
+                
+                write(*,*) "Warning:: calc_variable_basin:: no floating ice points &
+                &available in this basin for calculating the basin-wide mean."
+                write(*,*) "basin = ", m 
+                write(*,*) "n_flt = ", count(basins .eq. m .and. &
+                            (f_grnd .lt. 1.0 .and. H_ice .gt. 0.0) )
+                write(*,*) "n_ice = ", count(basins .eq. m .and. &
+                            (H_ice .gt. 0.0) )
+            end if 
+
+            ! Assign shelf value to all points in the basin
+            do j = 1, ny
             do i = 1, nx
-                do j = 1, ny
-                    ! Basin floating ice point
-                    if (f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0 .and. basins(i,j) .eq. m) then
-                        var_basin(i,j) = var_mean / n_pts
-                    end if
-                end do
+                
+                ! Basin point
+                if (basins(i,j) .eq. m) then
+                    var_basin(i,j) = var_mean
+                end if
+            
+            end do
             end do
 
         end do
@@ -1025,6 +1333,7 @@ contains
     elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
         ! Favier et al (2019), Eq. 3
+        ! z_base is ice-base elevation, which is negative below sea level
 
         implicit none 
 
@@ -1096,7 +1405,7 @@ contains
 
     end subroutine calc_bmb_quad_nl
     
-    elemental subroutine calc_bmb_anom(bmb,tf,bmb_ref,kappa_grz,c_grz,f_grz_shlf,is_grline,grz_length,dx)
+    elemental subroutine calc_bmb_anom(bmb,tf,bmb_ref,kappa_grz,c_grz,f_grz_shlf,mask_ocn,grz_length,dx)
         ! Calculate the ice-shelf basal mass balance following an anomaly approach:
         !
         ! bmb = bmb_ref + kappa*dT 
@@ -1113,7 +1422,7 @@ contains
         real(wp), intent(IN)  :: kappa_grz      ! [m yr-1 / K] Heat flux coeff. grounding zone 
         real(wp), intent(IN)  :: c_grz          ! [-] Scalar coefficient, grounding zone  
         real(wp), intent(IN)  :: f_grz_shlf     ! [-] Ratio of gl to shelf melt rate
-        logical,  intent(IN)  :: is_grline      ! [-] Grounding line mask
+        integer,  intent(IN)  :: mask_ocn       ! [-] Ocean mask
         real(wp), intent(IN)  :: grz_length     ! [km] Grounding-zone length scale
         real(wp), intent(IN)  :: dx             ! [m] Grid resolution 
 
@@ -1136,7 +1445,7 @@ contains
         ! Calculate floating shelf bmb: 
         bmb_floating = bmb_grline*f_shlf_grz
 
-        if (is_grline) then 
+        if (mask_ocn .eq. mask_val_grounding_line .or. mask_ocn .eq. mask_val_floating_line) then 
             ! Calculate gl-bmb as weighted average between gl-line value and shelf value 
             ! to account for resolution dependence 
             
@@ -1235,7 +1544,7 @@ contains
         if (allocated(now%tf_shlf))         deallocate(now%tf_shlf)
         if (allocated(now%tf_basin))        deallocate(now%tf_basin)
         if (allocated(now%tf_corr))         deallocate(now%tf_corr)
-        if (allocated(now%tf_corr_basin))         deallocate(now%tf_corr_basin)       
+        if (allocated(now%tf_corr_basin))   deallocate(now%tf_corr_basin)       
  
         if (allocated(now%z_base))          deallocate(now%z_base)
         if (allocated(now%slope_base))      deallocate(now%slope_base)
@@ -1297,96 +1606,6 @@ contains
 
     end function interp_linear
     
-    subroutine find_open_ocean(mask,f_grnd,mask_ref)
-        ! Brute-force routine to find all ocean points 
-        ! (ie, when f_grnd < 1) connected to
-        ! the open ocean as defined in mask_ref. 
-
-        implicit none 
-
-        integer,    intent(OUT) :: mask(:,:) 
-        real(wp),   intent(IN)  :: f_grnd(:,:)
-        integer,    intent(IN)  :: mask_ref(:,:) 
-
-        ! Local variables 
-        integer :: i, j, q, nx, ny
-        integer :: im1, ip1, jm1, jp1 
-        integer :: n_unfilled 
-
-        integer, parameter :: qmax = 1000 
-
-        nx = size(mask,1)
-        ny = size(mask,2) 
-
-        ! First specify land points (mask==0)
-        ! and assume all floating points are 'closed ocean' points (mask==-1)
-        mask = 0 
-        where (f_grnd .lt. 1.0) mask = -1 
-
-        ! Now populate our ocean mask to be consistent 
-        ! with known open ocean points that can be 
-        ! normal open ocean (1) or deep ocean (2) 
-        ! For now set all points to 1 for easier looping
-        where (mask .eq. -1 .and. mask_ref .gt. 0) mask = 1 
-         
-        ! Iteratively fill in open-ocean points that are found
-        ! next to known open-ocean points
-        do q = 1, qmax 
-
-            n_unfilled = 0 
-
-            do j = 1, ny 
-            do i = 1, nx 
-
-                ! Get neighbor indices 
-                im1 = max(i-1,1)
-                ip1 = min(i+1,nx)
-                jm1 = max(j-1,1)
-                jp1 = min(j+1,ny)
-                
-                if (mask(i,j) .eq. 1) then 
-                    ! This is an open-ocean point 
-                    ! Define any neighbor ocean points as open-ocean points
-                    
-                    if (mask(im1,j) .eq. -1) then 
-                        mask(im1,j) = 1
-                        n_unfilled = n_unfilled + 1
-                    end if 
-
-                    if (mask(ip1,j) .eq. -1) then 
-                        mask(ip1,j) = 1 
-                        n_unfilled = n_unfilled + 1
-                    end if
-
-                    if (mask(i,jm1) .eq. -1) then 
-                        mask(i,jm1) = 1 
-                        n_unfilled = n_unfilled + 1
-                    end if 
-
-                    if (mask(i,jp1) .eq. -1) then 
-                        mask(i,jp1) = 1 
-                        n_unfilled = n_unfilled + 1
-                    end if 
-
-                end if
-                    
-            end do 
-            end do  
-
-            !write(*,*) q, n_unfilled, count(mask .eq. -1) 
-
-            ! Exit loop if no more open-ocean points are found 
-            if (n_unfilled .eq. 0) exit 
-
-        end do 
-
-        ! Finally populate deep ocean points 
-        where (mask .gt. 0 .and. mask_ref .eq. 2) mask = 2 
-        
-        return 
-
-    end subroutine find_open_ocean
-
 end module marine_shelf
 
 
