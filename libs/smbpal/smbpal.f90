@@ -285,10 +285,12 @@ contains
                 
                 call calc_temp_effective(tmp4,smb%now%t2m-273.15,smb%now%sigma)
                 PDDs_ann = PDDs_ann + tmp4*30.0
+
             end do 
 
             ! Populate the ann object with the now object, then calculate the annual values 
             smb%ann = smb%now 
+             
             call smbpal_update_pdd(smb%ann,smb%par,PDDs_ann,z_srf,H_ice,t2m_ann,pr_ann,sf_ann)
 
             ! Note: annual values are output with units of [mm/a]
@@ -620,7 +622,7 @@ contains
 
         return 
 
-    end function calc_snowfrac 
+    end function calc_snowfrac
 
     ! =======================================================
     !
@@ -641,7 +643,7 @@ contains
         call nc_write_dim(filename,"yc",x=par%y)
         call nc_write_dim(filename,"day",  x=1,nx=360,dx=1)
         call nc_write_dim(filename,"month",x=1,nx=12,dx=1)
-        call nc_write_dim(filename,"time",x=0.0,units="ka BP",unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",x=0.0,units="kiloyears",unlimited=.TRUE.)
         
         ! Write the 2D latitude field to file
         call nc_write(filename,"lat2D",par%lats,dim1="xc",dim2="yc")
@@ -651,7 +653,7 @@ contains
 
         return 
 
-    end subroutine smbpal_write_init 
+    end subroutine smbpal_write_init
 
     subroutine smbpal_write(now,filename,time_bp,step,nstep)
 

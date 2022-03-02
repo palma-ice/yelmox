@@ -409,7 +409,7 @@ program yelmox
     yelmo1%bnd%H_sed = sed1%now%H 
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -426,10 +426,12 @@ program yelmox
 !                                file_out=trim(outfldr)//"smbpal.nc",write_now=.TRUE.,write_init=.TRUE.) 
 
 !     stop 
+
     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -506,7 +508,7 @@ program yelmox
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
 
             ! Update snapclim to reflect new topography 
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx)
 
             ! Update smbpal
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -685,12 +687,12 @@ program yelmox
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! Update snapclim
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain) 
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx) 
 
         ! == SURFACE MASS BALANCE ==============================================
 
         ! ajr: just testing...
-        !dT_now = 0.0 
+        dT_now = 0.0 
         !if (time .gt. 7000.0) dT_now = 4.0 
 
         call smbpal_update_monthly(smbpal1,snp1%now%tas+dT_now,snp1%now%pr, &
@@ -855,7 +857,7 @@ contains
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Strain-rate and stress tensors 
-        if (.TRUE.) then
+        if (.FALSE.) then
 
             ! call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
             !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
