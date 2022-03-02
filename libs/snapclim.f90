@@ -382,6 +382,7 @@ contains
 
         real(wp) :: dT_mean 
         real(wp) :: f_corr 
+        real(wp) :: t1, t2 
         real(wp), allocatable :: clim0_tsl_smooth(:,:) 
         real(wp), allocatable :: clim0_tsl_corr(:,:,:) 
         real(wp), allocatable :: clim0_prcor_smooth(:,:) 
@@ -485,12 +486,23 @@ contains
                         clim0_prcor_smooth = snp%clim0%prcor(:,:,m) 
                         call smooth_gauss_2D(clim0_prcor_smooth,dx=dx,f_sigma=80e3_wp/dx)
                         
+                        t1 = -8e3       ! [kyr ago] Before this time, f_corr=1
+                        t2 = -1e3       ! [kyr ago] After this time, f_corr=0
+
+                        if (time .le. t1) then 
+                            f_corr = 1.0 
+                        else if (time .ge. t2) then 
+                            f_corr = 0.0 
+                        else
+                            f_corr = 1.0_wp - (time-t1)/(t2-t1)
+                        end if 
+                        
                         ! Get corrected clim0_tsl
-                        f_corr = min(at,1.0)
+                        !f_corr = min(at,1.0)
                         clim0_tsl_corr(:,:,m)   = snp%clim0%tsl(:,:,m)*(1.0_wp-f_corr) + clim0_tsl_smooth*f_corr 
                         
                         ! Get corrected clim0_prcor
-                        f_corr = min(ap,1.0)
+                        !f_corr = min(ap,1.0)
                         clim0_prcor_corr(:,:,m) = snp%clim0%prcor(:,:,m)*(1.0_wp-f_corr) + clim0_prcor_smooth*f_corr 
                         
                     end do 

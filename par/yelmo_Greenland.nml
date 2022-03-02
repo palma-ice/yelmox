@@ -451,8 +451,8 @@
 
 &tf_corr_grl
     ne      = 0.0                   ! [K] tf_corr for northeast/negis basin (basin=2)
-    e       = 2.0                   ! [K] tf_corr for eastern basin (basin=3)
-    se      = 2.5                   ! [K] tf_corr for southeast basin (basin=4)
+    e       = 1.0                   ! [K] tf_corr for eastern basin (basin=3)
+    se      = 1.5                   ! [K] tf_corr for southeast basin (basin=4)
     w       = 0.0                   ! [K] tf_corr for western basin (basins=[6,7,8])
 /
 
