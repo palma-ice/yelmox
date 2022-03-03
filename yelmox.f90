@@ -333,6 +333,16 @@ program yelmox
             reg2%write = .FALSE. 
             reg3%write = .FALSE. 
 
+        case("Greenland")
+
+            ! Make sure to set ice_allowed to prevent ice from growing in 
+            ! Iceland and Svaalbard (on grid borders)
+
+            where(abs(yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
+                        
+
         case DEFAULT 
 
             reg1%write = .FALSE. 
