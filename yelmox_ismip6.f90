@@ -546,9 +546,6 @@ program yelmox_ismip6
         smbpal2 = smbpal1
         mshlf2  = mshlf1
         
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-        
         ! Update forcing to present-day reference
         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                     time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
@@ -564,6 +561,19 @@ program yelmox_ismip6
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+        ! ===== tf_corr initialization ======
+
+        ! Make sure that tf is prescribed externally
+        mshlf2%par%tf_method = 0 
+        mshlf2%now%tf_corr   = 0.0_wp 
+        
+        if (yelmo1%par%use_restart) then
+            ! Load tf_corr field from file 
+
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            
+        end if 
+        
         ! ===== basal friction optimization ======
         if (trim(ctl%equil_method) .eq. "opt") then 
             
@@ -580,38 +590,15 @@ program yelmox_ismip6
 
         end if 
 
-        ! ===== tf_corr initialization ======
-        if (.not. yelmo1%par%use_restart) then
-
-            ! Set tf_corr to zero initially 
-            mshlf1%now%tf_corr = 0.0_wp 
-            mshlf2%now%tf_corr = 0.0_wp 
-        
-        else 
-            ! Assume cf_ref was loaded in restart file.
-            ! Load tf_corr field from file 
-
-            path_tf_corr = yelmo1%par%restart
-            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
-
-            n = nc_size(path_tf_corr,"time")
-            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
-                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
-
-            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
-            
-        end if 
-
-        ! ========================================
 
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
 
-if (ctl%with_ice_sheet) then 
+if (ctl%with_ice_sheet .and. ctl%time_equil .gt. 0.0) then 
         ! Run yelmo alone for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,       dt=1.0_wp,topo_fixed=.FALSE.)
-        !call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
+        !call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,       dt=1.0_wp,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.FALSE.)
 end if 
 
         write(*,*) "Initial equilibration complete."
@@ -746,10 +733,10 @@ end if
         write(*,*)
         write(*,*) "Performing transient."
         write(*,*) 
- 
+        
         ! Initialize variables inside of ismip6 object 
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
-                                                domain="Antarctica",grid_name="ANT-32KM")
+                                                domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
         
@@ -757,23 +744,6 @@ end if
         smbpal2 = smbpal1
         mshlf2  = mshlf1
         
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-
-        if (yelmo1%par%use_restart) then 
-            ! Load tf_corr field from file 
-
-            path_tf_corr = yelmo1%par%restart
-            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
-
-            n = nc_size(path_tf_corr,"time")
-            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
-                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
-
-            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
-
-        end if 
-
         ! Update forcing to present-day reference 
         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
@@ -789,6 +759,19 @@ end if
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+        ! ===== tf_corr initialization ======
+
+        ! Make sure that tf is prescribed externally
+        mshlf2%par%tf_method = 0 
+        mshlf2%now%tf_corr   = 0.0_wp 
+        
+        if (yelmo1%par%use_restart) then
+            ! Load tf_corr field from file 
+
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            
+        end if 
+        
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
 
@@ -820,32 +803,12 @@ end if
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
- 
-if (.TRUE.) then 
             
-            ! Get hybrid snapclim + ISMIP6 climatic forcing 
 
+            ! Get hybrid snapclim + ISMIP6 climatic forcing 
             call calc_climate_hybrid(snp1,smbpal1,mshlf1,snp2,smbpal2,mshlf2, &
                                      ismp1,yelmo1,time,time_bp,ctl%time0,ctl%time1)
 
-else 
-    ! ISMIP6 only - to make sure it's working well.
-
-            call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
-                            time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
-            ! Overwrite original mshlf and snp with ismip6 derived ones 
-            snp1    = snp2
-            smbpal1 = smbpal2  
-            mshlf1  = mshlf2 
-
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-end if 
 
             ! == MODEL OUTPUT ===================================
 
@@ -869,6 +832,11 @@ end if
             end if 
 
             if (time == 1950.0_wp) then 
+                ! Write restart file at start of hist period
+                call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
+            end if 
+
+            if (time == 1905.0_wp) then 
                 ! Write restart file at start of hist period
                 call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
             end if 
@@ -898,7 +866,7 @@ end if
  
         ! Initialize variables inside of ismip6 object 
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
-                                                domain="Antarctica",grid_name="ANT-32KM")
+                                                domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
         
@@ -906,23 +874,6 @@ end if
         smbpal2 = smbpal1
         mshlf2  = mshlf1
         
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-
-        if (yelmo1%par%use_restart) then 
-            ! Load tf_corr field from file 
-
-            path_tf_corr = yelmo1%par%restart
-            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
-
-            n = nc_size(path_tf_corr,"time")
-            call nc_read(path_tf_corr,"tf_corr",mshlf2%now%tf_corr, &
-                            start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
-
-            write(*,*) "tf_corr: ", minval(mshlf2%now%tf_corr), maxval(mshlf2%now%tf_corr)
-
-        end if 
-
         ! Update forcing to present-day reference 
         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
@@ -938,6 +889,19 @@ end if
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+        ! ===== tf_corr initialization ======
+
+        ! Make sure that tf is prescribed externally
+        mshlf2%par%tf_method = 0 
+        mshlf2%now%tf_corr   = 0.0_wp 
+        
+        if (yelmo1%par%use_restart) then
+            ! Load tf_corr field from file 
+
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            
+        end if 
+        
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
 
@@ -1118,7 +1082,7 @@ end if
         
         ! Initialize variables inside of ismip6 object 
         call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
-                                                domain="Antarctica",grid_name="ANT-32KM")
+                                                domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
             
@@ -1132,21 +1096,8 @@ end if
         if (yelmo1%par%use_restart) then 
             ! Load tf_corr field from file 
 
-            path_tf_corr = yelmo1%par%restart
-            call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
-
-            if (nc_exists_var(path_tf_corr,"tf_corr")) then 
-                n = nc_size(path_tf_corr,"time")
-                call nc_read(path_tf_corr,"tf_corr",mshlf1%now%tf_corr, &
-                                start=[1,1,n],count=[yelmo1%grd%nx,yelmo1%grd%ny])
-            else 
-                write(*,*) "tf_corr: variable not found in restart folder yelmo2D.nc file!"
-                write(*,*) "path_tf_corr: ", trim(path_tf_corr)
-                stop 
-            end if 
-
-            write(*,*) "tf_corr: ", minval(mshlf1%now%tf_corr), maxval(mshlf1%now%tf_corr)
-
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            
         end if 
 
         ! Additionally make sure isostasy is update every timestep 
@@ -1951,7 +1902,6 @@ end if
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
-        
         if (present(dTo)) then 
             ! Update temperature fields with hysteresis anomaly 
             mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo
@@ -1990,6 +1940,9 @@ end if
 
         ! Local variables 
         real(wp) :: time_wt 
+
+if (.TRUE.) then 
+    !ajr : testing, proceed as normal here...
 
         if (time .le. time1) then 
 
@@ -2047,10 +2000,67 @@ end if
         
         end if
 
+else 
+    ! ajr: impose ISMIP6 forcing directly for testing
+
+        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp,ylmo,time,time_bp)
+
+        ! Overwrite original mshlf and snp with ismip6 derived ones 
+        snp1    = snp2
+        smbpal1 = smbpal2  
+        mshlf1  = mshlf2 
+
+        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
         return
 
+end if 
+      
     end subroutine calc_climate_hybrid
 
+    subroutine load_tf_corr_from_restart(tf_corr,file_restart)
+
+        implicit none 
+
+        real(wp),         intent(INOUT) :: tf_corr(:,:) 
+        character(len=*), intent(IN)    :: file_restart 
+    
+        ! Local variables 
+        integer :: i0, i1, n, nx, ny  
+        character(len=1024) :: path_tf_corr 
+
+        nx = size(tf_corr,1)
+        ny = size(tf_corr,2) 
+
+
+        ! Get folder holding the restart file and 
+        ! append filename holding the tf_corr field we want
+        ! (should be in yelmo2D.nc) 
+        i0 = index(file_restart,"/",back=.TRUE.)
+        path_tf_corr = file_restart(1:i0)//"yelmo2D.nc"
+
+        ! Old alternative method that only works if restart file
+        ! is named "yelmo_restart.nc"
+        !path_tf_corr = file_restart
+        !call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
+        
+
+        ! Load the tf_corr field from the last timestep of the yelmo2D file
+        n = nc_size(path_tf_corr,"time")
+        call nc_read(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny])
+
+        ! Write summary to screen
+        write(*,*) "load_tf_corr_from_restart:: loaded tf_corr field."
+        write(*,*) "path_tf_corr: ", trim(path_tf_corr)
+        write(*,*) "tf_corr: ", minval(tf_corr), maxval(tf_corr)
+
+        return
+
+    end subroutine load_tf_corr_from_restart
 
 
 ! ======================================

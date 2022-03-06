@@ -18,7 +18,7 @@
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 30e3              ! [yr] Ending time (model years)
-    time_equil      = 10.0              ! [yr] Equilibration time 
+    time_equil      = 1.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
