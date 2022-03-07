@@ -460,7 +460,7 @@ program yelmox_ismip6
             time         = ctl%time_init + n*ctl%dtt
             time_bp      = time - 1950.0_wp 
             time_elapsed = time - ctl%time_init 
-            
+
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=time_bp)
             yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -599,7 +599,7 @@ if (ctl%with_ice_sheet .and. ctl%time_equil .gt. 0.0) then
         ! Run yelmo alone for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
         !call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,       dt=1.0_wp,topo_fixed=.FALSE.)
-        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.FALSE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=10.0_wp,topo_fixed=.TRUE.)
 end if 
 
         write(*,*) "Initial equilibration complete."
