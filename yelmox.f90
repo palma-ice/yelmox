@@ -658,7 +658,7 @@ program yelmox
             case("relax")
                 ! ===== relaxation spinup ==================
 
-                if (ctl%with_ice_sheet .and. time_elapsed .lt. ctl%time_equil) then 
+                if (time_elapsed .lt. ctl%time_equil) then 
                     ! Turn on relaxation for now, to let thermodynamics equilibrate
                     ! without changing the topography too much. Important when 
                     ! effective pressure = f(thermodynamics).
@@ -667,12 +667,11 @@ program yelmox
                     yelmo1%tpo%par%topo_rel_tau = 50.0 
                     write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-                else if (ctl%with_ice_sheet .and. time_elapsed .eq. ctl%time_equil) then 
+                else if (time_elapsed .eq. ctl%time_equil) then 
                     ! Disable relaxation now... 
 
                     yelmo1%tpo%par%topo_rel     = 0
                     write(*,*) "timelog, relation off..."
-
 
                 end if 
 
