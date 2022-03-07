@@ -457,9 +457,10 @@ program yelmox_ismip6
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-            time    = ctl%time_init + n*ctl%dtt
-            time_bp = ctl%time_const - 1950.0_wp 
-
+            time         = ctl%time_init + n*ctl%dtt
+            time_bp      = time - 1950.0_wp 
+            time_elapsed = time - ctl%time_init 
+            
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=time_bp)
             yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -499,16 +500,16 @@ program yelmox_ismip6
 
             ! == MODEL OUTPUT ===================================
 
-            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
             end if
 
-            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
                 call yelmo_write_reg_step(yelmo1,file1D,time=time)
                  
             end if 
 
-            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
@@ -611,8 +612,8 @@ end if
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-            time    = ctl%time_init + n*ctl%dtt
-            time_bp = ctl%time_const - 1950.0_wp 
+            time         = ctl%time_init + n*ctl%dtt
+            time_bp      = time - 1950.0_wp 
             time_elapsed = time - ctl%time_init 
 
             ! ===== basal friction optimization ==================
@@ -698,16 +699,16 @@ end if
 
             ! == MODEL OUTPUT ===================================
 
-            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
             end if
 
-            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
                 call yelmo_write_reg_step(yelmo1,file1D,time=time)
                  
             end if 
 
-            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
@@ -744,6 +745,19 @@ end if
         smbpal2 = smbpal1
         mshlf2  = mshlf1
         
+        ! ===== tf_corr initialization ======
+
+        ! Make sure that tf is prescribed externally
+        mshlf2%par%tf_method = 0 
+        mshlf2%now%tf_corr   = 0.0_wp 
+        
+        if (yelmo1%par%use_restart) then
+            ! Load tf_corr field from file 
+
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            
+        end if 
+        
         ! Update forcing to present-day reference 
         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
@@ -759,19 +773,6 @@ end if
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-        ! ===== tf_corr initialization ======
-
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-        mshlf2%now%tf_corr   = 0.0_wp 
-        
-        if (yelmo1%par%use_restart) then
-            ! Load tf_corr field from file 
-
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
-            
-        end if 
-        
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt = 1.0_wp 
 
@@ -790,9 +791,10 @@ end if
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-            time    = ctl%time_init + n*ctl%dtt
-            time_bp = time - 1950.0_wp 
-            
+            time         = ctl%time_init + n*ctl%dtt
+            time_bp      = time - 1950.0_wp 
+            time_elapsed = time - ctl%time_init 
+
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
@@ -812,17 +814,17 @@ end if
 
             ! == MODEL OUTPUT ===================================
 
-            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
                                                   file2D,time,snp2,mshlf2,smbpal2)
             end if
 
-            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
                 call yelmo_write_reg_step(yelmo1,file1D,time=time)
                  
             end if 
 
-            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
@@ -832,11 +834,6 @@ end if
             end if 
 
             if (time == 1950.0_wp) then 
-                ! Write restart file at start of hist period
-                call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
-            end if 
-
-            if (time == 1905.0_wp) then 
                 ! Write restart file at start of hist period
                 call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
             end if 
@@ -920,9 +917,10 @@ end if
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-            time    = ctl%time_init + n*ctl%dtt
-            time_bp = time - 1950.0_wp 
-            
+            time         = ctl%time_init + n*ctl%dtt
+            time_bp      = time - 1950.0_wp 
+            time_elapsed = time - ctl%time_init 
+
             ! == ABUMIP =========================================================
 
             ! Make parameter changes relevant to abumip 
@@ -1033,17 +1031,17 @@ end if
             
             ! == MODEL OUTPUT ===================================
 
-            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
                                                   file2D,time,snp2,mshlf2,smbpal2)
             end if
 
-            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
                 call yelmo_write_reg_step(yelmo1,file1D,time=time)
                  
             end if 
 
-            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
@@ -1152,9 +1150,10 @@ end if
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-            time    = ctl%time_init + n*ctl%dtt
-            time_bp = time - 1950.0_wp 
-            
+            time         = ctl%time_init + n*ctl%dtt
+            time_bp      = time - 1950.0_wp 
+            time_elapsed = time - ctl%time_init 
+
             ! == HYSTERESIS =========================================================
 
             ! Make parameter changes relevant to hysteresis runs 
@@ -1296,15 +1295,15 @@ end if
 
             ! ** Using routines from yelmox_hysteresis_help **
 
-            if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call yx_hyst_write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
             end if
 
-            if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_small_out*100))==0) then
                 call yx_hyst_write_step_2D_combined_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time)
             end if
 
-            if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
                 call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,file1D,time=time)
                 
                 if (reg1%write) then 
@@ -1322,7 +1321,7 @@ end if
             end if 
 
 
-            if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
+            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
