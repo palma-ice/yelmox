@@ -408,9 +408,8 @@ program yelmox_ismip6
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    !call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
-    call yelmo_init_state(yelmo1,time=time,thrm_method="robin")
-
+    call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
+    
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables 
         ! equal to restarted value as needed 
