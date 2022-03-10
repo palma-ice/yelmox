@@ -107,9 +107,9 @@
 
 &opt_L21
     cf_time         = 30e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 0.1               ! Initial value of cf_ref everywhere
-    cf_min          = 1e-3              ! [--] Minimum allowed cf value
-    cf_max          = 0.2               ! [--] Maximum allowed cf value
+    cf_init         = 20                ! Initial value of cf_ref everywhere
+    cf_min          = 2                 ! [--] Minimum allowed cf value
+    cf_max          = 45                ! [--] Maximum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
