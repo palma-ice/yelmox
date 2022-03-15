@@ -375,7 +375,8 @@ contains
             hyst%f_mean_now = hyst%f_mean_now + (hyst%df_dt*hyst%dt) 
 
             ! Ensure f_min/f_max bounds are not exceeded (ramp method)
-            if (trim(hyst%par%method) .eq. "ramp") then 
+            if (trim(hyst%par%method) .eq. "ramp-slope" .or. &
+                trim(hyst%par%method) .eq. "ramp-time") then 
                 if (hyst%f_mean_now .lt. hyst%par%f_min) hyst%f_mean_now = hyst%par%f_min 
                 if (hyst%f_mean_now .gt. hyst%par%f_max) hyst%f_mean_now = hyst%par%f_max 
             end if 
