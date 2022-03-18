@@ -88,6 +88,7 @@ program yelmox_ismip6
         
         character(len=56) :: hyst_scenario 
         real(wp)          :: hyst_f_to 
+        real(wp)          :: hyst_f_ta
 
     end type 
 
@@ -190,6 +191,7 @@ program yelmox_ismip6
 
             call nml_read(path_par,"hysteresis","scenario",      ctl%hyst_scenario)
             call nml_read(path_par,"hysteresis","f_to",          ctl%hyst_f_to)
+            call nml_read(path_par,"hysteresis","f_ta",          ctl%hyst_f_ta)
             call nml_read(path_par,"hysteresis","dt2D_small_out",ctl%dt2D_small_out)          ! [yr] Frequency of 2D output 
     
     end select
@@ -1170,7 +1172,7 @@ end if
         ! Update forcing to constant reference time with initial hyst forcing
         call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                     time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
-                    dTa=hyst1%f_now,dTo=hyst1%f_now*ctl%hyst_f_to)
+                    dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
 
         yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -1262,7 +1264,7 @@ if (.TRUE.) then
             ! Update forcing to initial time with initial hyst forcing
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                         time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
-                        dTa=hyst1%f_now,dTo=hyst1%f_now*ctl%hyst_f_to)
+                        dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -1277,7 +1279,7 @@ else
             
             ! Update snapclim
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain, &
-                                                dTa=hyst1%f_now,dTo=hyst1%f_now*ctl%hyst_f_to)
+                                                dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
 
             ! Update surface mass balance
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -2565,6 +2567,3 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
 
 end program yelmox_ismip6
-
-
-
