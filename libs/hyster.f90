@@ -284,7 +284,7 @@ contains
                                     hyst%f_mean_now .ge. hyst%par%f_max) ) then  
                             ! Ramp-up complete, no more forcing change 
 
-                            hyst%df_dt = 0.0_wp 
+                            hyst%df_dt = 0.0_wp
 
                         else 
                             ! Linear rate of change from f_max to f_min (or vice versa) over 
@@ -370,15 +370,15 @@ contains
 
         if (hyst%dt .gt. 0.0_wp) then 
             ! Update f_now, etc. if time step is non-zero. 
-
-            ! Update the mean forcing value 
-            hyst%f_mean_now = hyst%f_mean_now + (hyst%df_dt*hyst%dt) 
-
+            hyst%f_mean_now = hyst%f_mean_now + (hyst%df_dt*hyst%dt)
             ! Ensure f_min/f_max bounds are not exceeded (ramp method)
-            if (trim(hyst%par%method) .eq. "ramp") then 
-                if (hyst%f_mean_now .lt. hyst%par%f_min) hyst%f_mean_now = hyst%par%f_min 
-                if (hyst%f_mean_now .gt. hyst%par%f_max) hyst%f_mean_now = hyst%par%f_max 
-            end if 
+            
+            if (hyst%f_mean_now .lt. hyst%par%f_min) then
+                hyst%f_mean_now = hyst%par%f_min
+            end if
+            if (hyst%f_mean_now .gt. hyst%par%f_max) then
+                hyst%f_mean_now = hyst%par%f_max
+            end if
 
             ! If desired, generate some noise 
             if (hyst%par%sigma .gt. 0.0) then 
