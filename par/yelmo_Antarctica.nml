@@ -134,12 +134,12 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
-    is_angle        = False             ! cb_ref is a till strength angle?
+    scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
+    is_angle        = True              ! cb_ref is a till strength angle?
     z0              = -400.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =    0.0            ! [m] Bedrock rel. to sea level, upper limit
-    cf_min          =  0.001            ! [-- or deg] Minimum value of cf
-    cf_ref          =  0.2              ! [-- or deg] Reference/const/max value of cf
+    cf_min          =  0.1              ! [-- or deg] Minimum value of cf
+    cf_ref          =  15               ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
@@ -434,8 +434,8 @@
 /
 
 &tf_corr_ant
-    ronne   =  0.1                  ! [K] tf_corr for ronne basin (basin=1)
-    ross    =  0.1                  ! [K] tf_corr for ronne ross  (basin=12)
+    ronne   =  0.3                  ! [K] tf_corr for ronne basin (basin=1)
+    ross    =  0.3                  ! [K] tf_corr for ronne ross  (basin=12)
     pine    = -1.5                  ! [K] tf_corr for ronne pine  (basin=14)
     abbott  =  0.0                  ! [K] tf_corr for Abbott glacier (basin=15)
 /
