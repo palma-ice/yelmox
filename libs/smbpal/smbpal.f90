@@ -355,7 +355,7 @@ contains
         if (smb%par%const_insol) insol_time = smb%par%const_kabp*1e3
         
         ! Set sigma to snow sigma everywhere for pdd calcs
-        smb%now%sigma = par%sigma_snow
+        smb%now%sigma = smb%par%sigma_snow
         
         ! Fill in local versions for easier access 
         par = smb%par 
