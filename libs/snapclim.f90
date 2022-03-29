@@ -601,10 +601,12 @@ contains
 
             case("snap_1ind_abs")
                 call calc_temp_1ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
+                call calc_salinity_1ind_abs(snp%now%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,as)
 
             case("snap_2ind_abs")
                 call calc_temp_2ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo) 
-            
+                call calc_salinity_2ind_abs(snp%now%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as,bs)            
+
             case("hybrid") 
                 ! Use hybrid method 
 
@@ -739,6 +741,20 @@ contains
 
     end subroutine calc_salinity_1ind
 
+    elemental subroutine calc_salinity_1ind_abs(salt_now,salt1,salt2,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt1, salt2
+        real(prec), intent(IN)  :: aa
+
+        salt_now = (1.0-aa)*salt1 + aa*salt2
+
+        return
+
+    end subroutine calc_salinity_1ind_abs
+
     elemental subroutine calc_temp_2ind(temp_now,temp0,temp1,temp2,temp3,aa,bb)
 
         implicit none
@@ -772,6 +788,21 @@ contains
         return
 
     end subroutine calc_salinity_2ind
+
+    elemental subroutine calc_salinity_2ind_abs(salt_now,salt1,salt2,salt3,aa,bb)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt1, salt2, salt3
+        real(prec), intent(IN)  :: aa, bb
+
+        ! needs checking
+        salt_now = aa*((1.0-bb)*(salt2) + bb*salt3)  + aa*salt1
+
+        return
+
+    end subroutine calc_salinity_2ind_abs
 
     elemental subroutine calc_temp_1ind_abs(temp_now,temp1,temp2,aa)
 
