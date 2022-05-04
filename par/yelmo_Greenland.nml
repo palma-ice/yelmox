@@ -7,7 +7,7 @@
     time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500               ! [yr] Frequency of writing 2D output files
+    dt2D_out        = 200               ! [yr] Frequency of writing 2D output files
     dt2D_small_out  = 200               ! [yr] Frequency of writing 2D output files
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 

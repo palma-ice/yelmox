@@ -1,5 +1,5 @@
 &ctrl
-    run_step        = "spinup_ismip6"
+    run_step        = "spinup"
     time0           =  850.0
     time1           = 1850.0 
 /
@@ -10,9 +10,11 @@
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
-    time_const      = -18e3             ! [yr] Year that equilibration represents
+    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
+    time_const      = 2014.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
+    equil_method    = "none"            ! "none"
+    scenario        = "ctrl"            ! "ctrl"
 /
 
 &spinup_ismip6
@@ -206,8 +208,8 @@
 /
 
 &ytill
-    method          = -1                ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
+    method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
+    scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
     is_angle        = False             ! cb_ref is a till strength angle?
     z0              = -200.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
@@ -216,9 +218,9 @@
 /
 
 &yneff 
-    method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    method          = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
-    p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    p               = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     set_water       = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
     delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
@@ -318,19 +320,19 @@
 ! ===== EXTERNAL LIBRARIES =====
 
 &sealevel
-    method              = 1                             ! 0: use z_sl_const, 1: read time series from sl_path
+    method              = 0                             ! 0: use z_sl_const, 1: read time series from sl_path
     z_sl_const          = 0.0                           ! [m] Sea-level relative to present day
     sl_path             = "input/sl_deglaciation.dat"   ! Input time series filename
     sl_name             = "none"                        ! Variable name in netcdf file, if relevant
 /
 
 &snap
-    atm_type           = "snap_1ind"
+    atm_type           = "anom"
     ocn_type           = "anom"
-    fname_at           = "input/epica_deglaciation.dat"
-    fname_ao           = "input/epica_deglaciation.dat"
-    fname_ap           = "input/epica_deglaciation.dat"
-    fname_as           = "input/salinity_index_deglaciation.dat"
+    fname_at           = "input/zeros.dat"
+    fname_ao           = "input/zeros.dat"
+    fname_ap           = "input/zeros.dat"
+    fname_as           = "input/zeros.dat"
     fname_bt           = "input/ones.dat"
     fname_bo           = "input/ones.dat"
     fname_bp           = "input/ones.dat"
