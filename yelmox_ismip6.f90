@@ -1928,7 +1928,7 @@ end if
 
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
-
+        
         if (present(dTo)) then 
             ! Update temperature fields with hysteresis anomaly 
             mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo

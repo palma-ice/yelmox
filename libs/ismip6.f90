@@ -549,42 +549,15 @@ contains
         ism%scen       = trim(scen) 
         ism%experiment = trim(ism%gcm)//"_"//trim(ism%scen) 
 
-        select case(trim(ism%gcm))
-
-            case("access13")
-                model_name = "ACCESS1.3"
-            case("cesm2")
-                model_name = "CESM2"
-            case("cnrmcm6")
-                model_name = "CNRM-CM6"
-            case("cnrmesm2")
-                model_name = "CNRM-ESM2"
-            case("csiromk36")
-                model_name = "CSIRO-Mk3.6"
-            case("hadgem2es")
-                model_name = "HadGEM2-ES"
-            case("ipslcm5mr")
-                model_name = "IPSL-CM5-MR"
-            case("miroc5")
-                model_name = "MIROC5"
-            case("noresm1")
-                model_name = "NorESM1"
-            case("ukesm1")
-                model_name = "UKESM1"
-            
-            case DEFAULT 
-
-                write(*,*) "ismip6_forcing_init:: Error: gcm name not recognized."
-                write(*,*) "gcm = ", trim(ism%gcm) 
-                stop 
-
-        end select
-
-
         ! Define group prefix
         group_prefix = trim(model_name)//"_"//trim(ism%scen)//"_"
 
-
+        grp_ts_ref   = trim(group_prefix)//"ts_ref"
+        grp_smb_ref  = trim(group_prefix)//"smb_ref"
+        grp_ts_proj  = trim(group_prefix)//"ts_proj"
+        grp_smb_proj = trim(group_prefix)//"smb_proj"
+        grp_tf_proj  = trim(group_prefix)//"tf_proj"
+                
         ! Initialize all variables from namelist entries 
 
         ! General fields 
@@ -592,66 +565,20 @@ contains
         
         ! Amospheric fields
         call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_ref,   filename,group=trim(grp_pr_ref), domain=domain,grid_name=grid_name)
         call varslice_init_nml(ism%smb_ref,  filename,group=trim(grp_smb_ref),domain=domain,grid_name=grid_name)
         
-        call varslice_init_nml(ism%ts_hist,  filename,group=trim(grp_ts_hist), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_hist,  filename,group=trim(grp_pr_hist), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_hist, filename,group=trim(grp_smb_hist),domain=domain,grid_name=grid_name)
-
         call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_proj,  filename,group=trim(grp_pr_proj), domain=domain,grid_name=grid_name)
         call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name)
 
         ! Oceanic fields
-        call varslice_init_nml(ism%to_ref,   filename,group=trim(grp_to_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_ref,   filename,group=trim(grp_so_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_ref,   filename,group=trim(grp_tf_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_cor,   filename,group=trim(grp_tf_cor),domain=domain,grid_name=grid_name)
-
-        call varslice_init_nml(ism%to_hist,  filename,group=trim(grp_to_hist),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_hist,  filename,group=trim(grp_so_hist),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_hist,  filename,group=trim(grp_tf_hist),domain=domain,grid_name=grid_name)
-
-        call varslice_init_nml(ism%to_proj,  filename,group=trim(grp_to_proj),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_proj,  filename,group=trim(grp_so_proj),domain=domain,grid_name=grid_name)
         call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name)
 
         ! Load time-independent fields
 
         ! Amospheric fields 
         call varslice_update(ism%ts_ref)
-        call varslice_update(ism%pr_ref)
         call varslice_update(ism%smb_ref)
-
-        ! Oceanic fields
-        call varslice_update(ism%to_ref)
-        call varslice_update(ism%so_ref)
-        call varslice_update(ism%tf_ref)
-        call varslice_update(ism%tf_cor)
-
-        ! Remove missing values from the ocean, if possible
-        do k = 1, size(ism%to_ref%var,3)
-            if (count(ism%to_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
-                tmp = minval(ism%to_ref%var(:,:,k,1),mask=ism%to_ref%var(:,:,k,1) .ne. mv)
-                where(ism%to_ref%var(:,:,k,1) .eq. mv) 
-                    ism%to_ref%var(:,:,k,1) = tmp
-                end where 
-            end if
-            if (count(ism%so_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
-                tmp = maxval(ism%so_ref%var(:,:,k,1),mask=ism%so_ref%var(:,:,k,1) .ne. mv)
-                where(ism%so_ref%var(:,:,k,1) .eq. mv) 
-                    ism%so_ref%var(:,:,k,1) = tmp
-                end where 
-            end if
-            if (count(ism%tf_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
-                tmp = maxval(ism%tf_ref%var(:,:,k,1),mask=ism%tf_ref%var(:,:,k,1) .ne. mv)
-                where(ism%tf_ref%var(:,:,k,1) .eq. mv) 
-                    ism%tf_ref%var(:,:,k,1) = tmp
-                end where 
-            end if
-        end do
-
+        
         return 
 
     end subroutine ismip6_grl_forcing_init
