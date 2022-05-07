@@ -34,7 +34,9 @@ module ismip6
         type(varslice_class)   :: ts
         type(varslice_class)   :: pr
         type(varslice_class)   :: smb
-
+        type(varslice_class)   :: dts_dz
+        type(varslice_class)   :: dsmb_dz
+        
         ! Oceanic fields 
         type(varslice_class)   :: to
         type(varslice_class)   :: so
@@ -44,6 +46,7 @@ module ismip6
 
         ! General fields 
         type(varslice_class)   :: basins
+        type(varslice_class)   :: z_srf
 
         ! Atmospheric fields
         type(varslice_class)   :: ts_ref 
@@ -57,7 +60,8 @@ module ismip6
         type(varslice_class)   :: ts_proj
         type(varslice_class)   :: pr_proj
         type(varslice_class)   :: smb_proj
-
+        type(varslice_class)   :: dts_dz_proj
+        type(varslice_class)   :: dsmb_dz_proj
 
         ! Oceanic fields 
         type(varslice_class)   :: to_ref
@@ -320,6 +324,15 @@ contains
             end if
         end do
 
+        ! Additional variables to zero
+        ism%z_srf = ism%basins 
+        ism%z_srf%var = 0.0_wp 
+
+        ism%dts_dz          = ism%z_srf
+        ism%dsmb_dz         = ism%z_srf
+        ism%dts_dz_proj     = ism%z_srf
+        ism%dsmb_dz_proj    = ism%z_srf
+        
         return 
 
     end subroutine ismip6_ant_forcing_init
@@ -586,13 +599,17 @@ contains
 
         ! Local variables 
         character(len=256) :: group_prefix 
+        character(len=256) :: grp_z_srf
+
         character(len=256) :: grp_ts_ref 
         character(len=256) :: grp_pr_ref 
         character(len=256) :: grp_smb_ref 
         character(len=256) :: grp_ts_proj 
         character(len=256) :: grp_pr_proj 
         character(len=256) :: grp_smb_proj 
-        
+        character(len=256) :: grp_dts_dz_proj 
+        character(len=256) :: grp_dsmb_dz_proj 
+
         character(len=256) :: grp_tf_proj 
         
         integer  :: k 
@@ -606,20 +623,24 @@ contains
         ! Define group prefix
         group_prefix = trim(ism%gcm)//"_"//trim(ism%scen)//"_"
 
-        grp_ts_ref   = trim(group_prefix)//"ts_ref"
-        grp_smb_ref  = trim(group_prefix)//"smb_ref"
-        grp_ts_proj  = trim(group_prefix)//"ts_proj"
-        grp_smb_proj = trim(group_prefix)//"smb_proj"
-        grp_tf_proj  = trim(group_prefix)//"tf_proj"
+        grp_z_srf        = trim(group_prefix)//"z_srf"
         
-        write(*,*) "HERE" 
-        write(*,*) trim(group_prefix) 
-        write(*,*) trim(grp_ts_ref) 
+        grp_ts_ref       = trim(group_prefix)//"ts_ref"
+        grp_smb_ref      = trim(group_prefix)//"smb_ref"
+        grp_ts_proj      = trim(group_prefix)//"ts_proj"
+        grp_smb_proj     = trim(group_prefix)//"smb_proj"
+        grp_dts_dz_proj  = trim(group_prefix)//"dts_dz_proj"
+        grp_dsmb_dz_proj = trim(group_prefix)//"dsmb_dz_proj"
+        
+        grp_tf_proj      = trim(group_prefix)//"tf_proj"
+        
 
         ! Initialize all variables from namelist entries 
 
         ! General fields 
         !call varslice_init_nml(ism%basins,   filename,group="imbie_basins",domain=domain,grid_name=grid_name)
+        
+        call varslice_init_nml(ism%z_srf,    filename,group=trim(grp_z_srf), domain=domain,grid_name=grid_name)
         
         ! Amospheric fields
         call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name)
@@ -628,10 +649,17 @@ contains
         call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name)
         call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name)
 
+        call varslice_init_nml(ism%dts_dz_proj,  filename,group=trim(grp_dts_dz_proj), domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%dsmb_dz_proj, filename,group=trim(grp_dsmb_dz_proj),domain=domain,grid_name=grid_name)
+
         ! Oceanic fields
         call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name)
 
         ! Load time-independent fields
+
+        ! General fields 
+        call varslice_update(ism%z_srf)
+
 
         ! Amospheric fields 
         call varslice_update(ism%ts_ref)
@@ -710,6 +738,12 @@ contains
             ism%ts%var  = 0.0_wp 
             ism%smb%var = 0.0_wp 
             
+            ! Same for vertical gradient fields 
+            ism%dts_dz      = ism%ts_ref 
+            ism%dts_dz%var  = 0.0_wp 
+            ism%dsmb_dz     = ism%ts_ref 
+            ism%dsmb_dz%var = 0.0_wp 
+            
             ! Set ocn field anomalies to zero values too
             ism%tf      = ism%tf_ref
             ism%tf%var  = 0.0_wp 
@@ -725,6 +759,12 @@ contains
             ism%ts%var  = 0.0_wp 
             ism%smb%var = 0.0_wp 
             
+            ! Same for vertical gradient fields 
+            ism%dts_dz      = ism%ts_ref 
+            ism%dts_dz%var  = 0.0_wp 
+            ism%dsmb_dz     = ism%ts_ref 
+            ism%dsmb_dz%var = 0.0_wp 
+            
             ! Same for ocean
             ism%tf      = ism%tf_ref
             ism%tf%var  = 0.0_wp 
@@ -735,8 +775,14 @@ contains
             call varslice_update(ism%ts_proj, [time],method=slice_method)
             call varslice_update(ism%smb_proj,[time],method=slice_method)
             
+            call varslice_update(ism%dts_dz_proj, [time],method=slice_method)
+            call varslice_update(ism%dsmb_dz_proj,[time],method=slice_method)
+            
             ism%ts  = ism%ts_proj 
             ism%smb = ism%smb_proj 
+            
+            ism%dts_dz  = ism%dts_dz_proj 
+            ism%dsmb_dz = ism%dsmb_dz_proj 
             
             ! Calculate anomaly of tf relative to reference period
             
@@ -756,8 +802,14 @@ contains
             call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
             call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
 
+            call varslice_update(ism%dts_dz_proj, [2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%dsmb_dz_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+
             ism%ts  = ism%ts_proj
             ism%smb = ism%smb_proj
+            
+            ism%dts_dz  = ism%dts_dz_proj 
+            ism%dsmb_dz = ism%dsmb_dz_proj 
             
             ! Calculate anomaly of tf relative to reference period
             
@@ -786,6 +838,12 @@ contains
             ! Since atm fields are anomalies, also set actual variable to zero 
             ism%ts%var  = 0.0_wp 
             ism%smb%var = 0.0_wp 
+            
+            ! Same for vertical gradient fields 
+            ism%dts_dz      = ism%ts_ref 
+            ism%dts_dz%var  = 0.0_wp 
+            ism%dsmb_dz     = ism%ts_ref 
+            ism%dsmb_dz%var = 0.0_wp 
             
         end if 
         end if
