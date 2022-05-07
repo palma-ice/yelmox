@@ -21,11 +21,7 @@
 
     "grp_aliases" : {},
 
-    "par_paths" : 
-        {
-            "ismip6" : "par/ismip6.nml",
-            "ismip6" : "par/ismip6_grl.nml"
-        },
+    "par_paths" : {},
 
     "files" : ["par/options_rembo"], 
 
