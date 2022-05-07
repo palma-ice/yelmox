@@ -5,7 +5,7 @@
 /
 
 &ismip6
-    par_file        = "ismip6.nml"
+    par_file        = "ismip6_ant.nml"
     gcm             = "noresm"
 /
 
