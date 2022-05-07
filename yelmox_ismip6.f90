@@ -551,7 +551,7 @@ program yelmox_ismip6
         call yelmo_cpu_time(cpu_start_time)
 
         ! Initialize variables inside of ismip6 object 
-        ismip6_path_par = trim(outfldr)//"/input/ismip6/"//trim(ctl%ismip6_par_file)
+        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
         call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
