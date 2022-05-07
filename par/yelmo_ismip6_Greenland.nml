@@ -4,6 +4,11 @@
     time1           = 1850.0 
 /
 
+&ismip6
+    par_file        = "ismip6_grl.nml"
+    gcm             = "noresm"
+/
+
 &spinup
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 30e3              ! [yr] Ending time (model years)
@@ -24,10 +29,10 @@
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
-    time_const      = 1950.0            ! [yr] Year that equilibration represents
+    time_const      = 1900.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"             ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
+    scenario        = "rcp85"           ! "ctrl" or "rcp85" 
 /
 
 &transient_lgm_to_proj
@@ -45,7 +50,7 @@
 
 &transient_proj
     time_init       = 1900.0            ! [yr] Starting time (years CE)
-    time_end        = 2500.0            ! [yr] Ending time (years CE)
+    time_end        = 2120.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
@@ -53,7 +58,7 @@
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
+    scenario        = "rcp85"           ! "ctrl" or "rcp85" 
 /
 
 &hysteresis_proj
@@ -454,15 +459,15 @@
 
 &marine_shelf
     bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 0             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
-    corr_method     = "none"        ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number    = 1             ! 1 2 3
+    corr_method     = "tf"          ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
+    basin_number    = -1            ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
+    basin_tf_corr   = 1.0           ! 1.0   2.0  3.0  
     tf_correction   = False
     tf_path         = "ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
     tf_name         = "dT_nl"

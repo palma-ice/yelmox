@@ -23,7 +23,8 @@
 
     "par_paths" : 
         {
-            "ismip6" : "par/ismip6.nml"
+            "ismip6" : "par/ismip6.nml",
+            "ismip6" : "par/ismip6_grl.nml"
         },
 
     "files" : ["par/options_rembo"], 

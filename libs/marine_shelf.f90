@@ -110,6 +110,11 @@ module marine_shelf
         type(pico_class)           :: pico  
     end type
 
+    interface marshelf_update_shelf
+        module procedure marshelf_update_shelf_2D
+        module procedure marshelf_update_shelf_3D
+    end interface
+
     private
     public :: marshelf_class
     public :: marshelf_update_shelf
@@ -119,7 +124,54 @@ module marine_shelf
 
 contains 
     
-    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
+    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
+                                                depth,to_ann,so_ann,dto_ann,tf_ann)
+        ! Calculate various 2D fields from 3D ocean fields representative 
+        ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
+
+        implicit none 
+
+        type(marshelf_class), intent(INOUT) :: mshlf
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: basins(:,:) 
+        real(wp), intent(IN) :: z_sl(:,:)
+        real(wp), intent(IN) :: dx
+        real(wp), intent(IN), optional :: depth(:)
+        real(wp), intent(IN) :: to_ann(:,:)
+        real(wp), intent(IN) :: so_ann(:,:)
+        real(wp), intent(IN) :: dto_ann(:,:)
+        real(wp), intent(IN), optional :: tf_ann(:,:)
+
+        ! Local variables
+        integer :: i, j, nx, ny 
+
+        nx = size(H_ice,1) 
+        ny = size(H_ice,2) 
+
+        ! Loop over domain and update variables at each point (simply set value at each point)
+        do j = 1, ny 
+        do i = 1, nx 
+
+            ! 1. Set water properties ============================
+
+            mshlf%now%T_shlf(i,j)  = to_ann(i,j) 
+            mshlf%now%S_shlf(i,j)  = so_ann(i,j) 
+            mshlf%now%dT_shlf(i,j) = dto_ann(i,j)
+
+            if (present(tf_ann)) then 
+                mshlf%now%tf_shlf(i,j) = tf_ann(i,j)
+            end if 
+
+        end do 
+        end do  
+
+        return 
+
+    end subroutine marshelf_update_shelf_2D
+
+    subroutine marshelf_update_shelf_3D(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
                                     depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
@@ -184,7 +236,7 @@ contains
 
                 case DEFAULT
 
-                    write(*,*) "marshelf_update_shelf:: Error: interp_depth method not recognized."
+                    write(*,*) "marshelf_update_shelf_3D:: Error: interp_depth method not recognized."
                     write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
 
             end select
@@ -220,7 +272,7 @@ contains
             if (sum(wt_shlf) .gt. 0.0_wp) then 
                 wt_shlf = wt_shlf / sum(wt_shlf) 
             else 
-                write(*,*) "marshelf_update_shelf:: Error: weighting should be > 0."
+                write(*,*) "marshelf_update_shelf_3D:: Error: weighting should be > 0."
                 stop 
             end if 
 
@@ -236,10 +288,10 @@ contains
 
         end do 
         end do  
-
+        
         return 
 
-    end subroutine marshelf_update_shelf
+    end subroutine marshelf_update_shelf_3D
 
     subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
         
@@ -536,20 +588,14 @@ contains
             case("bmb")
                 ! Modify specific basins according to parameter values 
 
-                do j = 1, size(mshlf%par%basin_number)
-                    where(basins .eq. mshlf%par%basin_number(j)) &
-                        mshlf%now%bmb_corr = mshlf%par%basin_bmb_corr(j)
-                end do 
+                call apply_value_by_basin(mshlf%now%bmb_corr,basins,mshlf%par%basin_bmb_corr, &
+                                            basin_numbers=mshlf%par%basin_number)
 
             case("tf")
                 ! Modify specific basins according to parameter values 
 
-                do j = 1, size(mshlf%par%basin_number)
-
-                    where(basins .eq. mshlf%par%basin_number(j)) &
-                        mshlf%now%tf_corr_basin = mshlf%par%basin_tf_corr(j)
-
-                end do
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,mshlf%par%basin_tf_corr, &
+                                            basin_numbers=mshlf%par%basin_number)
 
             case("tf-grl") 
                 ! Modify specific basins according to parameter values 
@@ -559,24 +605,24 @@ contains
 
                 ! ne = northeast
                 call nml_read(filename,group_now,"ne",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[2.0_wp])
                 
                 ! e = east
                 call nml_read(filename,group_now,"e",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[3.0_wp])
                 
                 
                 ! se = southeast 
                 call nml_read(filename,group_now,"se",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[4.0_wp])
 
                 
                 ! w = west
                 call nml_read(filename,group_now,"w",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[6.0_wp,7.0_wp,8.0_wp])
                 
 
@@ -588,22 +634,22 @@ contains
 
                 ! Ronne 
                 call nml_read(filename,group_now,"ronne",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[1.0_wp])
                 
                 ! Ross
                 call nml_read(filename,group_now,"ross",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[12.0_wp])
                 
                 ! Pine Island 
                 call nml_read(filename,group_now,"pine",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[14.0_wp])
                 
                 ! Abbott 
                 call nml_read(filename,group_now,"abbott",tf_corr_now)
-                call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
+                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[15.0_wp])
                 
             case DEFAULT ! eg, "none", "None", "zero"
@@ -697,31 +743,52 @@ contains
 
     end subroutine marshelf_init
 
-    subroutine apply_tf_corr_by_basin(tf_corr,basins,tf_corr_now,basin_numbers)
-        ! Apply the value of tf_corr_now in the basins that correspond
+    subroutine apply_value_by_basin(val,basins,basin_vals,basin_numbers)
+        ! Apply the value of basin_vals in the basins that correspond
         ! to the given basin_numbers of interest. 
 
         implicit none
 
-        real(wp), intent(INOUT) :: tf_corr(:,:) 
+        real(wp), intent(INOUT) :: val(:,:) 
         real(wp), intent(IN)    :: basins(:,:) 
-        real(wp), intent(IN)    :: tf_corr_now
+        real(wp), intent(IN)    :: basin_vals(:)
         real(wp), intent(IN)    :: basin_numbers(:) 
 
         ! Local variables 
         integer :: b, nb 
-        real(wp) :: basin_number_now
+        real(wp), allocatable :: basin_values(:)
 
-        nb = size(basin_numbers)
+        nb = size(basin_numbers,1)
 
-        do b = 1, nb 
-            basin_number_now = basin_numbers(b) 
-            where(basins .eq. basin_number_now) tf_corr = tf_corr_now
-        end do 
+        allocate(basin_values(nb))
+        if (size(basin_numbers,1) .gt. 1 .and. size(basin_vals,1) .eq. 1) then 
+            ! Populate basin_values to be the same length as basin_numbers
+
+            basin_values = basin_vals(1) 
+
+        else 
+            ! Populate local basin_values array with argument values
+
+            basin_values = basin_vals 
+
+        end if 
+
+        if (basin_numbers(1) .eq. -1) then 
+            ! Apply value to all basins
+
+            val = basin_values(1) 
+
+        else 
+
+            do b = 1, nb 
+                where( basins .eq. basin_numbers(b) ) val = basin_values(b)
+            end do 
+
+        end if 
 
         return
 
-    end subroutine apply_tf_corr_by_basin
+    end subroutine apply_value_by_basin
 
     subroutine marshelf_end(mshlf)
 
@@ -748,6 +815,9 @@ contains
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
+
+        par%basin_bmb_corr = 0.0 
+        par%basin_tf_corr  = 0.0 
 
         call nml_read(filename,group,"bmb_method",     par%bmb_method,     init=init_pars)
         call nml_read(filename,group,"tf_method",      par%tf_method,      init=init_pars)

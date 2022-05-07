@@ -29,6 +29,7 @@ program yelmox_ismip6
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
     character(len=512) :: path_tf_corr 
+    character(len=512) :: ismip6_path_par
     integer    :: n, m
     real(wp)   :: time, time_bp
     real(wp)   :: time_elapsed
@@ -90,6 +91,9 @@ program yelmox_ismip6
         real(wp)          :: hyst_f_to 
         real(wp)          :: hyst_f_ta
 
+        character(len=512) :: ismip6_par_file
+        character(len=56)  :: ismip6_gcm 
+
     end type 
 
     type opt_params
@@ -134,6 +138,10 @@ program yelmox_ismip6
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
     call nml_read(path_par,"ctrl","time0",      ctl%time0)
     call nml_read(path_par,"ctrl","time1",      ctl%time1)
+    
+    ! ismip6 parameters 
+    call nml_read(path_par,"ismip6","par_file", ctl%ismip6_par_file)
+    call nml_read(path_par,"ismip6","gcm",      ctl%ismip6_gcm)
     
     ! Read run_step specific control parameters
     call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
@@ -543,7 +551,8 @@ program yelmox_ismip6
         call yelmo_cpu_time(cpu_start_time)
 
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
+        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -764,7 +773,8 @@ program yelmox_ismip6
         write(*,*) 
         
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
+        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -890,7 +900,8 @@ program yelmox_ismip6
         write(*,*) 
  
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
+        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -1025,7 +1036,7 @@ if (n .eq. 0) then
                 snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
 
 end if 
-
+                
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
@@ -1107,7 +1118,8 @@ end if
         write(*,*) 
         
         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
+        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -1893,7 +1905,7 @@ end if
         ! Step 2: update the ISMIP6 forcing to the current year
 
         call ismip6_forcing_update(ismp,time)
-                
+        
         ! Step 3: apply ISMIP6 anomalies to climate and smb fields
         ! (apply to climate just for consistency)
 
@@ -1909,10 +1921,10 @@ end if
         else 
             snp%now%ta_sum  = sum(snp%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
         end if 
-        snp%now%pr_ann = sum(snp%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+        snp%now%pr_ann = sum(snp%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/yr]
         
         ! Update smb fields
-        smbp%ann%smb  = smbp%ann%smb  + ismp%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+        smbp%ann%smb  = smbp%ann%smb  + ismp%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/yr]
         smbp%ann%tsrf = smbp%ann%tsrf + ismp%ts%var(:,:,1,1)
 
         ! Step 4: update marine_shelf based on ISMIP6 fields 
@@ -1928,7 +1940,7 @@ end if
 
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
-        
+
         if (present(dTo)) then 
             ! Update temperature fields with hysteresis anomaly 
             mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo

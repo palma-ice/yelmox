@@ -1002,7 +1002,25 @@ contains
 
         end select
 
-        return 
+        ! Make sure all axis variables exist
+        if (.not. allocated(vs%x)) then 
+            allocate(vs%x(1))
+            vs%x = 0.0_wp 
+        end if 
+        if (.not. allocated(vs%y)) then 
+            allocate(vs%y(1))
+            vs%y = 0.0_wp 
+        end if 
+        if (.not. allocated(vs%lev)) then 
+            allocate(vs%lev(1))
+            vs%lev = 0.0_wp 
+        end if 
+        if (.not. allocated(vs%time)) then 
+            allocate(vs%time(1))
+            vs%time = 0.0_wp 
+        end if 
+
+        return  
 
     end subroutine varslice_init_data
 
