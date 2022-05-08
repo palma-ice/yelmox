@@ -1916,9 +1916,9 @@ end if
         call ismip6_forcing_update(ismp,time)
         
         ! Calculate anomaly fields accounting for elevation difference with reference topo
-        dts_now  = ismp%ts%var(:,:,1,1)  + ismp%dts_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
+        dts_now  = ismp%ts%var(:,:,1,1)  !+ ismp%dts_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
         dpr_now  = ismp%pr%var(:,:,1,1) 
-        dsmb_now = ismp%smb%var(:,:,1,1) + ismp%dsmb_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
+        dsmb_now = ismp%smb%var(:,:,1,1) !+ ismp%dsmb_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
 
         ! Step 3: apply ISMIP6 anomalies to climate and smb fields
         ! (apply to climate just for consistency)
