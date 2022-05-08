@@ -1887,6 +1887,15 @@ end if
         real(wp), intent(IN), optional :: dTa
         real(wp), intent(IN), optional :: dTo
         
+        ! Local variables
+        real(wp), allocatable :: dts_now(:,:) 
+        real(wp), allocatable :: dpr_now(:,:)
+        real(wp), allocatable :: dsmb_now(:,:) 
+
+        allocate(dts_now(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(dpr_now(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(dsmb_now(ylmo%grd%nx,ylmo%grd%ny))
+        
         ! Step 1: set climate to present day from input fields
         ! and calculate present-day smb based on this climate.
 
@@ -1906,13 +1915,18 @@ end if
 
         call ismip6_forcing_update(ismp,time)
         
+        ! Calculate anomaly fields accounting for elevation difference with reference topo
+        dts_now  = ismp%ts%var(:,:,1,1)  + ismp%dts_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
+        dpr_now  = ismp%pr%var(:,:,1,1) 
+        dsmb_now = ismp%smb%var(:,:,1,1) + ismp%dsmb_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
+
         ! Step 3: apply ISMIP6 anomalies to climate and smb fields
         ! (apply to climate just for consistency)
 
         ! Update climatic fields 
         do m = 1,12
-            snp%now%tas(:,:,m) = snp%now%tas(:,:,m) + ismp%ts%var(:,:,1,1)
-            snp%now%pr(:,:,m)  = snp%now%pr(:,:,m)  + ismp%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
+            snp%now%tas(:,:,m) = snp%now%tas(:,:,m) + dts_now 
+            snp%now%pr(:,:,m)  = snp%now%pr(:,:,m)  + dpr_now/365.0 ! [mm/yr] => [mm/d]
         end do 
 
         snp%now%ta_ann = sum(snp%now%tas,dim=3) / 12.0_wp 
@@ -1924,8 +1938,8 @@ end if
         snp%now%pr_ann = sum(snp%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/yr]
         
         ! Update smb fields
-        smbp%ann%smb  = smbp%ann%smb  + ismp%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/yr]
-        smbp%ann%tsrf = smbp%ann%tsrf + ismp%ts%var(:,:,1,1)
+        smbp%ann%smb  = smbp%ann%smb  + dsmb_now*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/yr]
+        smbp%ann%tsrf = smbp%ann%tsrf + dts_now
 
         ! Step 4: update marine_shelf based on ISMIP6 fields 
         ! (no need to mix with present-day climate, since ismip6 includes the
