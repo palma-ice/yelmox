@@ -623,6 +623,14 @@ contains
         ! Define group prefix
         group_prefix = trim(ism%gcm)//"_"//trim(ism%scen)//"_"
 
+        if (trim(ism%scen) .eq. "ctrl") then 
+            ! Use files from rcp85 scenario as control, just 
+            ! to load something. Anomalies are set to zero in any case
+
+            group_prefix = trim(ism%gcm)//"_"//"rcp85"//"_"
+
+        end if 
+
         grp_z_srf        = trim(group_prefix)//"z_srf"
         
         grp_ts_ref       = trim(group_prefix)//"ts_ref"
