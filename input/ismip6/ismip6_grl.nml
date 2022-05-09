@@ -44,7 +44,7 @@
 
 &miroc5_rcp26_smb_proj
     filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_ANOM_1950-2100.nc"
-    name        = "smb"
+    name        = "asmb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
     unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
@@ -132,7 +132,7 @@
 
 &miroc5_rcp85_smb_proj
     filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_ANOM_1950-2100.nc"
-    name        = "smb"
+    name        = "asmb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
     unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 

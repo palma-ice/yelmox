@@ -799,7 +799,7 @@ program yelmox_ismip6
         ! Update forcing to present-day reference 
         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
+        
         ! Overwrite original mshlf and snp with ismip6 derived ones 
         snp1    = snp2
         smbpal1 = smbpal2  

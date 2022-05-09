@@ -642,7 +642,6 @@ contains
         
         grp_tf_proj      = trim(group_prefix)//"tf_proj"
         
-
         ! Initialize all variables from namelist entries 
 
         ! General fields 
@@ -663,11 +662,11 @@ contains
         ! Oceanic fields
         call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name)
 
+
         ! Load time-independent fields
 
         ! General fields 
         call varslice_update(ism%z_srf)
-
 
         ! Amospheric fields 
         call varslice_update(ism%ts_ref)
