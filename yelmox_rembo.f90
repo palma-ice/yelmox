@@ -403,7 +403,15 @@ contains
         ! Write present-day data metrics (rmse[H],etc)
         ! call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
-
+        ! == 1D Variables ==
+        
+        call nc_write(filename,"V_ice",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"A_ice",reg%A_ice*1e-6,units="1e6 km^2",long_name="Ice area", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
+                      dim1="time",start=[n],ncid=ncid)
+        
         ! == yelmo_topography ==
 
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
