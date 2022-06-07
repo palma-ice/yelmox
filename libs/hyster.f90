@@ -368,18 +368,24 @@ contains
         ! Avoid underflow errors 
         if (abs(hyst%df_dt) .lt. 1e-8) hyst%df_dt = 0.0 
 
+
+        ! ajr: Note: for now, keep diagnosing df_dt even when limits have been reached.
+        ! df_dt will not be applied beyond forcing limits though.
+        ! To actually set df_dt to zero too, uncomment following lines:
+
+        ! Set df_dt to zero if desired forcing limits have been reached 
+        !if (hyst%f_mean_now .le. hyst%par%f_min) hyst%df_dt = 0.0
+        !if (hyst%f_mean_now .ge. hyst%par%f_max) hyst%df_dt = 0.0
+
         if (hyst%dt .gt. 0.0_wp) then 
             ! Update f_now, etc. if time step is non-zero. 
 
             ! Update the mean forcing value 
             hyst%f_mean_now = hyst%f_mean_now + (hyst%df_dt*hyst%dt) 
 
-            ! Ensure f_min/f_max bounds are not exceeded (ramp method)
-            if (trim(hyst%par%method) .eq. "ramp-slope" .or. &
-                trim(hyst%par%method) .eq. "ramp-time") then 
-                if (hyst%f_mean_now .lt. hyst%par%f_min) hyst%f_mean_now = hyst%par%f_min 
-                if (hyst%f_mean_now .gt. hyst%par%f_max) hyst%f_mean_now = hyst%par%f_max 
-            end if 
+            ! Ensure f_min/f_max bounds are not exceeded
+            if (hyst%f_mean_now .lt. hyst%par%f_min) hyst%f_mean_now = hyst%par%f_min 
+            if (hyst%f_mean_now .gt. hyst%par%f_max) hyst%f_mean_now = hyst%par%f_max 
 
             ! If desired, generate some noise 
             if (hyst%par%sigma .gt. 0.0) then 
@@ -394,11 +400,15 @@ contains
         hyst%f_now = hyst%f_mean_now + hyst%eta_now 
 
         ! Check if kill should be activated 
-        ! Note: for ramp method, condition will never be reached because f_now is limited to valid range.
-        if ( hyst%par%with_kill .and. &
-            (hyst%f_mean_now .lt. hyst%par%f_min .or. &
-             hyst%f_mean_now .gt. hyst%par%f_max) ) then 
-            hyst%kill = .TRUE. 
+        if (.not. trim(hyst%par%method) .eq. "sin") then 
+
+            if ( hyst%par%with_kill .and. &
+                 abs(hyst%dv_dt) .lt. hyst%par%eps .and. &
+                (hyst%f_mean_now .le. hyst%par%f_min .or. &
+                 hyst%f_mean_now .ge. hyst%par%f_max) ) then 
+                hyst%kill = .TRUE. 
+            end if 
+
         end if 
 
         return
