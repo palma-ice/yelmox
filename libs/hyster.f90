@@ -400,13 +400,18 @@ contains
         hyst%f_now = hyst%f_mean_now + hyst%eta_now 
 
         ! Check if kill should be activated 
-        if (.not. trim(hyst%par%method) .eq. "sin") then 
+        if (hyst%par%with_kill .and. &
+            .not. trim(hyst%par%method) .eq. "sin" .and. &
+            abs(hyst%dv_dt) .lt. hyst%par%eps) then 
 
-            if ( hyst%par%with_kill .and. &
-                 abs(hyst%dv_dt) .lt. hyst%par%eps .and. &
-                (hyst%f_mean_now .le. hyst%par%f_min .or. &
-                 hyst%f_mean_now .ge. hyst%par%f_max) ) then 
-                hyst%kill = .TRUE. 
+            if (hyst%par%df_sign .gt. 0.0 .and. &
+                hyst%f_mean_now .ge. hyst%par%f_max) then 
+                hyst%kill = .TRUE.
+            end if 
+
+            if (hyst%par%df_sign .lt. 0.0 .and. &
+                hyst%f_mean_now .le. hyst%par%f_min) then 
+                hyst%kill = .TRUE.
             end if 
 
         end if 
