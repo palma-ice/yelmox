@@ -564,7 +564,7 @@ program yelmox
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     
-    call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years") 
+!    call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years") 
     
     if (reg1%write) then 
         call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
@@ -732,14 +732,18 @@ program yelmox
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
         
         ! == MODEL OUTPUT =======================================================
+      
+        if (time .gt. -14950.0) then
+            ctl%dt2D_out = 650.0
+        end if
 
         if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if
 
-        if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
-                call yelmo_write_step(yelmo1,file2D_small,time)
-            end if
+        !if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
+        !        call yelmo_write_step(yelmo1,file2D_small,time)
+        !    end if
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
