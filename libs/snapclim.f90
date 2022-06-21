@@ -690,40 +690,40 @@ contains
         end select 
 
 
-        ! Finally apply temperature correction to now%tsl, if needed. 
-        ! This is intended to smooth out temperature anomalies so that
-        ! the PD pattern is not so strongly imprinted on a glacial anomaly,
-        ! and to account for a lack of atmospheric dynamics that would reduce
-        ! temperatures over land at low elevations. 
-
-        ! First, define a correction factor as a function of elevation, so that
-        ! 100% of correction is applied at low elevations (below 100m)
-        ! and 0% of correction is applied at high elevation (above 500m)
-        zs_corr = 0.0_wp 
-        where(z_srf .lt. 100.0) zs_corr = 1.0 
-        where(z_srf .ge. 100.0 .and. z_srf .le. 1000.0)
-            zs_corr = 1.0 - (z_srf-100.0)/(1000.0-100.0)
-        end where
-
-        ! Calculate and apply correction by month
-        do m = 1, 12
-
-            ! Calculate mean tsl temp anomaly for this month
-            dT_mean = sum(snp%now%tsl(:,:,m)-snp%clim0%tsl(:,:,m))/real(nx*ny,wp)
-
-            ! Calculate attenuation factor based on current climatic anomaly
-            ! A value of zero when dT_mean is zero, and 
-            ! a value of one when dT_mean is <= -5deg. 
-            f_corr = max(min(dT_mean/(-5.0),1.0),0.0)
-            
-            ! Given temporal and elevation factors, determine the desired 
-            ! additional reduction in temperature, eg., -3deg
-            dT_corr = f_corr*zs_corr * (-5.0_wp)
-
-            ! Apply the correction
-            snp%now%tsl(:,:,m) = snp%now%tsl(:,:,m) + dT_corr 
-
-        end do 
+!        ! Finally apply temperature correction to now%tsl, if needed. 
+!        ! This is intended to smooth out temperature anomalies so that
+!        ! the PD pattern is not so strongly imprinted on a glacial anomaly,
+!        ! and to account for a lack of atmospheric dynamics that would reduce
+!       ! temperatures over land at low elevations. 
+!
+!        ! First, define a correction factor as a function of elevation, so that
+!        ! 100% of correction is applied at low elevations (below 100m)
+!        ! and 0% of correction is applied at high elevation (above 500m)
+!        zs_corr = 0.0_wp 
+!        where(z_srf .lt. 100.0) zs_corr = 1.0 
+!        where(z_srf .ge. 100.0 .and. z_srf .le. 1000.0)
+!            zs_corr = 1.0 - (z_srf-100.0)/(1000.0-100.0)
+!        end where
+!
+!        ! Calculate and apply correction by month
+!        do m = 1, 12
+!
+!            ! Calculate mean tsl temp anomaly for this month
+!            dT_mean = sum(snp%now%tsl(:,:,m)-snp%clim0%tsl(:,:,m))/real(nx*ny,wp)
+!
+!            ! Calculate attenuation factor based on current climatic anomaly
+!            ! A value of zero when dT_mean is zero, and 
+!            ! a value of one when dT_mean is <= -5deg. 
+!            f_corr = max(min(dT_mean/(-5.0),1.0),0.0)
+!            
+!            ! Given temporal and elevation factors, determine the desired 
+!            ! additional reduction in temperature, eg., -3deg
+!            dT_corr = f_corr*zs_corr * (-5.0_wp)
+!
+!            ! Apply the correction
+!            snp%now%tsl(:,:,m) = snp%now%tsl(:,:,m) + dT_corr 
+!
+!        end do 
 
         ! Step 3: Now, using the monthly sea-level temperature and precipitation fields calculated above,
         ! correct for elevation
