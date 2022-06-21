@@ -26,10 +26,11 @@ ulimit -v unlimited
 ulimit -a
 
 #load required modules (compiler, MPI, ...)
-module purge
-module load intel64
-module load intelmpi
+#module purge
+module load intel64/18.0up04
+#module load intelmpi
 module load netcdf
 
 # Run the job
-srun <CMD> 
+#srun <CMD>
+<CMD> 
