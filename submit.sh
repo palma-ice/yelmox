@@ -3,7 +3,7 @@
 #SBATCH -J yelmo 
 #SBATCH -o yelmo.out
 #SBATCH -e yelmo.err
-#SBATCH --mem=1800
+#SBATCH --mem=18000
 #SBATCH -t 7-02:30:15
 
 # Run the job
