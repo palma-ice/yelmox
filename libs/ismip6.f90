@@ -145,13 +145,16 @@ contains
         ism%scen       = trim(scen) 
         ism%experiment = trim(ism%gcm)//"_"//trim(ism%scen) 
 
-        select case(trim(ism%experiment))
+        ! jablasco
+        !select case(trim(ism%experiment))
+        select case(trim(ism%gcm))
 
-            case("noresm_rcp85","noresm_ctrl")
+            case("CCSM4_RCP85","CESM2-WACCM_ssp585","CESM2-WACCM_ssp585-repeat","HadGEM2-ES_RCP85","HadGEM2-ES_RCP85-repeat",&
+                 "NorESM1-M_RCP26-repeat","NorESM1-M_RCP85-repeat","UKESM1-0-LL_ssp126","UKESM1-0-LL_ssp585","UKESM1-0-LL_ssp585-repeat")
                 ! Control and RCP85 scenarios use the same files 
                 ! since ctrl specific forcing adapted in update step 
 
-                group_prefix = "noresm_rcp85_"
+                group_prefix = "gcm_"
 
                 grp_ts_ref   = trim(group_prefix)//"ts_ref"
                 grp_pr_ref   = trim(group_prefix)//"pr_ref"
@@ -176,8 +179,8 @@ contains
                 
             case DEFAULT 
 
-                write(*,*) "ismip6_forcing_init:: Error: experiment not recognized."
-                write(*,*) "experiment = ", trim(ism%experiment) 
+                write(*,*) "ismip6_forcing_init:: Error: GCM not recognized."
+                write(*,*) "gcm = ", trim(ism%gcm) 
                 stop 
 
         end select
@@ -188,31 +191,31 @@ contains
         call varslice_init_nml(ism%basins,   filename,group="imbie_basins",domain=domain,grid_name=grid_name)
         
         ! Amospheric fields
-        call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_ref,   filename,group=trim(grp_pr_ref), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_ref,  filename,group=trim(grp_smb_ref),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name,gcm=ism%gcm)
+        call varslice_init_nml(ism%pr_ref,   filename,group=trim(grp_pr_ref), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%smb_ref,  filename,group=trim(grp_smb_ref),domain=domain,grid_name=grid_name,gcm=gcm)
         
-        call varslice_init_nml(ism%ts_hist,  filename,group=trim(grp_ts_hist), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_hist,  filename,group=trim(grp_pr_hist), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_hist, filename,group=trim(grp_smb_hist),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_hist,  filename,group=trim(grp_ts_hist), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%pr_hist,  filename,group=trim(grp_pr_hist), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%smb_hist, filename,group=trim(grp_smb_hist),domain=domain,grid_name=grid_name,gcm=gcm)
 
-        call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_proj,  filename,group=trim(grp_pr_proj), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%pr_proj,  filename,group=trim(grp_pr_proj), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name,gcm=gcm)
 
         ! Oceanic fields
-        call varslice_init_nml(ism%to_ref,   filename,group=trim(grp_to_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_ref,   filename,group=trim(grp_so_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_ref,   filename,group=trim(grp_tf_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_cor,   filename,group=trim(grp_tf_cor),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_ref,   filename,group=trim(grp_to_ref),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%so_ref,   filename,group=trim(grp_so_ref),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_ref,   filename,group=trim(grp_tf_ref),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_cor,   filename,group=trim(grp_tf_cor),domain=domain,grid_name=grid_name,gcm=gcm)
 
-        call varslice_init_nml(ism%to_hist,  filename,group=trim(grp_to_hist),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_hist,  filename,group=trim(grp_so_hist),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_hist,  filename,group=trim(grp_tf_hist),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_hist,  filename,group=trim(grp_to_hist),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%so_hist,  filename,group=trim(grp_so_hist),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_hist,  filename,group=trim(grp_tf_hist),domain=domain,grid_name=grid_name,gcm=gcm)
 
-        call varslice_init_nml(ism%to_proj,  filename,group=trim(grp_to_proj),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_proj,  filename,group=trim(grp_so_proj),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_proj,  filename,group=trim(grp_to_proj),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%so_proj,  filename,group=trim(grp_so_proj),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name,gcm=gcm)
 
         ! Load time-independent fields
 
@@ -297,7 +300,9 @@ contains
             
         else if (time .ge. 1995 .and. time .le. 2014) then 
             
-            if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+            ! jablasco: ismip6
+            !if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+            if ( (time .ge. 1995) &
                     .or. time .ge. 2005 ) then 
                 ! noresm hist file only goes until 1994, other gcms hist file goes to 2004
                 call varslice_update(ism%ts_proj, [time],method=slice_method)
@@ -321,7 +326,7 @@ contains
             end if 
 
                 
-        else if (time .ge. 2015 .and. time .le. 2100) then 
+        else if (time .ge. 2015 .and. time .le. 2300) then 
 
             call varslice_update(ism%ts_proj, [time],method=slice_method)
             call varslice_update(ism%pr_proj, [time],method=slice_method)
@@ -333,9 +338,9 @@ contains
             
         else ! time .gt. 2100
 
-            call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%pr_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%ts_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%pr_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%smb_proj,[2290.0_wp,2300.0_wp],method="range_mean")
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -365,7 +370,9 @@ contains
         else if (time .ge. 1995 .and. time .le. 2014) then 
             ! Historical period 
 
-            if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+            ! jablasco
+            !if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+            if ( (time .ge. 1995) &
                     .or. time .ge. 2005) then 
                 ! noresm hist file only goes until 1994, other hist files go until 2004
                 call varslice_update(ism%to_proj, [time],method=slice_method)
@@ -389,7 +396,7 @@ contains
             end if 
             
                 
-        else if (time .ge. 2015 .and. time .le. 2100) then 
+        else if (time .ge. 2015 .and. time .le. 2300) then 
             ! Projection period 1 
 
             call varslice_update(ism%to_proj,[time],method=slice_method)
@@ -403,9 +410,9 @@ contains
         else ! time .gt. 2100
             ! Projection period 2 
 
-            call varslice_update(ism%to_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%so_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%tf_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%to_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%so_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%tf_proj,[2290.0_wp,2300.0_wp],method="range_mean")
 
             ism%to = ism%to_proj
             ism%so = ism%so_proj
