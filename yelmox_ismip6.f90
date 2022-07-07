@@ -1039,10 +1039,12 @@ if (n .eq. 0) then
 end if 
 
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+                ! jablasco: ocean is in absolute value, hence dto_ann = 0.0
+                ! robinson: dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1)
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
                                 ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                                dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
+                                dto_ann=ismp1%to%var(:,:,:,1)*0.0, &
                                 tf_ann=ismp1%tf%var(:,:,:,1))
 
                 ! Update temperature forcing field with tf_corr and tf_corr_basin
@@ -1313,11 +1315,12 @@ else
 
 
             ! == MARINE-SHELF ===============================
-            
+            ! jablasco: ocean in absolute value
+            ! robinson: dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1) 
             call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                             yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
                             ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
+                            dto_ann=ismp1%to%var(:,:,:,1)*0.0, &
                             tf_ann=ismp1%tf%var(:,:,:,1))
 
             ! Update temperature forcing field with tf_corr and tf_corr_basin
@@ -1944,10 +1947,12 @@ end if
         !  reference ocean fields with internal depth dimension) 
 
         ! Update marine_shelf shelf fields
+        ! jablasco: set anomaly to zero
+        ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
         call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                         ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%lev, &
                         ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
-                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
+                        dto_ann=ismp%to%var(:,:,:,1)*0.0, &
                         tf_ann=ismp%tf%var(:,:,:,1))
 
         ! Update temperature forcing field with tf_corr and tf_corr_basin
@@ -2565,6 +2570,77 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine yx_hyst_write_step_1D_combined
 
+    subroutine write_1D_ismip6(ylm,snp,filename,time)
+
+        implicit none
+
+        type(yelmo_class),    intent(IN) :: ylm
+        type(snapclim_class), intent(IN) :: snp
+        character(len=*),     intent(IN) :: filename
+        real(prec),           intent(IN) :: time
+
+        ! Local variables
+        integer    :: ncid, n, k
+        real(prec) :: time_prev
+        real(prec) :: dT_axis(1000)
+        type(yregions_class) :: reg
+        real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction, rho_ice
+
+        myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
+        mmd_to_kgms  = 1/86400.0    ! mm/d to kg m^-2 s^-1
+        yr_to_sec    = 31536000.0   ! 1 yr to sec
+        density_corr = 917.0/1000.0 ! ice density correction with pure water
+
+        ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
+
+        rho_ice = 917.0 ! ice density kg/m3
+
+        ! Assume region to write is the global region of yelmo 
+        reg = ylm%reg
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
+        if (abs(time-time_prev).gt.1e-5) n = n+1
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! ===== Mass ===== 
+        call nc_write(filename,"lim",reg%V_ice*rho_ice*1e9,units="kg",long_name="Total ice mass", &
+                      standard_name="land_ice_mass",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
+                      standard_name="land_ice_mass_not_displacing_sea_water",dim1="t",start=[n],ncid=ncid)
+
+        ! ===== Area ====
+        call nc_write(filename,"iareagr",reg%A_ice_g*1e6,units="m^2",long_name="Grounded ice area", &
+                      standard_name="grounded_ice_sheet_area",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"iareafl",reg%A_ice_f*1e6,units="m^2",long_name="Floating ice area", &
+                      standard_name="floating_ice_shelf_area",dim1="t",start=[n],ncid=ncid)
+
+        ! ==== Flux ====
+        call nc_write(filename,"tendacabf",reg%smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlibmassbf ",reg%bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlibmassbffl",reg%bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
+                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlicalvf",reg%calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlifmassbf",reg%flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendligroundf",reg%flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
+                      standard_name="tendency_of_grounded_ice_mass",dim1="t",start=[n],ncid=ncid)
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return
+
+    end subroutine write_1D_ismip6
 
 end program yelmox_ismip6
 

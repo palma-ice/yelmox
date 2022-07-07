@@ -279,64 +279,36 @@ contains
         
         if (time .lt. 1995) then 
 
-            ! call varslice_update(ism%ts_hist, [1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%pr_hist, [1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%smb_hist,[1950.0_wp,1980.0_wp],method="range_mean")
+            ! jablasco
+            call varslice_update(ism%ts_hist, [time],method=slice_method)
+            call varslice_update(ism%pr_hist, [time],method=slice_method)
+            call varslice_update(ism%smb_hist,[time],method=slice_method)
 
-            ! ism%ts  = ism%ts_hist 
-            ! ism%pr  = ism%pr_hist 
-            ! ism%smb = ism%smb_hist
-            
-            ! Prior to 1995, no anomalies 
-            ! Set atm fields to reference values (ie, zero anomaly) 
-            ism%ts  = ism%ts_ref 
-            ism%pr  = ism%pr_ref 
-            ism%smb = ism%smb_ref 
+            ism%ts  = ism%ts_hist
+            ism%pr  = ism%pr_hist
+            ism%smb = ism%smb_hist
+
+            ! robinson
+            !ism%ts  = ism%ts_ref 
+            !ism%pr  = ism%pr_ref 
+            !ism%smb = ism%smb_ref 
 
             ! Since atm fields are anomalies, also set actual variable to zero 
-            ism%ts%var  = 0.0_wp 
-            ism%pr%var  = 0.0_wp 
-            ism%smb%var = 0.0_wp 
-            
-        else if (time .ge. 1995 .and. time .le. 2014) then 
-            
-            ! jablasco: ismip6
-            !if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
-            if ( (time .ge. 1995) &
-                    .or. time .ge. 2005 ) then 
-                ! noresm hist file only goes until 1994, other gcms hist file goes to 2004
-                call varslice_update(ism%ts_proj, [time],method=slice_method)
-                call varslice_update(ism%pr_proj, [time],method=slice_method)
-                call varslice_update(ism%smb_proj,[time],method=slice_method)
-                
-                ism%ts  = ism%ts_proj 
-                ism%pr  = ism%pr_proj 
-                ism%smb = ism%smb_proj 
-                
-            else 
-                ! Load hist variable as normal 
-                call varslice_update(ism%ts_hist, [time],method=slice_method)
-                call varslice_update(ism%pr_hist, [time],method=slice_method)
-                call varslice_update(ism%smb_hist,[time],method=slice_method)
-                
-                ism%ts  = ism%ts_hist 
-                ism%pr  = ism%pr_hist 
-                ism%smb = ism%smb_hist 
-                
-            end if 
+            !ism%ts%var  = 0.0_wp 
+            !ism%pr%var  = 0.0_wp 
+            !ism%smb%var = 0.0_wp 
 
-                
-        else if (time .ge. 2015 .and. time .le. 2300) then 
+        else if (time .ge. 1995 .and. time .le. 2300) then
 
             call varslice_update(ism%ts_proj, [time],method=slice_method)
             call varslice_update(ism%pr_proj, [time],method=slice_method)
-            call varslice_update(ism%smb_proj,[time],method=slice_method) 
+            call varslice_update(ism%smb_proj,[time],method=slice_method)
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
             ism%smb = ism%smb_proj
-            
-        else ! time .gt. 2100
+
+        else ! time .gt. 2300
 
             call varslice_update(ism%ts_proj, [2290.0_wp,2300.0_wp],method="range_mean")
             call varslice_update(ism%pr_proj, [2290.0_wp,2300.0_wp],method="range_mean")
@@ -345,58 +317,82 @@ contains
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
             ism%smb = ism%smb_proj
-            
+
         end if
+
+        ! robinson 
+        !else if (time .ge. 1995 .and. time .le. 2014) then 
+        !    
+        !    ! jablasco: ismip6
+        !    !if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+        !    if ( (time .ge. 1995) &
+        !            .or. time .ge. 2005 ) then 
+        !        ! noresm hist file only goes until 1994, other gcms hist file goes to 2004
+        !        call varslice_update(ism%ts_proj, [time],method=slice_method)
+        !        call varslice_update(ism%pr_proj, [time],method=slice_method)
+        !        call varslice_update(ism%smb_proj,[time],method=slice_method)
+        !        
+        !        ism%ts  = ism%ts_proj 
+        !        ism%pr  = ism%pr_proj 
+        !        ism%smb = ism%smb_proj 
+        !        
+        !    else 
+        !        ! Load hist variable as normal 
+        !        call varslice_update(ism%ts_hist, [time],method=slice_method)
+        !        call varslice_update(ism%pr_hist, [time],method=slice_method)
+        !        call varslice_update(ism%smb_hist,[time],method=slice_method)
+        !        
+        !        ism%ts  = ism%ts_hist 
+        !        ism%pr  = ism%pr_hist 
+        !        ism%smb = ism%smb_hist 
+        !        
+        !    end if 
+        !
+        !        
+        !else if (time .ge. 2015 .and. time .le. 2300) then 
+        !
+        !    call varslice_update(ism%ts_proj, [time],method=slice_method)
+        !    call varslice_update(ism%pr_proj, [time],method=slice_method)
+        !    call varslice_update(ism%smb_proj,[time],method=slice_method) 
+        !
+        !    ism%ts  = ism%ts_proj
+        !    ism%pr  = ism%pr_proj
+        !    ism%smb = ism%smb_proj
+        !    
+        !else ! time .gt. 2100
+        !
+        !    call varslice_update(ism%ts_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+        !    call varslice_update(ism%pr_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+        !    call varslice_update(ism%smb_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+        !
+        !    ism%ts  = ism%ts_proj
+        !    ism%pr  = ism%pr_proj
+        !    ism%smb = ism%smb_proj
+        !    
+        !end if
 
         ! === Oceanic fields ==================================
 
         if (time .lt. 1995) then 
             ! Prehistoric 
 
-            ! Oceanic fields 
-            ! call varslice_update(ism%to_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%so_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%tf_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-
-            ! ism%to = ism%to_hist
-            ! ism%so = ism%so_hist
-            ! ism%tf = ism%tf_hist
-
-            ! Set reference oceanic fields
-            ism%to = ism%to_ref
-            ism%so = ism%so_ref
-            ism%tf = ism%tf_ref
-
-        else if (time .ge. 1995 .and. time .le. 2014) then 
-            ! Historical period 
-
             ! jablasco
-            !if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
-            if ( (time .ge. 1995) &
-                    .or. time .ge. 2005) then 
-                ! noresm hist file only goes until 1994, other hist files go until 2004
-                call varslice_update(ism%to_proj, [time],method=slice_method)
-                call varslice_update(ism%so_proj, [time],method=slice_method)
-                call varslice_update(ism%tf_proj, [time],method=slice_method)
-                
-                ism%to = ism%to_proj
-                ism%so = ism%so_proj
-                ism%tf = ism%tf_proj
-                
-            else 
-                ! Load hist variable as normal 
-                call varslice_update(ism%to_hist, [time],method=slice_method)
-                call varslice_update(ism%so_hist, [time],method=slice_method)
-                call varslice_update(ism%tf_hist, [time],method=slice_method)
-                
-                ism%to = ism%to_hist
-                ism%so = ism%so_hist
-                ism%tf = ism%tf_hist
-                
-            end if 
-            
-                
-        else if (time .ge. 2015 .and. time .le. 2300) then 
+            ! Oceanic fields 
+            call varslice_update(ism%to_hist,[time],method=slice_method)
+            call varslice_update(ism%so_hist,[time],method=slice_method)
+            call varslice_update(ism%tf_hist,[time],method=slice_method)
+
+            ism%to = ism%to_hist
+            ism%so = ism%so_hist
+            ism%tf = ism%tf_hist
+
+            ! robinson
+            ! Set reference oceanic fields
+            !ism%to = ism%to_ref
+            !ism%so = ism%so_ref
+            !ism%tf = ism%tf_ref
+
+        else if (time .ge. 1995 .and. time .le. 2300) then
             ! Projection period 1 
 
             call varslice_update(ism%to_proj,[time],method=slice_method)
@@ -406,8 +402,8 @@ contains
             ism%to = ism%to_proj
             ism%so = ism%so_proj
             ism%tf = ism%tf_proj
-               
-        else ! time .gt. 2100
+
+        else ! time .gt. 3100
             ! Projection period 2 
 
             call varslice_update(ism%to_proj,[2290.0_wp,2300.0_wp],method="range_mean")
@@ -416,9 +412,63 @@ contains
 
             ism%to = ism%to_proj
             ism%so = ism%so_proj
-            ism%tf = ism%tf_proj 
-            
+            ism%tf = ism%tf_proj
+
         end if
+
+        ! robinson
+        !else if (time .ge. 1995 .and. time .le. 2014) then 
+        !    ! Historical period 
+        !
+        !    ! jablasco
+        !    !if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
+        !    if ( (time .ge. 1995) &
+        !            .or. time .ge. 2005) then 
+        !        ! noresm hist file only goes until 1994, other hist files go until 2004
+        !        call varslice_update(ism%to_proj, [time],method=slice_method)
+        !        call varslice_update(ism%so_proj, [time],method=slice_method)
+        !        call varslice_update(ism%tf_proj, [time],method=slice_method)
+        !        
+        !        ism%to = ism%to_proj
+        !        ism%so = ism%so_proj
+        !        ism%tf = ism%tf_proj
+        !        
+        !    else 
+        !        ! Load hist variable as normal 
+        !        call varslice_update(ism%to_hist, [time],method=slice_method)
+        !        call varslice_update(ism%so_hist, [time],method=slice_method)
+        !        call varslice_update(ism%tf_hist, [time],method=slice_method)
+        !        
+        !        ism%to = ism%to_hist
+        !        ism%so = ism%so_hist
+        !        ism%tf = ism%tf_hist
+        !        
+        !    end if 
+        !    
+        !        
+        !else if (time .ge. 2015 .and. time .le. 2300) then 
+        !    ! Projection period 1 
+        !
+        !    call varslice_update(ism%to_proj,[time],method=slice_method)
+        !    call varslice_update(ism%so_proj,[time],method=slice_method)
+        !    call varslice_update(ism%tf_proj,[time],method=slice_method)
+        !
+        !    ism%to = ism%to_proj
+        !    ism%so = ism%so_proj
+        !    ism%tf = ism%tf_proj
+        !       
+        !else ! time .gt. 2100
+        !    ! Projection period 2 
+        !
+        !    call varslice_update(ism%to_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+        !    call varslice_update(ism%so_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+        !    call varslice_update(ism%tf_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+        !
+        !    ism%to = ism%to_proj
+        !    ism%so = ism%so_proj
+        !    ism%tf = ism%tf_proj 
+        !    
+        !end if
 
         ! === Additional calculations ======================
 
