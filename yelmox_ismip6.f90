@@ -804,7 +804,7 @@ end if
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
-                
+        
         ! Perform 'coupled' model simulations for desired time
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
@@ -857,8 +857,8 @@ end if
             end if
 
             if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
-                call yelmo_write_reg_step(yelmo1,file1D,time=time)
-                 
+                ! jablasco: added ismip6 bool
+                call yelmo_write_reg_step(yelmo1,file1D,time=time,ismip6=.TRUE.)
             end if 
 
             if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
@@ -2570,19 +2570,19 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine yx_hyst_write_step_1D_combined
 
-    subroutine write_1D_ismip6(ylm,snp,filename,time)
+    subroutine write_1D_ismip6(dom,filename,time,mask,reg_now)
 
         implicit none
 
-        type(yelmo_class),    intent(IN) :: ylm
-        type(snapclim_class), intent(IN) :: snp
+        type(yelmo_class),    intent(IN) :: dom
         character(len=*),     intent(IN) :: filename
-        real(prec),           intent(IN) :: time
+        real(wp),             intent(IN) :: time
+        logical, intent(IN), optional    :: mask(:,:)
+        type(yregions_class), intent(IN), optional :: reg_now
 
         ! Local variables
-        integer    :: ncid, n, k
-        real(prec) :: time_prev
-        real(prec) :: dT_axis(1000)
+        integer    :: ncid, n
+        real(wp) :: time_prev
         type(yregions_class) :: reg
         real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction, rho_ice
 
@@ -2595,8 +2595,36 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         rho_ice = 917.0 ! ice density kg/m3
 
-        ! Assume region to write is the global region of yelmo 
-        reg = ylm%reg
+        ! 1. Determine regional values of variables 
+
+        if (present(mask) .and. present(reg_now)) then
+            write(*,*) "yelmo_write_reg_step:: Error: either a mask or a region &
+                       &object must be provided, not both. Try again."
+            write(*,*) "filename = ", trim(filename)
+            write(*,*) "time     = ", time
+            stop
+        end if
+
+        if (present(mask)) then
+            ! If a mask is provided, assume the regional 
+            ! values must be calculated now.
+
+            call calc_yregions(reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask)
+
+        else if (present(reg_now)) then
+            ! Assume region has been calculated and is available 
+            ! in the input object reg_now 
+
+            reg = reg_now
+
+        else
+            ! Take the global regional data object that 
+            ! is calculated over the whole domain at each timestep 
+            reg = dom%reg
+
+        end if
+
+        ! 2. Begin writing step 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
