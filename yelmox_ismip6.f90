@@ -1428,7 +1428,8 @@ contains
         real(wp) :: time_prev
         real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction
         ! ismip6 variables
-        !real(wp), allocatable :: z_base(:,:)
+        real(wp), allocatable :: z_base(:,:)
+        allocate(z_base(ylmo%grd%nx,ylmo%grd%ny)) 
 
         ! Initialize
         myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
@@ -1436,7 +1437,7 @@ contains
         yr_to_sec    = 31536000.0   ! 1 yr to sec
         density_corr = 917.0/1000.0 ! ice density correction with pure water
         ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
-        !z_base = 0.0_wp
+        z_base = 0.0_wp
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -1465,9 +1466,9 @@ contains
                           standard_name="surface_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             ! jablasco: local variable
             ! Local variables
-            !where(ylmo%tpo%now%f_grnd .gt. 0.0) z_base = ylmo%bnd%z_bed
-            !call nc_write(filename,"base",z_base,units="m",long_name="Base elevation", &
-            !              standard_name="base_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            where(ylmo%tpo%now%f_grnd .gt. 0.0) z_base = ylmo%bnd%z_bed
+            call nc_write(filename,"base",z_base,units="m",long_name="Base elevation", &
+                          standard_name="base_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"topg",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
                           standard_name="bedrock_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
