@@ -1428,8 +1428,10 @@ contains
         real(wp) :: time_prev
         real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction
         ! ismip6 variables
-        real(wp), allocatable :: z_base(:,:)
+        real(wp), allocatable :: z_base(:,:), T_base_grnd(:,:), T_base_flt(:,:)
         allocate(z_base(ylmo%grd%nx,ylmo%grd%ny)) 
+        allocate(T_base_grnd(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(T_base_flt(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Initialize
         myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
@@ -1438,6 +1440,8 @@ contains
         density_corr = 917.0/1000.0 ! ice density correction with pure water
         ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
         z_base = 0.0_wp
+        T_base_grnd = 0.0_wp
+        T_base_flt  = 0.0_wp 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -1504,12 +1508,16 @@ contains
             call nc_write(filename,"yvelmean",ylmo%dyn%now%uy_bar/yr_to_sec,units="m s-1",long_name="Mean velocity in y", &
                           standard_name="land_ice_vertical_mean_y_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             ! == yelmo_ice_temperature ==
+            ! jablasco: local variable
+            ! Local variables
+            where(ylmo%tpo%now%f_grnd .gt. 0.0) T_base_grnd = ylmo%thrm%now%T_ice(:,:,1)
+            where(ylmo%tpo%now%H_ice .gt. 0.0 .and. ylmo%tpo%now%f_grnd .eq. 0.0) T_base_flt = ylmo%thrm%now%T_ice(:,:,1)
             call nc_write(filename,"litemptop",ylmo%thrm%now%T_ice(:,:,ylmo%dyn%par%nz_aa),units="K",long_name="Surface temperature", &
                           standard_name="temperature_at_top_of_ice_sheet_model", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"litempbotgr",ylmo%thrm%now%T_ice(:,:,1),units="K",long_name="Basal temperature beneath grounded ice sheet", &
+            call nc_write(filename,"litempbotgr",T_base_grnd,units="K",long_name="Basal temperature beneath grounded ice sheet", &
                           standard_name="land_ice_basal_temperature", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            !call nc_write(filename,"litempbotfl",???,units="K",long_name="Basal temperature beneath floating ice shelf", &
-            !              standard_name="floating_ice_basal_temperature", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"litempbotfl",T_base_flt,units="K",long_name="Basal temperature beneath floating ice shelf", &
+                          standard_name="floating_ice_basal_temperature", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
             ! == yelmo_drag_and_fluxes ==
             call nc_write(filename,"strbasemag",ylmo%dyn%now%taub,units="Pa",long_name="Basal drag", &
