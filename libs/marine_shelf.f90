@@ -560,7 +560,7 @@ contains
                 ! ne = northeast
                 call nml_read(filename,group_now,"ne",tf_corr_now)
                 call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
-                                                basin_numbers=[2.0_wp])
+                                                basin_numbers=[2.1_wp,2.2_wp,1.4_wp])
                 
                 ! e = east
                 call nml_read(filename,group_now,"e",tf_corr_now)
@@ -571,7 +571,7 @@ contains
                 ! se = southeast 
                 call nml_read(filename,group_now,"se",tf_corr_now)
                 call apply_tf_corr_by_basin(mshlf%now%tf_corr_basin,basins,tf_corr_now, &
-                                                basin_numbers=[4.0_wp])
+                                                basin_numbers=[3.3_wp,4.1_wp,4.2_wp,4.3_wp])
 
                 
                 ! w = west
