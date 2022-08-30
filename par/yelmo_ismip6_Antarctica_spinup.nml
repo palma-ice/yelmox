@@ -17,11 +17,11 @@
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 30e3              ! [yr] Ending time (model years)
+    time_end        = 50e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 10e3             ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"             ! "none", "relax", "opt"
@@ -108,7 +108,7 @@
 /
 
 &opt_L21
-    cf_time         = 30e3              ! [yr] When should optimization of basal friction stop?
+    cf_time         = 50e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 0.1               ! Initial value of cf_ref everywhere
     cf_min          = 1e-3              ! [--] Minimum allowed cf value
     cf_max          = 0.2               ! [--] Maximum allowed cf value
@@ -125,14 +125,14 @@
     rel_time2       = 8e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
-    opt_tf          = True              ! Should thermal forcing be optimized too?
-    tf_time         = 30e3              ! [yr] When should optimization of thermal forcing stop?
+    opt_tf          = True             ! Should thermal forcing be optimized too?
+    tf_time         = 50e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -1.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = 1, 12, 14, 15, 18     ! Basin numbers to optimize (-1 for all basins)
+    tf_basins       = 1, 12, 18 ! Basin numbers to optimize (-1 for all basins)
 /
 
 &yelmo
@@ -167,7 +167,7 @@
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
-    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    bmb_gl_method       = "nmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
@@ -380,9 +380,8 @@
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    !ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
+    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    ocn_names       = "z" "mask_ocn" "to" "so"
     ocn_monthly     = False
     ocn_time        = 0
 /
@@ -478,11 +477,11 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
-    corr_method     = "tf-ant"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number    = 1             ! 1 2 3
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
-    tf_correction   = False
+    corr_method     = "tf"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
+    basin_number    = 14, 15             ! 1 2 3
+    basin_bmb_corr  = 0.0, 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
+    basin_tf_corr   = -0.5, -0.5         ! 1.0   2.0  3.0  
+    tf_correction   = True
     tf_path         = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  

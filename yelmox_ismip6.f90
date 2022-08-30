@@ -812,6 +812,13 @@ end if
             time    = ctl%time_init + n*ctl%dtt
             time_bp = time - 1950.0_wp 
             
+            ! jablasco: mask_shlf_collapse
+            if(time .ge. 2015 .and. .True.) then
+
+                where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
+
+            end if
+
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
             yelmo1%bnd%z_sl  = sealev%z_sl
@@ -1039,12 +1046,13 @@ if (n .eq. 0) then
 end if 
 
                 ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-                ! jablasco: ocean is in absolute value, hence dto_ann = 0.0
+                ! jablasco: ocean is in absolute value, hence dto_ann = ismp1%to%var(:,:,:,1)*0.0
                 ! robinson: dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1)
+                ! jablasco: leave previous version
                 call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                 yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
                                 ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                                dto_ann=ismp1%to%var(:,:,:,1)*0.0, &
+                                dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
                                 tf_ann=ismp1%tf%var(:,:,:,1))
 
                 ! Update temperature forcing field with tf_corr and tf_corr_basin
@@ -1326,10 +1334,11 @@ else
             ! Update temperature forcing field with tf_corr and tf_corr_basin
             mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + mshlf1%now%tf_corr + mshlf1%now%tf_corr_basin
 
+            ! jablasco: no?
             ! Update temperature fields with hysteresis anomaly 
-            mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + hyst1%f_now*ctl%hyst_f_to
-            mshlf1%now%dT_shlf = mshlf1%now%dT_shlf + hyst1%f_now*ctl%hyst_f_to
-            mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + hyst1%f_now*ctl%hyst_f_to
+            !mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + hyst1%f_now*ctl%hyst_f_to
+            !mshlf1%now%dT_shlf = mshlf1%now%dT_shlf + hyst1%f_now*ctl%hyst_f_to
+            !mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + hyst1%f_now*ctl%hyst_f_to
 
             ! Calculate bmb_shlf
             call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
@@ -1426,7 +1435,7 @@ contains
         ! Local variables
         integer  :: ncid, n
         real(wp) :: time_prev
-        real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction
+        real(wp) :: density_corr, m3yr_to_kgs, ismip6_correction, yr_to_sec
         ! ismip6 variables
         real(wp), allocatable :: bmb_grnd_mask(:,:), bmb_shlf_mask(:,:)
         real(wp), allocatable :: z_base(:,:), T_top_ice(:,:), T_base_grnd(:,:), T_base_flt(:,:), flux_grl(:,:)
@@ -1440,11 +1449,10 @@ contains
         allocate(flux_grl(ylmo%grd%nx,ylmo%grd%ny))
 
         ! Data conversion
-        myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
-        mmd_to_kgms  = 1/86400.0    ! mm/d to kg m^-2 s^-1
-        yr_to_sec    = 31536000.0   ! 1 yr to sec
         density_corr = 917.0/1000.0 ! ice density correction with pure water
-        ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
+        m3yr_to_kgs  = 3.2e-5       ! m3/yr of pure water to kg/s
+        ismip6_correction = m3yr_to_kgs*density_corr
+        yr_to_sec    = 31556952.0
         ! Initialize
         bmb_shlf_mask = 0.0_wp
         bmb_grnd_mask = 0.0_wp
@@ -1554,15 +1562,25 @@ contains
                           standard_name="grounded_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"sftflf",MAX(ylmo%tpo%now%f_ice-ylmo%tpo%now%f_grnd,0.0),units="1",long_name="Floating ice sheet area fraction", &
                           standard_name="floating_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            ! jablasco
+            call nc_write(filename,"mask_coll",ismp1%mask_shlf%var(:,:,1,1),units="1",long_name="Collapse mask", &
+                          standard_name="",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                          
 
             ! ATM and OCN test files
-            call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
+            call nc_write(filename,"T_atm_snap",ismp1%ts%var(:,:,1,1),units="K",long_name="Surface temperature anomaly", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
+            call nc_write(filename,"Tf_snap",ismp1%tf%var(:,:,1,1),units="K",long_name="TF map", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
+            call nc_write(filename,"T_srf",yelmo1%bnd%T_srf,units="K",long_name="Surface temperature Yelmo", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+            call nc_write(filename,"Tf_shlf",mshlf%now%tf_shlf,units="K",long_name="Shelf temperature", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing correction factor", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+ 
         else
 
             ! == yelmo_topography ==
@@ -2057,10 +2075,11 @@ contains
         ! Update marine_shelf shelf fields
         ! jablasco: set anomaly to zero
         ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
+        ! jablasco: volvamos al ppio! dto_ann=ismp%to%var(:,:,:,1)*0.0
         call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                         ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%lev, &
                         ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
-                        dto_ann=ismp%to%var(:,:,:,1)*0.0, &
+                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
                         tf_ann=ismp%tf%var(:,:,:,1))
 
         ! Update temperature forcing field with tf_corr and tf_corr_basin
@@ -2692,15 +2711,12 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         integer    :: ncid, n
         real(wp) :: time_prev
         type(yregions_class) :: reg
-        real(wp) :: myr_to_mmd, mmd_to_kgms, yr_to_sec, density_corr, ismip6_correction, rho_ice
+        real(wp) :: density_corr, m3yr_to_kgs, ismip6_correction, rho_ice, yr_to_sec
 
-        myr_to_mmd   = 10e3/365.0   ! 1 m/yr to mm/d
-        mmd_to_kgms  = 1/86400.0    ! mm/d to kg m^-2 s^-1
-        yr_to_sec    = 31536000.0   ! 1 yr to sec
+        m3yr_to_kgs  = 3.2e-5       ! m3/yr of pure water to kg/s
         density_corr = 917.0/1000.0 ! ice density correction with pure water
-
-        ismip6_correction = myr_to_mmd*mmd_to_kgms*density_corr
-
+        ismip6_correction = m3yr_to_kgs*density_corr
+        yr_to_sec    = 31556952.0
         rho_ice = 917.0 ! ice density kg/m3
 
         ! 1. Determine regional values of variables 
