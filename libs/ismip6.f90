@@ -106,6 +106,7 @@ module ismip6
 
     public :: ismip6_write_init
     public :: ismip6_write_step
+    public :: calc_iceberg_island
 
 contains
     
@@ -710,5 +711,102 @@ end if
         return 
 
     end subroutine ice_var_par_load
+
+    ! jablasco: subroutine for iceberg islands
+    subroutine calc_iceberg_island(iceberg_mask,f_grnd,H_ice)
+        ! Calculate distance to the grounding line 
+
+        implicit none
+
+        real(wp), intent(OUT) :: iceberg_mask(:,:) ! Iceberg island (lonely ice shelves)
+        real(wp), intent(IN)  :: f_grnd(:,:)       ! [1]  Grounded grid-cell fraction 
+        real(wp), intent(IN)  :: H_ice(:,:)        ! [m]  Ice thickness
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, q
+        integer  :: im1, ip1, jm1, jp1
+        integer,  parameter :: iter_max = 1000
+
+        real(wp), allocatable :: mask_ref(:,:)
+        real(wp), allocatable :: iceberg_mask_ref(:,:)
+
+        nx = size(f_grnd,1)
+        ny = size(f_grnd,2)
+
+        allocate(mask_ref(nx,ny))
+        allocate(iceberg_mask_ref(nx,ny))
+
+        ! 0: Assign mask values. 0 = ocn; 1 = flt; 2 = grd/grl
+        ! ======================
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (f_grnd(i,j) .gt. 0.0) then
+                mask_ref(i,j) = 2.0
+            else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then
+                mask_ref(i,j) = 1.0
+            else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0) then
+                mask_ref(i,j) = 2.0
+            end if
+
+        end do
+        end do
+        
+        ! 1. Next, determine the extension of the grounded and connected flt
+        ! points ===
+
+        ! Initialize the iceberg_mask_ref
+        iceberg_mask_ref = mask_ref
+
+        do q = 1, iter_max
+
+            do j = 1, ny
+            do i = 1, nx
+
+            ! Get neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(im1,j) .eq. 1.0) then
+                iceberg_mask_ref(im1,j) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(ip1,j) .eq. 1.0) then
+                iceberg_mask_ref(ip1,j) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(i,jm1) .eq. 1.0) then
+                iceberg_mask_ref(i,jm1) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(i,jp1) .eq. 1.0) then
+                iceberg_mask_ref(i,jp1) = 2.0
+            end if
+
+            end do
+            end do
+        end do
+        
+        ! 2. Where numbers are still 1.0 -> icebergs ======================
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (iceberg_mask_ref(i,j) .eq. 1.0) then
+                iceberg_mask(i,j) = 1.0
+            else
+                iceberg_mask(i,j) = 0.0
+            end if
+
+        end do
+        end do
+
+
+        return
+
+    end subroutine calc_iceberg_island
 
 end module ismip6

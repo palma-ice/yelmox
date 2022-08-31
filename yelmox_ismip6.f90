@@ -816,6 +816,8 @@ end if
             if(time .ge. 2015 .and. .True.) then
 
                 where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
+                call calc_iceberg_island(yelmo1%tpo%now%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
+                where(yelmo1%tpo%now%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0               
 
             end if
 
@@ -1567,7 +1569,8 @@ contains
                           standard_name="",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                          
+            call nc_write(filename,"iceberg_mask",ylmo%tpo%now%iceberg_mask,units="",long_name="Iceberg mask", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)                
 
             ! ATM and OCN test files
             call nc_write(filename,"T_atm_snap",ismp1%ts%var(:,:,1,1),units="K",long_name="Surface temperature anomaly", &

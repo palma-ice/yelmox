@@ -43,7 +43,7 @@
 
 &transient_proj
     time_init       = 1990.0            ! [yr] Starting time (years CE)
-    time_end        = 2299.0            ! [yr] Ending time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
@@ -52,7 +52,7 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     scenario        = "RCP85"           ! if "ctrl" - ctrl experiment. Else, gcm projection (RCP85)
-    gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
+    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
 /
 
 &abumip_proj
