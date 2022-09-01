@@ -30,7 +30,7 @@
 
 &transient_lgm_to_proj
     time_init       = -18e3             ! [yr] Starting time (years CE)
-    time_end        = 2299.0            ! [yr] Ending time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 

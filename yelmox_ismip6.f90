@@ -812,12 +812,10 @@ end if
             time    = ctl%time_init + n*ctl%dtt
             time_bp = time - 1950.0_wp 
             
-            ! jablasco: mask_shlf_collapse
+            ! jablasco: mask_shlf_collapse; set H to 0; then compute with Yelmo
             if(time .ge. 2015 .and. .True.) then
 
-                where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
-                call calc_iceberg_island(yelmo1%tpo%now%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
-                where(yelmo1%tpo%now%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0               
+                where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0               
 
             end if
 
@@ -831,6 +829,10 @@ end if
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+
+            ! jablasco: delete icebergs -> inside yelmo_update
+            !call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
+            !where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
  
 if (.TRUE.) then 
             

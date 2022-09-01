@@ -77,6 +77,8 @@ module ismip6
         ! jablasco
         ! Collapse mask
         type(varslice_class)   :: mask_shlf_proj
+        ! iceberg mask
+        real(wp), allocatable :: iceberg_mask(:,:)
         
     end type
 
@@ -268,6 +270,10 @@ contains
             end if
         end do
 
+        ! jablasco: Initialize variables and allocate
+        allocate(ism%iceberg_mask(size(ism%to_ref%var,1),size(ism%to_ref%var,2)))
+        ism%iceberg_mask = 0.0
+
         return 
 
     end subroutine ismip6_forcing_init
@@ -359,7 +365,7 @@ contains
             ism%tf = ism%tf_hist
 
         ! jablasco: only atm; 2015 -> 2301
-        else if (time .ge. 1995 .and. time .lt. 2015) then
+        else if (time .ge. 1995 .and. time .lt. 2301) then
             ! Projection period 1 
 
             ism%to = ism%to_ref
@@ -747,8 +753,8 @@ end if
                 mask_ref(i,j) = 2.0
             else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then
                 mask_ref(i,j) = 1.0
-            else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0) then
-                mask_ref(i,j) = 2.0
+            else
+                mask_ref(i,j) = 0.0
             end if
 
         end do
