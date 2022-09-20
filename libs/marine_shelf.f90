@@ -151,6 +151,8 @@ contains
         allocate(wt_shlf(nz)) 
         wt_shlf = 0.0 
 
+        write(*,*) "jablasco: ANT-16KM resolution"
+
         ! Loop over domain and update variables at each point (vertical interpolation)
         do j = 1, ny 
         do i = 1, nx 
@@ -363,11 +365,13 @@ contains
                 call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
+                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
+
                 ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
-                select case(trim(mshlf%par%domain))
-                    case("Antarctica")
-                        where (regions .eq. 2.1) mshlf%now%bmb_shlf = 0.5*mshlf%now%bmb_shlf+0.5*mshlf%par%c_deep
-                end select 
+                !select case(trim(mshlf%par%domain))
+                !    case("Antarctica")
+                !        where (regions .eq. 2.1) mshlf%now%bmb_shlf = 0.5*mshlf%now%bmb_shlf+0.5*mshlf%par%c_deep
+                !end select 
 
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 

@@ -257,7 +257,9 @@ contains
             call smbpal_update_itm(smb,daily,t2m_daily,pr_daily,sf_daily,z_srf,H_ice,time_bp, &
                                    file_out_mon,file_out_day,write_init,calc_mon,write_now)
         
-        else 
+        else
+            ! jablasco: test llego
+            write(*,*) "jablasco: linea 262: smpbal.f90" 
             ! PDD method 
 
             allocate(t2m_ann(size(t2m,1),size(t2m,2)))
@@ -297,6 +299,8 @@ contains
 
         end if 
 
+        write(*,*) "jablasco: ante sde init: l300"
+ 
         ! Annual I/O 
         if (write_out_now) then
             if (init_now) call smbpal_write_init(smb%par,file_out,z_srf,H_ice)
@@ -354,12 +358,14 @@ contains
         insol_time = time_bp
         if (smb%par%const_insol) insol_time = smb%par%const_kabp*1e3
         
-        ! Set sigma to snow sigma everywhere for pdd calcs
-        smb%now%sigma = par%sigma_snow
-        
         ! Fill in local versions for easier access 
         par = smb%par 
         now = smb%now 
+      
+        ! jablasco
+        ! Set sigma to snow sigma everywhere for pdd calcs
+        !smb%now%sigma = par%sigma_snow
+        now%sigma = par%sigma_snow
 
         ! First calculate PDDs for the whole year (input to itm)
         now%PDDs = 0.0 
