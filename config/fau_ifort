@@ -3,11 +3,11 @@ FC = ifort
 INC_NC  = -I${NETCDF_F_BASE}/include
 LIB_NC  = -L${NETCDF_F_BASE}/lib -lnetcdff -L${NETCDF_BASE}/lib -lnetcdf
 
-LISROOT = /home/woody/gwgi/gwgi007h/apps/lis/lis
+LISROOT = /home/hpc/gwgk/gwgk005h/libs/lis/lis
 INC_LIS = -I${LISROOT}/include
 LIB_LIS = -L${LISROOT}/lib -llis
 
-YELMOROOT = /home/woody/gwgi/gwgi007h/yelmo/yelmo
+YELMOROOT = /home/titan/gwgk/gwgk005h/models/yelmo/v1.753/yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
