@@ -77,6 +77,7 @@ module snapclim
         real(wp) :: dSo_const 
         real(wp) :: f_to 
         real(wp) :: f_p
+        real(wp) :: f_p_ne
         real(wp) :: f_stdev
 
     end type
@@ -105,7 +106,8 @@ module snapclim
         real(wp), allocatable :: tsl_ann(:,:)
         real(wp), allocatable :: tsl_sum(:,:)
         real(wp), allocatable :: prcor_ann(:,:)
-        
+        real(wp), allocatable :: beta_p(:,:)        
+
         ! Oceanic variables
         integer :: nzo
         real(wp), allocatable :: depth(:) 
@@ -190,7 +192,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -202,6 +204,7 @@ contains
         character(len=*),     intent(IN)    :: filename 
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
+        real(wp), intent(IN) :: basins(:,:)
 
         ! Local variables 
         logical :: load_atm1, load_atm2, load_atm3 
@@ -297,14 +300,14 @@ contains
         ! == clim0: reference climate (eg, present day) ==
 
         call snapshot_par_load(snp%clim0%par,filename,"snap_clim0",domain,grid_name,init=.TRUE.)
-        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
         call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,"snap_clim1",domain,grid_name,init=.TRUE.)                
-            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
         end if 
@@ -313,7 +316,7 @@ contains
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,"snap_clim2",domain,grid_name,init=.TRUE.)                
-            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
         end if 
@@ -322,7 +325,7 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,"snap_clim3",domain,grid_name,init=.TRUE.)
-            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
         end if 
@@ -360,7 +363,7 @@ contains
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo,dx)
+    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo,dx,basins)
 
         implicit none 
 
@@ -368,6 +371,7 @@ contains
         real(wp), intent(IN)    :: z_srf(:,:) 
         real(wp), intent(IN)    :: time    ! Current simulation year
         character(len=*), intent(IN) :: domain 
+        real(wp), intent(IN)    :: basins(:,:)
         real(wp), intent(IN), optional :: dTa   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dTo   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dSo   ! For atm_type='anom'
@@ -468,7 +472,7 @@ contains
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
-                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
 
             case("snap_1ind","snap_1ind_new")
 
@@ -545,7 +549,7 @@ contains
                 end do 
 
                 ! Calculate monthly precip anomaly
-                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
 
                 ! Update external index
                 at = sum(dT)/real(size(dT,1))   ! Annual mean
@@ -562,7 +566,7 @@ contains
 
                 ! Load reconstruction fields of tas and pr for the current time 
                 call read_climate_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%z_srf, &
-                                                                    snp%par%lapse,snp%par%f_p,time,domain) 
+                                                                    snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,time,domain,basins) 
 
                 ! We  have loaded dT and pr/pr_0 fields, apply to reference climate  
                 ! to get current climate snapshot 
@@ -690,40 +694,40 @@ contains
         end select 
 
 
-        ! Finally apply temperature correction to now%tsl, if needed. 
-        ! This is intended to smooth out temperature anomalies so that
-        ! the PD pattern is not so strongly imprinted on a glacial anomaly,
-        ! and to account for a lack of atmospheric dynamics that would reduce
-        ! temperatures over land at low elevations. 
-
-        ! First, define a correction factor as a function of elevation, so that
-        ! 100% of correction is applied at low elevations (below 100m)
-        ! and 0% of correction is applied at high elevation (above 500m)
-        zs_corr = 0.0_wp 
-        where(z_srf .lt. 100.0) zs_corr = 1.0 
-        where(z_srf .ge. 100.0 .and. z_srf .le. 1000.0)
-            zs_corr = 1.0 - (z_srf-100.0)/(1000.0-100.0)
-        end where
-
-        ! Calculate and apply correction by month
-        do m = 1, 12
-
-            ! Calculate mean tsl temp anomaly for this month
-            dT_mean = sum(snp%now%tsl(:,:,m)-snp%clim0%tsl(:,:,m))/real(nx*ny,wp)
-
-            ! Calculate attenuation factor based on current climatic anomaly
-            ! A value of zero when dT_mean is zero, and 
-            ! a value of one when dT_mean is <= -5deg. 
-            f_corr = max(min(dT_mean/(-5.0),1.0),0.0)
-            
-            ! Given temporal and elevation factors, determine the desired 
-            ! additional reduction in temperature, eg., -3deg
-            dT_corr = f_corr*zs_corr * (-5.0_wp)
-
-            ! Apply the correction
-            snp%now%tsl(:,:,m) = snp%now%tsl(:,:,m) + dT_corr 
-
-        end do 
+!        ! Finally apply temperature correction to now%tsl, if needed. 
+!        ! This is intended to smooth out temperature anomalies so that
+!        ! the PD pattern is not so strongly imprinted on a glacial anomaly,
+!        ! and to account for a lack of atmospheric dynamics that would reduce
+!       ! temperatures over land at low elevations. 
+!
+!        ! First, define a correction factor as a function of elevation, so that
+!        ! 100% of correction is applied at low elevations (below 100m)
+!        ! and 0% of correction is applied at high elevation (above 500m)
+!        zs_corr = 0.0_wp 
+!        where(z_srf .lt. 100.0) zs_corr = 1.0 
+!        where(z_srf .ge. 100.0 .and. z_srf .le. 1000.0)
+!            zs_corr = 1.0 - (z_srf-100.0)/(1000.0-100.0)
+!        end where
+!
+!        ! Calculate and apply correction by month
+!        do m = 1, 12
+!
+!            ! Calculate mean tsl temp anomaly for this month
+!            dT_mean = sum(snp%now%tsl(:,:,m)-snp%clim0%tsl(:,:,m))/real(nx*ny,wp)
+!
+!            ! Calculate attenuation factor based on current climatic anomaly
+!            ! A value of zero when dT_mean is zero, and 
+!            ! a value of one when dT_mean is <= -5deg. 
+!            f_corr = max(min(dT_mean/(-5.0),1.0),0.0)
+!            
+!            ! Given temporal and elevation factors, determine the desired 
+!            ! additional reduction in temperature, eg., -3deg
+!            dT_corr = f_corr*zs_corr * (-5.0_wp)
+!
+!            ! Apply the correction
+!            snp%now%tsl(:,:,m) = snp%now%tsl(:,:,m) + dT_corr 
+!
+!        end do 
 
         ! Step 3: Now, using the monthly sea-level temperature and precipitation fields calculated above,
         ! correct for elevation
@@ -742,7 +746,7 @@ contains
            
         ! 3b: Calculate monthly precipitation accounting for current surface elevation
 
-        call calc_precip_anom(snp%now%pr,snp%now%prcor,snp%now%tas-snp%now%tsl,snp%par%f_p)
+        call calc_precip_anom(snp%now%pr,snp%now%prcor,snp%now%tas-snp%now%tsl,snp%now%beta_p)
 
         ! Step 4: Calculate annual and summer averages
 
@@ -900,19 +904,24 @@ contains
 
     end subroutine calc_temp_2ind_abs
 
-    elemental subroutine calc_precip_anom(pr_now,pr0,dT,f_p)
+    subroutine calc_precip_anom(pr_now,pr0,dT,betap)
         ! Calculate current precipitation value given 
         ! a temperature anomaly (independent of how dT was obtained)
 
         implicit none 
 
-        real(wp), intent(OUT) :: pr_now 
-        real(wp), intent(IN)  :: pr0 
-        real(wp), intent(IN)  :: dT       ! Current temperature anomaly
-        real(wp), intent(IN)  :: f_p 
+        real(wp), intent(OUT) :: pr_now(:,:,:)
+        real(wp), intent(IN)  :: pr0(:,:,:) 
+        real(wp), intent(IN)  :: dT(:,:,:)       ! Current temperature anomaly
+        real(wp), intent(IN)  :: betap(:,:) 
 
-        pr_now = pr0*exp(f_p*dT)
-        
+        ! Local variables
+        integer :: m
+
+        do m = 1, 12 
+           pr_now(:,:,m) = pr0(:,:,m)*exp(betap*dT(:,:,m))
+        end do 
+
         return
          
     end subroutine calc_precip_anom
@@ -1020,7 +1029,7 @@ contains
 
     end subroutine calc_salinity_anom
 
-    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,time,domain)
+    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,f_p_ne,time,domain,basins)
         ! Given a predefined climate snapshot clim (already allocated),
         ! repopulate it with new snapshot based on current time 
 
@@ -1031,8 +1040,10 @@ contains
         real(wp),       intent(IN) :: z_srf(:,:) 
         real(wp),       intent(IN) :: lapse(2) 
         real(wp),       intent(IN) :: f_p 
+        real(wp),       intent(IN) :: f_p_ne
         real(wp),       intent(IN) :: time 
         character(len=*), intent(IN) :: domain 
+        real(wp),       intent(IN) :: basins(:,:)
 
         ! Local variables 
         integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j   
@@ -1059,7 +1070,11 @@ contains
         allocate(var0(nx,ny,nm))
         allocate(var1(nx,ny,nm))
         allocate(var(nx,ny,nm))
-        allocate(z_srf_pd(nx,ny))        
+        allocate(z_srf_pd(nx,ny))    
+
+        ! Define beta_p from f_p
+        clim%beta_p = f_p    
+        where(basins .eq. 2.0 .or. basins .eq. 9.0) clim%beta_p = f_p * f_p_ne    
 
         ! Determine the indices of reconstruction time slices 
         ! bracketing the current time 
@@ -1201,7 +1216,7 @@ contains
             end if 
 
             ! Precip (scale by a fraction)
-            clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
+            clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(clim%beta_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
         end do
 
@@ -1414,6 +1429,7 @@ contains
         call nml_read(filename,"snap","dSo_const",          par%dSo_const,      init=init_pars)
         call nml_read(filename,"snap","f_to",               par%f_to,           init=init_pars)
         call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
+        call nml_read(filename,"snap","f_p_ne",             par%f_p_ne,         init=init_pars)
         call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
         
         call nml_read(filename,"snap_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
@@ -1518,7 +1534,7 @@ contains
 
     end subroutine snapshot_par_load
 
-    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_stdev,domain)
+    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_p_ne,f_stdev,domain,basins)
         ! `names` is a vector of names in the netcdf file that 
         ! correspond to the fields to be read in:
         ! (1) 2D elevation field
@@ -1532,9 +1548,11 @@ contains
         integer,          intent(IN) :: nx, ny  
         real(wp),       intent(IN) :: lapse(2)
         real(wp),       intent(IN) :: f_p 
+        real(wp),       intent(IN) :: f_p_ne
         real(wp),       intent(IN) :: f_stdev
         character(len=*), intent(IN) :: domain   
-        
+        real(wp),       intent(IN) :: basins(:,:)       
+  
         ! Local variables
         real(wp) :: lapse_mon(12)   
         real(wp), allocatable :: rf(:,:,:)
@@ -1563,7 +1581,8 @@ contains
             clim%sf        = 0.0 
             clim%ta_ann    = 0.0 
             clim%ta_sum    = 0.0 
-            
+            clim%beta_p    = 0.0           
+ 
             clim%tsl       = 0.0 
             clim%tsl_ann   = 0.0 
             clim%tsl_sum   = 0.0 
@@ -1579,6 +1598,10 @@ contains
             ! Define mask based on elevations 
             clim%mask = 0.0 
             where(clim%z_srf .gt. 0.0) clim%mask = 1.0 
+
+            ! Define beta_p
+            clim%beta_p = f_p
+            where(basins .eq. 2.1 .or. basins .eq. 2.2 .or. basins .eq. 9.0) clim%beta_p = f_p * f_p_ne
 
             if (clim%par%clim_monthly) then 
                 ! Read in monthly climate fields, then get the averages
@@ -1714,7 +1737,7 @@ contains
             clim%pr     = clim%pr     * (1.0 + f_stdev*clim%pr_stdev_frac)
             
             ! Calculate sea-level corrected precip 
-            clim%prcor_ann = clim%pr_ann/exp(f_p*(clim%ta_ann-clim%tsl_ann))
+            clim%prcor_ann = clim%pr_ann/exp(clim%beta_p*(clim%ta_ann-clim%tsl_ann))
 
             do m = 1, 12
 
@@ -1728,7 +1751,7 @@ contains
                 end if 
 
                 ! Precip
-                clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
+                clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(clim%beta_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
             end do 
         
@@ -2161,7 +2184,8 @@ contains
         if (allocated(clim%prcor_ann))          deallocate(clim%prcor_ann)
         if (allocated(clim%z_srf))              deallocate(clim%z_srf)
         if (allocated(clim%mask))               deallocate(clim%mask)
-        
+        if (allocated(clim%beta_p))             deallocate(clim%beta_p)        
+ 
         allocate(clim%tas(nx,ny,12))
         allocate(clim%tsl(nx,ny,12))
         allocate(clim%pr(nx,ny,12))
@@ -2178,6 +2202,7 @@ contains
         allocate(clim%prcor_ann(nx,ny))
         allocate(clim%z_srf(nx,ny))
         allocate(clim%mask(nx,ny))
+        allocate(clim%beta_p(nx,ny))
 
         return 
 

@@ -618,7 +618,6 @@ contains
                 call nml_read(filename,group_now,"se",tf_corr_now)
                 call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[4.0_wp])
-
                 
                 ! w = west
                 call nml_read(filename,group_now,"w",tf_corr_now)
