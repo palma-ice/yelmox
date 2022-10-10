@@ -572,3 +572,8 @@
     R_lith       = 131910.0             ! [m] Radius of relative stiffness
     
 /
+
+&egia
+    
+
+/

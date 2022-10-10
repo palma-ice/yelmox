@@ -94,12 +94,12 @@ contains
         integer, intent(IN) :: nx, ny 
         real(wp), intent(IN) :: dx
 
-        integer :: LBLOC 
+        integer :: lbloc 
 
         ! Load parameters
         call isos_par_load(isos%par,filename,init=.TRUE.)
         
-        ! LBLOC, 400 km on each side
+        ! lbloc, 400 km on each side
         ! ajr: 400km set internally, since the radius should be smaller.
         ! This needs thorough revision and code refactoring. 
         ! See Greve and Blatter (2009), Chpt 8, page 192 for methodology 
