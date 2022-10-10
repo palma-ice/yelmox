@@ -13,23 +13,23 @@ module isostasy
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = sp 
+    integer,  parameter :: wp = sp 
 
-    real(prec), parameter :: G  = 9.81                  ! [m/s^2]
-    real(prec), parameter :: pi = 3.14159265359
+    real(wp), parameter :: G  = 9.81                  ! [m/s^2]
+    real(wp), parameter :: pi = 3.14159265359
 
-    real(prec), parameter :: rho_ice    = 910.0                 ! [kg/m^3]
-    real(prec), parameter :: rho_ocean  = 1028.0                ! [kg/m^3] 
-    real(prec), parameter :: rho_water  = 1000.0                ! [kg/m^3] 
-    real(prec), parameter :: rho_mantle = 3300.0                ! [kg/m^3] 
+    real(wp), parameter :: rho_ice    = 910.0                 ! [kg/m^3]
+    real(wp), parameter :: rho_ocean  = 1028.0                ! [kg/m^3] 
+    real(wp), parameter :: rho_water  = 1000.0                ! [kg/m^3] 
+    real(wp), parameter :: rho_mantle = 3300.0                ! [kg/m^3] 
 
     type isos_param_class 
         integer             :: method           ! Type of isostasy to use
         character(len=512)  :: fname_kelvin     ! File containing precalculated zero-order Kelvin function values
-        real(prec)          :: dt               ! [yr] Timestep to recalculate bedrock uplift rate
-        real(prec)          :: tau              ! [yr] Asthenospheric relaxation constant
-        real(prec)          :: DL               ! [N-m] lithosphere flexural rigidity (D_lith)
-        real(prec)          :: RL               ! [m] radius of relative stiffness (R_lith)
+        real(wp)          :: dt               ! [yr] Timestep to recalculate bedrock uplift rate
+        real(wp)          :: tau              ! [yr] Asthenospheric relaxation constant
+        real(wp)          :: DL               ! [N-m] lithosphere flexural rigidity (D_lith)
+        real(wp)          :: RL               ! [m] radius of relative stiffness (R_lith)
         
         ! Internal parameters 
 
@@ -38,31 +38,35 @@ module isostasy
                                 ! la lithosphere.  
 
         
-        real(prec) :: time 
+        real(wp) :: time 
 
     end type 
 
     type isos_state_class 
         
-        real(prec), allocatable :: z_bed(:,:)       ! Bedrock elevation         [m]
-        real(prec), allocatable :: dzbdt(:,:)       ! Rate of bedrock uplift    [m/a]
-        real(prec), allocatable :: z_bed_ref(:,:)   ! Reference (unweighted) bedrock 
+        real(wp), allocatable :: z_bed(:,:)       ! Bedrock elevation         [m]
+        real(wp), allocatable :: dzbdt(:,:)       ! Rate of bedrock uplift    [m/a]
+        real(wp), allocatable :: z_bed_ref(:,:)   ! Reference (unweighted) bedrock 
 
-        real(prec), allocatable :: we(:,:)          ! enfoncement du socle autour
+        real(wp), allocatable :: tau(:,:)           ! [yr] Asthenospheric relaxation timescale field
+        real(wp), allocatable :: He_lith(:,:)       ! [m]  Effective elastic thickness of the lithosphere
+        real(wp), allocatable :: D_lith(:,:)        ! [m]  [N-m] Lithosphere flexural rigidity
+        
+        real(wp), allocatable :: we(:,:)          ! enfoncement du socle autour
                                                     ! d'une charge unitaire, sera
                                                     ! dimensionne dans le module 
                                                     ! isostasie_mod, routine init_iso a 
                                                     ! WE(LBLOC:LBOC,-LBLOC:LBLOC)
 
         ! Relaxation
-        real(prec), allocatable :: charge(:,:)      ! charge sur une maille = RO G H
+        real(wp), allocatable :: charge(:,:)      ! charge sur une maille = RO G H
                                                     ! unite : 
                                                     ! sera dimensionne dans
                                                     ! isostasie_mod 
                                                     ! CHARGE(1-LBLOC:NX+LBLOC,1-LBLOC,NY+LBLOC)
 
-        real(prec), allocatable :: w0(:,:)          ! Current weighting
-        real(prec), allocatable :: w1(:,:)          ! New weighting          
+        real(wp), allocatable :: w0(:,:)          ! Current weighting
+        real(wp), allocatable :: w1(:,:)          ! New weighting          
 
         
     end type 
@@ -88,7 +92,7 @@ contains
         type(isos_class), intent(OUT) :: isos 
         character(len=*), intent(IN)  :: filename 
         integer, intent(IN) :: nx, ny 
-        real(prec), intent(IN) :: dx
+        real(wp), intent(IN) :: dx
 
         integer :: LBLOC 
 
@@ -132,17 +136,23 @@ contains
         implicit none 
 
         type(isos_class), intent(INOUT) :: isos 
-        real(prec), intent(IN) :: z_bed(:,:)            ! [m] Current bedrock elevation 
-        real(prec), intent(IN) :: H_ice(:,:)            ! [m] Current ice thickness  
-        real(prec), intent(IN) :: z_sl(:,:)             ! [m] Current sea level 
-        real(prec), intent(IN) :: z_bed_ref(:,:)        ! [m] Reference bedrock elevation (with known load)
-        real(prec), intent(IN) :: H_ice_ref(:,:)        ! [m] Reference ice thickness (associated with reference z_bed)
-        real(prec), intent(IN) :: z_sl_ref(:,:)         ! [m] Reference sea level (associated with reference z_bed)
-        real(prec), intent(IN) :: time                  ! [a] Initial time 
+        real(wp), intent(IN) :: z_bed(:,:)            ! [m] Current bedrock elevation 
+        real(wp), intent(IN) :: H_ice(:,:)            ! [m] Current ice thickness  
+        real(wp), intent(IN) :: z_sl(:,:)             ! [m] Current sea level 
+        real(wp), intent(IN) :: z_bed_ref(:,:)        ! [m] Reference bedrock elevation (with known load)
+        real(wp), intent(IN) :: H_ice_ref(:,:)        ! [m] Reference ice thickness (associated with reference z_bed)
+        real(wp), intent(IN) :: z_sl_ref(:,:)         ! [m] Reference sea level (associated with reference z_bed)
+        real(wp), intent(IN) :: time                  ! [a] Initial time 
         
         ! Store reference bedrock field
         isos%now%z_bed_ref = z_bed_ref 
         isos%now%dzbdt    = 0.0 
+
+        ! Store initial values of parameters
+        isos%now%tau = isos%par%tau 
+        isos%now%He_lith = 1.0_wp   ! ajr: to do!
+        isos%now%D_lith  = 1.0_wp   ! ajr: to do!
+
 
         ! Initialize the charge field to match reference topography
         call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%lbloc)
@@ -189,12 +199,12 @@ contains
         implicit none 
 
         type(isos_class), intent(INOUT) :: isos 
-        real(prec), intent(IN) :: H_ice(:,:)        ! [m] Current ice thickness 
-        real(prec), intent(IN) :: z_sl(:,:)         ! [m] Current sea level 
-        real(prec), intent(IN) :: time              ! [a] Current time 
+        real(wp), intent(IN) :: H_ice(:,:)        ! [m] Current ice thickness 
+        real(wp), intent(IN) :: z_sl(:,:)         ! [m] Current sea level 
+        real(wp), intent(IN) :: time              ! [a] Current time 
 
         ! Local variables 
-        real(prec) :: dt 
+        real(wp) :: dt 
 
         ! Step 0: determine current timestep 
         dt = time - isos%par%time 
@@ -226,7 +236,20 @@ contains
 
                 ! Relaxing aesthenosphere (RA)
                 isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
-                
+            
+            case(3) 
+                ! Elementary GIA model (spatially varying ELRA with geoid - to do!)
+
+                ! Regional elastic lithosphere (EL)
+                call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
+
+                ! Aesthenosphere timescale field 
+                isos%now%tau = isos%par%tau 
+
+                ! Relaxing aesthenosphere (RA)
+                call calc_uplift_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
+                                                w_b=isos%now%w1-isos%now%w0,tau=isos%now%tau)
+
         end select 
 
         ! Step 2: update bedrock elevation (every timestep > 0)
@@ -295,7 +318,11 @@ contains
         allocate(now%z_bed(nx,ny))
         allocate(now%dzbdt(nx,ny))
         allocate(now%z_bed_ref(nx,ny))
-         
+        
+        allocate(now%tau(nx,ny))
+        allocate(now%He_lith(nx,ny))
+        allocate(now%D_lith(nx,ny))
+
 !         allocate(now%we(nx,ny))
 !         allocate(now%charge(nx,ny))
 !         allocate(now%w0(nx,ny))
@@ -323,6 +350,10 @@ contains
         if (allocated(now%dzbdt))       deallocate(now%dzbdt)
         if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref)
         
+        if (allocated(now%tau))         deallocate(now%tau)
+        if (allocated(now%He_lith))     deallocate(now%He_lith)
+        if (allocated(now%D_lith))      deallocate(now%D_lith)
+        
         if (allocated(now%we))          deallocate(now%we)
         if (allocated(now%charge))      deallocate(now%charge)
         if (allocated(now%w0))          deallocate(now%w0)
@@ -343,14 +374,14 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: charge(:,:)
-        real(prec), intent(IN) :: H0(:,:)
-        real(prec), intent(IN) :: BSOC0(:,:)
-        real(prec), intent(IN) :: sealevel(:,:)
+        real(wp), intent(INOUT) :: charge(:,:)
+        real(wp), intent(IN) :: H0(:,:)
+        real(wp), intent(IN) :: BSOC0(:,:)
+        real(wp), intent(IN) :: sealevel(:,:)
         integer, intent(IN) :: lbloc 
 
         integer :: i, j, nx, ny, nrad 
-        real(prec), allocatable :: charge_local(:,:)
+        real(wp), allocatable :: charge_local(:,:)
 
         ! Size of neighborhood 
         nrad = lbloc
@@ -428,20 +459,20 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: WE(:,:) 
+        real(wp), intent(INOUT) :: WE(:,:) 
         character(len=*), intent(IN) :: filename 
-        real(prec), intent(IN) :: RL, DL, DX, DY 
+        real(wp), intent(IN) :: RL, DL, DX, DY 
 
         ! Local variables
         integer, parameter :: nk = 1000
         integer :: i, j, k 
         integer :: LBLOC 
-        real(prec) :: kei(0:nk)
-        real(prec) :: stepk, AL, XL, DIST
-        real(prec) :: som
+        real(wp) :: kei(0:nk)
+        real(wp) :: stepk, AL, XL, DIST
+        real(wp) :: som
         integer :: num_kelvin = 177 
 
-        real(prec), allocatable :: WE00(:,:)
+        real(wp), allocatable :: WE00(:,:)
 
         ! Size of neighborhood 
         LBLOC = (size(WE,1)-1)/2 
@@ -514,19 +545,19 @@ contains
          
         implicit none
 
-        real(prec), intent(INOUT) :: W1(:,:)       ! enfoncement courant
-        real(prec), intent(IN)    :: CHARGE(:,:)
-        real(prec), intent(IN)    :: WE(:,:)
+        real(wp), intent(INOUT) :: W1(:,:)       ! enfoncement courant
+        real(wp), intent(IN)    :: CHARGE(:,:)
+        real(wp), intent(IN)    :: WE(:,:)
         integer, intent(IN)    :: LBLOC 
 
         ! Local variables
         integer :: IP,JP,LPX,LPY,II,SOM1,SOM2
-        real(prec), allocatable :: WLOC(:,:)
-        real(prec), allocatable :: croix(:)
+        real(wp), allocatable :: WLOC(:,:)
+        real(wp), allocatable :: croix(:)
 
         integer :: i, j, nx ,ny
         integer :: nrad  
-        real(prec), allocatable :: charge_local(:,:)
+        real(wp), allocatable :: charge_local(:,:)
 
         nx = size(W1,1)
         ny = size(W1,2)
@@ -620,17 +651,17 @@ contains
 
         implicit none
 
-        real(prec), intent(INOUT) :: w1(:,:) 
-        real(prec), intent(INOUT) :: charge(:,:) 
-        real(prec), intent(IN) :: we(:,:) 
-        real(prec), intent(IN) :: z_bed(:,:) 
-        real(prec), intent(IN) :: H_ice(:,:) 
-        real(prec), intent(IN) :: z_sl(:,:) 
+        real(wp), intent(INOUT) :: w1(:,:) 
+        real(wp), intent(INOUT) :: charge(:,:) 
+        real(wp), intent(IN) :: we(:,:) 
+        real(wp), intent(IN) :: z_bed(:,:) 
+        real(wp), intent(IN) :: H_ice(:,:) 
+        real(wp), intent(IN) :: z_sl(:,:) 
         
         ! Local variables 
         integer :: nrad 
         integer :: i, j, nx, ny 
-        real(prec), allocatable :: charge_local(:,:)
+        real(wp), allocatable :: charge_local(:,:)
 
         nx = size(W1,1)
         ny = size(W1,2)
@@ -691,8 +722,8 @@ contains
 
         implicit none 
 
-        real(prec), intent(INOUT) :: w1
-        real(prec), intent(IN)    :: z_bed, H_ice, z_sl 
+        real(wp), intent(INOUT) :: w1
+        real(wp), intent(IN)    :: z_bed, H_ice, z_sl 
 
         if (rho_ice*H_ice.ge.rho_ocean*(z_sl-z_bed)) then
             ! Ice or land 
@@ -706,6 +737,23 @@ contains
 
         return 
 
-    end subroutine calc_litho_local 
+    end subroutine calc_litho_local
 
-end module isostasy 
+    elemental subroutine calc_uplift_relax(dzbdt,z_bed,z_bed_ref,w_b,tau)
+
+        implicit none
+
+        real(wp), intent(OUT) :: dzbdt 
+        real(wp), intent(IN)  :: z_bed 
+        real(wp), intent(IN)  :: z_bed_ref
+        real(wp), intent(IN)  :: w_b        ! w_b = w1-w0
+        real(wp), intent(IN)  :: tau
+
+        dzbdt = -((z_bed-z_bed_ref) - w_b) / tau
+        
+        return
+
+    end subroutine calc_uplift_relax
+
+
+end module isostasy
