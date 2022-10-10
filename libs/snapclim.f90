@@ -1429,7 +1429,7 @@ contains
         call nml_read(filename,"snap","dSo_const",          par%dSo_const,      init=init_pars)
         call nml_read(filename,"snap","f_to",               par%f_to,           init=init_pars)
         call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
-        call nml_read(filename,"snap","f_p_ne",             par%f_p_ne,         init=init_pars)
+        !call nml_read(filename,"snap","f_p_ne",             par%f_p_ne,         init=init_pars)
         call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
         
         call nml_read(filename,"snap_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
@@ -1439,6 +1439,11 @@ contains
         call nml_read(filename,"snap_hybrid","f_seas",      hpar%f_seas,       init=init_pars)
         call nml_read(filename,"snap_hybrid","f_to",        hpar%f_to,         init=init_pars)
         
+        ! For now, impose the value of f_p_ne=1.0 to use the unmodified value of f_p everywhere
+        ! ajr: note that this parameter is domain specific (to Greenland). 
+        ! Code should be adjusted to allow for variable f_p, but in a general way...
+        par%f_p_ne = 1.0_wp 
+
         return 
 
     end subroutine snapclim_par_load
