@@ -83,6 +83,8 @@ module isostasy
     public :: isos_update 
     public :: isos_end  
 
+    public :: isos_set_tau
+
 contains 
 
     subroutine isos_init(isos,filename,nx,ny,dx)
@@ -118,6 +120,11 @@ contains
         isos%now%z_bed      = 0.0 
         isos%now%dzbdt      = 0.0 
 
+        ! Store initial values of parameters
+        isos%now%He_lith    = 1.0_wp   ! ajr: to do!
+        isos%now%D_lith     = isos%par%D_lith
+        isos%now%tau        = isos%par%tau 
+        
         ! Set time to very large value in the future 
         isos%par%time       = 1e10 
 
@@ -148,12 +155,6 @@ contains
         isos%now%z_bed_ref = z_bed_ref 
         isos%now%dzbdt    = 0.0 
 
-        ! Store initial values of parameters
-        isos%now%He_lith = 1.0_wp   ! ajr: to do!
-        isos%now%D_lith  = isos%par%D_lith
-        isos%now%tau = isos%par%tau 
-        
-
         ! Initialize the charge field to match reference topography
         call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%lbloc)
 
@@ -169,7 +170,7 @@ contains
                 ! 1: LLRA - Local lithosphere, relaxing Aesthenosphere
                 ! 2: ELRA - Elastic lithosphere, relaxing Aesthenosphere
 
-                call litho(isos%now%w1,isos%now%charge,isos%now%we,isos%par%LBLOC)
+                call litho(isos%now%w1,isos%now%charge,isos%now%we,isos%par%lbloc)
                 isos%now%w0 = isos%now%w1 
 
         end select 
@@ -369,7 +370,7 @@ contains
         ! Impose multiple tau values according to the corresponding
         ! locations provided in a mask. 
         ! Additionally impose Gaussian smoothing via the
-        ! smoothing radius sigma 
+        ! smoothing radius sigma.
 
         implicit none 
 
@@ -380,10 +381,25 @@ contains
         real(wp), intent(IN)  :: dx 
         real(wp), intent(IN)  :: sigma 
 
+        ! Local variables
+        integer :: j, n 
 
+        ! Determine how many values should be assigned
+        n = size(tau_values,1)
+
+        ! Initially set tau=0 everywhere
+        tau = 0.0_wp 
+
+        ! Loop over unique tau values and assign them
+        ! to correct regions of domain.
+        do j = 1, n 
+
+            where(mask .eq. mask_values(j)) tau = tau_values(j)
+
+        end do
 
         ! Apply Gaussian smoothing as desired
-        !call smooth_gauss_2D(tau,dx=dx,sigma=sigma)
+        call smooth_gauss_2D(tau,dx=dx,sigma=sigma)
         
         return
 
@@ -623,7 +639,7 @@ contains
         ! Local variables
         integer, parameter :: nk = 1000
         integer :: i, j, k 
-        integer :: LBLOC 
+        integer :: lbloc 
         real(wp) :: kei(0:nk)
         real(wp) :: stepk, AL, XL, DIST
         real(wp) :: som
@@ -632,10 +648,10 @@ contains
         real(wp), allocatable :: WE00(:,:)
 
         ! Size of neighborhood 
-        LBLOC = (size(WE,1)-1)/2 
+        lbloc = (size(WE,1)-1)/2 
 
         ! Allocate local WE object with proper indexing
-        allocate(WE00(-LBLOC:LBLOC,-LBLOC:LBLOC))
+        allocate(WE00(-lbloc:lbloc,-lbloc:lbloc))
 
         ! pour la lithosphere
         STEPK = 100.0
@@ -653,12 +669,12 @@ contains
         end do
         close(num_kelvin)
 
-        do i = -LBLOC, LBLOC    
-        do j = -LBLOC, LBLOC
+        do i = -lbloc, lbloc    
+        do j = -lbloc, lbloc
             DIST = dx*sqrt(1.0*(i*i+j*j))                                
             XL   = DIST/RL*STEPK                                          
             K    = int(XL)
-            if ((K.gt.834).or.(DIST.gt.dx*LBLOC)) then                 
+            if ((K.gt.834).or.(DIST.gt.dx*lbloc)) then                 
                 WE00(i,j) = 0.0                                              
             else 
                 WE00(i,j)=kei(k)+(kei(k+1)-kei(k))*(XL-K)
@@ -674,7 +690,7 @@ contains
         WE00  = WE00/(som*rho_mantle*G)
 
         ! Return solution to external object
-        WE = WE00(-LBLOC:LBLOC,-LBLOC:LBLOC)
+        WE = WE00(-lbloc:lbloc,-lbloc:lbloc)
 
         ! Make sure too small values are eliminated 
         where(abs(WE) .lt. 1e-12) WE = 0.0 
@@ -683,7 +699,7 @@ contains
     
     end subroutine read_tab_litho
 
-    subroutine litho(W1,CHARGE,WE,LBLOC)
+    subroutine litho(W1,CHARGE,WE,lbloc)
         ! litho-0.3.f            10 Novembre 1999             *     
         !
         ! Petit routine qui donne la repartition des enfoncements
@@ -691,12 +707,12 @@ contains
         !
         ! En entree 
         !      ------------
-        !     WE(-LBLOC:LBLOC,-LBLOC:LBLOC)  : deflection due a une charge unitaire 
+        !     WE(-lbloc:lbloc,-lbloc:lbloc)  : deflection due a une charge unitaire 
         !                          defini dans tab-litho
-        !     LBLOC : relie a la distance : distance en noeud autour de laquelle 
+        !     lbloc : relie a la distance : distance en noeud autour de laquelle 
         !     la flexure de la lithosphere est calculee
         !
-        !     CHARGE(1-LBLOC:NX+LBLOC,1-LBLOC:NY+LBLOC) : poids par unite de surface
+        !     CHARGE(1-lbloc:NX+lbloc,1-lbloc:NY+lbloc) : poids par unite de surface
         !             (unite ?)        au temps time, calcule avant  'appel a litho 
         !                     dans taubed ou initial2 
          
@@ -705,7 +721,7 @@ contains
         real(wp), intent(INOUT) :: W1(:,:)       ! enfoncement courant
         real(wp), intent(IN)    :: CHARGE(:,:)
         real(wp), intent(IN)    :: WE(:,:)
-        integer, intent(IN)    :: LBLOC 
+        integer, intent(IN)    :: lbloc 
 
         ! Local variables
         integer :: IP,JP,LPX,LPY,II,SOM1,SOM2
@@ -719,20 +735,20 @@ contains
         nx = size(W1,1)
         ny = size(W1,2)
 
-        nrad = LBLOC 
+        nrad = lbloc 
         allocate(charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
         charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
 
         ! ----- allocation de WLOC  et de croix -----------
 
         if (allocated(WLOC)) deallocate(WLOC)
-        allocate(WLOC(-LBLOC:LBLOC,-LBLOC:LBLOC))
+        allocate(WLOC(-lbloc:lbloc,-lbloc:lbloc))
 
         if (allocated(croix)) deallocate(croix)
-        allocate(croix(0:LBLOC))
+        allocate(croix(0:lbloc))
 
         ! calcul de la deflexion par sommation des voisins appartenant
-        ! au bloc de taille 2*LBLOC
+        ! au bloc de taille 2*lbloc
         som1 = 0.0
         som2 = 0.0
 
@@ -747,14 +763,14 @@ contains
             ii      = 0
 
             ! Apply the neighborhood weighting to the charge
-            WLOC = WE * charge_local(I-LBLOC:I+LBLOC,J-LBLOC:J+LBLOC)
+            WLOC = WE * charge_local(I-lbloc:I+lbloc,J-lbloc:J+lbloc)
 
             ! sommation de tous les effets (tentative pour
             ! eviter les erreurs d'arrondi)
             W1(i,j)=WLOC(0,0)
 
             ! dans croix on calcul la somme des effets WLOC puis on met le resultat dans W1   
-            do LPX=1,LBLOC
+            do LPX=1,lbloc
                 LPY=0
                 CROIX(LPY)=(WLOC(LPX,LPY)+WLOC(-LPX,LPY))
 
@@ -775,7 +791,7 @@ contains
      
             end do
 
-            ! --- FIN DE L'INTEGRATION SUR LE PAVE LBLOC
+            ! --- FIN DE L'INTEGRATION SUR LE PAVE lbloc
             som1 = som1 + W1(i,j)
             som2 = som2 - charge_local(i,j)/(rho_mantle*G)
 
