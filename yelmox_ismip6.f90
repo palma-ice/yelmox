@@ -362,7 +362,7 @@ program yelmox_ismip6
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
@@ -389,7 +389,7 @@ program yelmox_ismip6
     yelmo1%bnd%H_sed = sed1%now%H 
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -487,7 +487,7 @@ program yelmox_ismip6
             ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
             if (mod(time,ctl%dtt)==0) then
                 ! Update snapclim (for elevation changes, but keep time=time_init)
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
             end if 
 
             ! == SURFACE MASS BALANCE ==============================================
@@ -1267,6 +1267,7 @@ else
             
             ! Update snapclim
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain, &
+                                                dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
                                                 dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
 
             ! Update surface mass balance
@@ -1861,7 +1862,7 @@ end if
         
         ! Step 1: udpate the climate to the present time 
 
-        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=ylmo%par%domain)
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=ylmo%par%domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
         ! Step 2: update the smb fields 
 
@@ -1912,6 +1913,7 @@ end if
 
         ! Set present-day climate with optional constant atmospheric anomaly
         call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp, &
+                                        dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
                                         domain=ylmo%par%domain,dTa=dTa,dTo=0.0_wp)
 
         ! Calculate smb for present day 
