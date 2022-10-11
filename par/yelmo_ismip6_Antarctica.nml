@@ -569,7 +569,6 @@
     dt           = 50.0                 ! [yr] Time step to recalculate bedrock uplift rate 
     tau          = 3000.0               ! [yr] Relaxation time 
     D_lith       = 9.87e24              ! [N-m] Flexural rigidity 
-    R_lith       = 131910.0             ! [m] Radius of relative stiffness
     
 /
 

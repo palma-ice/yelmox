@@ -30,15 +30,15 @@ module isostasy
     real(wp), parameter :: m_earth  = 5.972e24      ! [kg] Earth's mass,   Coulon et al (2021) 
     
     type isos_param_class 
-        integer             :: method           ! Type of isostasy to use
-        character(len=512)  :: fname_kelvin     ! File containing precalculated zero-order Kelvin function values
-        real(wp)          :: dt                 ! [yr] Timestep to recalculate bedrock uplift rate
-        real(wp)          :: tau                ! [yr] Asthenospheric relaxation constant
-        real(wp)          :: D_lith             ! [N-m] lithosphere flexural rigidity
-        real(wp)          :: R_lith             ! [m] radius of relative stiffness (R_lith)
+        integer            :: method            ! Type of isostasy to use
+        character(len=512) :: fname_kelvin      ! File containing precalculated zero-order Kelvin function values
+        real(wp)           :: dt                ! [yr] Timestep to recalculate bedrock uplift rate
+        real(wp)           :: tau               ! [yr] Asthenospheric relaxation constant
+        real(wp)           :: D_lith            ! [N-m] Lithosphere flexural rigidity
         
         ! Internal parameters 
-
+        real(wp)          :: L_w                ! [m] flexural length scale
+        
         integer    :: lbloc     ! distance en noeuds sur laquelle on calcule
                                 ! l'influence d'une charge sur la deflexion de 
                                 ! la lithosphere.  
@@ -100,13 +100,17 @@ contains
         type(isos_class), intent(OUT) :: isos 
         character(len=*), intent(IN)  :: filename 
         integer, intent(IN) :: nx, ny 
-        real(wp), intent(IN) :: dx
-
-        integer :: lbloc 
+        real(wp), intent(IN) :: dx 
 
         ! Load parameters
         call isos_par_load(isos%par,filename,init=.TRUE.)
         
+
+        ! Calculate the flexural length scale
+        ! (Coulon et al, 2021, Eq. in text after Eq. 3)
+        ! Note: should be on the order of 100km
+        isos%par%L_w = (isos%par%D_lith / (rho_a*g))**0.25 
+
         ! lbloc, 400 km on each side
         ! ajr: 400km set internally, since the radius should be smaller.
         ! This needs thorough revision and code refactoring. 
@@ -114,10 +118,9 @@ contains
         ! and Le Muer and Huybrechts (1996). It seems that this value
         ! should be larger to capture the forebuldge at 5-6x radius of relative stiffness
         isos%par%lbloc = int((400000.0-0.1)/dx)+1
-        lbloc = isos%par%lbloc
         
         ! Initialize isos variables 
-        call isos_allocate(isos%now,nx,ny,nrad=lbloc)
+        call isos_allocate(isos%now,nx,ny,nrad=isos%par%lbloc)
     
         ! Intially ensure all variables are zero 
         isos%now%we         = 0.0 
@@ -136,7 +139,7 @@ contains
 
         ! Load lithospheric table of Kelvin function values 
         call read_tab_litho(isos%now%we,filename=trim(isos%par%fname_kelvin), &
-                            RL=isos%par%R_lith,DL=isos%par%D_lith,dx=dx,dy=dx)
+                            RL=isos%par%L_w,DL=isos%par%D_lith,dx=dx,dy=dx)
 
         write(*,*) "isos_init:: range(WE):  ", minval(isos%now%we),     maxval(isos%now%we)
 
@@ -304,8 +307,7 @@ contains
         call nml_read(filename,"isostasy","dt",             par%dt,             init=init_pars)
         call nml_read(filename,"isostasy","tau",            par%tau,            init=init_pars)
         call nml_read(filename,"isostasy","D_lith",         par%D_lith,         init=init_pars)
-        call nml_read(filename,"isostasy","R_lith",         par%R_lith,             init=init_pars)
-        
+
         return
 
     end subroutine isos_par_load
@@ -693,7 +695,7 @@ contains
         
         ! normalisation
         som = SUM(WE00)
-        WE00  = WE00/(som*rho_a*G)
+        WE00  = WE00/(som*rho_a*g)
 
         ! Return solution to external object
         WE = WE00(-lbloc:lbloc,-lbloc:lbloc)
@@ -827,7 +829,7 @@ contains
         !               W1 peut etre calcule de plusieurs facons selon le modele 
         !               d'isostasie utilise
         !
-
+        
         implicit none
 
         real(wp), intent(INOUT) :: w1(:,:) 
@@ -840,7 +842,7 @@ contains
         ! Local variables 
         integer :: nrad 
         integer :: i, j, nx, ny 
-        real(wp), allocatable :: charge_local(:,:)
+        real(wp), allocatable :: w1_local(:,:)
 
         nx = size(W1,1)
         ny = size(W1,2)
@@ -848,56 +850,58 @@ contains
         ! Size of neighborhood 
         nrad = (size(we,1)-1)/2 
 
-        allocate(charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
-        charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
+        allocate(w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
+        w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
 
         ! ********* calcul de W1 l'enfoncement d'equilibre au temps t
         ! NLITH est defini dans isostasie et permet le choix du modele d'isostasie
 
         ! avec rigidite de la lithosphere
 
-        do j = 1, ny 
-        do i = 1, nx
-            if (rho_ice*H_ice(i,j).ge.rho_sw*(z_sl(i,j)-z_bed(i,j))) then
-                ! glace ou terre 
-                charge_local(i,j)=(rho_ice*G)*H_ice(i,j)
-            else
-                ! ocean
-                charge_local(i,j)=(rho_sw*G)*(z_sl(i,j)-z_bed(i,j))
-            endif
-        end do
-        end do
+        ! do j = 1, ny 
+        ! do i = 1, nx
+        !     if (rho_ice*H_ice(i,j).ge.rho_sw*(z_sl(i,j)-z_bed(i,j))) then
+        !         ! glace ou terre 
+        !         w1_local(i,j)=(rho_ice*G)*H_ice(i,j)
+        !     else
+        !         ! ocean
+        !         w1_local(i,j)=(rho_sw*G)*(z_sl(i,j)-z_bed(i,j))
+        !     endif
+        ! end do
+        ! end do
 
+        ! Calculate local lithospheric displacement first
+        call calc_litho_local(w1_local,z_bed,H_ice,z_sl)
 
-        ! il faut remplir charge_local dans les parties a l'exterieur de la grille :
-        ! a l'exterieur de la grille charge_local est egale a la valeur sur le bord
+        ! il faut remplir w1_local dans les parties a l'exterieur de la grille :
+        ! a l'exterieur de la grille w1_local est egale a la valeur sur le bord
 
         do j = 1, ny
-            charge_local(1-nrad:0,j)=charge_local(1,j)      ! bord W
-            charge_local(NX+1:NX+nrad,j)=charge_local(nx,j) ! bord E
+            w1_local(1-nrad:0,j)=w1_local(1,j)      ! bord W
+            w1_local(NX+1:NX+nrad,j)=w1_local(nx,j) ! bord E
         end do
         do i = 1, nx
-            charge_local(i,1-nrad:0)=charge_local(i,1)      ! bord S
-            charge_local(i,ny+1:ny+nrad)=charge_local(i,ny) ! bord N
+            w1_local(i,1-nrad:0)=w1_local(i,1)      ! bord S
+            w1_local(i,ny+1:ny+nrad)=w1_local(i,ny) ! bord N
         end do
 
         ! valeur dans les quatres coins exterieurs au domaine       
-        charge_local(1-nrad:0,1-nrad:0)         = charge_local(1,1)   ! coin SW
-        charge_local(1-nrad:0,ny+1:ny+nrad)     = charge_local(1,ny)  ! coin NW
-        charge_local(nx+1:nx+nrad,1-nrad:0)     = charge_local(nx,1)  ! coin SE
-        charge_local(nx+1:nx+nrad,ny+1:ny+nrad) = charge_local(nx,ny) ! coin NE
+        w1_local(1-nrad:0,1-nrad:0)         = w1_local(1,1)   ! coin SW
+        w1_local(1-nrad:0,ny+1:ny+nrad)     = w1_local(1,ny)  ! coin NW
+        w1_local(nx+1:nx+nrad,1-nrad:0)     = w1_local(nx,1)  ! coin SE
+        w1_local(nx+1:nx+nrad,ny+1:ny+nrad) = w1_local(nx,ny) ! coin NE
 
-        call litho(w1,charge_local,we,nrad)
+        call litho(w1,w1_local,we,nrad)
 
         ! Return charge to the external variable (to match indices from 1:nx+2*nrad)
-        charge = charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
+        charge = w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
 
         return
 
     end subroutine calc_litho_regional
 
     elemental subroutine calc_litho_local(w1,z_bed,H_ice,z_sl)
-        ! Previously the else-statement in the routine `taubed`
+        ! Calculate the local lithospheric loading from ice or ocean weight 
 
         implicit none 
 
@@ -905,11 +909,13 @@ contains
         real(wp), intent(IN)    :: z_bed, H_ice, z_sl 
 
         if (rho_ice*H_ice.ge.rho_sw*(z_sl-z_bed)) then
-            ! Ice or land 
+            ! Ice or land
+
             w1 = rho_ice/rho_a*H_ice
 
         else
             ! Ocean
+
             w1 = rho_sw/rho_a*(z_sl-z_bed)
 
         end if
