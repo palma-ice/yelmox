@@ -15,14 +15,20 @@ module isostasy
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: wp = sp 
 
-    real(wp), parameter :: G  = 9.81                  ! [m/s^2]
+    real(wp), parameter :: g  = 9.81                ! [m/s^2]
     real(wp), parameter :: pi = 3.14159265359
 
-    real(wp), parameter :: rho_ice    = 910.0                 ! [kg/m^3]
-    real(wp), parameter :: rho_ocean  = 1028.0                ! [kg/m^3] 
-    real(wp), parameter :: rho_water  = 1000.0                ! [kg/m^3] 
-    real(wp), parameter :: rho_mantle = 3300.0                ! [kg/m^3] 
+    real(wp), parameter :: rho_ice  = 910.0         ! [kg/m^3]
+    real(wp), parameter :: rho_sw   = 1028.0        ! [kg/m^3] 
+    real(wp), parameter :: rho_w    = 1000.0        ! [kg/m^3] 
+    real(wp), parameter :: rho_a    = 3300.0        ! [kg/m^3] 3370 used by Coulon et al (2021)
 
+    real(wp), parameter :: nu       = 0.25          ! [-]   Poisson's ratio, Coulon et al (2021) 
+    real(wp), parameter :: E        = 100.0         ! [GPa] Young's modulus, Coulon et al (2021) 
+    
+    real(wp), parameter :: r_earth  = 6.378e6       ! [m]  Earth's radius, Coulon et al (2021) 
+    real(wp), parameter :: m_earth  = 5.972e24      ! [kg] Earth's mass,   Coulon et al (2021) 
+    
     type isos_param_class 
         integer             :: method           ! Type of isostasy to use
         character(len=512)  :: fname_kelvin     ! File containing precalculated zero-order Kelvin function values
@@ -65,7 +71,7 @@ module isostasy
                                                     ! isostasie_mod 
                                                     ! CHARGE(1-LBLOC:NX+LBLOC,1-LBLOC,NY+LBLOC)
 
-        real(wp), allocatable :: w0(:,:)          ! Current weighting
+        real(wp), allocatable :: w0(:,:)          ! Reference weighting
         real(wp), allocatable :: w1(:,:)          ! New weighting          
 
         
@@ -83,7 +89,7 @@ module isostasy
     public :: isos_update 
     public :: isos_end  
 
-    public :: isos_set_tau
+    public :: isos_set_field
 
 contains 
 
@@ -163,7 +169,7 @@ contains
             case(0)
                 ! Steady-state lithospheric depression 
 
-                isos%now%w0 = isos%now%charge/(rho_mantle*G)
+                isos%now%w0 = isos%now%charge/(rho_a*G)
                 isos%now%w1 = isos%now%w0
 
             case(1,2) 
@@ -366,16 +372,16 @@ contains
     end subroutine isos_deallocate
 
 
-    subroutine isos_set_tau(tau,tau_values,mask_values,mask,dx,sigma)
-        ! Impose multiple tau values according to the corresponding
+    subroutine isos_set_field(var,var_values,mask_values,mask,dx,sigma)
+        ! Impose multiple var values according to the corresponding
         ! locations provided in a mask. 
         ! Additionally impose Gaussian smoothing via the
         ! smoothing radius sigma.
 
         implicit none 
 
-        real(wp), intent(OUT) :: tau(:,:) 
-        real(wp), intent(IN)  :: tau_values(:)
+        real(wp), intent(OUT) :: var(:,:) 
+        real(wp), intent(IN)  :: var_values(:)
         real(wp), intent(IN)  :: mask_values(:)
         real(wp), intent(IN)  :: mask(:,:) 
         real(wp), intent(IN)  :: dx 
@@ -385,25 +391,25 @@ contains
         integer :: j, n 
 
         ! Determine how many values should be assigned
-        n = size(tau_values,1)
+        n = size(var_values,1)
 
-        ! Initially set tau=0 everywhere
-        tau = 0.0_wp 
+        ! Initially set var=0 everywhere
+        var = 0.0_wp 
 
-        ! Loop over unique tau values and assign them
+        ! Loop over unique var values and assign them
         ! to correct regions of domain.
         do j = 1, n 
 
-            where(mask .eq. mask_values(j)) tau = tau_values(j)
+            where(mask .eq. mask_values(j)) var = var_values(j)
 
         end do
 
         ! Apply Gaussian smoothing as desired
-        call smooth_gauss_2D(tau,dx=dx,sigma=sigma)
+        call smooth_gauss_2D(var,dx=dx,sigma=sigma)
         
         return
 
-    end subroutine isos_set_tau
+    end subroutine isos_set_field
 
     subroutine smooth_gauss_2D(var,dx,sigma,mask_apply,mask_use)
         ! Smooth out a field to avoid noise 
@@ -569,7 +575,7 @@ contains
         
         do i = 1, nx
         do j = 1, ny
-            if (rho_ice*H0(i,j).ge.rho_ocean*(sealevel(i,j)-BSOC0(i,j))) then
+            if (rho_ice*H0(i,j).ge.rho_sw*(sealevel(i,j)-BSOC0(i,j))) then
                 ! glace ou terre
                 
                 charge_local(i,j) = (rho_ice*G)*H0(i,j)
@@ -577,7 +583,7 @@ contains
             else
                 ! ocean
                 
-                charge_local(i,j) = (rho_ocean*G)*(sealevel(i,j)-BSOC0(i,j))
+                charge_local(i,j) = (rho_sw*G)*(sealevel(i,j)-BSOC0(i,j))
 
             endif
 
@@ -687,7 +693,7 @@ contains
         
         ! normalisation
         som = SUM(WE00)
-        WE00  = WE00/(som*rho_mantle*G)
+        WE00  = WE00/(som*rho_a*G)
 
         ! Return solution to external object
         WE = WE00(-lbloc:lbloc,-lbloc:lbloc)
@@ -793,7 +799,7 @@ contains
 
             ! --- FIN DE L'INTEGRATION SUR LE PAVE lbloc
             som1 = som1 + W1(i,j)
-            som2 = som2 - charge_local(i,j)/(rho_mantle*G)
+            som2 = som2 - charge_local(i,j)/(rho_a*G)
 
         end do
         end do
@@ -852,12 +858,12 @@ contains
 
         do j = 1, ny 
         do i = 1, nx
-            if (rho_ice*H_ice(i,j).ge.rho_ocean*(z_sl(i,j)-z_bed(i,j))) then
+            if (rho_ice*H_ice(i,j).ge.rho_sw*(z_sl(i,j)-z_bed(i,j))) then
                 ! glace ou terre 
                 charge_local(i,j)=(rho_ice*G)*H_ice(i,j)
             else
                 ! ocean
-                charge_local(i,j)=(rho_ocean*G)*(z_sl(i,j)-z_bed(i,j))
+                charge_local(i,j)=(rho_sw*G)*(z_sl(i,j)-z_bed(i,j))
             endif
         end do
         end do
@@ -898,13 +904,13 @@ contains
         real(wp), intent(INOUT) :: w1
         real(wp), intent(IN)    :: z_bed, H_ice, z_sl 
 
-        if (rho_ice*H_ice.ge.rho_ocean*(z_sl-z_bed)) then
+        if (rho_ice*H_ice.ge.rho_sw*(z_sl-z_bed)) then
             ! Ice or land 
-            w1 = rho_ice/rho_mantle*H_ice
+            w1 = rho_ice/rho_a*H_ice
 
         else
             ! Ocean
-            w1 = rho_ocean/rho_mantle*(z_sl-z_bed)
+            w1 = rho_sw/rho_a*(z_sl-z_bed)
 
         end if
 
