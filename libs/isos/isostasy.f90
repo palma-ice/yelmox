@@ -34,16 +34,12 @@ module isostasy
         character(len=512) :: fname_kelvin      ! File containing precalculated zero-order Kelvin function values
         real(wp)           :: dt                ! [yr] Timestep to recalculate bedrock uplift rate
         real(wp)           :: tau               ! [yr] Asthenospheric relaxation constant
+        real(wp)           :: He_lith           ! [km] Effective elastic thickness of lithosphere
         real(wp)           :: D_lith            ! [N-m] Lithosphere flexural rigidity
         
         ! Internal parameters 
-        real(wp)          :: L_w                ! [m] flexural length scale
-        
-        integer    :: lbloc     ! distance en noeuds sur laquelle on calcule
-                                ! l'influence d'une charge sur la deflexion de 
-                                ! la lithosphere.  
-
-        
+        real(wp) :: L_w         ! [m] flexural length scale
+        integer  :: nrad        ! [-] Radius of neighborhood for convolution, in number of grid points        
         real(wp) :: time 
 
     end type 
@@ -62,14 +58,14 @@ module isostasy
                                                     ! d'une charge unitaire, sera
                                                     ! dimensionne dans le module 
                                                     ! isostasie_mod, routine init_iso a 
-                                                    ! WE(LBLOC:LBOC,-LBLOC:LBLOC)
+                                                    ! WE(nrad:LBOC,-nrad:nrad)
 
         ! Relaxation
         real(wp), allocatable :: charge(:,:)      ! charge sur une maille = RO G H
                                                     ! unite : 
                                                     ! sera dimensionne dans
                                                     ! isostasie_mod 
-                                                    ! CHARGE(1-LBLOC:NX+LBLOC,1-LBLOC,NY+LBLOC)
+                                                    ! CHARGE(1-nrad:nx+nrad,1-nrad,ny+nrad)
 
         real(wp), allocatable :: w0(:,:)          ! Reference weighting
         real(wp), allocatable :: w1(:,:)          ! New weighting          
@@ -105,22 +101,27 @@ contains
         ! Load parameters
         call isos_par_load(isos%par,filename,init=.TRUE.)
         
-
+        ! Store initial values of parameters as constant fields
+        isos%now%He_lith    = isos%par%He_lith
+        isos%now%D_lith     = isos%par%D_lith
+        isos%now%tau        = isos%par%tau 
+        
         ! Calculate the flexural length scale
         ! (Coulon et al, 2021, Eq. in text after Eq. 3)
         ! Note: should be on the order of 100km
         isos%par%L_w = (isos%par%D_lith / (rho_a*g))**0.25 
 
-        ! lbloc, 400 km on each side
+        ! nrad, 400 km on each side
         ! ajr: 400km set internally, since the radius should be smaller.
         ! This needs thorough revision and code refactoring. 
         ! See Greve and Blatter (2009), Chpt 8, page 192 for methodology 
         ! and Le Muer and Huybrechts (1996). It seems that this value
         ! should be larger to capture the forebuldge at 5-6x radius of relative stiffness
-        isos%par%lbloc = int((400000.0-0.1)/dx)+1
+        !isos%par%nrad = int((400000.0-0.1)/dx)+1
+        isos%par%nrad = int((6.0*isos%par%L_w-0.1)/dx)+1
         
         ! Initialize isos variables 
-        call isos_allocate(isos%now,nx,ny,nrad=isos%par%lbloc)
+        call isos_allocate(isos%now,nx,ny,nrad=isos%par%nrad)
     
         ! Intially ensure all variables are zero 
         isos%now%we         = 0.0 
@@ -129,11 +130,6 @@ contains
         isos%now%z_bed      = 0.0 
         isos%now%dzbdt      = 0.0 
 
-        ! Store initial values of parameters
-        isos%now%He_lith    = 1.0_wp   ! ajr: to do!
-        isos%now%D_lith     = isos%par%D_lith
-        isos%now%tau        = isos%par%tau 
-        
         ! Set time to very large value in the future 
         isos%par%time       = 1e10 
 
@@ -165,7 +161,7 @@ contains
         isos%now%dzbdt    = 0.0 
 
         ! Initialize the charge field to match reference topography
-        call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%lbloc)
+        call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%nrad)
 
         select case(isos%par%method)
 
@@ -179,7 +175,7 @@ contains
                 ! 1: LLRA - Local lithosphere, relaxing Aesthenosphere
                 ! 2: ELRA - Elastic lithosphere, relaxing Aesthenosphere
 
-                call litho(isos%now%w1,isos%now%charge,isos%now%we,isos%par%lbloc)
+                call litho(isos%now%w1,isos%now%charge,isos%now%we,isos%par%nrad)
                 isos%now%w0 = isos%now%w1 
 
         end select 
@@ -305,9 +301,10 @@ contains
         call nml_read(filename,"isostasy","method",         par%method,         init=init_pars)
         call nml_read(filename,"isostasy","fname_kelvin",   par%fname_kelvin,   init=init_pars)
         call nml_read(filename,"isostasy","dt",             par%dt,             init=init_pars)
-        call nml_read(filename,"isostasy","tau",            par%tau,            init=init_pars)
+        call nml_read(filename,"isostasy","He_lith",        par%He_lith,        init=init_pars)
         call nml_read(filename,"isostasy","D_lith",         par%D_lith,         init=init_pars)
-
+        call nml_read(filename,"isostasy","tau",            par%tau,            init=init_pars)
+        
         return
 
     end subroutine isos_par_load
@@ -548,7 +545,7 @@ contains
 
     ! === ISOS physics routines ======================================
 
-    subroutine init_charge(charge,H0,BSOC0,sealevel,lbloc)
+    subroutine init_charge(charge,H0,BSOC0,sealevel,nrad)
         !******** initialisation de CHARGE ***********
         ! pour calcul du socle initial on calcule la charge
         ! avec l'etat initial suppose en equilibre S0, H0, Bsoc0
@@ -559,13 +556,10 @@ contains
         real(wp), intent(IN) :: H0(:,:)
         real(wp), intent(IN) :: BSOC0(:,:)
         real(wp), intent(IN) :: sealevel(:,:)
-        integer, intent(IN) :: lbloc 
+        integer,  intent(IN) :: nrad            ! Size of neighborhood 
 
-        integer :: i, j, nx, ny, nrad 
+        integer :: i, j, nx, ny
         real(wp), allocatable :: charge_local(:,:)
-
-        ! Size of neighborhood 
-        nrad = lbloc
 
         nx = size(BSOC0,1)
         ny = size(BSOC0,2)
@@ -593,27 +587,27 @@ contains
         end do
 
         do j = 1, ny  ! parties de charge_local a l'exterieure de la grille
-            charge_local(1-lbloc:0,j)     = charge_local(1,j)
-            charge_local(nx+1:nx+lbloc,j) = charge_local(nx,j)
+            charge_local(1-nrad:0,j)     = charge_local(1,j)
+            charge_local(nx+1:nx+nrad,j) = charge_local(nx,j)
         end do
         do i = 1, nx
-            charge_local(i,1-lbloc:0)     = charge_local(i,1)
-            charge_local(i,ny+1:ny+lbloc) = charge_local(i,ny)
+            charge_local(i,1-nrad:0)     = charge_local(i,1)
+            charge_local(i,ny+1:ny+nrad) = charge_local(i,ny)
         end do
 
         do j = 1, ny  ! parties de charge_local a l'exterieure de la grille
-            charge_local(1-lbloc:0,j)     = charge_local(1,j)
-            charge_local(nx+1:nx+lbloc,j) = charge_local(nx,j)
+            charge_local(1-nrad:0,j)     = charge_local(1,j)
+            charge_local(nx+1:nx+nrad,j) = charge_local(nx,j)
         end do
         do i = 1, nx
-            charge_local(i,1-lbloc:0)     = charge_local(i,1)
-            charge_local(i,ny+1:ny+lbloc) = charge_local(i,ny)
+            charge_local(i,1-nrad:0)     = charge_local(i,1)
+            charge_local(i,ny+1:ny+nrad) = charge_local(i,ny)
         end do
 
-        charge_local(1-lbloc:0,1-lbloc:0)         = charge_local(1,1) !valeurs aux quatres coins
-        charge_local(1-lbloc:0,ny+1:ny+lbloc)     = charge_local(1,ny) ! exterieurs au domaine
-        charge_local(nx+1:nx+lbloc,1-lbloc:0)     = charge_local(nx,1)
-        charge_local(nx+1:nx+lbloc,ny+1:ny+lbloc) = charge_local(nx,ny)
+        charge_local(1-nrad:0,1-nrad:0)         = charge_local(1,1) !valeurs aux quatres coins
+        charge_local(1-nrad:0,ny+1:ny+nrad)     = charge_local(1,ny) ! exterieurs au domaine
+        charge_local(nx+1:nx+nrad,1-nrad:0)     = charge_local(nx,1)
+        charge_local(nx+1:nx+nrad,ny+1:ny+nrad) = charge_local(nx,ny)
         
         ! Return charge_local to the external variable (to match indices from 1:nx+2*nrad)
         charge = charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
@@ -647,7 +641,7 @@ contains
         ! Local variables
         integer, parameter :: nk = 1000
         integer :: i, j, k 
-        integer :: lbloc 
+        integer :: nrad 
         real(wp) :: kei(0:nk)
         real(wp) :: stepk, AL, XL, DIST
         real(wp) :: som
@@ -656,10 +650,10 @@ contains
         real(wp), allocatable :: WE00(:,:)
 
         ! Size of neighborhood 
-        lbloc = (size(WE,1)-1)/2 
+        nrad = (size(WE,1)-1)/2 
 
         ! Allocate local WE object with proper indexing
-        allocate(WE00(-lbloc:lbloc,-lbloc:lbloc))
+        allocate(WE00(-nrad:nrad,-nrad:nrad))
 
         ! pour la lithosphere
         STEPK = 100.0
@@ -677,12 +671,12 @@ contains
         end do
         close(num_kelvin)
 
-        do i = -lbloc, lbloc    
-        do j = -lbloc, lbloc
+        do i = -nrad, nrad    
+        do j = -nrad, nrad
             DIST = dx*sqrt(1.0*(i*i+j*j))                                
             XL   = DIST/RL*STEPK                                          
             K    = int(XL)
-            if ((K.gt.834).or.(DIST.gt.dx*lbloc)) then                 
+            if ((K.gt.834).or.(DIST.gt.dx*nrad)) then                 
                 WE00(i,j) = 0.0                                              
             else 
                 WE00(i,j)=kei(k)+(kei(k+1)-kei(k))*(XL-K)
@@ -698,7 +692,7 @@ contains
         WE00  = WE00/(som*rho_a*g)
 
         ! Return solution to external object
-        WE = WE00(-lbloc:lbloc,-lbloc:lbloc)
+        WE = WE00(-nrad:nrad,-nrad:nrad)
 
         ! Make sure too small values are eliminated 
         where(abs(WE) .lt. 1e-12) WE = 0.0 
@@ -707,7 +701,7 @@ contains
     
     end subroutine read_tab_litho
 
-    subroutine litho(W1,CHARGE,WE,lbloc)
+    subroutine litho(W1,CHARGE,WE,nrad)
         ! litho-0.3.f            10 Novembre 1999             *     
         !
         ! Petit routine qui donne la repartition des enfoncements
@@ -715,12 +709,12 @@ contains
         !
         ! En entree 
         !      ------------
-        !     WE(-lbloc:lbloc,-lbloc:lbloc)  : deflection due a une charge unitaire 
+        !     WE(-nrad:nrad,-nrad:nrad)  : deflection due a une charge unitaire 
         !                          defini dans tab-litho
-        !     lbloc : relie a la distance : distance en noeud autour de laquelle 
+        !     nrad : relie a la distance : distance en noeud autour de laquelle 
         !     la flexure de la lithosphere est calculee
         !
-        !     CHARGE(1-lbloc:NX+lbloc,1-lbloc:NY+lbloc) : poids par unite de surface
+        !     CHARGE(1-nrad:NX+nrad,1-nrad:NY+nrad) : poids par unite de surface
         !             (unite ?)        au temps time, calcule avant  'appel a litho 
         !                     dans taubed ou initial2 
          
@@ -729,7 +723,7 @@ contains
         real(wp), intent(INOUT) :: W1(:,:)       ! enfoncement courant
         real(wp), intent(IN)    :: CHARGE(:,:)
         real(wp), intent(IN)    :: WE(:,:)
-        integer, intent(IN)    :: lbloc 
+        integer, intent(IN)    :: nrad 
 
         ! Local variables
         integer :: IP,JP,LPX,LPY,II,SOM1,SOM2
@@ -737,26 +731,24 @@ contains
         real(wp), allocatable :: croix(:)
 
         integer :: i, j, nx ,ny
-        integer :: nrad  
         real(wp), allocatable :: charge_local(:,:)
 
         nx = size(W1,1)
         ny = size(W1,2)
 
-        nrad = lbloc 
         allocate(charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
         charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
 
         ! ----- allocation de WLOC  et de croix -----------
 
         if (allocated(WLOC)) deallocate(WLOC)
-        allocate(WLOC(-lbloc:lbloc,-lbloc:lbloc))
+        allocate(WLOC(-nrad:nrad,-nrad:nrad))
 
         if (allocated(croix)) deallocate(croix)
-        allocate(croix(0:lbloc))
+        allocate(croix(0:nrad))
 
         ! calcul de la deflexion par sommation des voisins appartenant
-        ! au bloc de taille 2*lbloc
+        ! au bloc de taille 2*nrad
         som1 = 0.0
         som2 = 0.0
 
@@ -771,14 +763,14 @@ contains
             ii      = 0
 
             ! Apply the neighborhood weighting to the charge
-            WLOC = WE * charge_local(I-lbloc:I+lbloc,J-lbloc:J+lbloc)
+            WLOC = WE * charge_local(I-nrad:I+nrad,J-nrad:J+nrad)
 
             ! sommation de tous les effets (tentative pour
             ! eviter les erreurs d'arrondi)
             W1(i,j)=WLOC(0,0)
 
             ! dans croix on calcul la somme des effets WLOC puis on met le resultat dans W1   
-            do LPX=1,lbloc
+            do LPX=1,nrad
                 LPY=0
                 CROIX(LPY)=(WLOC(LPX,LPY)+WLOC(-LPX,LPY))
 
@@ -799,7 +791,7 @@ contains
      
             end do
 
-            ! --- FIN DE L'INTEGRATION SUR LE PAVE lbloc
+            ! --- FIN DE L'INTEGRATION SUR LE PAVE nrad
             som1 = som1 + W1(i,j)
             som2 = som2 - charge_local(i,j)/(rho_a*G)
 
@@ -817,19 +809,19 @@ contains
         ! de chaque point a la deflexion de la lithosphere
         !    En sortie
         !   ------------
-        !       CHARGE(1-LBLOC:NX+LBLOC,1-LBLOC:NY+LBLOC) : poids par unite de surface
+        !       CHARGE(1-nrad:nx+nrad,1-nrad:ny+nrad) : poids par unite de surface
         !               (unite ?)   Elle est calculee initialement dans initial2
         !               Poids de la colonne d'eau ou de la colonne de glace.
-        !               a l'exterieur du domaine : 1-LBLOC:1 et NX+1:NX+LBLOC
+        !               a l'exterieur du domaine : 1-nrad:1 et nx+1:nx+nrad
         !               on donne les valeurs des bords de la grille
         !               CHARGE est utilise par litho uniquement
         !
-        !       W1(NX,NY) est l'enfoncement courant, c'est le resultat 
+        !       W1(nx,ny) est l'enfoncement courant, c'est le resultat 
         !               de la routine litho
         !               W1 peut etre calcule de plusieurs facons selon le modele 
         !               d'isostasie utilise
         !
-        
+
         implicit none
 
         real(wp), intent(INOUT) :: w1(:,:) 
@@ -902,6 +894,7 @@ contains
 
     elemental subroutine calc_litho_local(w1,z_bed,H_ice,z_sl)
         ! Calculate the local lithospheric loading from ice or ocean weight 
+        ! in units of [m] displacement 
 
         implicit none 
 
@@ -925,6 +918,8 @@ contains
     end subroutine calc_litho_local
 
     elemental subroutine calc_uplift_relax(dzbdt,z_bed,z_bed_ref,w_b,tau)
+        ! Calculate rate of change of vertical bedrock height
+        ! from a relaxing asthenosphere.
 
         implicit none
 

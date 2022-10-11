@@ -567,8 +567,9 @@
     method       = 2                    ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
     fname_kelvin = "input/kelvin.res"   ! File containing precalculated zero-order Kelvin function values 
     dt           = 50.0                 ! [yr] Time step to recalculate bedrock uplift rate 
-    tau          = 3000.0               ! [yr] Relaxation time 
+    He_lith      = 100.0                ! [km] Effective elastic thickness lithosphere
     D_lith       = 9.87e24              ! [N-m] Flexural rigidity 
+    tau          = 3000.0               ! [yr] Relaxation time 
     
 /
 
