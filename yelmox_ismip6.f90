@@ -130,7 +130,7 @@ program yelmox_ismip6
 
     type(ctrl_params)     :: ctl
     type(opt_params)      :: opt 
-
+    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 

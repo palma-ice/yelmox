@@ -50,6 +50,8 @@ module isostasy
         real(wp), allocatable :: dzbdt(:,:)       ! Rate of bedrock uplift    [m/a]
         real(wp), allocatable :: z_bed_ref(:,:)   ! Reference (unweighted) bedrock 
 
+        real(wp), allocatable :: kei(:,:)         ! Kelvin function filter values 
+
         real(wp), allocatable :: tau(:,:)           ! [yr] Asthenospheric relaxation timescale field
         real(wp), allocatable :: He_lith(:,:)       ! [m]  Effective elastic thickness of the lithosphere
         real(wp), allocatable :: D_lith(:,:)        ! [m]  [N-m] Lithosphere flexural rigidity
@@ -87,6 +89,8 @@ module isostasy
 
     public :: isos_set_field
 
+    public :: calc_kei_filter_2D
+
 contains 
 
     subroutine isos_init(isos,filename,nx,ny,dx)
@@ -95,16 +99,14 @@ contains
 
         type(isos_class), intent(OUT) :: isos 
         character(len=*), intent(IN)  :: filename 
-        integer, intent(IN) :: nx, ny 
+        integer,  intent(IN) :: nx, ny 
         real(wp), intent(IN) :: dx 
+
+        ! Local variables
+        integer :: n 
 
         ! Load parameters
         call isos_par_load(isos%par,filename,init=.TRUE.)
-        
-        ! Store initial values of parameters as constant fields
-        isos%now%He_lith    = isos%par%He_lith
-        isos%now%D_lith     = isos%par%D_lith
-        isos%now%tau        = isos%par%tau 
         
         ! Calculate the flexural length scale
         ! (Coulon et al, 2021, Eq. in text after Eq. 3)
@@ -118,11 +120,11 @@ contains
         ! and Le Muer and Huybrechts (1996). It seems that this value
         ! should be larger to capture the forebuldge at 5-6x radius of relative stiffness
         !isos%par%nrad = int((400000.0-0.1)/dx)+1
-        isos%par%nrad = int((6.0*isos%par%L_w-0.1)/dx)+1
+        isos%par%nrad = int(4.0*isos%par%L_w/dx)+1
         
         ! Initialize isos variables 
         call isos_allocate(isos%now,nx,ny,nrad=isos%par%nrad)
-    
+        
         ! Intially ensure all variables are zero 
         isos%now%we         = 0.0 
         isos%now%charge     = 0.0  
@@ -132,6 +134,16 @@ contains
 
         ! Set time to very large value in the future 
         isos%par%time       = 1e10 
+
+        ! Calculate the Kelvin function filter 
+        call calc_kei_filter_2D(isos%now%kei,dx=dx,dy=dx, &
+                        L_w=isos%par%L_w,filename=isos%par%fname_kelvin)
+        
+        ! Store initial values of parameters as constant fields
+        isos%now%He_lith    = isos%par%He_lith
+        isos%now%D_lith     = isos%par%D_lith
+        isos%now%tau        = isos%par%tau 
+        
 
         ! Load lithospheric table of Kelvin function values 
         call read_tab_litho(isos%now%we,filename=trim(isos%par%fname_kelvin), &
@@ -316,14 +328,22 @@ contains
         type(isos_state_class), intent(INOUT) :: now 
         integer, intent(IN) :: nx, ny, nrad  
 
+        ! Local variables
+        integer :: nfilt 
+
+        nfilt = 2*nrad+1 
+
         ! First ensure arrays are not allocated
         call isos_deallocate(now)
 
         ! Allocate arrays
 
+        allocate(now%kei(nfilt,nfilt))
+
         allocate(now%z_bed(nx,ny))
         allocate(now%dzbdt(nx,ny))
         allocate(now%z_bed_ref(nx,ny))
+        
         
         allocate(now%tau(nx,ny))
         allocate(now%He_lith(nx,ny))
@@ -336,7 +356,7 @@ contains
         
 !         allocate(now%we(-nrad:nrad,-nrad:nrad))
 !         allocate(now%charge(1-nrad:nx+nrad,1-nrad:ny+nrad))
-        allocate(now%we(nrad*2+1,nrad*2+1))
+        allocate(now%we(nfilt,nfilt))
         allocate(now%charge(1:nx+2*nrad,1:ny+2*nrad))
 
         allocate(now%w0(nx,ny))
@@ -352,6 +372,8 @@ contains
 
         type(isos_state_class), intent(INOUT) :: now 
 
+        if (allocated(now%kei))         deallocate(now%kei)
+        
         if (allocated(now%z_bed))       deallocate(now%z_bed)
         if (allocated(now%dzbdt))       deallocate(now%dzbdt)
         if (allocated(now%z_bed_ref))   deallocate(now%z_bed_ref)
@@ -542,6 +564,182 @@ contains
         return 
 
     end function gauss_values
+
+
+    subroutine calc_kei_filter_2D(filt,dx,dy,L_w,filename)
+        ! Calculate 2D Kelvin function (kei) smoothing kernel
+
+        implicit none 
+
+        real(wp), intent(OUT) :: filt(:,:) 
+        real(wp), intent(IN)  :: dx 
+        real(wp), intent(IN)  :: dy 
+        real(wp), intent(IN)  :: L_w  
+        character(len=*), intent(IN) :: filename 
+
+        ! Local variables 
+        integer  :: i, j, i1, j1, n, n2
+        real(wp) :: x, y, r
+
+        real(wp), allocatable :: rn_vals(:) 
+        real(wp), allocatable :: kei_vals(:) 
+        
+        ! Get size of filter array and half-width
+        n  = size(filt,1) 
+        n2 = (n-1)/2 
+
+        ! Safety check
+        if (size(filt,1) .ne. size(filt,2)) then 
+            write(*,*) "calc_kei_filt:: error: array 'filt' must be square [n,n]."
+            write(*,*) "size(filt): ", size(filt,1), size(filt,2)
+            stop
+        end if 
+
+        ! Safety check
+        if (mod(n,2) .ne. 1) then 
+            write(*,*) "calc_kei_filt:: error: n can only be odd."
+            write(*,*) "n = ", n
+            stop  
+        end if 
+
+        ! Load tabulated kei values from file
+        call load_kei_values(rn_vals,kei_vals,filename)
+
+        ! Loop over filter array in two dimensions,
+        ! calculate the distance from the center, normalized by L_w
+        ! and impose correct Kelvin function value. 
+
+        do j = -n2, n2 
+        do i = -n2, n2
+
+            x  = i*dx 
+            y  = j*dy 
+            r  = sqrt(x**2+y**2)
+
+            ! Get actual index of array
+            i1 = i+1+n2 
+            j1 = j+1+n2 
+
+            ! Get correct kei value for this point
+            filt(i1,j1) = get_kei_value(r,L_w,rn_vals,kei_vals)
+
+        end do 
+        end do 
+        
+        return 
+
+    end subroutine calc_kei_filter_2D
+
+    function get_kei_value(r,L_w,rn_vals,kei_vals) result(kei)
+
+        implicit none
+
+        real(wp), intent(IN) :: r           ! [m] Radius from point load 
+        real(wp), intent(IN) :: L_w         ! [m] Flexural length scale
+        real(wp), intent(IN) :: rn_vals(:)  ! [-] Tabulated normalised radius values (r/L_w)
+        real(wp), intent(IN) :: kei_vals(:) ! [-] Tabulated normalised Kelvin function values
+        real(wp) :: kei
+
+        ! Local variables 
+        integer :: k, n 
+        real(wp) :: rn_now 
+        real(wp) :: wt 
+
+        n = size(rn_vals,1) 
+
+        ! Get current normalized radius from point load
+        rn_now = r / L_w 
+
+        if (rn_now .gt. rn_vals(n)) then 
+
+            kei = kei_vals(n)
+
+        else 
+
+            do k = 1, n-1
+                if (rn_now .ge. rn_vals(k) .and. rn_now .lt. rn_vals(k+1)) exit
+            end do 
+
+            ! Linear interpolation to get current kei value
+            kei = kei_vals(k) &
+                + (rn_now-rn_vals(k))/(rn_vals(k+1)-rn_vals(k))*(kei_vals(k+1)-kei_vals(k))   
+
+        end if 
+
+        ! Diagnostics (only works if function is changed to a subroutine!)
+        !write(*,*) "get_kei_value: ", L_w, r, rn_now, k, rn_vals(k), kei_vals(k) 
+
+        return
+
+    end function get_kei_value
+
+    subroutine load_kei_values(rn,kei,filename)
+
+        implicit none
+
+        real(wp), allocatable,  intent(OUT):: rn(:)
+        real(wp), allocatable,  intent(OUT):: kei(:)
+        character(len=*),       intent(IN) :: filename
+
+        ! Local variables 
+        integer :: k 
+        integer, parameter :: ntot    = 1001
+        integer, parameter :: filenum = 177
+
+        if (allocated(rn))  deallocate(rn)
+        if (allocated(kei)) deallocate(kei) 
+
+        allocate(rn(ntot))
+        allocate(kei(ntot)) 
+
+        ! fonction de kelvin
+        ! lecture de la table kei qui est tous les 0.01 entre 0 et 10
+        ! STEPK=100=1/ecart 
+        !cdc modification du chemin maintenant fonction de dir_inp
+        ! trim(dir_inp)//'kelvin.res'
+        open(filenum,file=trim(filename))
+        read(filenum,*)  ! Skip first line
+        do k = 1, ntot
+            read(filenum,*) rn(k),kei(k)
+        end do
+        close(filenum)
+
+        return
+
+    end subroutine load_kei_values
+
+    function calc_kei_value(r,L_w) result(kei)
+        ! This function is based on Greve and Blatter (2009), Eq. 8.34.
+        ! Combined with 8.11, it should be possible to obtain
+        ! an analytical expression for the Kelvin function (kei). 
+        ! This could eventually be used as a replacement for loading 
+        ! the tabulated values from a file. 
+
+        ! So far, this approach is not giving the right answer. 
+        
+        implicit none 
+
+        real(wp), intent(IN) :: r       ! [m] Radius from point load 
+        real(wp), intent(IN) :: L_w     ! [m] Flexural length scale
+        real(wp) :: kei 
+
+        ! Local variables
+        real(wp) :: alpha 
+        real(wp) :: f_now 
+        real(wp) :: fac 
+
+        alpha = r / (sqrt(2.0)*L_w)
+        f_now = exp(-alpha)*(cos(alpha)+sin(alpha))
+
+        fac = sqrt(2.0)**3 * L_w * (pi/4.0)
+        
+        kei = fac * f_now 
+
+        ! Note: this doesn't give the right values of kei!!!
+
+        return
+
+    end function calc_kei_value
 
     ! === ISOS physics routines ======================================
 
