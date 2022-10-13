@@ -46,11 +46,12 @@ module isostasy
 
     type isos_state_class 
         
-        real(wp), allocatable :: z_bed(:,:)       ! Bedrock elevation         [m]
-        real(wp), allocatable :: dzbdt(:,:)       ! Rate of bedrock uplift    [m/a]
-        real(wp), allocatable :: z_bed_ref(:,:)   ! Reference (unweighted) bedrock 
+        real(wp), allocatable :: z_bed(:,:)         ! Bedrock elevation         [m]
+        real(wp), allocatable :: dzbdt(:,:)         ! Rate of bedrock uplift    [m/a]
+        real(wp), allocatable :: z_bed_ref(:,:)     ! Reference (unweighted) bedrock 
 
-        real(wp), allocatable :: kei(:,:)         ! Kelvin function filter values 
+        real(wp), allocatable :: kei(:,:)           ! Kelvin function filter values 
+        real(wp), allocatable :: G0(:,:)            ! Green's function values
 
         real(wp), allocatable :: tau(:,:)           ! [yr] Asthenospheric relaxation timescale field
         real(wp), allocatable :: He_lith(:,:)       ! [m]  Effective elastic thickness of the lithosphere
@@ -88,8 +89,6 @@ module isostasy
     public :: isos_end  
 
     public :: isos_set_field
-
-    public :: calc_kei_filter_2D
 
 contains 
 
@@ -138,7 +137,10 @@ contains
         ! Calculate the Kelvin function filter 
         call calc_kei_filter_2D(isos%now%kei,dx=dx,dy=dx, &
                         L_w=isos%par%L_w,filename=isos%par%fname_kelvin)
-        
+
+        ! Calculate the Green's function values
+        call calc_greens_function(isos%now%G0,isos%now%kei,isos%par%L_w,isos%par%D_lith)
+
         ! Store initial values of parameters as constant fields
         isos%now%He_lith    = isos%par%He_lith
         isos%now%D_lith     = isos%par%D_lith
@@ -339,7 +341,8 @@ contains
         ! Allocate arrays
 
         allocate(now%kei(nfilt,nfilt))
-
+        allocate(now%G0(nfilt,nfilt))
+        
         allocate(now%z_bed(nx,ny))
         allocate(now%dzbdt(nx,ny))
         allocate(now%z_bed_ref(nx,ny))
@@ -373,6 +376,7 @@ contains
         type(isos_state_class), intent(INOUT) :: now 
 
         if (allocated(now%kei))         deallocate(now%kei)
+        if (allocated(now%G0))          deallocate(now%G0)
         
         if (allocated(now%z_bed))       deallocate(now%z_bed)
         if (allocated(now%dzbdt))       deallocate(now%dzbdt)
@@ -564,6 +568,21 @@ contains
         return 
 
     end function gauss_values
+
+    subroutine calc_greens_function(G0,kei2D,L_w,D_lith)
+
+        implicit none
+
+        real(wp), intent(OUT) :: G0(:,:) 
+        real(wp), intent(IN)  :: kei2D(:,:) 
+        real(wp), intent(IN)  :: L_w 
+        real(wp), intent(IN)  :: D_lith 
+
+        G0 = -L_w**2 / (2.0*pi*D_lith) * kei2D
+
+        return
+
+    end subroutine calc_greens_function
 
 
     subroutine calc_kei_filter_2D(filt,dx,dy,L_w,filename)
