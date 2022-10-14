@@ -93,6 +93,13 @@ check_sim : $(objdir)/ncio.o
 		@echo "    check_sim.x is ready."
 		@echo " "
 
+test_isostasy : yelmo-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/test_isostasy.x tests/test_isostasy.f90 \
+			$(LFLAGS) $(yelmox_libs)
+		@echo " "
+		@echo "    test_isostasy.x is ready."
+		@echo " "
+
 .PHONY : usage
 usage:
 	@echo ""

@@ -131,6 +131,7 @@ contains
         isos%now%z_bed      = 0.0 
         isos%now%dzbdt      = 0.0 
 
+
         ! Set time to very large value in the future 
         isos%par%time       = 1e10 
 
@@ -152,6 +153,8 @@ contains
                             RL=isos%par%L_w,DL=isos%par%D_lith,dx=dx,dy=dx)
 
         write(*,*) "isos_init:: range(WE):  ", minval(isos%now%we),     maxval(isos%now%we)
+        !write(*,*) "isos_init:: range(G0):  ", minval(isos%now%G0),     maxval(isos%now%G0)
+        !stop 
 
         return 
 
@@ -182,12 +185,12 @@ contains
             case(0)
                 ! Steady-state lithospheric depression 
 
-                isos%now%w0 = isos%now%charge/(rho_a*G)
+                isos%now%w0 = isos%now%charge/(rho_a*g)
                 isos%now%w1 = isos%now%w0
 
             case(1,2) 
-                ! 1: LLRA - Local lithosphere, relaxing Aesthenosphere
-                ! 2: ELRA - Elastic lithosphere, relaxing Aesthenosphere
+                ! 1: LLRA - Local lithosphere, relaxing Asthenosphere
+                ! 2: ELRA - Elastic lithosphere, relaxing Asthenosphere
 
                 call litho(isos%now%w1,isos%now%charge,isos%now%we,isos%par%nrad)
                 isos%now%w0 = isos%now%w1 
@@ -240,22 +243,22 @@ contains
                 isos%now%dzbdt = 0.0 
 
             case(1)
-                ! Local lithosphere, relaxing aesthenosphere (LLRA)
+                ! Local lithosphere, relaxing asthenosphere (LLRA)
 
                 ! Local lithosphere (LL)
                 call calc_litho_local(isos%now%w1,isos%now%z_bed,H_ice,z_sl)
 
-                ! Relaxing aesthenosphere (RA)
-                isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
+                ! Relaxing asthenosphere (RA)
+                isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%now%tau
 
             case(2)
-                ! Elastic lithosphere, relaxing aesthenosphere (ELRA)
+                ! Elastic lithosphere, relaxing asthenosphere (ELRA)
                 
                 ! Regional elastic lithosphere (EL)
                 call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
 
-                ! Relaxing aesthenosphere (RA)
-                isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%par%tau
+                ! Relaxing asthenosphere (RA)
+                isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%now%tau
             
             case(3) 
                 ! Elementary GIA model (spatially varying ELRA with geoid - to do!)
@@ -263,10 +266,10 @@ contains
                 ! Regional elastic lithosphere (EL)
                 call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
 
-                ! Aesthenosphere timescale field 
+                ! Asthenosphere timescale field 
                 isos%now%tau = isos%par%tau 
 
-                ! Relaxing aesthenosphere (RA)
+                ! Relaxing asthenosphere (RA)
                 call calc_uplift_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
                                                 w_b=isos%now%w1-isos%now%w0,tau=isos%now%tau)
 
@@ -415,6 +418,14 @@ contains
         ! Local variables
         integer :: j, n 
 
+        ! Safety check 
+        if (sigma .le. dx) then 
+            write(*,*) "isos_set_field:: Error: sigma must be larger than dx."
+            write(*,*) "dx    = ", dx 
+            write(*,*) "sigma = ", sigma 
+            stop 
+        end if 
+
         ! Determine how many values should be assigned
         n = size(var_values,1)
 
@@ -450,11 +461,14 @@ contains
         logical,    intent(IN), optional :: mask_use(:,:) 
 
         ! Local variables
-        integer  :: i, j, nx, ny, n, n2 
+        integer  :: i, j, nx, ny, n, n2, nfx, nfy, nx_ext, ny_ext, k 
+        integer  :: imx, ipx, jmx, jpx 
         real(wp), allocatable :: filter0(:,:), filter(:,:) 
         real(wp), allocatable :: var_old(:,:) 
         logical,  allocatable :: mask_apply_local(:,:) 
         logical,  allocatable :: mask_use_local(:,:) 
+
+        real(wp), allocatable :: var_ext(:,:), var_ref_ext(:,:) 
 
         nx    = size(var,1)
         ny    = size(var,2)
@@ -465,12 +479,19 @@ contains
         ! Get total number of points for filter window in each direction
         n = 2*n2+1
         
+        ! Get extended array size 
+        nx_ext = nx + 2*n2  
+        ny_ext = ny + 2*n2  
+
         allocate(var_old(nx,ny))
         allocate(mask_apply_local(nx,ny))
         allocate(mask_use_local(nx,ny))
         allocate(filter0(n,n))
         allocate(filter(n,n))
 
+        allocate(var_ext(-n2:nx+n2,-n2:ny+n2))
+        allocate(var_ref_ext(-n2:nx+n2,-n2:ny+n2))
+        
         ! Check whether mask_apply is available 
         if (present(mask_apply)) then 
             ! use mask_use to define neighborhood points
@@ -502,26 +523,56 @@ contains
 
         var_old = var 
 
-        do j = n2+1, ny-n2
-        do i = n2+1, nx-n2
+        var_ref_ext = -9999.0 
 
-            if (mask_apply_local(i,j)) then 
+        var_ref_ext(1:nx,1:ny) = var 
+        do i = 0, -n2, -1
+            k = -i+1
+            var_ref_ext(i,:) = var_ref_ext(k,:) 
+        end do 
+        do i = nx+1, nx+n2 
+            k = nx + ((nx+1)-i)
+            var_ref_ext(i,:) = var_ref_ext(k,:) 
+        end do 
+
+        do j = 0, -n2, -1
+            k = -j+1
+            var_ref_ext(:,j) = var_ref_ext(:,k) 
+        end do 
+        do j = ny+1, ny+n2 
+            k = ny + ((ny+1)-j)
+            var_ref_ext(:,j) = var_ref_ext(:,k) 
+        end do 
+
+        if (count(var_ref_ext .eq. -9999.0) .gt. 0) then 
+            write(*,*) "Missing points!"
+            stop 
+        end if 
+
+        do j = 1, ny
+        do i = 1, nx
+
+
+            !if (mask_apply_local(i,j)) then 
                 ! Apply smoothing to this point 
 
                 ! Limit filter input to neighbors of interest
                 filter = filter0 
-                where(.not. mask_use_local(i-n2:i+n2,j-n2:j+n2)) filter = 0.0
+                !where(.not. mask_use_local(i-n2:i+n2,j-n2:j+n2) ) filter = 0.0
 
                 ! If neighbors are available, normalize and perform smoothing  
                 if (sum(filter) .gt. 0.0) then 
                     filter = filter/sum(filter)
-                    var(i,j) = sum(var_old(i-n2:i+n2,j-n2:j+n2)*filter) 
+                    var_ext(i,j) = sum(var_ref_ext(i-n2:i+n2,j-n2:j+n2)*filter) 
                 end if  
 
-            end if 
+            !end if 
 
         end do 
         end do 
+
+        ! Get variable on normal grid 
+        var = var_ext(1:nx,1:ny)
 
         return 
 
@@ -1080,7 +1131,7 @@ contains
         ! end do
 
         ! Calculate local lithospheric displacement first
-        call calc_litho_local(w1_local,z_bed,H_ice,z_sl)
+        call calc_litho_local(w1_local(1:nx,1:ny),z_bed,H_ice,z_sl)
 
         ! il faut remplir w1_local dans les parties a l'exterieur de la grille :
         ! a l'exterieur de la grille w1_local est egale a la valeur sur le bord
@@ -1121,12 +1172,13 @@ contains
         if (rho_ice*H_ice.ge.rho_sw*(z_sl-z_bed)) then
             ! Ice or land
 
-            w1 = rho_ice/rho_a*H_ice
-
+            !w1 = rho_ice/rho_a*H_ice
+            w1 = rho_ice*g*H_ice 
         else
             ! Ocean
 
-            w1 = rho_sw/rho_a*(z_sl-z_bed)
+            !w1 = rho_sw/rho_a*(z_sl-z_bed)
+            w1 = rho_sw*g*(z_sl-z_bed)
 
         end if
 
