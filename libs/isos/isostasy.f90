@@ -57,21 +57,18 @@ module isostasy
         real(wp), allocatable :: He_lith(:,:)       ! [m]  Effective elastic thickness of the lithosphere
         real(wp), allocatable :: D_lith(:,:)        ! [m]  [N-m] Lithosphere flexural rigidity
         
-        real(wp), allocatable :: we(:,:)          ! enfoncement du socle autour
-                                                    ! d'une charge unitaire, sera
+        real(wp), allocatable :: we(:,:)            ! enfoncement du socle autour
+                                                    ! d'une load unitaire, sera
                                                     ! dimensionne dans le module 
                                                     ! isostasie_mod, routine init_iso a 
                                                     ! WE(nrad:LBOC,-nrad:nrad)
 
         ! Relaxation
-        real(wp), allocatable :: charge(:,:)      ! charge sur une maille = RO G H
-                                                    ! unite : 
-                                                    ! sera dimensionne dans
-                                                    ! isostasie_mod 
-                                                    ! CHARGE(1-nrad:nx+nrad,1-nrad,ny+nrad)
+        real(wp), allocatable :: load(:,:)          ! [N] Surface load = rho * g * H
+                                                    ! Internally used as load(1-nrad:nx+nrad,1-nrad,ny+nrad)
 
-        real(wp), allocatable :: w0(:,:)          ! Reference weighting
-        real(wp), allocatable :: w1(:,:)          ! New weighting          
+        real(wp), allocatable :: w0(:,:)          ! Reference displacement
+        real(wp), allocatable :: w1(:,:)          ! New displacement          
 
         
     end type 
@@ -126,7 +123,7 @@ contains
         
         ! Intially ensure all variables are zero 
         isos%now%we         = 0.0 
-        isos%now%charge     = 0.0  
+        isos%now%load       = 0.0  
         isos%now%z_bed_ref  = 0.0
         isos%now%z_bed      = 0.0 
         isos%now%dzbdt      = 0.0 
@@ -177,22 +174,22 @@ contains
         isos%now%z_bed_ref = z_bed_ref 
         isos%now%dzbdt    = 0.0 
 
-        ! Initialize the charge field to match reference topography
-        call init_charge(isos%now%charge,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%nrad)
+        ! Initialize the load field to match reference topography
+        call init_load(isos%now%load,H_ice_ref,z_bed_ref,z_sl_ref,isos%par%nrad)
 
         select case(isos%par%method)
 
             case(0)
                 ! Steady-state lithospheric depression 
 
-                isos%now%w0 = isos%now%charge/(rho_a*g)
+                isos%now%w0 = isos%now%load/(rho_a*g)
                 isos%now%w1 = isos%now%w0
 
             case(1,2) 
                 ! 1: LLRA - Local lithosphere, relaxing Asthenosphere
                 ! 2: ELRA - Elastic lithosphere, relaxing Asthenosphere
 
-                call litho(isos%now%w1,isos%now%charge,isos%now%we,isos%par%nrad)
+                call litho(isos%now%w1,isos%now%load,isos%now%we,isos%par%nrad)
                 isos%now%w0 = isos%now%w1 
 
         end select 
@@ -209,7 +206,7 @@ contains
 
         write(*,*) "isos_init_state:: "
         write(*,*) "  Initial time:  ", isos%par%time 
-        write(*,*) "  range(charge): ", minval(isos%now%charge), maxval(isos%now%charge)
+        write(*,*) "  range(load):   ", minval(isos%now%load), maxval(isos%now%load)
         write(*,*) "  range(w0):     ", minval(isos%now%w0), maxval(isos%now%w0)
         write(*,*) "  range(z_bed):  ", minval(isos%now%z_bed), maxval(isos%now%z_bed)
         
@@ -255,7 +252,7 @@ contains
                 ! Elastic lithosphere, relaxing asthenosphere (ELRA)
                 
                 ! Regional elastic lithosphere (EL)
-                call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
+                call calc_litho_regional(isos%now%w1,isos%now%load,isos%now%we,isos%now%z_bed,H_ice,z_sl)
 
                 ! Relaxing asthenosphere (RA)
                 isos%now%dzbdt = ((isos%now%z_bed_ref-isos%now%z_bed) - (isos%now%w1-isos%now%w0))/isos%now%tau
@@ -264,7 +261,7 @@ contains
                 ! Elementary GIA model (spatially varying ELRA with geoid - to do!)
 
                 ! Regional elastic lithosphere (EL)
-                call calc_litho_regional(isos%now%w1,isos%now%charge,isos%now%we,isos%now%z_bed,H_ice,z_sl)
+                call calc_litho_regional(isos%now%w1,isos%now%load,isos%now%we,isos%now%z_bed,H_ice,z_sl)
 
                 ! Asthenosphere timescale field 
                 isos%now%tau = isos%par%tau 
@@ -356,14 +353,14 @@ contains
         allocate(now%D_lith(nx,ny))
 
 !         allocate(now%we(nx,ny))
-!         allocate(now%charge(nx,ny))
+!         allocate(now%load(nx,ny))
 !         allocate(now%w0(nx,ny))
 !         allocate(now%w1(nx,ny))
         
 !         allocate(now%we(-nrad:nrad,-nrad:nrad))
-!         allocate(now%charge(1-nrad:nx+nrad,1-nrad:ny+nrad))
+!         allocate(now%load(1-nrad:nx+nrad,1-nrad:ny+nrad))
         allocate(now%we(nfilt,nfilt))
-        allocate(now%charge(1:nx+2*nrad,1:ny+2*nrad))
+        allocate(now%load(1:nx+2*nrad,1:ny+2*nrad))
 
         allocate(now%w0(nx,ny))
         allocate(now%w1(nx,ny))
@@ -390,7 +387,7 @@ contains
         if (allocated(now%D_lith))      deallocate(now%D_lith)
         
         if (allocated(now%we))          deallocate(now%we)
-        if (allocated(now%charge))      deallocate(now%charge)
+        if (allocated(now%load))        deallocate(now%load)
         if (allocated(now%w0))          deallocate(now%w0)
         if (allocated(now%w1))          deallocate(now%w1)
         
@@ -461,7 +458,7 @@ contains
         logical,    intent(IN), optional :: mask_use(:,:) 
 
         ! Local variables
-        integer  :: i, j, nx, ny, n, n2, nfx, nfy, nx_ext, ny_ext, k 
+        integer  :: i, j, nx, ny, n, n2, k 
         integer  :: imx, ipx, jmx, jpx 
         real(wp), allocatable :: filter0(:,:), filter(:,:) 
         real(wp), allocatable :: var_old(:,:) 
@@ -479,10 +476,6 @@ contains
         ! Get total number of points for filter window in each direction
         n = 2*n2+1
         
-        ! Get extended array size 
-        nx_ext = nx + 2*n2  
-        ny_ext = ny + 2*n2  
-
         allocate(var_old(nx,ny))
         allocate(mask_apply_local(nx,ny))
         allocate(mask_use_local(nx,ny))
@@ -813,76 +806,77 @@ contains
 
     ! === ISOS physics routines ======================================
 
-    subroutine init_charge(charge,H0,BSOC0,sealevel,nrad)
-        !******** initialisation de CHARGE ***********
-        ! pour calcul du socle initial on calcule la charge
-        ! avec l'etat initial suppose en equilibre S0, H0, Bsoc0
+    subroutine init_load(load,H_ice_ref,z_bed_ref,z_sl_ref,nrad)
+        ! Initialize surface load to be consistent with
+        ! reference topography and ice/ocean load.
+        ! Assumes equilibrium conditions between 
+        ! z_bed_ref, H_ice_ref and z_sl_ref. 
 
         implicit none 
 
-        real(wp), intent(INOUT) :: charge(:,:)
-        real(wp), intent(IN) :: H0(:,:)
-        real(wp), intent(IN) :: BSOC0(:,:)
-        real(wp), intent(IN) :: sealevel(:,:)
+        real(wp), intent(INOUT) :: load(:,:)
+        real(wp), intent(IN) :: H_ice_ref(:,:)
+        real(wp), intent(IN) :: z_bed_ref(:,:)
+        real(wp), intent(IN) :: z_sl_ref(:,:)
         integer,  intent(IN) :: nrad            ! Size of neighborhood 
 
         integer :: i, j, nx, ny
-        real(wp), allocatable :: charge_local(:,:)
+        real(wp), allocatable :: load_local(:,:)
 
-        nx = size(BSOC0,1)
-        ny = size(BSOC0,2)
+        nx = size(z_bed_ref,1)
+        ny = size(z_bed_ref,2)
 
         
-        allocate(charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
-        charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
+        allocate(load_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
+        load_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = load 
 
         
         do i = 1, nx
         do j = 1, ny
-            if (rho_ice*H0(i,j).ge.rho_sw*(sealevel(i,j)-BSOC0(i,j))) then
+            if (rho_ice*H_ice_ref(i,j).ge.rho_sw*(z_sl_ref(i,j)-z_bed_ref(i,j))) then
                 ! glace ou terre
                 
-                charge_local(i,j) = (rho_ice*G)*H0(i,j)
+                load_local(i,j) = (rho_ice*g)*H_ice_ref(i,j)
 
             else
                 ! ocean
                 
-                charge_local(i,j) = (rho_sw*G)*(sealevel(i,j)-BSOC0(i,j))
+                load_local(i,j) = (rho_sw*g)*(z_sl_ref(i,j)-z_bed_ref(i,j))
 
             endif
 
         end do
         end do
 
-        do j = 1, ny  ! parties de charge_local a l'exterieure de la grille
-            charge_local(1-nrad:0,j)     = charge_local(1,j)
-            charge_local(nx+1:nx+nrad,j) = charge_local(nx,j)
+        do j = 1, ny  ! parties de load_local a l'exterieure de la grille
+            load_local(1-nrad:0,j)     = load_local(1,j)
+            load_local(nx+1:nx+nrad,j) = load_local(nx,j)
         end do
         do i = 1, nx
-            charge_local(i,1-nrad:0)     = charge_local(i,1)
-            charge_local(i,ny+1:ny+nrad) = charge_local(i,ny)
+            load_local(i,1-nrad:0)     = load_local(i,1)
+            load_local(i,ny+1:ny+nrad) = load_local(i,ny)
         end do
 
-        do j = 1, ny  ! parties de charge_local a l'exterieure de la grille
-            charge_local(1-nrad:0,j)     = charge_local(1,j)
-            charge_local(nx+1:nx+nrad,j) = charge_local(nx,j)
+        do j = 1, ny  ! parties de load_local a l'exterieure de la grille
+            load_local(1-nrad:0,j)     = load_local(1,j)
+            load_local(nx+1:nx+nrad,j) = load_local(nx,j)
         end do
         do i = 1, nx
-            charge_local(i,1-nrad:0)     = charge_local(i,1)
-            charge_local(i,ny+1:ny+nrad) = charge_local(i,ny)
+            load_local(i,1-nrad:0)     = load_local(i,1)
+            load_local(i,ny+1:ny+nrad) = load_local(i,ny)
         end do
 
-        charge_local(1-nrad:0,1-nrad:0)         = charge_local(1,1) !valeurs aux quatres coins
-        charge_local(1-nrad:0,ny+1:ny+nrad)     = charge_local(1,ny) ! exterieurs au domaine
-        charge_local(nx+1:nx+nrad,1-nrad:0)     = charge_local(nx,1)
-        charge_local(nx+1:nx+nrad,ny+1:ny+nrad) = charge_local(nx,ny)
+        load_local(1-nrad:0,1-nrad:0)         = load_local(1,1) !valeurs aux quatres coins
+        load_local(1-nrad:0,ny+1:ny+nrad)     = load_local(1,ny) ! exterieurs au domaine
+        load_local(nx+1:nx+nrad,1-nrad:0)     = load_local(nx,1)
+        load_local(nx+1:nx+nrad,ny+1:ny+nrad) = load_local(nx,ny)
         
-        ! Return charge_local to the external variable (to match indices from 1:nx+2*nrad)
-        charge = charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
+        ! Return load_local to the external variable (to match indices from 1:nx+2*nrad)
+        load = load_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
 
         return 
 
-    end subroutine init_charge
+    end subroutine init_load
 
     subroutine read_tab_litho(WE,filename,RL,DL,DX,DY) 
         !        subroutine qui donne la repartition des enfoncements
@@ -895,7 +889,7 @@ contains
         !      DL  rigidite flexural
         !  
         !   variables en sortie------------
-        !      WE  deflection due a une charge unitaire      
+        !      WE  deflection due a une load unitaire      
         !
         !
         !
@@ -969,7 +963,7 @@ contains
     
     end subroutine read_tab_litho
 
-    subroutine litho(W1,CHARGE,WE,nrad)
+    subroutine litho(W1,load,WE,nrad)
         ! litho-0.3.f            10 Novembre 1999             *     
         !
         ! Petit routine qui donne la repartition des enfoncements
@@ -977,19 +971,19 @@ contains
         !
         ! En entree 
         !      ------------
-        !     WE(-nrad:nrad,-nrad:nrad)  : deflection due a une charge unitaire 
+        !     WE(-nrad:nrad,-nrad:nrad)  : deflection due a une load unitaire 
         !                          defini dans tab-litho
         !     nrad : relie a la distance : distance en noeud autour de laquelle 
         !     la flexure de la lithosphere est calculee
         !
-        !     CHARGE(1-nrad:NX+nrad,1-nrad:NY+nrad) : poids par unite de surface
+        !     load(1-nrad:NX+nrad,1-nrad:NY+nrad) : poids par unite de surface
         !             (unite ?)        au temps time, calcule avant  'appel a litho 
         !                     dans taubed ou initial2 
          
         implicit none
 
         real(wp), intent(INOUT) :: W1(:,:)       ! enfoncement courant
-        real(wp), intent(IN)    :: CHARGE(:,:)
+        real(wp), intent(IN)    :: load(:,:)
         real(wp), intent(IN)    :: WE(:,:)
         integer, intent(IN)    :: nrad 
 
@@ -999,13 +993,13 @@ contains
         real(wp), allocatable :: croix(:)
 
         integer :: i, j, nx ,ny
-        real(wp), allocatable :: charge_local(:,:)
+        real(wp), allocatable :: load_local(:,:)
 
         nx = size(W1,1)
         ny = size(W1,2)
 
-        allocate(charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
-        charge_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
+        allocate(load_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
+        load_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = load 
 
         ! ----- allocation de WLOC  et de croix -----------
 
@@ -1021,8 +1015,8 @@ contains
         som2 = 0.0
 
         ! On somme aussi les contributions des points exterieurs au domaine
-        ! lorsque la charge est due a l'ocean. On suppose alors  que
-        ! ces points ont la meme charge que les limites
+        ! lorsque la load est due a l'ocean. On suppose alors  que
+        ! ces points ont la meme load que les limites
 
         do j = 1, ny
         do i = 1, nx
@@ -1030,8 +1024,8 @@ contains
             W1(i,j) = 0.0 
             ii      = 0
 
-            ! Apply the neighborhood weighting to the charge
-            WLOC = WE * charge_local(I-nrad:I+nrad,J-nrad:J+nrad)
+            ! Apply the neighborhood weighting to the load
+            WLOC = WE * load_local(I-nrad:I+nrad,J-nrad:J+nrad)
 
             ! sommation de tous les effets (tentative pour
             ! eviter les erreurs d'arrondi)
@@ -1061,7 +1055,7 @@ contains
 
             ! --- FIN DE L'INTEGRATION SUR LE PAVE nrad
             som1 = som1 + W1(i,j)
-            som2 = som2 - charge_local(i,j)/(rho_a*G)
+            som2 = som2 - load_local(i,j)/(rho_a*G)
 
         end do
         end do
@@ -1070,19 +1064,19 @@ contains
 
     end subroutine litho
         
-    subroutine calc_litho_regional(w1,charge,we,z_bed,H_ice,z_sl)
+    subroutine calc_litho_regional(w1,load,we,z_bed,H_ice,z_sl)
         ! Previously known as `taubed`
-        ! Routine qui calcul la charge en chaque point de la grille
+        ! Routine qui calcul la load en chaque point de la grille
         ! puis appel la routine litho pour calculer la contribution 
         ! de chaque point a la deflexion de la lithosphere
         !    En sortie
         !   ------------
-        !       CHARGE(1-nrad:nx+nrad,1-nrad:ny+nrad) : poids par unite de surface
+        !       load(1-nrad:nx+nrad,1-nrad:ny+nrad) : poids par unite de surface
         !               (unite ?)   Elle est calculee initialement dans initial2
         !               Poids de la colonne d'eau ou de la colonne de glace.
         !               a l'exterieur du domaine : 1-nrad:1 et nx+1:nx+nrad
         !               on donne les valeurs des bords de la grille
-        !               CHARGE est utilise par litho uniquement
+        !               load est utilise par litho uniquement
         !
         !       W1(nx,ny) est l'enfoncement courant, c'est le resultat 
         !               de la routine litho
@@ -1093,7 +1087,7 @@ contains
         implicit none
 
         real(wp), intent(INOUT) :: w1(:,:) 
-        real(wp), intent(INOUT) :: charge(:,:) 
+        real(wp), intent(INOUT) :: load(:,:) 
         real(wp), intent(IN) :: we(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: H_ice(:,:) 
@@ -1111,7 +1105,7 @@ contains
         nrad = (size(we,1)-1)/2 
 
         allocate(w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad))
-        w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = charge 
+        w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad) = load 
 
         ! ********* calcul de W1 l'enfoncement d'equilibre au temps t
         ! NLITH est defini dans isostasie et permet le choix du modele d'isostasie
@@ -1153,8 +1147,8 @@ contains
 
         call litho(w1,w1_local,we,nrad)
 
-        ! Return charge to the external variable (to match indices from 1:nx+2*nrad)
-        charge = w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
+        ! Return load to the external variable (to match indices from 1:nx+2*nrad)
+        load = w1_local(1-nrad:nx+nrad,1-nrad:ny+nrad)
 
         return
 
