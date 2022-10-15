@@ -147,7 +147,7 @@ contains
         call read_tab_litho(isos%now%we,filename=trim(isos%par%fname_kelvin), &
                             RL=isos%par%L_w,DL=isos%par%D_lith,dx=dx,dy=dx)
 
-        write(*,*) "isos_init:: range(WE):  ", minval(isos%now%we),     maxval(isos%now%we)
+        write(*,*) "isos_init:: range(we):  ", minval(isos%now%we),     maxval(isos%now%we)
         !write(*,*) "isos_init:: range(G0):  ", minval(isos%now%G0),     maxval(isos%now%G0)
         !stop 
 
@@ -187,7 +187,7 @@ contains
                 call calc_litho_regional(isos%now%w0,z_bed_ref,H_ice_ref,z_sl_ref,isos%now%we)
 
         end select 
-        
+
         ! Define initial time of isostasy model 
         isos%par%time = time 
 
@@ -790,48 +790,46 @@ contains
 
     end function calc_kei_value
 
-    subroutine read_tab_litho(WE,filename,RL,DL,DX,DY) 
+    subroutine read_tab_litho(we,filename,rl,dl,dx,dy) 
         !        subroutine qui donne la repartition des enfoncements
         !        en fonction de la rigidite de la lithosphere.
         !        definition du tableau
         !
         !   variables en entree-----------
         !      ROM masse volumique du manteau
-        !      RL  rayon de rigidite relative
-        !      DL  rigidite flexural
+        !      rl  rayon de rigidite relative
+        !      dl  rigidite flexural
         !  
         !   variables en sortie------------
-        !      WE  deflection due a une load unitaire      
+        !      we  deflection due a une load unitaire      
         !
         !
         !
 
         implicit none 
 
-        real(wp), intent(INOUT) :: WE(:,:) 
+        real(wp), intent(INOUT) :: we(:,:) 
         character(len=*), intent(IN) :: filename 
-        real(wp), intent(IN) :: RL, DL, DX, DY 
+        real(wp), intent(IN) :: rl, dl, dx, dy 
 
         ! Local variables
         integer, parameter :: nk = 1000
-        integer :: i, j, k 
-        integer :: nrad 
+        integer :: i, j, k, nr 
         real(wp) :: kei(0:nk)
-        real(wp) :: stepk, AL, XL, DIST
-        real(wp) :: som
+        real(wp) :: stepk, al, xl, dist
         integer :: num_kelvin = 177 
 
-        real(wp), allocatable :: WE00(:,:)
+        real(wp), allocatable :: we00(:,:)
 
         ! Size of neighborhood 
-        nrad = (size(WE,1)-1)/2 
+        nr = (size(we,1)-1)/2 
 
         ! Allocate local WE object with proper indexing
-        allocate(WE00(-nrad:nrad,-nrad:nrad))
+        allocate(we00(-nr:nr,-nr:nr))
 
         ! pour la lithosphere
-        STEPK = 100.0
-        AL    = -RL*RL/(2.0*pi*DL)*DX*DY      
+        stepk = 100.0
+        al    = -rl*rl/(2.0*pi*dl)*dx*dy      
 
         ! fonction de kelvin
         ! lecture de la table kei qui est tous les 0.01 entre 0 et 10
@@ -840,36 +838,39 @@ contains
         ! trim(dir_inp)//'kelvin.res'
         open(num_kelvin,file=trim(filename))
         read(num_kelvin,*)  ! Skip first line
-        do K=1,NK
-            read(num_kelvin,*) XL,kei(K)
+        do k=1,nk
+            read(num_kelvin,*) xl, kei(k)
         end do
         close(num_kelvin)
 
-        do i = -nrad, nrad    
-        do j = -nrad, nrad
-            DIST = dx*sqrt(1.0*(i*i+j*j))                                
-            XL   = DIST/RL*STEPK                                          
-            K    = int(XL)
-            if ((K.gt.834).or.(DIST.gt.dx*nrad)) then                 
-                WE00(i,j) = 0.0                                              
+        do i = -nr, nr    
+        do j = -nr, nr
+            dist = dx*sqrt(1.0*(i*i+j*j))                                
+            xl   = dist/rl*stepk                                          
+            k    = int(xl)+1
+            if ((k.gt.834).or.(dist.gt.dx*nr)) then                 
+                we00(i,j) = 0.0                                              
             else 
-                WE00(i,j)=kei(k)+(kei(k+1)-kei(k))*(XL-K)
-                if (K.eq.834) WE00(i,j) = max(WE00(i,j),0.0)                   
+                we00(i,j)=kei(k)+(kei(k+1)-kei(k))*(xl-k)
+                if (K.eq.834) we00(i,j) = max(we00(i,j),0.0)                   
             endif
-            WE00(i,j) = WE00(i,j)*AL 
+            we00(i,j) = we00(i,j)*al 
+
+            ! write(*,*) i, j, dist, xl, k, we00(i,j) 
+            ! write(*,*) kei(k), kei(k+1), xl-k
+            ! if (i .eq. 0 .and. j .eq. 0) stop 
+
         end do
         end do
 
-        
-        ! normalisation
-        som = SUM(WE00)
-        WE00  = WE00/(som*rho_a*g)
+        ! normalisation and scaling
+        we00  = we00/sum(we00) / (rho_a*g)
 
         ! Return solution to external object
-        WE = WE00(-nrad:nrad,-nrad:nrad)
+        we = we00(-nr:nr,-nr:nr)
 
-        ! Make sure too small values are eliminated 
-        where(abs(WE) .lt. 1e-12) WE = 0.0 
+        ! Make sure too small values are eliminated to avoid underflow errors
+        where(abs(we) .lt. 1e-15) we = 0.0_wp 
 
         return
     
