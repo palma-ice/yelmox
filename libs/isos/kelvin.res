@@ -1,4 +1,4 @@
- x         kei(x)       d'apres IMSL fonction AKEIO
+ x         kei(x)  ! Obtained from the IMSL special math library function AKEIO
  0.0000  -0.78540E+00
  0.0100  -0.78526E+00
  0.0200  -0.78490E+00
