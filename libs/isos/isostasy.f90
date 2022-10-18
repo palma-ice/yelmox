@@ -98,7 +98,7 @@ contains
         real(wp) :: filter_scaling
 
         ! Load parameters
-        call isos_par_load(isos%par,filename,init=.TRUE.)
+        call isos_par_load(isos%par,filename)
         
         ! Modify the relative radius to use for the regional filter
         ! depending on whether we want to include the forbulge at
@@ -113,7 +113,6 @@ contains
         ! Smaller radius, filter scaling to improve accuracy
         radius_fac      = 4.0 
         filter_scaling  = 0.91 
-
 
         ! Calculate the flexural length scale
         ! (Coulon et al, 2021, Eq. in text after Eq. 3)
@@ -159,8 +158,8 @@ contains
         isos%now%D_lith     = isos%par%D_lith       ! [N m]
         isos%now%tau        = isos%par%tau          ! [yr]
         
-        write(*,*) "isos_init:: range(kei): ", minval(isos%now%kei),    maxval(isos%now%kei)
-        write(*,*) "isos_init:: range(G0):  ", minval(isos%now%G0),     maxval(isos%now%G0)
+        !write(*,*) "isos_init:: range(kei): ", minval(isos%now%kei),    maxval(isos%now%kei)
+        !write(*,*) "isos_init:: range(G0):  ", minval(isos%now%G0),     maxval(isos%now%G0)
 
         return 
 
@@ -179,9 +178,13 @@ contains
         real(wp), intent(IN) :: z_sl_ref(:,:)         ! [m] Reference sea level (associated with reference z_bed)
         real(wp), intent(IN) :: time                  ! [a] Initial time 
         
+        ! Store initial bedrock field 
+        isos%now%z_bed = z_bed 
+        
         ! Store reference bedrock field
         isos%now%z_bed_ref = z_bed_ref 
         isos%now%dzbdt    = 0.0 
+
 
         select case(isos%par%method)
 
@@ -203,9 +206,6 @@ contains
         ! (set time_lith earlier, so that it is definitely updated on the first timestep)
         isos%par%time_lith = time - isos%par%dt_lith
         isos%par%time_step = time 
-
-        ! Store initial bedrock field 
-        isos%now%z_bed = z_bed 
 
         ! Call isos_update to diagnose rate of change
         ! (no change to z_bed will be applied since isos%par%time==time)
@@ -273,7 +273,7 @@ contains
                     call calc_litho_local(isos%now%w1,isos%now%q1,isos%now%z_bed,H_ice,z_sl)
 
                     ! Relaxing asthenosphere (RA)
-                    call calc_uplift_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
+                    call calc_asthenosphere_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
                                                     w_b=isos%now%w1-isos%now%w0,tau=isos%now%tau)
 
                 case(2)
@@ -285,7 +285,7 @@ contains
                     end if 
 
                     ! Relaxing asthenosphere (RA)
-                    call calc_uplift_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
+                    call calc_asthenosphere_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
                                                     w_b=isos%now%w1-isos%now%w0,tau=isos%now%tau)
 
                 case(3) 
@@ -297,7 +297,7 @@ contains
                     end if 
 
                     ! Relaxing asthenosphere (RA)
-                    call calc_uplift_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
+                    call calc_asthenosphere_relax(isos%now%dzbdt,isos%now%z_bed,isos%now%z_bed_ref, &
                                                     w_b=isos%now%w1-isos%now%w0,tau=isos%now%tau)
 
             end select 
@@ -344,27 +344,20 @@ contains
 
     end subroutine isos_end
 
-    subroutine isos_par_load(par,filename,init)
+    subroutine isos_par_load(par,filename)
 
         implicit none
 
         type(isos_param_class), intent(OUT) :: par
         character(len=*),       intent(IN)  :: filename 
-        logical, optional        :: init
 
-        ! Local variables 
-        logical :: init_pars 
-
-        init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
-        
-        call nml_read(filename,"isostasy","method",         par%method,         init=init_pars)
-        call nml_read(filename,"isostasy","fname_kelvin",   par%fname_kelvin,   init=init_pars)
-        call nml_read(filename,"isostasy","dt_lith",        par%dt_lith,        init=init_pars)
-        call nml_read(filename,"isostasy","dt_step",        par%dt_step,        init=init_pars)
-        call nml_read(filename,"isostasy","He_lith",        par%He_lith,        init=init_pars)
-        call nml_read(filename,"isostasy","D_lith",         par%D_lith,         init=init_pars)
-        call nml_read(filename,"isostasy","tau",            par%tau,            init=init_pars)
+        call nml_read(filename,"isostasy","method",         par%method)
+        call nml_read(filename,"isostasy","fname_kelvin",   par%fname_kelvin)
+        call nml_read(filename,"isostasy","dt_lith",        par%dt_lith)
+        call nml_read(filename,"isostasy","dt_step",        par%dt_step)
+        call nml_read(filename,"isostasy","He_lith",        par%He_lith)
+        call nml_read(filename,"isostasy","D_lith",         par%D_lith)
+        call nml_read(filename,"isostasy","tau",            par%tau)
         
         return
 
@@ -679,9 +672,152 @@ contains
 
     end subroutine calc_greens_function_scaling
 
+    ! === isos physics routines ======================================
+
+    elemental subroutine calc_asthenosphere_relax(dzbdt,z_bed,z_bed_ref,w_b,tau)
+        ! Calculate rate of change of vertical bedrock height
+        ! from a relaxing asthenosphere.
+
+        implicit none
+
+        real(wp), intent(OUT) :: dzbdt 
+        real(wp), intent(IN)  :: z_bed 
+        real(wp), intent(IN)  :: z_bed_ref
+        real(wp), intent(IN)  :: w_b        ! w_b = w1-w0
+        real(wp), intent(IN)  :: tau
+
+        dzbdt = -((z_bed-z_bed_ref) + w_b) / tau
+        
+        return
+
+    end subroutine calc_asthenosphere_relax
+
+    elemental subroutine calc_litho_local(w,q,z_bed,H_ice,z_sl)
+        ! Calculate the local lithospheric loading from ice or ocean weight 
+        ! in units of [Pa] and local equilibrium displacement w [m].
+
+        implicit none 
+
+        real(wp), intent(OUT) :: w
+        real(wp), intent(OUT) :: q
+        real(wp), intent(IN)  :: z_bed, H_ice, z_sl 
+
+        if (rho_ice*H_ice.ge.rho_sw*(z_sl-z_bed)) then
+            ! Ice or land
+
+            q = rho_ice*g*H_ice
+
+        else
+            ! Ocean
+
+            q = rho_sw*g*(z_sl-z_bed)
+
+        end if
+
+        ! Scale to get local displacement given the load q
+        w = q / (rho_a*g) 
+
+        return 
+
+    end subroutine calc_litho_local
+
+    subroutine calc_litho_regional(w1,q1,z_bed,H_ice,z_sl,G0)
+        ! Calculate the load on the lithosphere as
+        ! distributed on an elastic plate. 
+
+        implicit none
+
+        real(wp), intent(INOUT) :: w1(:,:)      ! [m] Lithospheric displacement
+        real(wp), intent(INOUT) :: q1(:,:)      ! [Pa] Lithospheric load
+        real(wp), intent(IN)    :: z_bed(:,:)   ! [m] Bed elevation
+        real(wp), intent(IN)    :: H_ice(:,:)   ! [m] Ice thickness 
+        real(wp), intent(IN)    :: z_sl(:,:)    ! [m] Sea level 
+        real(wp), intent(IN)    :: G0(:,:)      ! Regional filter function
+        
+        ! Calculate local lithospheric load and displacement first
+        call calc_litho_local(w1,q1,z_bed,H_ice,z_sl)
+
+        ! Convolve the estimated point load with the regional
+        ! filter to obtain the distributed load w1. 
+        call convolve_load_elastic_plate(w1,q1,G0)
+
+        return
+
+    end subroutine calc_litho_regional
+
+    subroutine convolve_load_elastic_plate(w1,q1,G0)
+        ! Spread the load q1 [Pa] from each point in the grid
+        ! via the regional Green's function scaling G0 [m N-1]
+
+        implicit none
+
+        real(wp), intent(OUT) :: w1(:,:)        ! [m] Lithospheric displacement
+        real(wp), intent(IN)  :: q1(:,:)        ! [Pa] Lithospheric loading
+        real(wp), intent(IN)  :: G0(:,:)        ! Regional scaling filter
+
+        ! Local variables
+        !integer :: ip, jp, lpx, lpy
+        real(wp), allocatable :: q1_ext(:,:)
+        real(wp), allocatable :: w_reg(:,:)
+
+        integer :: i, j, nx ,ny, nr
+
+        nx = size(w1,1)
+        ny = size(w1,2)
+
+        ! Size of regional neighborhood 
+        nr = (size(G0,1)-1)/2 
+
+        ! Populate load on extended grid
+        allocate(q1_ext(1-nr:nx+nr,1-nr:ny+nr))
+
+        ! First fill in main grid points with current point load
+        q1_ext(1:nx,1:ny) = q1 
+
+        ! Populate the extended grid points
+        do i = 1, nx
+            q1_ext(i,1-nr:0)=q1_ext(i,1)
+            q1_ext(i,ny+1:ny+nr)=q1_ext(i,ny)
+        end do
+        do j = 1, ny
+            q1_ext(1-nr:0,j)=q1_ext(1,j)
+            q1_ext(NX+1:NX+nr,j)=q1_ext(nx,j)
+        end do
+        
+        ! Populate the extended grid corner points     
+        q1_ext(1-nr:0,1-nr:0)         = q1_ext(1,1)
+        q1_ext(1-nr:0,ny+1:ny+nr)     = q1_ext(1,ny)
+        q1_ext(nx+1:nx+nr,1-nr:0)     = q1_ext(nx,1)
+        q1_ext(nx+1:nx+nr,ny+1:ny+nr) = q1_ext(nx,ny)
+
+        ! ----- allocation de w_reg  et de croix -----------
+
+        allocate(w_reg(-nr:nr,-nr:nr))
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Apply the neighborhood scaling to the deflection in the neighborhood
+            w_reg = G0 * q1_ext(i-nr:i+nr,j-nr:j+nr)
+
+            ! Sum to get total deflection at current point due to all neighbors
+            w1(i,j) = sum(w_reg)
+
+        end do
+        end do
+        
+        return
+
+    end subroutine convolve_load_elastic_plate
+
+! ========================================================
+!
+! Functions related to the zero-order Kelvin function
+!
+! ========================================================
 
     subroutine calc_kei_filter_2D(filt,L_w,dx,dy,filename)
-        ! Calculate 2D Kelvin function (kei) smoothing kernel
+        ! Calculate 2D Kelvin function (kei) kernel
 
         implicit none 
 
@@ -807,6 +943,39 @@ end if
 
     end function get_kei_value
 
+    function calc_kei_value(r,L_w) result(kei)
+        ! This function is based on Greve and Blatter (2009), Eq. 8.34.
+        ! Combined with 8.11, it should be possible to obtain
+        ! an analytical expression for the Kelvin function (kei). 
+        ! This could eventually be used as a replacement for loading 
+        ! the tabulated values from a file. 
+
+        ! So far, this approach is not giving the right answer. 
+        
+        implicit none 
+
+        real(wp), intent(IN) :: r       ! [m] Radius from point load 
+        real(wp), intent(IN) :: L_w     ! [m] Flexural length scale
+        real(wp) :: kei 
+
+        ! Local variables
+        real(wp) :: alpha 
+        real(wp) :: f_now 
+        real(wp) :: fac 
+
+        alpha = r / (sqrt(2.0)*L_w)
+        f_now = exp(-alpha)*(cos(alpha)+sin(alpha))
+
+        fac = sqrt(2.0)**3 * L_w * (pi/4.0)
+        
+        kei = fac * f_now 
+
+        ! Note: this doesn't give the right values of kei!!!
+
+        return
+
+    end function calc_kei_value
+
     subroutine load_kei_values(rn,kei,filename)
 
         implicit none
@@ -841,179 +1010,6 @@ end if
         return
 
     end subroutine load_kei_values
-
-    function calc_kei_value(r,L_w) result(kei)
-        ! This function is based on Greve and Blatter (2009), Eq. 8.34.
-        ! Combined with 8.11, it should be possible to obtain
-        ! an analytical expression for the Kelvin function (kei). 
-        ! This could eventually be used as a replacement for loading 
-        ! the tabulated values from a file. 
-
-        ! So far, this approach is not giving the right answer. 
-        
-        implicit none 
-
-        real(wp), intent(IN) :: r       ! [m] Radius from point load 
-        real(wp), intent(IN) :: L_w     ! [m] Flexural length scale
-        real(wp) :: kei 
-
-        ! Local variables
-        real(wp) :: alpha 
-        real(wp) :: f_now 
-        real(wp) :: fac 
-
-        alpha = r / (sqrt(2.0)*L_w)
-        f_now = exp(-alpha)*(cos(alpha)+sin(alpha))
-
-        fac = sqrt(2.0)**3 * L_w * (pi/4.0)
-        
-        kei = fac * f_now 
-
-        ! Note: this doesn't give the right values of kei!!!
-
-        return
-
-    end function calc_kei_value
-
-    ! === isos physics routines ======================================
-
-    elemental subroutine calc_litho_local(w,q,z_bed,H_ice,z_sl)
-        ! Calculate the local lithospheric loading from ice or ocean weight 
-        ! in units of [Pa] and local equilibrium displacement w [m].
-
-        implicit none 
-
-        real(wp), intent(OUT) :: w
-        real(wp), intent(OUT) :: q
-        real(wp), intent(IN)  :: z_bed, H_ice, z_sl 
-
-        if (rho_ice*H_ice.ge.rho_sw*(z_sl-z_bed)) then
-            ! Ice or land
-
-            q = rho_ice*g*H_ice
-
-        else
-            ! Ocean
-
-            q = rho_sw*g*(z_sl-z_bed)
-
-        end if
-
-        ! Scale to get local displacement given the load q
-        w = q / (rho_a*g) 
-
-        return 
-
-    end subroutine calc_litho_local
-
-    subroutine calc_litho_regional(w1,q1,z_bed,H_ice,z_sl,G0)
-        ! Calculate the load on the lithosphere as
-        ! distributed on an elastic plate. 
-
-        implicit none
-
-        real(wp), intent(INOUT) :: w1(:,:)      ! [m] Lithospheric displacement
-        real(wp), intent(INOUT) :: q1(:,:)      ! [Pa] Lithospheric load
-        real(wp), intent(IN)    :: z_bed(:,:)   ! [m] Bed elevation
-        real(wp), intent(IN)    :: H_ice(:,:)   ! [m] Ice thickness 
-        real(wp), intent(IN)    :: z_sl(:,:)    ! [m] Sea level 
-        real(wp), intent(IN)    :: G0(:,:)      ! Regional filter function
-        
-        ! Calculate local lithospheric load and displacement first
-        call calc_litho_local(w1,q1,z_bed,H_ice,z_sl)
-
-        ! Convolve the estimated point load with the regional
-        ! filter to obtain the distributed load w1. 
-        call convolve_load_elastic_plate(w1,q1,G0)
-
-        return
-
-    end subroutine calc_litho_regional
-
-    subroutine convolve_load_elastic_plate(w1,q1,G0)
-        ! Spread the load q1 [Pa] from each point in the grid
-        ! via the regional Green's function scaling G0 [m N-1]
-
-        implicit none
-
-        real(wp), intent(OUT) :: w1(:,:)        ! [m] Lithospheric displacement
-        real(wp), intent(IN)  :: q1(:,:)        ! [Pa] Lithospheric loading
-        real(wp), intent(IN)  :: G0(:,:)        ! Regional scaling filter
-
-        ! Local variables
-        !integer :: ip, jp, lpx, lpy
-        real(wp), allocatable :: q1_ext(:,:)
-        real(wp), allocatable :: w_reg(:,:)
-
-        integer :: i, j, nx ,ny, nr
-
-        nx = size(w1,1)
-        ny = size(w1,2)
-
-        ! Size of regional neighborhood 
-        nr = (size(G0,1)-1)/2 
-
-        ! Populate load on extended grid
-        allocate(q1_ext(1-nr:nx+nr,1-nr:ny+nr))
-
-        ! First fill in main grid points with current point load
-        q1_ext(1:nx,1:ny) = q1 
-
-        ! Populate the extended grid points
-        do i = 1, nx
-            q1_ext(i,1-nr:0)=q1_ext(i,1)
-            q1_ext(i,ny+1:ny+nr)=q1_ext(i,ny)
-        end do
-        do j = 1, ny
-            q1_ext(1-nr:0,j)=q1_ext(1,j)
-            q1_ext(NX+1:NX+nr,j)=q1_ext(nx,j)
-        end do
-        
-        ! Populate the extended grid corner points     
-        q1_ext(1-nr:0,1-nr:0)         = q1_ext(1,1)
-        q1_ext(1-nr:0,ny+1:ny+nr)     = q1_ext(1,ny)
-        q1_ext(nx+1:nx+nr,1-nr:0)     = q1_ext(nx,1)
-        q1_ext(nx+1:nx+nr,ny+1:ny+nr) = q1_ext(nx,ny)
-
-        ! ----- allocation de w_reg  et de croix -----------
-
-        allocate(w_reg(-nr:nr,-nr:nr))
-
-        do j = 1, ny
-        do i = 1, nx
-
-            ! Apply the neighborhood scaling to the deflection in the neighborhood
-            w_reg = G0 * q1_ext(i-nr:i+nr,j-nr:j+nr)
-
-            ! Sum to get total deflection at current point due to all neighbors
-            w1(i,j) = sum(w_reg)
-
-        end do
-        end do
-        
-        return
-
-    end subroutine convolve_load_elastic_plate
-    
-    elemental subroutine calc_uplift_relax(dzbdt,z_bed,z_bed_ref,w_b,tau)
-        ! Calculate rate of change of vertical bedrock height
-        ! from a relaxing asthenosphere.
-
-        implicit none
-
-        real(wp), intent(OUT) :: dzbdt 
-        real(wp), intent(IN)  :: z_bed 
-        real(wp), intent(IN)  :: z_bed_ref
-        real(wp), intent(IN)  :: w_b        ! w_b = w1-w0
-        real(wp), intent(IN)  :: tau
-
-        dzbdt = -((z_bed-z_bed_ref) + w_b) / tau
-        
-        return
-
-    end subroutine calc_uplift_relax
-
-
 
     subroutine load_kei_values_1(rn,kei)
         ! Originally obtained from the IMSL special math library function AKEIO
