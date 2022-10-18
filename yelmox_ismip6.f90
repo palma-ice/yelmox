@@ -364,7 +364,9 @@ program yelmox_ismip6
 
     ! Define spatially variable tau (asthenosphere relaxation constant)
     isos1%now%tau = isos1%par%tau 
+
     
+
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
@@ -816,8 +818,9 @@ program yelmox_ismip6
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
         ! Additionally make sure isostasy is update every timestep 
-        isos1%par%dt = 1.0_wp 
-
+        isos1%par%dt_step = 1.0_wp 
+        isos1%par%dt_lith = 10.0_wp 
+        
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
         
@@ -943,8 +946,9 @@ program yelmox_ismip6
         end if 
         
         ! Additionally make sure isostasy is update every timestep 
-        isos1%par%dt = 1.0_wp 
-
+        isos1%par%dt_step = 1.0_wp 
+        isos1%par%dt_lith = 10.0_wp 
+        
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
         
@@ -1143,8 +1147,9 @@ end if
         end if 
 
         ! Additionally make sure isostasy is update every timestep 
-        isos1%par%dt = 1.0_wp 
-
+        isos1%par%dt_step = 1.0_wp 
+        isos1%par%dt_lith = 10.0_wp 
+        
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
         
