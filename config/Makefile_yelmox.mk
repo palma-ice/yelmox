@@ -29,7 +29,7 @@ $(objdir)/ismip6.o: $(libdir)/ismip6.f90 $(objdir)/nml.o \
 							$(objdir)/ncio.o $(objdir)/varslice.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/isostasy.o: $(libdir)/isos/isostasy.f90 $(objdir)/nml.o
+$(objdir)/isostasy.o: $(libdir)/isostasy.f90 $(objdir)/nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/ncio.o: $(libdir)/ncio.f90
