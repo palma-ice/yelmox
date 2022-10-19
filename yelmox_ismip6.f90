@@ -372,10 +372,11 @@ program yelmox_ismip6
         call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
         call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
         call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
-
-        isos1%now%tau = ctl%isos_tau_1 
-        call isos_set_field(isos1%now%tau,[ctl%isos_tau_2],[2.0_wp],regions_mask, &
-                                                    yelmo1%grd%dx,ctl%isos_sigma)
+ 
+        call isos_set_field(isos1%now%tau, &
+                [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
+                [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
+                                      regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
         
     end if
 
