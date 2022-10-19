@@ -94,6 +94,10 @@ program yelmox_ismip6
         character(len=512) :: ismip6_par_file
         character(len=56)  :: ismip6_gcm 
 
+        real(wp) :: isos_tau_1 
+        real(wp) :: isos_tau_2 
+        real(wp) :: isos_sigma 
+
     end type 
 
     type opt_params
@@ -362,10 +366,18 @@ program yelmox_ismip6
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
 
-    ! Define spatially variable tau (asthenosphere relaxation constant)
-    isos1%now%tau = isos1%par%tau 
+    if (trim(domain) .eq. "Antarctica") then 
+        ! Redefine tau (asthenosphere relaxation constant) as spatially
+        ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
+        call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
+        call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
+        call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
 
-    
+        isos1%now%tau = ctl%isos_tau_1 
+        call isos_set_field(isos1%now%tau,[ctl%isos_tau_2],[2.0_wp],regions_mask, &
+                                                    yelmo1%grd%dx,ctl%isos_sigma)
+        
+    end if
 
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
@@ -1438,6 +1450,12 @@ contains
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
+        ! Write constant fields
+        if (n .eq. 1) then 
+            call nc_write(filename,"isos_tau",isos%now%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
+                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+        end if 
+
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

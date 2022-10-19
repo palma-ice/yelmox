@@ -572,3 +572,8 @@
     
 /
 
+&isos_ant
+    tau             = 100.0 
+    tau_eais        = 5000.0 
+    sigma           = 200e3 
+/
