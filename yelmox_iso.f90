@@ -258,7 +258,7 @@ program yelmox
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
 
     ! Ensure that global f_hol is used if running with 1ind_new method 
     if (trim(snp1%par%atm_type) .ne. "hybrid") snp1%hybrid%f_hol = f_hol 
@@ -291,7 +291,7 @@ program yelmox
     yelmo1%bnd%enh_srf = ice_enh%enh 
 
     ! Normal snapclim call 
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
     
     ! Modify tas and precip
     call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time_init)
@@ -421,8 +421,9 @@ do iter = 1, n_iter
 
     smbpal1 = smbpal0 
     isos1   = isos0 
-    isos1%par%time = time_init 
-
+    isos1%par%time_lith = time_init - isos1%par%dt_lith
+    isos1%par%time_step = time_init 
+        
     yelmo0%dyn%now%cb_ref = yelmo1%dyn%now%cb_ref
     yelmo1  = yelmo0 
     call yelmo_set_time(yelmo1,time_init)   ! For safety
@@ -533,7 +534,7 @@ if (calc_transient_climate) then
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
 
         ! Normal snapclim call 
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
         ! Modify tas and precip
         call modify_tas(snp1%now%tas,snp1%now%ta_ann,snp1%now%ta_sum,dtas_now,dtas_hol,yelmo1%grd,time)

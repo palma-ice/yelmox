@@ -116,7 +116,7 @@ program yelmox
     convert_km3_Gt = rho_ice *1e-3
 
     ! Initialize "climate" model (here for ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
@@ -172,7 +172,7 @@ program yelmox
     end if 
     
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
@@ -284,7 +284,7 @@ if (calc_transient_climate) then
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         
         ! Update snapclim
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain) 
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
 
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &

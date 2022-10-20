@@ -267,7 +267,7 @@ contains
         ! (set time_lith earlier, so that it is definitely updated on the first timestep)
         isos%par%time_lith = time - isos%par%dt_lith
         isos%par%time_step = time 
-
+        
         ! Call isos_update to diagnose rate of change
         ! (no change to z_bed will be applied since isos%par%time==time)
         call isos_update(isos,H_ice,z_sl,time)

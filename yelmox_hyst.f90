@@ -39,7 +39,7 @@ program yelmox
 
     logical, parameter :: use_hyster = .TRUE. 
 
-    real(4) :: conv_km3_Gt, var 
+    real(4) :: var 
     real(4) :: dTa 
     real(4) :: dTo
 
@@ -95,12 +95,11 @@ program yelmox
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
 
     ! Initialize hysteresis module for transient forcing experiments 
     call hyster_init(hyst1,path_par,time_init) 
-    conv_km3_Gt = rho_ice *1e-3
-
+    
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
     
@@ -115,9 +114,11 @@ program yelmox
 
     ! Initialize isostasy using present-day topography values to 
     ! calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,z_bed_ref=yelmo1%bnd%z_bed_ref, &
-                               H_ice_ref=yelmo1%bnd%H_ice_ref,z_sl=yelmo1%bnd%z_sl*0.0,time=time_init)
-
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
+                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
+                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
+                                      
 
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -127,13 +128,13 @@ program yelmox
 
         ! snapclim call using anomaly from the hyster package 
         call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain, &
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
                                                         dTa=hyst1%f_now,dTo=hyst1%f_now*0.25)
 
     else
 
         ! Normal snapclim call 
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain)
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
     end if 
 
@@ -239,13 +240,13 @@ if (calc_transient_climate) then
                 ! snapclim call using anomaly from the hyster package 
                 call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*conv_km3_Gt)
                 write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain, &
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
                                                                 dTa=hyst1%f_now,dTo=hyst1%f_now*0.25)
 
             else
 
                 ! Normal snapclim call 
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain)
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
             
             end if 
 
