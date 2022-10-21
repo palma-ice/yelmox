@@ -111,6 +111,8 @@ program yelmox_ismip6
         real(wp) :: sigma_vel 
         character(len=56) :: fill_method 
 
+        character(len=512) :: cf_init_path 
+
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
         real(wp) :: rel_tau2
@@ -188,6 +190,11 @@ program yelmox_ismip6
         call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
         call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
         call nml_read(path_par,"opt_L21","tf_basins",   opt%tf_basins)
+
+        if (opt%cf_init .le. 0.0) then 
+            ! Load initial cb_ref field from input file 
+            call nml_read(path_par,"opt_L21","cf_init_path",   opt%cf_init_path)
+        end if 
 
     end if 
 
@@ -415,7 +422,7 @@ program yelmox_ismip6
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp,time_equil=100.0)
     end if 
-     
+    
     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
@@ -617,8 +624,14 @@ program yelmox_ismip6
             ! If not using restart...
             if (.not. yelmo1%par%use_restart) then
 
-                ! Prescribe cb_ref to initial guess 
-                yelmo1%dyn%now%cb_ref = opt%cf_init 
+                if (opt%cf_init .gt. 0.0) then 
+                    ! Prescribe cb_ref to initial guess 
+                    yelmo1%dyn%now%cb_ref = opt%cf_init 
+                else 
+                    ! Load cb_ref from separate input file 
+                    call nc_read(opt%cf_init_path,"cb_ref",yelmo1%dyn%now%cb_ref)
+
+                end if 
 
             end if 
 

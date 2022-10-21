@@ -115,7 +115,7 @@
     cf_time         = 20e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 0.1               ! Initial value of cf_ref everywhere
     cf_min          = 0.001             ! [--] Minimum allowed cf value
-    cf_max          = 0.5               ! [--] Maximum allowed cf value
+    cf_max          = 0.1               ! [--] Maximum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
@@ -137,6 +137,8 @@
     tf_min          = -1.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
+
+    cf_init_path    = "none"
 /
 
 &yelmo
