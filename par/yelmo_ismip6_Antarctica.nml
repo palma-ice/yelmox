@@ -134,7 +134,7 @@
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
+    tf_min          = -4.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
 
