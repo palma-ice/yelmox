@@ -605,13 +605,19 @@ program yelmox_ismip6
         ! ===== tf_corr initialization ======
 
         ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-        mshlf2%now%tf_corr   = 0.0_wp 
+        mshlf2%par%tf_method = 0  
         
         if (yelmo1%par%use_restart) then
             ! Load tf_corr field from file 
 
             call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+        
+        else 
+            ! Initialize tf_corr to be equal to tf_corr_basin, and
+            ! set tf_corr_basin to zero (all corrections will be contained in one field)
+
+            mshlf2%now%tf_corr       = mshlf2%now%tf_corr_basin
+            mshlf2%now%tf_corr_basin = 0.0_wp
             
         end if 
         
