@@ -22,8 +22,8 @@
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 30e3              ! [yr] Ending time (model years)
-    time_equil      = 0.0               ! [yr] Equilibration time 
+    time_end        = 20e3              ! [yr] Ending time (model years)
+    time_equil      = 5e3               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
@@ -126,16 +126,16 @@
     rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
     rel_time1       = 4e3               ! [yr] Time limit for time period 1
-    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_time2       = 8e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = True              ! Should thermal forcing be optimized too?
-    tf_time         = 20e3              ! [yr] When should optimization of thermal forcing stop?
+    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
-    tau_m           = 200.0             ! [yr] Optimization relxation timescale 
+    tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -4.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
+    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
 
     cf_init_path    = "none"

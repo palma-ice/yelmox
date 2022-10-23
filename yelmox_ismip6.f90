@@ -618,7 +618,7 @@ program yelmox_ismip6
 
             mshlf2%now%tf_corr       = mshlf2%now%tf_corr_basin
             mshlf2%now%tf_corr_basin = 0.0_wp
-            
+
         end if 
         
         ! ===== basal friction optimization ======
@@ -647,6 +647,16 @@ program yelmox_ismip6
             ! Run yelmo alone for one or a few years with constant boundary conditions
             ! to sort out inconsistencies from initialization.
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,dt=1.0_wp,topo_fixed=.FALSE.)
+        end if 
+
+        if (trim(ctl%equil_method) .eq. "opt") then 
+            ! Additional initialization option when running 'opt' spinup...
+            
+            if (ctl%with_ice_sheet .and. ctl%time_equil .gt. 0.0) then 
+                ! Calculate thermodynamics with fixed ice sheet 
+                call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.TRUE.)
+            end if 
+
         end if 
 
         write(*,*) "Initialization complete."
