@@ -303,6 +303,13 @@ program yelmox_ismip6
             ! Load mask from file 
             call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
 
+            ! ajr: fix mask inconsistency at 16km resolution
+            ! Note: the files themselves should be fixed and made consistent!
+            if (trim(yelmo1%par%grid_name) .eq. "ANT-16KM") then 
+                where(abs(regions_mask - 4.0) .lt. 1e-3) regions_mask = 1.0 
+                where(abs(regions_mask - 5.0) .lt. 1e-3) regions_mask = 2.0 
+            end if 
+
             ! APIS region (region=3.0 in regions map)
             reg1%write = .TRUE. 
             reg1%name  = "APIS" 
