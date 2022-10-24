@@ -705,8 +705,8 @@ program yelmox_ismip6
                                             yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                             yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                             opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                            dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp, &
-                                            tf_corr=mshlf2%now%tf_corr)
+                                            dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp) !, &
+                                            !tf_corr=mshlf2%now%tf_corr)
 
                     end if
 
