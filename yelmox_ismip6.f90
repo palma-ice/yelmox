@@ -610,7 +610,8 @@ program yelmox_ismip6
         if (yelmo1%par%use_restart) then
             ! Load tf_corr field from file 
 
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
+                                                    yelmo1%par%domain,yelmo1%par%grid_name)
         
         else 
             ! Initialize tf_corr to be equal to tf_corr_basin, and
@@ -841,7 +842,8 @@ program yelmox_ismip6
         if (yelmo1%par%use_restart) then
             ! Load tf_corr field from file 
 
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
+                                                    yelmo1%par%domain,yelmo1%par%grid_name)
             
         end if 
         
@@ -984,7 +986,8 @@ program yelmox_ismip6
         if (yelmo1%par%use_restart) then
             ! Load tf_corr field from file 
 
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
+                                                    yelmo1%par%domain,yelmo1%par%grid_name)
             
         end if 
         
@@ -1185,7 +1188,8 @@ end if
         if (yelmo1%par%use_restart) then 
             ! Load tf_corr field from file 
 
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart)
+            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
+                                                    yelmo1%par%domain,yelmo1%par%grid_name)
             
         end if 
 
@@ -2143,20 +2147,54 @@ end if
       
     end subroutine calc_climate_hybrid
 
-    subroutine load_tf_corr_from_restart(tf_corr,file_restart)
+    subroutine load_tf_corr_from_restart(tf_corr,file_restart,domain,grid_name)
+
+        use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+                                            gen_map_filename, nc_read_interp
 
         implicit none 
 
         real(wp),         intent(INOUT) :: tf_corr(:,:) 
         character(len=*), intent(IN)    :: file_restart 
-    
+        character(len=*), intent(IN)    :: domain 
+        character(len=*), intent(IN)    :: grid_name 
+        
         ! Local variables 
         integer :: i0, i1, n, nx, ny  
         character(len=1024) :: path_tf_corr 
 
+        character(len=56) :: restart_domain 
+        character(len=56) :: restart_grid_name 
+        type(map_scrip_class) :: mps
+        logical :: restart_interpolated
+
         nx = size(tf_corr,1)
         ny = size(tf_corr,2) 
 
+        ! Load restart file grid attributes 
+        if (nc_exists_attr(file_restart,"domain")) then 
+            call nc_read_attr(file_restart,"domain",    restart_domain)
+        else 
+            restart_domain = trim(domain)
+        end if 
+
+        if (nc_exists_attr(file_restart,"grid_name")) then 
+            call nc_read_attr(file_restart,"grid_name", restart_grid_name)
+        else 
+            restart_grid_name = trim(grid_name)
+        end if 
+
+        if (trim(restart_grid_name) .ne. trim(grid_name)) then 
+            restart_interpolated = .TRUE. 
+        else 
+            restart_interpolated = .FALSE. 
+        end if 
+
+        if (restart_interpolated) then
+            ! Load the scrip map from file (should already have been generated via cdo externally)
+            call map_scrip_init(mps,restart_grid_name,grid_name, &
+                                    method="con",fldr="maps",load=.TRUE.)
+        end if 
 
         ! Get folder holding the restart file and 
         ! append filename holding the tf_corr field we want
@@ -2172,7 +2210,12 @@ end if
 
         ! Load the tf_corr field from the last timestep of the yelmo2D file
         n = nc_size(path_tf_corr,"time")
-        call nc_read(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny])
+
+        if (restart_interpolated) then
+            call nc_read_interp(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        else 
+            call nc_read(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1])
+        end if 
 
         ! Write summary to screen
         write(*,*) "load_tf_corr_from_restart:: loaded tf_corr field."
