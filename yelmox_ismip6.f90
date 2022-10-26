@@ -721,12 +721,12 @@ program yelmox_ismip6
                     if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
                         ! Perform tf_corr optimization
 
-                        call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                                yelmo1%dta%pd%H_ice,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
-                                                opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=100e3_wp,dt=ctl%dtt)
-                        ! call update_tf_corr_l21_basin(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                        !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                        !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
+                        ! call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                        !                         yelmo1%dta%pd%H_ice,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
+                        !                         opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=100e3_wp,dt=ctl%dtt)
+                        call update_tf_corr_l21_basin(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                     
                     end if 
 
