@@ -696,7 +696,7 @@ program yelmox_ismip6
                         
                         ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
                         yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                        yelmo1%tpo%par%topo_rel     = 4
+                        yelmo1%tpo%par%topo_rel     = 3
                     
                     else 
                         ! Turn-off relaxation now
