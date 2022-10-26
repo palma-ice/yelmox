@@ -123,6 +123,7 @@ program yelmox_ismip6
         logical  :: opt_tf 
         real(wp) :: tf_time
         real(wp) :: H_grnd_lim
+        real(wp) :: tf_sigma 
         real(wp) :: tau_m 
         real(wp) :: m_temp
         real(wp) :: tf_min 
@@ -166,34 +167,35 @@ program yelmox_ismip6
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
-        call nml_read(path_par,"opt_L21","cf_time",     opt%cf_time)
-        call nml_read(path_par,"opt_L21","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt_L21","cf_min",      opt%cf_min_par)
-        call nml_read(path_par,"opt_L21","cf_max",      opt%cf_max_par)
-        call nml_read(path_par,"opt_L21","tau_c",       opt%tau_c)
-        call nml_read(path_par,"opt_L21","H0",          opt%H0)
-        call nml_read(path_par,"opt_L21","sigma_err",   opt%sigma_err)   
-        call nml_read(path_par,"opt_L21","sigma_vel",   opt%sigma_vel)   
-        call nml_read(path_par,"opt_L21","fill_method", opt%fill_method)   
+        call nml_read(path_par,"opt","cf_time",     opt%cf_time)
+        call nml_read(path_par,"opt","cf_init",     opt%cf_init)
+        call nml_read(path_par,"opt","cf_min",      opt%cf_min_par)
+        call nml_read(path_par,"opt","cf_max",      opt%cf_max_par)
+        call nml_read(path_par,"opt","tau_c",       opt%tau_c)
+        call nml_read(path_par,"opt","H0",          opt%H0)
+        call nml_read(path_par,"opt","sigma_err",   opt%sigma_err)   
+        call nml_read(path_par,"opt","sigma_vel",   opt%sigma_vel)   
+        call nml_read(path_par,"opt","fill_method", opt%fill_method)   
         
-        call nml_read(path_par,"opt_L21","rel_tau1",    opt%rel_tau1)   
-        call nml_read(path_par,"opt_L21","rel_tau2",    opt%rel_tau2)  
-        call nml_read(path_par,"opt_L21","rel_time1",   opt%rel_time1)    
-        call nml_read(path_par,"opt_L21","rel_time2",   opt%rel_time2) 
-        call nml_read(path_par,"opt_L21","rel_m",       opt%rel_m)
+        call nml_read(path_par,"opt","rel_tau1",    opt%rel_tau1)   
+        call nml_read(path_par,"opt","rel_tau2",    opt%rel_tau2)  
+        call nml_read(path_par,"opt","rel_time1",   opt%rel_time1)    
+        call nml_read(path_par,"opt","rel_time2",   opt%rel_time2) 
+        call nml_read(path_par,"opt","rel_m",       opt%rel_m)
 
-        call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
-        call nml_read(path_par,"opt_L21","tf_time",     opt%tf_time)
-        call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
-        call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
-        call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
-        call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
-        call nml_read(path_par,"opt_L21","tf_max",      opt%tf_max)
-        call nml_read(path_par,"opt_L21","tf_basins",   opt%tf_basins)
+        call nml_read(path_par,"opt","opt_tf",      opt%opt_tf)
+        call nml_read(path_par,"opt","tf_time",     opt%tf_time)
+        call nml_read(path_par,"opt","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt","tf_sigma",    opt%tf_sigma)
+        call nml_read(path_par,"opt","tau_m",       opt%tau_m)
+        call nml_read(path_par,"opt","m_temp",      opt%m_temp)
+        call nml_read(path_par,"opt","tf_min",      opt%tf_min)
+        call nml_read(path_par,"opt","tf_max",      opt%tf_max)
+        call nml_read(path_par,"opt","tf_basins",   opt%tf_basins)
 
         if (opt%cf_init .le. 0.0) then 
             ! Load initial cb_ref field from input file 
-            call nml_read(path_par,"opt_L21","cf_init_path",   opt%cf_init_path)
+            call nml_read(path_par,"opt","cf_init_path",   opt%cf_init_path)
         end if 
 
     end if 
@@ -713,7 +715,7 @@ program yelmox_ismip6
                                             yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                             yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                             opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                            dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=80.0_wp, &
+                                            dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
                                             cb_tgt=yelmo1%dyn%now%cb_tgt)
 
                     end if
@@ -721,12 +723,12 @@ program yelmox_ismip6
                     if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
                         ! Perform tf_corr optimization
 
-                        ! call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                        !                         yelmo1%dta%pd%H_ice,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
-                        !                         opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=100e3_wp,dt=ctl%dtt)
-                        call update_tf_corr_l21_basin(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                                yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                                opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
+                        call update_tf_corr_l21(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%dHicedt, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
+                                                opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
+                        ! call update_tf_corr_l21_basin(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                        !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                        !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                     
                     end if 
 
