@@ -121,7 +121,7 @@
     
     sigma_err       = 80e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
-    fill_method     = "target"          ! nearest, analog, target, cf_min
+    fill_method     = "cf_min"          ! nearest, analog, target, cf_min
     
     rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
