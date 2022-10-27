@@ -645,8 +645,10 @@ program yelmox_ismip6
                     yelmo1%dyn%now%cb_ref = opt%cf_init 
                 else 
                     ! Load cb_ref from separate input file 
-                    call nc_read(opt%cf_init_path,"cb_ref",yelmo1%dyn%now%cb_ref)
+                    !call nc_read(opt%cf_init_path,"cb_ref",yelmo1%dyn%now%cb_ref)
 
+                    yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_tgt 
+                    
                 end if 
 
             end if 
