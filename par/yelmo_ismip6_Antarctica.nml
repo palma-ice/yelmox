@@ -119,7 +119,7 @@
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
-    sigma_err       = 80e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
+    sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
     
@@ -135,7 +135,7 @@
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
+    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
 
@@ -239,7 +239,7 @@
     z0              = -250.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =  250.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.001            ! [-- or deg] Minimum value of cf
-    cf_ref          =  0.1              ! [-- or deg] Reference/const/max value of cf
+    cf_ref          =  0.2              ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
