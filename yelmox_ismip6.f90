@@ -104,14 +104,11 @@ program yelmox_ismip6
         real(wp) :: cf_time
         real(wp) :: cf_init
         real(wp) :: cf_min_par
-        real(wp) :: cf_max_par 
         real(wp) :: tau_c 
         real(wp) :: H0
         real(wp) :: sigma_err 
         real(wp) :: sigma_vel 
         character(len=56) :: fill_method 
-
-        character(len=512) :: cf_init_path 
 
         real(wp) :: rel_tau 
         real(wp) :: rel_tau1 
@@ -170,7 +167,6 @@ program yelmox_ismip6
         call nml_read(path_par,"opt","cf_time",     opt%cf_time)
         call nml_read(path_par,"opt","cf_init",     opt%cf_init)
         call nml_read(path_par,"opt","cf_min",      opt%cf_min_par)
-        call nml_read(path_par,"opt","cf_max",      opt%cf_max_par)
         call nml_read(path_par,"opt","tau_c",       opt%tau_c)
         call nml_read(path_par,"opt","H0",          opt%H0)
         call nml_read(path_par,"opt","sigma_err",   opt%sigma_err)   
@@ -192,11 +188,6 @@ program yelmox_ismip6
         call nml_read(path_par,"opt","tf_min",      opt%tf_min)
         call nml_read(path_par,"opt","tf_max",      opt%tf_max)
         call nml_read(path_par,"opt","tf_basins",   opt%tf_basins)
-
-        if (opt%cf_init .le. 0.0) then 
-            ! Load initial cb_ref field from input file 
-            call nml_read(path_par,"opt","cf_init_path",   opt%cf_init_path)
-        end if 
 
     end if 
 
@@ -288,8 +279,9 @@ program yelmox_ismip6
     ! Ensure optimization fields are allocated and preassigned
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    
     opt%cf_min = opt%cf_min_par 
-    opt%cf_max = opt%cf_max_par 
+    opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define specific regions of interest =====================
 
@@ -644,11 +636,9 @@ program yelmox_ismip6
                     ! Prescribe cb_ref to initial guess 
                     yelmo1%dyn%now%cb_ref = opt%cf_init 
                 else 
-                    ! Load cb_ref from separate input file 
-                    !call nc_read(opt%cf_init_path,"cb_ref",yelmo1%dyn%now%cb_ref)
-
+                    ! Load cb_ref from calculated cb_tgt field
                     yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_tgt 
-                    
+
                 end if 
 
             end if 
