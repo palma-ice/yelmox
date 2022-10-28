@@ -17,30 +17,34 @@
     equil_method    = "relax"           ! "none", "relax", "opt"
 /
 
-&opt_L21
-    cf_init         = 0.2               ! Initial value of cf_ref everywhere
-    cf_min          = 1e-4              ! [--] Minimum allowed cf value
-    cf_max          = 1.0               ! [--] Maximum allowed cf value
+&opt
+    cf_time         = 15e3              ! [yr] When should optimization of basal friction stop?
+    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
+    cf_min          = 0.001             ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
-    sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
-    fill_method     = "cf_min"          ! nearest, analog, cf_min
+    sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
+    sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
+    fill_method     = "cf_min"          ! nearest, analog, target, cf_min
     
-    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 5e3               ! [yr] Time limit for time period 1
-    rel_time2       = 10e3              ! [yr] Time limit for time period 2
+    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 2e3               ! [yr] Time limit for time period 1
+    rel_time2       = 6e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
-    opt_tf          = False             ! Should thermal forcing be optimized too?
+    opt_tf          = True              ! Should thermal forcing be optimized too?
+    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  5.0              ! [degC] Maximum allowed tf_corr value 
-    
+    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
+    tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
+
+    cf_ref_wais     = 0.01
 /
 
 &yelmo
