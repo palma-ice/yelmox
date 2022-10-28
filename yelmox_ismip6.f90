@@ -336,7 +336,8 @@ program yelmox_ismip6
             where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
 
             ! Adjust optimization cf_max field specifically for the WAIS
-            where(reg2%mask) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
+            !where(reg2%mask) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
+            where(abs(yelmo1%bnd%basins - 14.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
 
         case("Laurentide")
 
