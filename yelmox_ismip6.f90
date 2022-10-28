@@ -127,6 +127,8 @@ program yelmox_ismip6
         real(wp) :: tf_max
         integer  :: tf_basins(100) 
 
+        real(wp) :: cf_ref_wais 
+
         real(wp), allocatable :: cf_min(:,:) 
         real(wp), allocatable :: cf_max(:,:) 
         
@@ -189,6 +191,8 @@ program yelmox_ismip6
         call nml_read(path_par,"opt","tf_max",      opt%tf_max)
         call nml_read(path_par,"opt","tf_basins",   opt%tf_basins)
 
+        call nml_read(path_par,"opt","cf_ref_wais", opt%cf_ref_wais)
+        
     end if 
 
     ! Check if special scenario is being run, make parameter adjustments
@@ -331,15 +335,8 @@ program yelmox_ismip6
             reg3%mask = .FALSE. 
             where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
 
-
-            ! Adjust optimization cf_min field for Antarctica
-            ! (higher friction in Pine Island)
-            opt%cf_min = opt%cf_min_par 
-            
-            !where (yelmo1%bnd%basins .eq. 14.0) opt%cf_min = 10.0*opt%cf_min_par 
-            !where (yelmo1%bnd%basins .eq. 15.0) opt%cf_min = 10.0*opt%cf_min_par 
-
-            !where (yelmo1%dta%pd%H_grnd .gt. 0.0) opt%cf_min = 1e-2
+            ! Adjust optimization cf_max field specifically for the WAIS
+            where(reg2%mask) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
 
         case("Laurentide")
 
