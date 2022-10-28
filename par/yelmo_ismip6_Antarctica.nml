@@ -123,9 +123,9 @@
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
     
     rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 4e3               ! [yr] Time limit for time period 1
-    rel_time2       = 8e3               ! [yr] Time limit for time period 2
+    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 2e3               ! [yr] Time limit for time period 1
+    rel_time2       = 6e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = True              ! Should thermal forcing be optimized too?
