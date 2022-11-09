@@ -1,6 +1,9 @@
 #!/usr/bin/julia
 
-using IceAnalysis
+import Pkg; Pkg.activate(".")
+
+#using IceAnalysis
+import IceAnalysis
 
 #include("/Users/robinson/models/IceAnalysis.jl/src/IceAnalysis.jl")
 #using .IceAnalysis
@@ -14,4 +17,4 @@ end
 path = ARGS[end];
 
 
-ens = ensemble_check(path);
+IceAnalysis.ensemble_check(path);
