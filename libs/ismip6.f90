@@ -42,6 +42,9 @@ module ismip6
         type(varslice_class)   :: so
         type(varslice_class)   :: tf
 
+        ! Collapse mask
+        type(varslice_class)   :: mask_shlf
+
         ! Resources: 
 
         ! General fields 
@@ -76,6 +79,12 @@ module ismip6
         type(varslice_class)   :: to_proj
         type(varslice_class)   :: so_proj
         type(varslice_class)   :: tf_proj
+
+        ! jablasco
+        ! Collapse mask
+        type(varslice_class)   :: mask_shlf_proj
+        ! iceberg mask
+        real(wp), allocatable :: iceberg_mask(:,:)
         
     end type
 
@@ -107,6 +116,7 @@ module ismip6
 
     public :: ismip6_write_init
     public :: ismip6_write_step
+    public :: calc_iceberg_island
 
 contains
     
@@ -191,6 +201,7 @@ contains
 
         ! Local variables 
         character(len=256) :: group_prefix 
+
         character(len=256) :: grp_ts_ref 
         character(len=256) :: grp_pr_ref 
         character(len=256) :: grp_smb_ref 
@@ -210,7 +221,9 @@ contains
         character(len=256) :: grp_tf_hist 
         character(len=256) :: grp_to_proj 
         character(len=256) :: grp_so_proj 
-        character(len=256) :: grp_tf_proj 
+        character(len=256) :: grp_tf_proj
+
+        character(len=256) :: grp_mask_shlf_proj
         
         integer  :: k 
         real(wp) :: tmp 
@@ -220,13 +233,16 @@ contains
         ism%scen       = trim(scen) 
         ism%experiment = trim(ism%gcm)//"_"//trim(ism%scen) 
 
-        select case(trim(ism%experiment))
+        ! jablasco
+        !select case(trim(ism%experiment))
+        select case(trim(ism%gcm))
 
-            case("noresm_rcp85","noresm_ctrl")
+            case("CCSM4_RCP85","CESM2-WACCM_ssp585","CESM2-WACCM_ssp585-repeat","HadGEM2-ES_RCP85","HadGEM2-ES_RCP85-repeat",&
+                 "NorESM1-M_RCP26-repeat","NorESM1-M_RCP85-repeat","UKESM1-0-LL_ssp126","UKESM1-0-LL_ssp585","UKESM1-0-LL_ssp585-repeat")
                 ! Control and RCP85 scenarios use the same files 
                 ! since ctrl specific forcing adapted in update step 
 
-                group_prefix = "noresm_rcp85_"
+                group_prefix = "gcm_"
 
                 grp_ts_ref   = trim(group_prefix)//"ts_ref"
                 grp_pr_ref   = trim(group_prefix)//"pr_ref"
@@ -248,11 +264,16 @@ contains
                 grp_to_proj  = trim(group_prefix)//"to_proj"
                 grp_so_proj  = trim(group_prefix)//"so_proj"
                 grp_tf_proj  = trim(group_prefix)//"tf_proj"
+
+                grp_mask_shlf_proj = trim(group_prefix)//"mask_shlf_proj"
                 
             case DEFAULT 
 
-                write(*,*) "ismip6_ant_forcing_init:: Error: experiment not recognized."
-                write(*,*) "experiment = ", trim(ism%experiment) 
+     
+
+                write(*,*) "ismip6_forcing_init:: Error: GCM not recognized."
+                write(*,*) "gcm = ", trim(ism%gcm) 
+
                 stop 
 
         end select
@@ -263,31 +284,34 @@ contains
         call varslice_init_nml(ism%basins,   filename,group="imbie_basins",domain=domain,grid_name=grid_name)
         
         ! Amospheric fields
-        call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_ref,   filename,group=trim(grp_pr_ref), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_ref,  filename,group=trim(grp_smb_ref),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_ref,   filename,group=trim(grp_ts_ref), domain=domain,grid_name=grid_name,gcm=ism%gcm)
+        call varslice_init_nml(ism%pr_ref,   filename,group=trim(grp_pr_ref), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%smb_ref,  filename,group=trim(grp_smb_ref),domain=domain,grid_name=grid_name,gcm=gcm)
         
-        call varslice_init_nml(ism%ts_hist,  filename,group=trim(grp_ts_hist), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_hist,  filename,group=trim(grp_pr_hist), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_hist, filename,group=trim(grp_smb_hist),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_hist,  filename,group=trim(grp_ts_hist), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%pr_hist,  filename,group=trim(grp_pr_hist), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%smb_hist, filename,group=trim(grp_smb_hist),domain=domain,grid_name=grid_name,gcm=gcm)
 
-        call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%pr_proj,  filename,group=trim(grp_pr_proj), domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%ts_proj,  filename,group=trim(grp_ts_proj), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%pr_proj,  filename,group=trim(grp_pr_proj), domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%smb_proj, filename,group=trim(grp_smb_proj),domain=domain,grid_name=grid_name,gcm=gcm)
 
         ! Oceanic fields
-        call varslice_init_nml(ism%to_ref,   filename,group=trim(grp_to_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_ref,   filename,group=trim(grp_so_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_ref,   filename,group=trim(grp_tf_ref),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_cor,   filename,group=trim(grp_tf_cor),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_ref,   filename,group=trim(grp_to_ref),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%so_ref,   filename,group=trim(grp_so_ref),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_ref,   filename,group=trim(grp_tf_ref),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_cor,   filename,group=trim(grp_tf_cor),domain=domain,grid_name=grid_name,gcm=gcm)
 
-        call varslice_init_nml(ism%to_hist,  filename,group=trim(grp_to_hist),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_hist,  filename,group=trim(grp_so_hist),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_hist,  filename,group=trim(grp_tf_hist),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_hist,  filename,group=trim(grp_to_hist),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%so_hist,  filename,group=trim(grp_so_hist),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_hist,  filename,group=trim(grp_tf_hist),domain=domain,grid_name=grid_name,gcm=gcm)
 
-        call varslice_init_nml(ism%to_proj,  filename,group=trim(grp_to_proj),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%so_proj,  filename,group=trim(grp_so_proj),domain=domain,grid_name=grid_name)
-        call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name)
+        call varslice_init_nml(ism%to_proj,  filename,group=trim(grp_to_proj),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%so_proj,  filename,group=trim(grp_so_proj),domain=domain,grid_name=grid_name,gcm=gcm)
+        call varslice_init_nml(ism%tf_proj,  filename,group=trim(grp_tf_proj),domain=domain,grid_name=grid_name,gcm=gcm)
+
+        ! Shelf collapse fields
+        call varslice_init_nml(ism%mask_shlf_proj,  filename,group=trim(grp_mask_shlf_proj),domain=domain,grid_name=grid_name,gcm=gcm)
 
         ! Load time-independent fields
 
@@ -324,15 +348,21 @@ contains
             end if
         end do
 
-        ! Additional variables to zero
-        ism%z_srf = ism%basins 
-        ism%z_srf%var = 0.0_wp 
+      ! HEAD
+      !  ! Additional variables to zero
+      !  ism%z_srf = ism%basins 
+      !  ism%z_srf%var = 0.0_wp 
 
-        ism%dts_dz          = ism%z_srf
-        ism%dsmb_dz         = ism%z_srf
-        ism%dts_dz_proj     = ism%z_srf
-        ism%dsmb_dz_proj    = ism%z_srf
-        
+      !  ism%dts_dz          = ism%z_srf
+      !  ism%dsmb_dz         = ism%z_srf
+      !  ism%dts_dz_proj     = ism%z_srf
+      !  ism%dsmb_dz_proj    = ism%z_srf
+      !END HEAD  
+
+        ! jablasco: Initialize variables and allocate
+        allocate(ism%iceberg_mask(size(ism%to_ref%var,1),size(ism%to_ref%var,2)))
+        ism%iceberg_mask = 0.0
+
         return 
 
     end subroutine ismip6_ant_forcing_init
@@ -358,11 +388,43 @@ contains
 
         ! === Atmospheric fields ==================================
         
-        if (trim(ism%scen) .eq. "ctrl") then 
-            ! For control scenario, override time choices and 
-            ! set control atm and ocn 
+       !HEAD
+       ! if (trim(ism%scen) .eq. "ctrl") then 
+       !     ! For control scenario, override time choices and 
+       !     ! set control atm and ocn 
 
-            ! Set atm fields to reference values (ie, zero anomaly) 
+        !    ! Set atm fields to reference values (ie, zero anomaly) 
+        !    ism%ts  = ism%ts_ref 
+        !    ism%pr  = ism%pr_ref 
+        !    ism%smb = ism%smb_ref 
+
+         !   ! Since atm fields are anomalies, also set actual variable to zero 
+         !   ism%ts%var  = 0.0_wp 
+         !   ism%pr%var  = 0.0_wp 
+         !   ism%smb%var = 0.0_wp 
+            
+       ! else if (time .lt. 1995) then 
+       !END HEAD
+
+        ! 1995
+        if (time .lt. 1995) then 
+
+
+            ! jablasco
+            call varslice_update(ism%ts_hist, [time],method=slice_method)
+            call varslice_update(ism%pr_hist, [time],method=slice_method)
+            call varslice_update(ism%smb_hist,[time],method=slice_method)
+
+            ism%ts  = ism%ts_hist
+            ism%pr  = ism%pr_hist
+            ism%smb = ism%smb_hist
+
+        ! 2015 pa 2300
+
+        ! targeted experiments: jablasco
+        ! 2015 -> 2301
+        else if (time .ge. 1995 .and. time .lt. 2015) then
+
             ism%ts  = ism%ts_ref 
             ism%pr  = ism%pr_ref 
             ism%smb = ism%smb_ref 
@@ -370,56 +432,9 @@ contains
             ! Since atm fields are anomalies, also set actual variable to zero 
             ism%ts%var  = 0.0_wp 
             ism%pr%var  = 0.0_wp 
-            ism%smb%var = 0.0_wp 
-            
-        else if (time .lt. 1995) then 
+            ism%smb%var = 0.0_wp
 
-            ! call varslice_update(ism%ts_hist, [1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%pr_hist, [1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%smb_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-
-            ! ism%ts  = ism%ts_hist 
-            ! ism%pr  = ism%pr_hist 
-            ! ism%smb = ism%smb_hist
-            
-            ! Prior to 1995, no anomalies 
-            ! Set atm fields to reference values (ie, zero anomaly) 
-            ism%ts  = ism%ts_ref 
-            ism%pr  = ism%pr_ref 
-            ism%smb = ism%smb_ref 
-
-            ! Since atm fields are anomalies, also set actual variable to zero 
-            ism%ts%var  = 0.0_wp 
-            ism%pr%var  = 0.0_wp 
-            ism%smb%var = 0.0_wp 
-            
-        else if (time .ge. 1995 .and. time .le. 2014) then 
-            
-            if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
-                    .or. time .ge. 2005 ) then 
-                ! noresm hist file only goes until 1994, other gcms hist file goes to 2004
-                call varslice_update(ism%ts_proj, [time],method=slice_method)
-                call varslice_update(ism%pr_proj, [time],method=slice_method)
-                call varslice_update(ism%smb_proj,[time],method=slice_method)
-                
-                ism%ts  = ism%ts_proj 
-                ism%pr  = ism%pr_proj 
-                ism%smb = ism%smb_proj 
-                
-            else 
-                ! Load hist variable as normal 
-                call varslice_update(ism%ts_hist, [time],method=slice_method)
-                call varslice_update(ism%pr_hist, [time],method=slice_method)
-                call varslice_update(ism%smb_hist,[time],method=slice_method)
-                
-                ism%ts  = ism%ts_hist 
-                ism%pr  = ism%pr_hist 
-                ism%smb = ism%smb_hist 
-                
-            end if 
-
-                
-        else if (time .ge. 2015 .and. time .le. 2100) then 
+        else if (time .ge. 2015 .and. time .le. 2300) then
 
             call varslice_update(ism%ts_proj, [time],method=slice_method)
             call varslice_update(ism%pr_proj, [time],method=slice_method)
@@ -428,75 +443,56 @@ contains
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
             ism%smb = ism%smb_proj
-            
-        else ! time .gt. 2100
 
-            call varslice_update(ism%ts_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%pr_proj, [2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%smb_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+        else ! time .gt. 2300
+
+            call varslice_update(ism%ts_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%pr_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%smb_proj,[2290.0_wp,2300.0_wp],method="range_mean")
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
             ism%smb = ism%smb_proj
-            
+
         end if
 
         ! === Oceanic fields ==================================
 
-        if (trim(ism%scen) .eq. "ctrl") then 
-            ! For control scenario, override time choices and 
-            ! set control atm and ocn 
+       !HEAD
+       ! if (trim(ism%scen) .eq. "ctrl") then 
+       !     ! For control scenario, override time choices and 
+       !     ! set control atm and ocn 
 
-            ! Set ocn fields to reference values 
-            ism%to = ism%to_ref 
-            ism%so = ism%so_ref 
-            ism%tf = ism%tf_ref 
+       !     ! Set ocn fields to reference values 
+       !     ism%to = ism%to_ref 
+       !     ism%so = ism%so_ref 
+       !     ism%tf = ism%tf_ref 
 
-        else if (time .lt. 1995) then 
+       ! else if (time .lt. 1995) then 
+     !END HEAD
+        ! 2501
+        if (time .lt. 1995) then 
             ! Prehistoric 
 
+            ! jablasco
             ! Oceanic fields 
-            ! call varslice_update(ism%to_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%so_hist,[1950.0_wp,1980.0_wp],method="range_mean")
-            ! call varslice_update(ism%tf_hist,[1950.0_wp,1980.0_wp],method="range_mean")
+            call varslice_update(ism%to_hist,[time],method=slice_method)
+            call varslice_update(ism%so_hist,[time],method=slice_method)
+            call varslice_update(ism%tf_hist,[time],method=slice_method)
 
-            ! ism%to = ism%to_hist
-            ! ism%so = ism%so_hist
-            ! ism%tf = ism%tf_hist
+            ism%to = ism%to_hist
+            ism%so = ism%so_hist
+            ism%tf = ism%tf_hist
 
-            ! Set reference oceanic fields
+        ! jablasco: only atm; 2015 -> 2301
+        else if (time .ge. 1995 .and. time .lt. 2301) then
+            ! Projection period 1 
+
             ism%to = ism%to_ref
             ism%so = ism%so_ref
             ism%tf = ism%tf_ref
 
-        else if (time .ge. 1995 .and. time .le. 2014) then 
-            ! Historical period 
-
-            if ( (trim(ism%gcm) .eq. "noresm" .and. time .ge. 1995) &
-                    .or. time .ge. 2005) then 
-                ! noresm hist file only goes until 1994, other hist files go until 2004
-                call varslice_update(ism%to_proj, [time],method=slice_method)
-                call varslice_update(ism%so_proj, [time],method=slice_method)
-                call varslice_update(ism%tf_proj, [time],method=slice_method)
-                
-                ism%to = ism%to_proj
-                ism%so = ism%so_proj
-                ism%tf = ism%tf_proj
-                
-            else 
-                ! Load hist variable as normal 
-                call varslice_update(ism%to_hist, [time],method=slice_method)
-                call varslice_update(ism%so_hist, [time],method=slice_method)
-                call varslice_update(ism%tf_hist, [time],method=slice_method)
-                
-                ism%to = ism%to_hist
-                ism%so = ism%so_hist
-                ism%tf = ism%tf_hist
-                
-            end if 
-            
-                
-        else if (time .ge. 2015 .and. time .le. 2100) then 
+        else if (time .ge. 2015 .and. time .le. 2300) then
             ! Projection period 1 
 
             call varslice_update(ism%to_proj,[time],method=slice_method)
@@ -506,22 +502,67 @@ contains
             ism%to = ism%to_proj
             ism%so = ism%so_proj
             ism%tf = ism%tf_proj
-               
-        else ! time .gt. 2100
+
+        else ! time .gt. 2300
             ! Projection period 2 
 
-            call varslice_update(ism%to_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%so_proj,[2090.0_wp,2100.0_wp],method="range_mean")
-            call varslice_update(ism%tf_proj,[2090.0_wp,2100.0_wp],method="range_mean")
+            call varslice_update(ism%to_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%so_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%tf_proj,[2290.0_wp,2300.0_wp],method="range_mean")
 
             ism%to = ism%to_proj
             ism%so = ism%so_proj
-            ism%tf = ism%tf_proj 
-            
+            ism%tf = ism%tf_proj
+
+        end if
+
+        ! === Mask shelf collapse ==========================
+
+        if (time .lt. 2015) then
+
+            call varslice_update(ism%mask_shlf_proj,[2000.0_wp],method=slice_method)
+            ism%mask_shlf = ism%mask_shlf_proj
+
+        else if (time .ge. 2015 .and. time .le. 2300) then
+
+            call varslice_update(ism%mask_shlf_proj,[time],method=slice_method)
+            ism%mask_shlf = ism%mask_shlf_proj
+        
+        else
+
+            call varslice_update(ism%mask_shlf_proj,[2300.0_wp],method=slice_method)
+            ism%mask_shlf  = ism%mask_shlf_proj
+
         end if
 
         ! === Additional calculations ======================
 
+        if (trim(ism%scen) .eq. "ctrl") then 
+            ! For control scenario, override above choices and 
+            ! set control atm and ocn 
+
+            ! jablasco (mantain hist runs)
+            if (time .ge. 1995) then
+
+                ! Set atm fields to reference values (ie, zero anomaly) 
+                ism%ts  = ism%ts_ref 
+                ism%pr  = ism%pr_ref 
+                ism%smb = ism%smb_ref 
+
+                ! Since atm fields are anomalies, also set actual variable to zero 
+                ism%ts%var  = 0.0_wp 
+                ism%pr%var  = 0.0_wp 
+                ism%smb%var = 0.0_wp 
+            
+                ! Set ocn fields to reference values 
+                ism%to = ism%to_ref 
+                ism%so = ism%so_ref 
+                ism%tf = ism%tf_ref 
+
+            end if
+
+        end if 
+        
         ! If desired, override other choices and use reference atm fields
         if (present(use_ref_atm)) then 
         if (use_ref_atm) then  
@@ -1091,5 +1132,102 @@ end if
         return 
 
     end subroutine ice_var_par_load
+
+    ! jablasco: subroutine for iceberg islands
+    subroutine calc_iceberg_island(iceberg_mask,f_grnd,H_ice)
+        ! Calculate distance to the grounding line 
+
+        implicit none
+
+        real(wp), intent(OUT) :: iceberg_mask(:,:) ! Iceberg island (lonely ice shelves)
+        real(wp), intent(IN)  :: f_grnd(:,:)       ! [1]  Grounded grid-cell fraction 
+        real(wp), intent(IN)  :: H_ice(:,:)        ! [m]  Ice thickness
+
+        ! Local variables 
+        integer  :: i, j, nx, ny, q
+        integer  :: im1, ip1, jm1, jp1
+        integer,  parameter :: iter_max = 1000
+
+        real(wp), allocatable :: mask_ref(:,:)
+        real(wp), allocatable :: iceberg_mask_ref(:,:)
+
+        nx = size(f_grnd,1)
+        ny = size(f_grnd,2)
+
+        allocate(mask_ref(nx,ny))
+        allocate(iceberg_mask_ref(nx,ny))
+
+        ! 0: Assign mask values. 0 = ocn; 1 = flt; 2 = grd/grl
+        ! ======================
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (f_grnd(i,j) .gt. 0.0) then
+                mask_ref(i,j) = 2.0
+            else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then
+                mask_ref(i,j) = 1.0
+            else
+                mask_ref(i,j) = 0.0
+            end if
+
+        end do
+        end do
+        
+        ! 1. Next, determine the extension of the grounded and connected flt
+        ! points ===
+
+        ! Initialize the iceberg_mask_ref
+        iceberg_mask_ref = mask_ref
+
+        do q = 1, iter_max
+
+            do j = 1, ny
+            do i = 1, nx
+
+            ! Get neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(im1,j) .eq. 1.0) then
+                iceberg_mask_ref(im1,j) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(ip1,j) .eq. 1.0) then
+                iceberg_mask_ref(ip1,j) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(i,jm1) .eq. 1.0) then
+                iceberg_mask_ref(i,jm1) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(i,jp1) .eq. 1.0) then
+                iceberg_mask_ref(i,jp1) = 2.0
+            end if
+
+            end do
+            end do
+        end do
+        
+        ! 2. Where numbers are still 1.0 -> icebergs ======================
+
+        do j = 1, ny
+        do i = 1, nx
+
+            ! Grounded point or partially floating point with floating neighbors
+            if (iceberg_mask_ref(i,j) .eq. 1.0) then
+                iceberg_mask(i,j) = 1.0
+            else
+                iceberg_mask(i,j) = 0.0
+            end if
+
+        end do
+        end do
+
+
+        return
+
+    end subroutine calc_iceberg_island
 
 end module ismip6

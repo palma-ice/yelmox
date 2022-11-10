@@ -240,7 +240,7 @@ contains
                 load_atm2 = .TRUE. 
                 load_atm3 = .FALSE. 
 
-            case("snap_2ind","snap_2ind_abs") 
+            case("snap_1ind_miocene","snap_2ind","snap_2ind_abs") 
                 load_atm1 = .TRUE.
                 load_atm2 = .TRUE. 
                 load_atm3 = .TRUE. 
@@ -265,7 +265,7 @@ contains
                 load_ocn2 = .TRUE. 
                 load_ocn3 = .FALSE. 
 
-            case("snap_2ind","snap_2ind_abs") 
+            case("snap_1ind_miocene","snap_2ind","snap_2ind_abs") 
                 load_ocn1 = .TRUE.
                 load_ocn2 = .TRUE. 
                 load_ocn3 = .TRUE. 
@@ -476,6 +476,7 @@ contains
 
             case("snap_1ind","snap_1ind_new")
 
+ !HEAD
                 if (present(dx)) then 
                     ! Allow smoothing...
 
@@ -522,6 +523,17 @@ contains
                 call calc_temp_1ind(snp%now%tsl,clim0_tsl_corr,snp%clim1%tsl,snp%clim2%tsl,at)
                 call calc_precip_1ind(snp%now%prcor,clim0_prcor_corr,snp%clim1%prcor,snp%clim2%prcor,ap)
                 
+!END HEAD
+                call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
+                call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
+            
+            ! jablasco: miocene
+            case("snap_1ind_miocene")
+
+                call calc_temp_1ind_miocene(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at)
+                call calc_precip_1ind_miocene(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,ap)
+      
+
             case("snap_2ind")
                 
                 call calc_temp_2ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt)
@@ -661,16 +673,23 @@ contains
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
                 call calc_salinity_1ind(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,as)
                         
+            ! jablasco: miocene
+            case("snap_1ind_miocene")
+                call calc_temp_1ind_miocene(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao)
+                call calc_salinity_1ind_miocene(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as)
+            
             case("snap_2ind")
                 call calc_temp_2ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo)
                 call calc_salinity_2ind(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as,bs)
 
             case("snap_1ind_abs")
                 call calc_temp_1ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
+                call calc_salinity_1ind_abs(snp%now%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,as)
 
             case("snap_2ind_abs")
                 call calc_temp_2ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo) 
-            
+                call calc_salinity_2ind_abs(snp%now%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as,bs)            
+
             case("hybrid") 
                 ! Use hybrid method 
 
@@ -841,6 +860,20 @@ contains
 
     end subroutine calc_salinity_1ind
 
+    elemental subroutine calc_salinity_1ind_abs(salt_now,salt1,salt2,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt1, salt2
+        real(prec), intent(IN)  :: aa
+
+        salt_now = (1.0-aa)*salt1 + aa*salt2
+
+        return
+
+    end subroutine calc_salinity_1ind_abs
+
     elemental subroutine calc_temp_2ind(temp_now,temp0,temp1,temp2,temp3,aa,bb)
 
         implicit none
@@ -861,6 +894,21 @@ contains
 
     end subroutine calc_temp_2ind
 
+    ! jablasco: 2ind for miocene simulation
+    elemental subroutine calc_temp_1ind_miocene(temp_now,temp0,temp1,temp2,temp3,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: temp_now
+        real(prec), intent(IN)  :: temp0, temp1, temp2, temp3
+        real(prec), intent(IN)  :: aa
+
+        temp_now = temp0 + temp1 - temp3 + aa*(temp2-temp1)
+
+        return
+
+    end subroutine calc_temp_1ind_miocene
+
     elemental subroutine calc_salinity_2ind(salt_now,salt0,salt1,salt2,salt3,aa,bb)
 
         implicit none
@@ -874,6 +922,37 @@ contains
         return
 
     end subroutine calc_salinity_2ind
+
+    ! jablasco: 2ind salinity for miocene simulation
+    elemental subroutine calc_salinity_1ind_miocene(salt_now,salt0,salt1,salt2,salt3,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt0, salt1, salt2, salt3
+        real(prec), intent(IN)  :: aa
+
+        salt_now = salt0 + salt1 - salt3 + aa*(salt2-salt1)
+
+        return
+
+    end subroutine calc_salinity_1ind_miocene
+
+
+    elemental subroutine calc_salinity_2ind_abs(salt_now,salt1,salt2,salt3,aa,bb)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt1, salt2, salt3
+        real(prec), intent(IN)  :: aa, bb
+
+        ! needs checking
+        salt_now = aa*((1.0-bb)*(salt2) + bb*salt3)  + aa*salt1
+
+        return
+
+    end subroutine calc_salinity_2ind_abs
 
     elemental subroutine calc_temp_1ind_abs(temp_now,temp1,temp2,aa)
 
@@ -961,6 +1040,25 @@ contains
         return
 
     end subroutine calc_precip_1ind
+
+    ! jablasco: precipitation miocene
+    elemental subroutine calc_precip_1ind_miocene(pr_now,pr0,pr1,pr2,pr3,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: pr_now
+        real(prec), intent(IN)  :: pr0, pr1, pr2, pr3
+        real(prec), intent(IN)  :: aa
+
+        if (pr3.ne.0.0) then
+            pr_now = pr0 * (pr1 + aa*(pr2-pr1))/pr3
+        else
+            pr_now = pr0
+        end if
+
+        return
+
+    end subroutine calc_precip_1ind_miocene
 
     elemental subroutine calc_precip_2ind(pr_now,pr0,pr1,pr2,pr3,aa,bb)
 
