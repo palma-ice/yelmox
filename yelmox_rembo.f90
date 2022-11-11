@@ -113,6 +113,13 @@ program yelmox
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
 
+    ! Ensure optimization fields are allocated and preassigned
+    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    
+    opt%cf_min = opt%cf_min_par 
+    opt%cf_max = yelmo1%dyn%par%till_cf_ref
+    
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
 
