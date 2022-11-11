@@ -4,7 +4,8 @@ program yelmox
 
     use ncio 
     use yelmo 
-    
+    use ice_optimization 
+
     ! External libraries
     use sealevel 
     use isostasy  
@@ -32,7 +33,8 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file1D_hyst, file_restart, domain 
     character(len=256) :: file_rembo
     character(len=512) :: path_par, path_const  
-    real(prec) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
+    real(wp)   :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
+    real(wp)   :: time_elapsed
     integer    :: n
     logical    :: calc_transient_climate
     
@@ -47,6 +49,8 @@ program yelmox
     logical :: with_ice_sheet 
     logical :: optimize 
 
+    type(ice_opt_params)  :: opt 
+
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     ! Start timing 
@@ -60,19 +64,26 @@ program yelmox
     path_par = trim(outfldr)//"yelmo_Greenland_rembo.nml"
     
     ! Timing and other parameters 
-    call nml_read(path_par,"ctrl","time_init",   time_init)                  ! [yr] Starting time
-    call nml_read(path_par,"ctrl","time_end",    time_end)                   ! [yr] Ending time
-    call nml_read(path_par,"ctrl","time_equil",  time_equil)                 ! [yr] Years to equilibrate first
-    call nml_read(path_par,"ctrl","dtt",         dtt)                        ! [yr] Main loop time step 
-    call nml_read(path_par,"ctrl","dt1D_out",    dt1D_out)                   ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"ctrl","dt2D_out",    dt2D_out)                   ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"ctrl","write_restart", write_restart)
-    call nml_read(path_par,"ctrl","transient",   calc_transient_climate)     ! Calculate transient climate? 
-    call nml_read(path_par,"ctrl","use_hyster",  use_hyster)                 ! Use hyster?
-    call nml_read(path_par,"ctrl","dT",          dT_summer)                  ! Initial summer temperature anomaly
-    call nml_read(path_par,"ctrl","lim_pd_ice",  lim_pd_ice)                 ! Limit to pd ice extent (apply extra melting outside mask)
-    call nml_read(path_par,"ctrl","with_ice_sheet",with_ice_sheet)  ! Active ice sheet? 
-    call nml_read(path_par,"ctrl","optimize",optimize)              ! Optimize basal friction?
+    call nml_read(path_par,"ctrl","time_init",      time_init)              ! [yr] Starting time
+    call nml_read(path_par,"ctrl","time_end",       time_end)               ! [yr] Ending time
+    call nml_read(path_par,"ctrl","time_equil",     time_equil)             ! [yr] Years to equilibrate first
+    call nml_read(path_par,"ctrl","dtt",            dtt)                    ! [yr] Main loop time step 
+    call nml_read(path_par,"ctrl","dt1D_out",       dt1D_out)               ! [yr] Frequency of 1D output 
+    call nml_read(path_par,"ctrl","dt2D_out",       dt2D_out)               ! [yr] Frequency of 2D output 
+    call nml_read(path_par,"ctrl","write_restart",  write_restart)
+    call nml_read(path_par,"ctrl","transient",      calc_transient_climate) ! Calculate transient climate? 
+    call nml_read(path_par,"ctrl","use_hyster",     use_hyster)             ! Use hyster?
+    call nml_read(path_par,"ctrl","dT",             dT_summer)              ! Initial summer temperature anomaly
+    call nml_read(path_par,"ctrl","lim_pd_ice",     lim_pd_ice)             ! Limit to pd ice extent (apply extra melting outside mask)
+    call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
+    call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
+    
+    if (optimize) then 
+        ! Load optimization parameters 
+
+        call optimize_par_load(opt,path_par,"opt")
+
+    end if 
     
     ! Define input and output locations 
     path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
@@ -239,15 +250,51 @@ program yelmox
     do n = 1, ceiling((time_end-time_init)/dtt)
 
         ! Get current time 
-        time = time_init + n*dtt
+        time         = time_init + n*dtt
+        time_elapsed = time - time_init
 
         ! == SEA LEVEL ==========================================================
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == Yelmo ice sheet ===================================================
-        if (with_ice_sheet) then 
+        if (with_ice_sheet) then
+
+            if (optimize) then 
+
+                ! === Optimization update step =========
+
+                if (time_elapsed .le. opt%cf_time) then 
+                    ! Perform cf_ref optimization
+                
+                    ! Update cb_ref based on error metric(s) 
+                    call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
+                                        yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
+                                        opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                        dt=dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
+                                        cb_tgt=yelmo1%dyn%now%cb_tgt)
+
+                end if
+
+                if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
+                    ! Perform tf_corr optimization
+
+                    call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
+                                            opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=dtt)
+                    ! call optimize_tf_corr_basin(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                    !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
+                    !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=dtt)
+                
+                end if 
+
+            
+            end if 
+
+            ! Update ice sheet to current time 
             call yelmo_update(yelmo1,time)
+
         end if 
 
         ! == ISOSTASY ==========================================================

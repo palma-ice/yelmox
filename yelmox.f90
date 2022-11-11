@@ -75,40 +75,6 @@ program yelmox
         character(len=56) :: equil_method
     end type 
 
-    type opt_params
-        real(wp) :: cf_time
-        real(wp) :: cf_init
-        real(wp) :: cf_min_par
-        real(wp) :: tau_c 
-        real(wp) :: H0
-        real(wp) :: sigma_err 
-        real(wp) :: sigma_vel 
-        character(len=56) :: fill_method 
-
-        real(wp) :: rel_tau 
-        real(wp) :: rel_tau1 
-        real(wp) :: rel_tau2
-        real(wp) :: rel_time1
-        real(wp) :: rel_time2
-        real(wp) :: rel_m
-
-        logical  :: opt_tf 
-        real(wp) :: tf_time
-        real(wp) :: H_grnd_lim
-        real(wp) :: tf_sigma 
-        real(wp) :: tau_m 
-        real(wp) :: m_temp
-        real(wp) :: tf_min 
-        real(wp) :: tf_max
-        integer  :: tf_basins(100) 
-
-        real(wp) :: cf_ref_wais 
-
-        real(wp), allocatable :: cf_min(:,:) 
-        real(wp), allocatable :: cf_max(:,:) 
-        
-    end type  
-
     type stats_class
         logical  :: defined
         real(wp) :: pd_rmse_H
@@ -120,9 +86,9 @@ program yelmox
     end type
 
 
-    type(ctrl_params)   :: ctl
-    type(opt_params)    :: opt  
-    type(stats_class)   :: stats_pd_1, stats_lgm, stats_pd_2
+    type(ctrl_params)    :: ctl
+    type(ice_opt_params) :: opt  
+    type(stats_class)    :: stats_pd_1, stats_lgm, stats_pd_2
 
     ! Internal parameters
     logical  :: running_laurentide
@@ -183,33 +149,8 @@ program yelmox
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
-        call nml_read(path_par,"opt","cf_time",     opt%cf_time)
-        call nml_read(path_par,"opt","cf_init",     opt%cf_init)
-        call nml_read(path_par,"opt","cf_min",      opt%cf_min_par)
-        call nml_read(path_par,"opt","tau_c",       opt%tau_c)
-        call nml_read(path_par,"opt","H0",          opt%H0)
-        call nml_read(path_par,"opt","sigma_err",   opt%sigma_err)   
-        call nml_read(path_par,"opt","sigma_vel",   opt%sigma_vel)   
-        call nml_read(path_par,"opt","fill_method", opt%fill_method)   
-        
-        call nml_read(path_par,"opt","rel_tau1",    opt%rel_tau1)   
-        call nml_read(path_par,"opt","rel_tau2",    opt%rel_tau2)  
-        call nml_read(path_par,"opt","rel_time1",   opt%rel_time1)    
-        call nml_read(path_par,"opt","rel_time2",   opt%rel_time2) 
-        call nml_read(path_par,"opt","rel_m",       opt%rel_m)
+        call optimize_par_load(opt,path_par,"opt")
 
-        call nml_read(path_par,"opt","opt_tf",      opt%opt_tf)
-        call nml_read(path_par,"opt","tf_time",     opt%tf_time)
-        call nml_read(path_par,"opt","H_grnd_lim",  opt%H_grnd_lim)
-        call nml_read(path_par,"opt","tf_sigma",    opt%tf_sigma)
-        call nml_read(path_par,"opt","tau_m",       opt%tau_m)
-        call nml_read(path_par,"opt","m_temp",      opt%m_temp)
-        call nml_read(path_par,"opt","tf_min",      opt%tf_min)
-        call nml_read(path_par,"opt","tf_max",      opt%tf_max)
-        call nml_read(path_par,"opt","tf_basins",   opt%tf_basins)
-
-        call nml_read(path_par,"opt","cf_ref_wais", opt%cf_ref_wais)
-        
     end if 
 
     ! Set initial time 
@@ -623,7 +564,7 @@ program yelmox
                     ! Apply relaxation to the model 
 
                     ! Update model relaxation time scale and error scaling (in [m])
-                    opt%rel_tau = get_opt_param(time_elapsed,time1=opt%rel_time1,time2=opt%rel_time2, &
+                    call optimize_set_transient_param(opt%rel_tau,time_elapsed,time1=opt%rel_time1,time2=opt%rel_time2, &
                                                     p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
                     
                     ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
@@ -643,7 +584,7 @@ program yelmox
                     ! Perform cf_ref optimization
                 
                     ! Update cb_ref based on error metric(s) 
-                    call update_cb_ref_errscaling_l21(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
+                    call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                             yelmo1%tpo%now%dHicedt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                             yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                             opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
@@ -655,10 +596,10 @@ program yelmox
                 if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
                     ! Perform tf_corr optimization
 
-                    call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                    call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
                                                 opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
-                    ! call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
+                    ! call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
                     !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
                     !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                 
