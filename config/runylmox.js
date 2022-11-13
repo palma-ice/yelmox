@@ -23,7 +23,7 @@
 
     "par_paths" : {},
 
-    "files" : ["par/options_rembo"], 
+    "files" : ["par/rembo_Greenland.nml"], 
 
     "dir-special" : {},
 
