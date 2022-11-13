@@ -119,7 +119,7 @@ program yelmox
     
     opt%cf_min = opt%cf_min_par 
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
-    
+
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
 
@@ -219,6 +219,28 @@ program yelmox
 
     end if 
 
+    ! ===== basal friction optimization ======
+    if (optimize) then 
+        
+        ! Ensure that cb_ref will be optimized (till_method == set externally) 
+        yelmo1%dyn%par%till_method = -1  
+
+        ! If not using restart...
+        if (.not. yelmo1%par%use_restart) then
+
+            if (opt%cf_init .gt. 0.0) then 
+                ! Prescribe cb_ref to initial guess 
+                yelmo1%dyn%now%cb_ref = opt%cf_init 
+            else 
+                ! Load cb_ref from calculated cb_tgt field
+                yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_tgt 
+
+            end if 
+
+        end if 
+
+    end if 
+    
     ! Run yelmo for several years with constant boundary conditions and topo
     ! to equilibrate thermodynamics and dynamics
     if (with_ice_sheet) then 
