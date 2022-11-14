@@ -113,6 +113,8 @@ program yelmox
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
 
+
+
     ! Ensure optimization fields are allocated and preassigned
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -120,6 +122,14 @@ program yelmox
     opt%cf_min = opt%cf_min_par 
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
+    ! Define no-ice mask from present-day data
+    allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
+    mask_noice = .FALSE. 
+    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
+
+
+
+    
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
 
@@ -176,11 +186,6 @@ program yelmox
     yelmo1%bnd%smb   = rembo_ann%smb    *conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = rembo_ann%T_srf
     
-    ! Define no-ice mask from present-day data
-    allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
-    mask_noice = .FALSE. 
-    where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
-
     ! Special treatment for Greenland
     if (lim_pd_ice) then 
         
