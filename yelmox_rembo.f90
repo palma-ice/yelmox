@@ -245,7 +245,7 @@ program yelmox
     ! to equilibrate thermodynamics and dynamics
     if (with_ice_sheet) then 
         call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-        call yelmo_update_equil(yelmo1,time,time_tot=500.0_prec,dt=dtt,topo_fixed=.TRUE.)
+        call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.TRUE.)
     end if 
 
     ! Now run steady-state for several thousand years
