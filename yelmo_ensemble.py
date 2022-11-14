@@ -546,17 +546,17 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     else:
         print("Warning: path does not exist {}".format(srcname))
 
-    srcname = "ice_data_javi"
-    dstname = os.path.join(outfldr,srcname)
-    if os.path.islink(dstname): os.unlink(dstname)
-    if os.path.islink(srcname):
-        linkto = os.readlink(srcname)
-        os.symlink(linkto, dstname)
-    elif os.path.isdir(srcname):
-        srcpath = os.path.abspath(srcname)
-        os.symlink(srcpath,dstname)
-    else:
-        print("Warning: path does not exist {}".format(srcname))
+    #srcname = "ice_data_javi"
+    #dstname = os.path.join(outfldr,srcname)
+    #if os.path.islink(dstname): os.unlink(dstname)
+    #if os.path.islink(srcname):
+    #    linkto = os.readlink(srcname)
+    #    os.symlink(linkto, dstname)
+    #elif os.path.isdir(srcname):
+    #    srcpath = os.path.abspath(srcname)
+    #    os.symlink(srcpath,dstname)
+    #else:
+    #    print("Warning: path does not exist {}".format(srcname))
 
     # Copy the submit.sh file
     submit_file = "submit.sh"

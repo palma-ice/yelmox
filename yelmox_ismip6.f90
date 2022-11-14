@@ -884,7 +884,7 @@ program yelmox_ismip6
 
             ! Get current time 
             time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp 
+            time_bp      = time - 1995.0_wp 
             time_elapsed = time - ctl%time_init 
 
             ! == SEA LEVEL ==========================================================
@@ -925,7 +925,7 @@ program yelmox_ismip6
                 call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
             end if 
 
-            if (time == 1950.0_wp) then 
+            if (time == 1995.0_wp) then 
                 ! Write restart file at start of hist period
                 call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
             end if 
@@ -1013,7 +1013,7 @@ program yelmox_ismip6
 
             ! Get current time 
             time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp 
+            time_bp      = time - 1995.0_wp 
             time_elapsed = time - ctl%time_init 
 
             ! == ABUMIP =========================================================
@@ -1145,7 +1145,7 @@ end if
                 call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
             end if 
 
-            if (time == 1950.0_wp) then 
+            if (time == 1995.0_wp) then 
                 ! Write restart file at start of hist period
                 call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
             end if 

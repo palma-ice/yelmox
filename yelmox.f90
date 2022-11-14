@@ -96,6 +96,7 @@ program yelmox
         logical  :: opt_tf 
         real(wp) :: tf_time
         real(wp) :: H_grnd_lim
+        real(wp) :: tf_sigma
         real(wp) :: tau_m 
         real(wp) :: m_temp
         real(wp) :: tf_min 
@@ -200,6 +201,7 @@ program yelmox
         call nml_read(path_par,"opt_L21","opt_tf",      opt%opt_tf)
         call nml_read(path_par,"opt_L21","tf_time",     opt%tf_time)
         call nml_read(path_par,"opt_L21","H_grnd_lim",  opt%H_grnd_lim)
+        call nml_read(path_par,"opt_L21","tf_sigma",    opt%tf_sigma)
         call nml_read(path_par,"opt_L21","tau_m",       opt%tau_m)
         call nml_read(path_par,"opt_L21","m_temp",      opt%m_temp)
         call nml_read(path_par,"opt_L21","tf_min",      opt%tf_min)
@@ -286,7 +288,7 @@ program yelmox
 
             ! Define base regions for whole domain first 
             regions_mask_fnm = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
-                                "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
+                                "/MASKS/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
             allocate(regions_mask(yelmo1%grd%nx,yelmo1%grd%ny))
             
             ! Load mask from file 
@@ -650,9 +652,8 @@ program yelmox
                     ! Perform tf_corr optimization
 
                     call update_tf_corr_l21(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHicedt, &
-                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                                            opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
-                
+                                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
+                                            opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
                 end if 
 
             case("relax")

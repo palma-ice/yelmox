@@ -1,10 +1,20 @@
 #!/bin/bash 
-#SBATCH -p long
-#SBATCH -J yelmo 
+# Submission script for Dragon2
+#SBATCH --job-name=yelmox_v1.8
+##SBATCH --partition=long  # batch or long
+##SBATCH --time=7-23:00:00 # hh:mm:ss
+#SBATCH --partition=batch  # batch or long
+#SBATCH --time=0-4:00:00 # hh:mm:ss
+#
 #SBATCH -o yelmo.out
 #SBATCH -e yelmo.err
-#SBATCH --mem=1800
-#SBATCH -t 7-02:30:15
+#
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=2000 # megabytes
+#
+##SBATCH --mail-user=javier.blasco.navarro@ulb.be
+##SBATCH --mail-type=ALL
 
 # Run the job
 #./yelmox.x yelmo_Antarctica_pico.nml
