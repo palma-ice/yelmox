@@ -473,10 +473,12 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     infldr = "./" # Path to original parameter files
 
     # Determine the base name of the parameter files (no folders)
-    #o1_in  = "par/yelmo_Antarctica_melt_ensemble.nml"
-    #o1_out = "yelmo_Antarctica_melt_ensemble.nml"
-    o1_in  = "par/yelmo_Antarctica_deglaciation.nml"
-    o1_out = "yelmo_Antarctica_deglaciation.nml"
+    #o1_in  = "par/yelmo_Antarctica_lgm.nml"
+    #o1_out = "yelmo_Antarctica_lgm.nml"
+    o1_in  = "par/yelmo_pyrenees_deglaciation.nml"
+    o1_out = "yelmo_pyrenees_deglaciation.nml"
+    #o1_in  = "par/yelmo_Antarctica_deglaciation.nml"
+    #o1_out = "yelmo_Antarctica_deglaciation.nml"
 
     # Generate a name for the output folder, if desired
     if auto:
