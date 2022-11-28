@@ -475,10 +475,14 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     # Determine the base name of the parameter files (no folders)
     #o1_in  = "par/yelmo_Antarctica_lgm.nml"
     #o1_out = "yelmo_Antarctica_lgm.nml"
-    o1_in  = "par/yelmo_pyrenees_deglaciation.nml"
-    o1_out = "yelmo_pyrenees_deglaciation.nml"
-    #o1_in  = "par/yelmo_Antarctica_deglaciation.nml"
-    #o1_out = "yelmo_Antarctica_deglaciation.nml"
+    #o1_in  = "par/yelmo_pyrenees_deglaciation.nml"
+    #o1_out = "yelmo_pyrenees_deglaciation.nml"
+    o1_in  = "par/yelmo_Antarctica_deglaciation.nml"
+    o1_out = "yelmo_Antarctica_deglaciation.nml"
+    #o1_in  = "par/yelmo_ismip6_Antarctica_spinup.nml"
+    #o1_out = "yelmo_ismip6_Antarctica_spinup.nml"
+    #o1_in  = "par/yelmo_ismip6_Antarctica.nml"
+    #o1_out = "yelmo_ismip6_Antarctica.nml"
 
     # Generate a name for the output folder, if desired
     if auto:
@@ -522,6 +526,9 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     # Get path of constants parameter file and copy it 
     const_path = "par/yelmo_const_Earth.nml"
     shutil.copy(const_path,outfldr)
+    # Get path of ismip6 parameter file and copy it
+    ismip6_path = "par/ismip6.nml"
+    shutil.copy(ismip6_path,outfldr)
 
     # Also copy exe file to rundir
     shutil.copy("libyelmox/bin/"+executable,outfldr)
@@ -609,6 +616,7 @@ def main():
 
     # Default values of options #
     executable = 'yelmox.x'        # Exectutable program (default: Ant-40)
+    # executable = 'yelmox_ismip6.x'
     submit     = False           # Submit the job to loadleveler (default: no)
     edit       = False           # Interactive editing of options
     outfldr    = 'output/test/'  # Default output folder is just the outbase
