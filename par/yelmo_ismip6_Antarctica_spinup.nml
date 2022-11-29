@@ -4,6 +4,11 @@
     time1           = 1850.0 
 /
 
+&ismip6
+    par_file        = "input/ismip6/ismip6_ant.nml"
+    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
+/
+
 &spinup
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 30e3              ! [yr] Ending time (model years)
@@ -13,20 +18,21 @@
     dt2D_out        = 1000.0            ! [yr] Frequency of writing 2D output files 
     time_const      = -18e3             ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
+   
 /
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 50e3              ! [yr] Ending time (model years)
+    time_end        = 30e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10e3             ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
-    equil_method    = "opt"             ! "none", "relax", "opt"
+    equil_method    = "opt"           ! "none", "relax", "opt"
     scenario        = "ctrl"            ! "ctrl" or "rcp85" 
-    gcm             = "CCSM4_RCP85"
+    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
 /
 
 &transient_lgm_to_proj
@@ -43,17 +49,17 @@
 /
 
 &transient_proj
-    time_init       = 1900.0            ! [yr] Starting time (years CE)
-    time_end        = 2500.0            ! [yr] Ending time (years CE)
+    time_init       = 1990.0            ! [yr] Starting time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
-    time_const      = 1950.0            ! [yr] Year that equilibration represents
+    dt2D_out        = 1.0               ! [yr] Frequency of writing 2D output files 
+    time_const      = 1995.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
-    gcm             = "CCSM4"           ! gcm model
+    scenario        = "RCP85"           ! if "ctrl" - ctrl experiment. Else, gcm projection (RCP85)
+    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
 /
 
 &abumip_proj
@@ -90,7 +96,8 @@
 &hysteresis
     scenario        = "ctrl"            ! Scenario to run
     dt2D_small_out  = 50                ! [yr] Frequency of writing small 2D output
-    f_to            = 0.25              ! Ratio of ocean warming to atm warming
+    f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
+    f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
 /
 
 &hyster
@@ -107,32 +114,34 @@
     f_max           =  5.0              ! [f] Forcing value maximum 
 /
 
-&opt_L21
-    cf_time         = 50e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 0.1               ! Initial value of cf_ref everywhere
-    cf_min          = 1e-3              ! [--] Minimum allowed cf value
-    cf_max          = 0.2               ! [--] Maximum allowed cf value
+&opt
+    cf_time         = 15e3              ! [yr] When should optimization of basal friction stop?
+    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
+    cf_min          = 0.001             ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
-    sigma_err       = 1.5               ! [--] Smoothing radius for error to calculate correction in cf_ref (in multiples of dx)
-    sigma_vel       = 100.0             ! [m/a] Speed at which smoothing diminishes to zero
-    fill_method     = "cf_min"          ! nearest, analog, cf_min
+    sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
+    sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
+    fill_method     = "cf_min"          ! nearest, analog, target, cf_min
     
-    rel_tau1        = 10.0              ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 4e3               ! [yr] Time limit for time period 1
-    rel_time2       = 8e3               ! [yr] Time limit for time period 2
+    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 2e3               ! [yr] Time limit for time period 1
+    rel_time2       = 6e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
-    opt_tf          = True             ! Should thermal forcing be optimized too?
-    tf_time         = 50e3              ! [yr] When should optimization of thermal forcing stop?
+    opt_tf          = True              ! Should thermal forcing be optimized too?
+    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -1.5              ! [degC] Minimum allowed tf_corr value 
+    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = 1, 12, 18 ! Basin numbers to optimize (-1 for all basins)
+    tf_basins       = 1, 12, 14, 15, 18     ! Basin numbers to optimize (-1 for all basins)
+
+    cf_ref_wais     = 0.01
 /
 
 &yelmo
@@ -140,9 +149,12 @@
     grid_name       = "ANT-16KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "None"
-    restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
-    restart_H_ice   = True              ! Take H_ice from restart file
+    !restart         = "/home/jablasco/yelmo-ucm/yelmox_ismip6/output/ismip6_spinup/opttf/bmbglmthd.nmp/yelmo_restart.nc"
+    !restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
+    !restart_H_ice   = True              ! Take H_ice from restart file
+    restart         = "none"
+    restart_z_bed   = False              ! Take z_bed (and z_bed_sd) from restart file
+    restart_H_ice   = False
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
@@ -167,7 +179,7 @@
     solver              = "impl-upwind"     ! "expl", "impl-upwind"
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
-    bmb_gl_method       = "nmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    bmb_gl_method       = "nmp"             ! "fcmp": flotation; "fmp": full melt; "nmp": partial melt; "nmp": no melt
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
@@ -225,19 +237,20 @@
 /
 
 &ytill
-    method          = -1                ! -1: set externally; 1: calculate cb_ref online  
+    method          =  1                ! -1: set externally; 1: calculate cb_ref online  
     scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
     is_angle        = False             ! cb_ref is a till strength angle?
-    z0              = -200.0            ! [m] Bedrock rel. to sea level, lower limit
-    z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
+    n_sd            = 10                ! Number of samples over z_bed_sd field
+    z0              = -250.0            ! [m] Bedrock rel. to sea level, lower limit
+    z1              =  250.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.001            ! [-- or deg] Minimum value of cf
-    cf_ref          =  0.1              ! [-- or deg] Reference/const/max value of cf
+    cf_ref          =  0.05             ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
-    method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    method          = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
-    p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
+    p               = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     set_water       = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
     delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
@@ -477,10 +490,10 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
-    corr_method     = "tf"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
+    corr_method     = "tf-ant"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
     basin_number    = 14, 15             ! 1 2 3
     basin_bmb_corr  = 0.0, 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = -0.5, -0.5         ! 1.0   2.0  3.0  
+    basin_tf_corr   = -0.5, -0.5         ! 1.0   2.0  3.0
     tf_correction   = True
     tf_path         = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
@@ -559,11 +572,16 @@
 /
 
 &isostasy 
-    method       = 2                    ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
-    fname_kelvin = "input/kelvin.res"   ! File containing precalculated zero-order Kelvin function values 
-    dt           = 50.0                 ! [yr] Time step to recalculate bedrock uplift rate 
-    tau          = 3000.0               ! [yr] Relaxation time 
-    D_lith       = 9.87e24              ! [N-m] Flexural rigidity 
-    R_lith       = 131910.0             ! [m] Radius of relative stiffness
+    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA
+    dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
+    dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
+    He_lith         = 100.0                 ! [km] Effective elastic thickness lithosphere
+    tau             = 3000.0                ! [yr] Relaxation time 
     
+/
+
+&isos_ant
+    tau             = 100.0 
+    tau_eais        = 5000.0 
+    sigma           = 200e3 
 /

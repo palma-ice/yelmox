@@ -400,14 +400,12 @@ program yelmox_ismip6
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
-
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
     call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
                                     z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
                                     H_ice_ref=yelmo1%bnd%H_ice_ref, &
                                     z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
-                                                    
 
     ! === Update external modules and pass variables to yelmo boundaries =======
 
@@ -578,12 +576,11 @@ program yelmox_ismip6
         call yelmo_cpu_time(cpu_start_time)
 
         ! Initialize variables inside of ismip6 object 
-<<<<<<< HEAD
+ !HEAD
         ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
-=======
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm=trim(ctl%gcm),scen=trim(ctl%scenario), &
->>>>>>> c5d210548255f83af59df35b5c709f511d71b629
+ !      call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario)
+ !END HEAD
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%gcm),scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -831,16 +828,13 @@ program yelmox_ismip6
         write(*,*) 
         
         ! Initialize variables inside of ismip6 object 
-<<<<<<< HEAD
-        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
-=======
-<<<<<<< HEAD
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
-=======
-        call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm=trim(ctl%gcm),scen=trim(ctl%scenario), &
->>>>>>> 6bf2ff744fee06e0338a366beb14e9fb2e6252cb
->>>>>>> c5d210548255f83af59df35b5c709f511d71b629
+!HEAD
+         ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+ !       call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
+!
+ !       call ismip6_forcing_init(ismp1,trim(outfldr)//"/ismip6.nml",gcm="noresm",scen=trim(ctl%scenario), &
+!END HEAD
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%gcm),scen=trim(ctl%scenario), &
                                                 domain=domain,grid_name=grid_name)
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
@@ -897,21 +891,18 @@ program yelmox_ismip6
         do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
 
             ! Get current time 
-<<<<<<< HEAD
+
             time         = ctl%time_init + n*ctl%dtt
             time_bp      = time - 1950.0_wp 
-            time_elapsed = time - ctl%time_init 
-=======
-            time    = ctl%time_init + n*ctl%dtt
-            time_bp = time - 1950.0_wp 
+            time_elapsed = time - ctl%time_init
             
             ! jablasco: mask_shlf_collapse; set H to 0; then compute with Yelmo
-            if(time .ge. 2015 .and. .True.) then
+            if(time .ge. 2015 .and. .False.) then
 
                 where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0               
 
             end if
->>>>>>> 6bf2ff744fee06e0338a366beb14e9fb2e6252cb
+
 
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
@@ -923,38 +914,50 @@ program yelmox_ismip6
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-<<<<<<< HEAD
-=======
+
 
             ! jablasco: delete icebergs -> inside yelmo_update
             !call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
             !where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
  
 if (.TRUE.) then 
->>>>>>> 6bf2ff744fee06e0338a366beb14e9fb2e6252cb
+
             
 
             ! Get hybrid snapclim + ISMIP6 climatic forcing 
             call calc_climate_hybrid(snp1,smbpal1,mshlf1,snp2,smbpal2,mshlf2, &
                                      ismp1,yelmo1,time,time_bp,ctl%time0,ctl%time1)
 
+else
+        ! ISMIP6 only - to make sure it's working well.
 
+            call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+                            time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+
+            ! Overwrite original mshlf and snp with ismip6 derived ones 
+            snp1    = snp2
+            smbpal1 = smbpal2
+            mshlf1  = mshlf2
+
+            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
+
+end if
             ! == MODEL OUTPUT ===================================
 
             if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
                                                   file2D,time,snp2,mshlf2,smbpal2,ismip6=.TRUE.)
             end if
-
-<<<<<<< HEAD
-            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
-                call yelmo_write_reg_step(yelmo1,file1D,time=time)
-                 
-=======
+           
+             
             if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
                 ! jablasco: added ismip6 bool
-                call yelmo_write_reg_step(yelmo1,file1D,time=time,ismip6=.TRUE.)
->>>>>>> 6bf2ff744fee06e0338a366beb14e9fb2e6252cb
+                 call yelmo_write_reg_step(yelmo1,file1D,time=time,ismip6=.TRUE.)
+                 !call yelmo_write_reg_step(yelmo1,file1D,time=time)
             end if 
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
@@ -995,9 +998,14 @@ if (.TRUE.) then
         write(*,*) 
  
         ! Initialize variables inside of ismip6 object 
-        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
-                                                domain=domain,grid_name=grid_name)
+         ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+        !call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario)
+         !                                       domain=domain,grid_name=grid_name)
+
+         ! Initialize variables inside of ismip6 object 
+        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm="noresm",scen=trim(ctl%scenario), &
+                                                domain="Antarctica",grid_name=grid_name)
+
 
         ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
         
@@ -1559,7 +1567,7 @@ contains
 
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-<<<<<<< HEAD
+!HEAD
         
         ! Write constant fields
         if (n .eq. 1) then 
@@ -1568,25 +1576,25 @@ contains
         end if 
 
         ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_grz",ylmo%tpo%now%mask_grz,units="",long_name="Grounding-zone mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+       ! call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
+        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+         !             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
+         !             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"mask_grz",ylmo%tpo%now%mask_grz,units="",long_name="Grounding-zone mask", &
+         !             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &
+         !             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km",long_name="Distance to grounding line", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-=======
->>>>>>> c5d210548255f83af59df35b5c709f511d71b629
+        !call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km",long_name="Distance to grounding line", &
+         !             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+!END HEAD
 
         ! jablasco: draw ismip6 variables 
-        if(present(ismip6) .and. ismip6 .eqv. .TRUE.) then
+        ! antoniojm
+        if(present(ismip6) .and. ismip6 .eqv. .FALSE.) then
 
             ! == yelmo_topography ==
             call nc_write(filename,"lithk",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
@@ -1700,7 +1708,7 @@ contains
             call nc_write(filename,"mask_grz",ylmo%tpo%now%mask_grz,units="",long_name="Grounding-zone mask", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-<<<<<<< HEAD
+!HEAD
         call nc_write(filename,"taul_int_acx",ylmo%dyn%now%taul_int_acx,units="Pa m",long_name="Vertically integrated lateral stress (x)", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"taul_int_acy",ylmo%dyn%now%taul_int_acy,units="Pa m",long_name="Vertically integrated lateral stress (y)", &
@@ -1725,10 +1733,9 @@ contains
         !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-=======
             call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km",long_name="Distance to grounding line", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
->>>>>>> c5d210548255f83af59df35b5c709f511d71b629
+!END HEAD
 
             call nc_write(filename,"dHicedt",ylmo%tpo%now%dHicedt,units="m/yr",long_name="Ice thickness rate of change", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1847,7 +1854,7 @@ contains
             call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-<<<<<<< HEAD
+!HEAD
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1860,14 +1867,13 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-=======
             call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
->>>>>>> c5d210548255f83af59df35b5c709f511d71b629
+!END HEAD
 
 
             call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &

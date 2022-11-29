@@ -13,6 +13,7 @@ module snapclim
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
+    integer,  parameter :: prec = sp
     integer,  parameter :: wp   = sp 
 
     real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
@@ -524,8 +525,8 @@ contains
                 call calc_precip_1ind(snp%now%prcor,clim0_prcor_corr,snp%clim1%prcor,snp%clim2%prcor,ap)
                 
 !END HEAD
-                call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-                call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
+  !             call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
+  !             call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
             
             ! jablasco: miocene
             case("snap_1ind_miocene")

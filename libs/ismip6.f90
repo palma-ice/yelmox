@@ -436,9 +436,9 @@ contains
 
         else if (time .ge. 2015 .and. time .le. 2300) then
 
-            call varslice_update(ism%ts_proj, [time],method=slice_method)
-            call varslice_update(ism%pr_proj, [time],method=slice_method)
-            call varslice_update(ism%smb_proj,[time],method=slice_method) 
+            call varslice_update(ism%ts_proj, [2015.0],method=slice_method)
+            call varslice_update(ism%pr_proj, [2015.0],method=slice_method)
+            call varslice_update(ism%smb_proj,[2015.0],method=slice_method) 
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -495,9 +495,9 @@ contains
         else if (time .ge. 2015 .and. time .le. 2300) then
             ! Projection period 1 
 
-            call varslice_update(ism%to_proj,[time],method=slice_method)
-            call varslice_update(ism%so_proj,[time],method=slice_method)
-            call varslice_update(ism%tf_proj,[time],method=slice_method)
+            call varslice_update(ism%to_proj,[2015.0],method=slice_method)
+            call varslice_update(ism%so_proj,[2015.0],method=slice_method)
+            call varslice_update(ism%tf_proj,[2015.0],method=slice_method)
 
             ism%to = ism%to_proj
             ism%so = ism%so_proj
