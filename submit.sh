@@ -1,20 +1,26 @@
 #!/bin/bash 
-# Submission script for Dragon2
-#SBATCH --job-name=deglaciation
-##SBATCH --partition=long  # batch or long
-##SBATCH --time=15-23:00:00 # hh:mm:ss
-#SBATCH --partition=batch  # batch or long
-#SBATCH --time=4-23:00:00 # hh:mm:ss
-#
+# Submission script for Brigit
+
+## No limit
+##SBATCH -p long_nolimits
+##SBATCH -q qnolimits
+##SBATCH -J pyrenees
+##SBATCH -n 12
+##SBATCH -o yelmo.out
+##SBATCH -e yelmo.err
+##SBATCH --mem=2Gb
+##SBATCH -t 14-23:30:15
+
+## Max 30
+#SBATCH -p long
+#SBATCH -J deglaciation
 #SBATCH -o yelmo.out
 #SBATCH -e yelmo.err
-#
-##SBATCH --mail-user=javier.blasco.navarro@ulb.be
-##SBATCH --mail-type=ALL
-#SBATCH --mem=18000
+#SBATCH --mem=2Gb
+#SBATCH -t 6-23:59:59
 
 # Run the job
-#./yelmox.x yelmo_pyrenees_deglaciation.nml 
+#./yelmox.x yelmo_pyrenees_1cycle.nml 
 #./yelmox.x yelmo_Antarctica_lgm.nml
 ./yelmox.x yelmo_Antarctica_deglaciation.nml
 #./yelmox_ismip6.x yelmo_ismip6_Antarctica_spinup.nml
