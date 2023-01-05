@@ -410,7 +410,7 @@ program yelmox
 
         call isos_set_field(isos1%now%tau, &
                 [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
-                [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
+                [        0.0_wp,        4.0_wp,        5.0_wp,        3.0_wp], &
                                       regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
 
     end if

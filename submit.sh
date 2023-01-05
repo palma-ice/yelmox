@@ -17,7 +17,7 @@
 #SBATCH -o yelmo.out
 #SBATCH -e yelmo.err
 #SBATCH --mem=2Gb
-#SBATCH -t 6-23:59:59
+#SBATCH -t 8-23:59:59
 
 # Run the job
 #./yelmox.x yelmo_pyrenees_1cycle.nml 

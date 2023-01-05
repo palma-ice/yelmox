@@ -436,7 +436,7 @@
 
 &tf_corr_ant
     ronne   = 0.5                   ! [K] tf_corr for ronne basin (basin=1)
-    ross    = 0.25                   ! [K] tf_corr for ronne ross  (basin=12)
+    ross    = 0.5                   ! [K] tf_corr for ronne ross  (basin=12)
     pine    = -1.0                   ! [K] tf_corr for ronne pine  (basin=14)
     abbott  = 0.0                   ! [K] tf_corr for Abbott glacier (basin=15)
 /
@@ -475,10 +475,4 @@
     dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
     He_lith         = 100.0                 ! [km] Effective elastic thickness lithosphere
     tau             = 3000.0                ! [yr] Relaxation time
-/
-
-&isos_ant
-    tau             = 100.0
-    tau_eais        = 5000.0
-    sigma           = 200e3
 /
