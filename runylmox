@@ -324,16 +324,18 @@ def main():
     # 2. Run the job
     ##########################################
 
-    # Generate the appropriate executable command to run job
-    if copy_exec:
+    # Determine where job will be running from
+    if copy_exec: 
         # Assume executable is running from rundir
-        executable = "{}./{} {}".format(profiler_prefix,exe_fname,exe_args)
+        exe_rundir = "."
 
     else:
         # Assume executable will run from current working directory 
-        cwd = os.getcwd()
-        executable = "{}{}/{} {}".format(profiler_prefix,cwd,exe_path,exe_args)
+        exe_rundir = os.getcwd()
 
+    # Generate the appropriate executable command to run program
+    executable = "{}{}/{} {}".format(profiler_prefix,exe_rundir,exe_fname,exe_args)
+    
     # Run the job if desired 
     if run:
 
@@ -356,12 +358,11 @@ def runjob(rundir,cmd,omp):
     '''Run a job generated with makejob.'''
 
     if omp > 0:
-        env_cmd = "&& export OMP_NUM_THREADS={}".format(omp) # && export OMP_THREAD_LIMIT=2"
+        # && export OMP_THREAD_LIMIT=2"
+        cmd_job = "cd {} && export OMP_NUM_THREADS={} && mpiexec -n {} {} > {} &".format(rundir,omp,omp,cmd,"out.out")
     else:
-        env_cmd = ""
-    
-    cmd_job = "cd {} {} && exec {} > {} &".format(rundir,env_cmd,cmd,"out.out")
-    #cmd_job = "cd {} {} && mpiexec -n 2 {} > {} &".format(rundir,env_cmd,executable,"out.out")
+        cmd_job = "cd {} && exec {} > {} &".format(rundir,cmd,"out.out")
+        #cmd_job = "cd {} && exec mpiexec -n 1 {} > {} &".format(rundir,cmd,"out.out")
     
     print("Running job in background: {}".format(cmd_job))
 
