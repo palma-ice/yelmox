@@ -267,6 +267,16 @@ program yelmox
 
         case("Laurentide")
 
+            ! Make sure to set ice_allowed to prevent ice from growing in 
+            ! Greenland (and on grid borders)
+
+            where(abs(yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
+            
+            yelmo1%bnd%ice_allowed(1,:)             = .FALSE. 
+            yelmo1%bnd%ice_allowed(yelmo1%grd%nx,:) = .FALSE. 
+            yelmo1%bnd%ice_allowed(:,1)             = .FALSE. 
+            yelmo1%bnd%ice_allowed(:,yelmo1%grd%ny) = .FALSE. 
+            
             ! Hudson region (region=1.12 in regions map)
             reg1%write = .TRUE. 
             reg1%name  = "Hudson" 
@@ -443,10 +453,9 @@ program yelmox
             call nc_read(path_lgm,"dz",yelmo1%bnd%H_ice_ref,start=[1,1,1], &
                                 count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
 
-
-            if (laurentide_init_const_H) then
             ! Start with some ice cover to speed up initialization
-
+            if (laurentide_init_const_H) then
+            
                 yelmo1%tpo%now%H_ice = 0.0
                 where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
                 where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
@@ -465,6 +474,11 @@ program yelmox
             
             end if 
             
+            ! Load sediment mask 
+            path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
+                        "/"//trim(yelmo1%par%grid_name)//"_SED-L97.nc"
+            call nc_read(path_lgm,"z_sed",yelmo1%bnd%H_sed) 
+
             ! Run Yelmo for briefly to update surface topography
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
 
@@ -926,9 +940,13 @@ contains
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
-                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-        
+        if (n .le. 1) then 
+            call nc_write(filename,"H_sed",ylmo%bnd%Q_geo,units="m",long_name="Sediment thickness", &
+                        dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+            call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
+                        dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+        end if 
+
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Margin-front mass balance", &
