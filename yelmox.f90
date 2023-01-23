@@ -452,8 +452,13 @@ program yelmox
                 where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
 
             else
-                ! Set LGM reconstsruction as initial ice thickness 
-                yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
+                ! Set LGM reconstruction as initial ice thickness over North America
+                where ( yelmo1%bnd%z_bed .gt. -500.0 .and. &
+                        (   yelmo1%bnd%regions .eq. 1.1  .or. &
+                            yelmo1%bnd%regions .eq. 1.11 .or. &
+                            yelmo1%bnd%regions .eq. 1.12) )
+                    yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
+                end where 
 
                 ! Apply Gaussian smoothing to keep things stable
                 call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,f_sigma=2.0)
@@ -461,6 +466,10 @@ program yelmox
             end if 
             
             ! Run Yelmo for briefly to update surface topography
+            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+
+            ! Addtional cleanup - remove floating ice 
+            where( yelmo1%tpo%now%mask_bed .eq. 5) yelmo1%tpo%now%H_ice = 0.0 
             call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
 
             ! Update snapclim to reflect new topography 
@@ -682,10 +691,6 @@ program yelmox
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
         
         ! == MODEL OUTPUT =======================================================
-      
-        if (time .gt. -14950.0) then
-            ctl%dt2D_out = 650.0
-        end if
 
         if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
