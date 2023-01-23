@@ -519,7 +519,7 @@ program yelmox
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     
-!    call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years") 
+    call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years") 
     
     if (reg1%write) then 
         call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
