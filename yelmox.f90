@@ -696,9 +696,9 @@ program yelmox
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if
 
-        !if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
-        !        call yelmo_write_step(yelmo1,file2D_small,time)
-        !    end if
+        if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
+               call yelmo_write_step(yelmo1,file2D_small,time,compare_pd=.FALSE.)
+           end if
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
