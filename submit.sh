@@ -16,7 +16,7 @@
 # Run the job
 #./yelmox_ismip6.x yelmo_ismip6_Antarctica_spinup.nml
 ./yelmox_ismip6.x yelmo_ismip6_Antarctica.nml
-#./yelmox_ismip6.x yelmo_ismip6_Antarctica_restart.nml
+
 
 
 # Run ensemble

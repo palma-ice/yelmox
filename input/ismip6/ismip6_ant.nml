@@ -85,7 +85,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2299, 1
 /
 
 &gcm_pr_proj
@@ -96,7 +96,7 @@
     unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2299, 1
 /
 
 &gcm_smb_proj
@@ -107,7 +107,7 @@
     unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2299, 1
 /
 
 ! ====== OCEAN ================
@@ -208,7 +208,7 @@
     unit_scale  = 1.0
     unit_offset = 273.15 
     with_time   = True 
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2299, 1
 /
 
 &gcm_so_proj
@@ -219,7 +219,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2299, 1
 /
 &gcm_tf_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}/1995-2300/{gcm}.nc"
@@ -229,7 +229,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2299, 1
 /
 
 ================== Ice shelf collapse mask =================

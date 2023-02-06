@@ -411,13 +411,23 @@ contains
 
 
             ! jablasco
-            call varslice_update(ism%ts_hist, [time],method=slice_method)
-            call varslice_update(ism%pr_hist, [time],method=slice_method)
-            call varslice_update(ism%smb_hist,[time],method=slice_method)
+         !!   call varslice_update(ism%ts_hist, [time],method=slice_method)
+         !!   call varslice_update(ism%pr_hist, [time],method=slice_method)
+         !!   call varslice_update(ism%smb_hist,[time],method=slice_method)
 
-            ism%ts  = ism%ts_hist
-            ism%pr  = ism%pr_hist
-            ism%smb = ism%smb_hist
+         !!   ism%ts  = ism%ts_hist
+         !!   ism%pr  = ism%pr_hist
+         !!   ism%smb = ism%smb_hist
+
+         !!ajr:
+            ism%ts  = ism%ts_ref
+            ism%pr  = ism%pr_ref
+            ism%smb = ism%smb_ref
+
+            ! Since atm fields are anomalies, also set actual variable to zero
+            ism%ts%var  = 0.0_wp
+            ism%pr%var  = 0.0_wp
+            ism%smb%var = 0.0_wp
 
         ! 2015 pa 2300
 
@@ -436,9 +446,9 @@ contains
 
         else if (time .ge. 2015 .and. time .le. 2300) then
 
-            call varslice_update(ism%ts_proj, [2015.0],method=slice_method)
-            call varslice_update(ism%pr_proj, [2015.0],method=slice_method)
-            call varslice_update(ism%smb_proj,[2015.0],method=slice_method) 
+            call varslice_update(ism%ts_proj, [time],method=slice_method)
+            call varslice_update(ism%pr_proj, [time],method=slice_method)
+            call varslice_update(ism%smb_proj,[time],method=slice_method) 
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -472,21 +482,28 @@ contains
      !END HEAD
         ! 2501
         if (time .lt. 1995) then 
-            ! Prehistoric 
+            ! Historic 
 
             ! jablasco
             ! Oceanic fields 
-            call varslice_update(ism%to_hist,[time],method=slice_method)
-            call varslice_update(ism%so_hist,[time],method=slice_method)
-            call varslice_update(ism%tf_hist,[time],method=slice_method)
+            !!call varslice_update(ism%to_hist,[time],method=slice_method)
+            !!call varslice_update(ism%so_hist,[time],method=slice_method)
+            !!call varslice_update(ism%tf_hist,[time],method=slice_method)
 
-            ism%to = ism%to_hist
-            ism%so = ism%so_hist
-            ism%tf = ism%tf_hist
+            !!ism%to = ism%to_hist
+            !!ism%so = ism%so_hist
+            !!ism%tf = ism%tf_hist
+            
+            !!ajr:
+            ism%to = ism%to_ref
+            ism%so = ism%so_ref
+            ism%tf = ism%tf_ref
 
         ! jablasco: only atm; 2015 -> 2301
-        else if (time .ge. 1995 .and. time .lt. 2301) then
-            ! Projection period 1 
+        !!else if (time .ge. 1995 .and. time .lt. 2301) then
+        !!ajr:
+        else if (time .ge. 1995 .and. time .lt. 2015) then
+            ! Historic 
 
             ism%to = ism%to_ref
             ism%so = ism%so_ref
@@ -495,9 +512,9 @@ contains
         else if (time .ge. 2015 .and. time .le. 2300) then
             ! Projection period 1 
 
-            call varslice_update(ism%to_proj,[2015.0],method=slice_method)
-            call varslice_update(ism%so_proj,[2015.0],method=slice_method)
-            call varslice_update(ism%tf_proj,[2015.0],method=slice_method)
+            call varslice_update(ism%to_proj,[time],method=slice_method)
+            call varslice_update(ism%so_proj,[time],method=slice_method)
+            call varslice_update(ism%tf_proj,[time],method=slice_method)
 
             ism%to = ism%to_proj
             ism%so = ism%so_proj
@@ -519,7 +536,10 @@ contains
         ! === Mask shelf collapse ==========================
 
         if (time .lt. 2015) then
-
+            
+            ! Note: the year 2000 is used for this mask, however, any value from 2000 to 2015 
+            ! could be used as nothing really changes with the mask in the historical period.
+            ! Retreat only begins to be seen some decades later.
             call varslice_update(ism%mask_shlf_proj,[2000.0_wp],method=slice_method)
             ism%mask_shlf = ism%mask_shlf_proj
 
@@ -612,6 +632,8 @@ contains
             end if
         end do
 
+!!ajr: we want to move all corrections to marine_shelf, so eventually remove this section:
+if (.FALSE.) then
         ! Apply oceanic correction factor to each depth level
         do k = 1, size(ism%to%var,3)
             where(ism%to%var(:,:,k,1) .ne. mv .and. ism%tf_cor%var(:,:,1,1) .ne. mv)   
@@ -621,7 +643,8 @@ contains
                 ism%tf%var(:,:,k,1) = ism%tf%var(:,:,k,1) + ism%tf_cor%var(:,:,1,1) 
             end where
         end do 
-        
+end if
+
         return 
 
     end subroutine ismip6_ant_forcing_update

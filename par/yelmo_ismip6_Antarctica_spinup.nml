@@ -6,7 +6,7 @@
 
 &ismip6
     par_file        = "input/ismip6/ismip6_ant.nml"
-    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
+    gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
 /
 
 &spinup
@@ -23,7 +23,7 @@
 
 &spinup_ismip6
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 30e3              ! [yr] Ending time (model years)
+    time_end        = 30e3             ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
@@ -32,7 +32,7 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"           ! "none", "relax", "opt"
     scenario        = "ctrl"            ! "ctrl" or "rcp85" 
-    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
+    gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
 /
 
 &transient_lgm_to_proj
@@ -59,7 +59,7 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     scenario        = "RCP85"           ! if "ctrl" - ctrl experiment. Else, gcm projection (RCP85)
-    gcm             = "UKESM1-0-LL_ssp585" ! ISMIP6 GCM model
+    gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
 /
 
 &abumip_proj
@@ -146,15 +146,12 @@
 
 &yelmo
     domain          = "Antarctica"
-    grid_name       = "ANT-16KM"
+    grid_name       = "ANT-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    !restart         = "/home/jablasco/yelmo-ucm/yelmox_ismip6/output/ismip6_spinup/opttf/bmbglmthd.nmp/yelmo_restart.nc"
-    !restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
-    !restart_H_ice   = True              ! Take H_ice from restart file
-    restart         = "none"
-    restart_z_bed   = False              ! Take z_bed (and z_bed_sd) from restart file
-    restart_H_ice   = False
+    restart         = "None"
+    restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
+    restart_H_ice   = True
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"

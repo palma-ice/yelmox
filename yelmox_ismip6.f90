@@ -1,5 +1,4 @@
 
-
 program yelmox_ismip6
 
     use ncio 
@@ -676,6 +675,9 @@ program yelmox_ismip6
             time_bp      = time - 1950.0_wp 
             time_elapsed = time - ctl%time_init 
 
+            !!ajr: only update optimized fields if ice sheet is running
+            if (ctl%with_ice_sheet) then
+             
             select case(trim(ctl%equil_method))
             
                 case("opt")
@@ -752,7 +754,9 @@ program yelmox_ismip6
                     ! Pass - do nothing 
 
             end select 
-         
+            
+            end if 
+
             ! ====================================================
 
 
@@ -857,10 +861,26 @@ program yelmox_ismip6
             
         end if 
         
+        !antoniojm
+         print *, "antoniojm-1"
+         print *, time
+         print *, smbpal2%ann%tsrf(200,200)
+         print *, mshlf2%now%bmb_shlf(200,200)
+         print *, yelmo1%bnd%T_srf(200,200)
+         print *, yelmo1%bnd%bmb_shlf(200,200)
+
+
         ! Update forcing to present-day reference 
-        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-        
+       !antoniojm
+         print *, "antoniojm-2"
+         print *, time
+         print *, smbpal2%ann%tsrf(200,200)
+         print *, mshlf2%now%bmb_shlf(200,200)
+         print *, yelmo1%bnd%T_srf(200,200)
+         print *, yelmo1%bnd%bmb_shlf(200,200)
+
         ! Overwrite original mshlf and snp with ismip6 derived ones 
         snp1    = snp2
         smbpal1 = smbpal2  
@@ -868,10 +888,18 @@ program yelmox_ismip6
 
         yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+       
+         !antoniojm
+        print *, "antoniojm-3"
+        print *, time
+        print *, smbpal2%ann%tsrf(200,200)
+        print *, mshlf2%now%bmb_shlf(200,200)
+        print *, yelmo1%bnd%T_srf(200,200)
+        print *, yelmo1%bnd%bmb_shlf(200,200)
 
+ 
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt_step = 1.0_wp 
         isos1%par%dt_lith = 10.0_wp 
@@ -919,6 +947,7 @@ program yelmox_ismip6
             ! jablasco: delete icebergs -> inside yelmo_update
             !call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
             !where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
+
  
 if (.TRUE.) then 
 
@@ -927,6 +956,17 @@ if (.TRUE.) then
             ! Get hybrid snapclim + ISMIP6 climatic forcing 
             call calc_climate_hybrid(snp1,smbpal1,mshlf1,snp2,smbpal2,mshlf2, &
                                      ismp1,yelmo1,time,time_bp,ctl%time0,ctl%time1)
+            print *, "antoniojm-5"
+            print *, time
+            print *, smbpal2%ann%tsrf(200,200)
+            print *, mshlf2%now%bmb_shlf(200,200)
+            print *, yelmo1%bnd%T_srf(200,200)
+            print *, yelmo1%bnd%bmb_shlf(200,200)
+
+           !antoniojm-stop
+            !if (time .eq. 1991.0) then
+            !  stop
+            !end if
 
 else
         ! ISMIP6 only - to make sure it's working well.
@@ -941,9 +981,10 @@ else
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
-
+           
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
+          
 
 end if
             ! == MODEL OUTPUT ===================================
@@ -2350,7 +2391,14 @@ if (.TRUE.) then
             ylmo%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             ylmo%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-        
+            print *, "antoniojm-6"
+            print *, time
+            print *, smbpal2%ann%tsrf(200,200)
+            print *, mshlf2%now%bmb_shlf(200,200)
+            print *, yelmo1%bnd%T_srf(200,200)
+            print *, yelmo1%bnd%bmb_shlf(200,200)
+
+ 
         end if
 
 else 
@@ -2368,6 +2416,15 @@ else
 
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+        print *, "antoniojm-7"
+        print *, time 
+        print *, smbpal2%ann%tsrf(200,200)
+        print *, mshlf2%now%bmb_shlf(200,200)
+        print *, yelmo1%bnd%T_srf(200,200)
+        print *, yelmo1%bnd%bmb_shlf(200,200)
+        stop 
+
+
 
         return
 
