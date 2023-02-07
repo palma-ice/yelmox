@@ -861,25 +861,12 @@ program yelmox_ismip6
             
         end if 
         
-        !antoniojm
-         print *, "antoniojm-1"
-         print *, time
-         print *, smbpal2%ann%tsrf(200,200)
-         print *, mshlf2%now%bmb_shlf(200,200)
-         print *, yelmo1%bnd%T_srf(200,200)
-         print *, yelmo1%bnd%bmb_shlf(200,200)
 
 
         ! Update forcing to present-day reference 
          call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
                                  time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-       !antoniojm
-         print *, "antoniojm-2"
-         print *, time
-         print *, smbpal2%ann%tsrf(200,200)
-         print *, mshlf2%now%bmb_shlf(200,200)
-         print *, yelmo1%bnd%T_srf(200,200)
-         print *, yelmo1%bnd%bmb_shlf(200,200)
+      
 
         ! Overwrite original mshlf and snp with ismip6 derived ones 
         snp1    = snp2
@@ -891,13 +878,6 @@ program yelmox_ismip6
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
        
-         !antoniojm
-        print *, "antoniojm-3"
-        print *, time
-        print *, smbpal2%ann%tsrf(200,200)
-        print *, mshlf2%now%bmb_shlf(200,200)
-        print *, yelmo1%bnd%T_srf(200,200)
-        print *, yelmo1%bnd%bmb_shlf(200,200)
 
  
         ! Additionally make sure isostasy is update every timestep 
@@ -956,17 +936,7 @@ if (.TRUE.) then
             ! Get hybrid snapclim + ISMIP6 climatic forcing 
             call calc_climate_hybrid(snp1,smbpal1,mshlf1,snp2,smbpal2,mshlf2, &
                                      ismp1,yelmo1,time,time_bp,ctl%time0,ctl%time1)
-            print *, "antoniojm-5"
-            print *, time
-            print *, smbpal2%ann%tsrf(200,200)
-            print *, mshlf2%now%bmb_shlf(200,200)
-            print *, yelmo1%bnd%T_srf(200,200)
-            print *, yelmo1%bnd%bmb_shlf(200,200)
-
-           !antoniojm-stop
-            !if (time .eq. 1991.0) then
-            !  stop
-            !end if
+            
 
 else
         ! ISMIP6 only - to make sure it's working well.
@@ -2391,12 +2361,7 @@ if (.TRUE.) then
             ylmo%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             ylmo%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-            print *, "antoniojm-6"
-            print *, time
-            print *, smbpal2%ann%tsrf(200,200)
-            print *, mshlf2%now%bmb_shlf(200,200)
-            print *, yelmo1%bnd%T_srf(200,200)
-            print *, yelmo1%bnd%bmb_shlf(200,200)
+    
 
  
         end if
@@ -2415,14 +2380,7 @@ else
         yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-        print *, "antoniojm-7"
-        print *, time 
-        print *, smbpal2%ann%tsrf(200,200)
-        print *, mshlf2%now%bmb_shlf(200,200)
-        print *, yelmo1%bnd%T_srf(200,200)
-        print *, yelmo1%bnd%bmb_shlf(200,200)
-        stop 
+        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf   
 
 
 
