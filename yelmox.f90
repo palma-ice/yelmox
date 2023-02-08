@@ -398,6 +398,10 @@ program yelmox
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
+    if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+        ! Modify glacial smb
+        call scale_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
+    end if
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
@@ -682,6 +686,11 @@ program yelmox
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
+        if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+            ! Modify glacial smb
+            call scale_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
+        end if
+    
         ! yelmo1%bnd%smb   = yelmo1%dta%pd%smb
         ! yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
         
@@ -1085,6 +1094,59 @@ contains
     end subroutine write_step_2D_combined
 
 
+
+    subroutine scale_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
+
+        implicit none
+
+        real(wp), intent(INOUT) :: smb(:,:)
+        real(wp), intent(IN)    :: lat2D(:,:)
+        real(wp), intent(IN)    :: ta_ann(:,:)
+        real(wp), intent(IN)    :: ta_ann_pd(:,:)
+
+        ! Local variables 
+        integer  :: i, j, nx, ny 
+        real(wp) :: t0, tnow
+        real(wp) :: at
+        real(wp) :: fac
+
+        real(wp), parameter :: dt_lgm  = -8.0 
+        real(wp), parameter :: lat_lim = 55.0 
+        real(wp), parameter :: fac_lim = 0.90
+
+        nx = size(smb,1)
+        ny = size(smb,2) 
+
+        ! Determine a quasi glacial-interglacial index
+        ! 0: interglacial
+        ! 1: glacial 
+        tnow = sum(ta_ann) / real(nx*ny,wp)
+        t0   = sum(ta_ann_pd) / real(nx*ny,wp)
+
+        at = (tnow-t0)/dt_lgm
+        if (at .lt. 0.0) at = 0.0
+        if (at .gt. 1.0) at = 1.0
+        
+        ! Now determine smb scaling as a function of glacial index and latitude
+        ! fac==0: no change to smb
+        ! 0<fac<=1: scale smb up to value of fac_lim
+
+        do j = 1, ny 
+        do i = 1, nx
+
+            if (smb(i,j) .lt. 0.0 .and. lat2D(i,j) .gt. lat_lim) then
+                ! Calculate scaling here
+
+                smb(i,j) = smb(i,j) -  smb(i,j) * at * fac_lim
+
+            end if
+
+        end do
+        end do
+
+        return
+
+    end subroutine scale_glacial_smb
 
 end program yelmox
 

@@ -1,13 +1,13 @@
 &ctrl
-    time_init       = -20000 !-68050 !-114950               ! [yr] Starting time
-    time_end        = 1950.0              ! [yr] Ending time
+    time_init       = -70000.0               ! [yr] Starting time
+    time_end        = 0.0               ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
-    time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
+    time_const      = 0.0          ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
     time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
     dtt             = 10.0              ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 5000               ! [yr] Frequency of writing 2D output files
+    dt1D_out        = 100.0  !500.0    ! [yr] Frequency of writing 1D output files 
+    dt2D_out        = 5000.0            ! [yr] Frequency of writing 2D output files
     dt2D_small_out  = 100               ! [yr] Frequency of writing 2D output files
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = True             ! Calculate transient climate? 
@@ -15,6 +15,8 @@
     use_pd_step     = False             ! Activate PD step-return in forcing at time=time_pd_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
+    cf_negis_0      = 1.0 !0.496
+    cf_negis_1      = 1.0 !0.194
 /
 
 &opt_L21
@@ -51,7 +53,7 @@
     grid_name       = "GRL-8KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    restart         = "None"
+    restart         = "None"            !"input/yelmo_restart.nc"
     restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True              ! Take H_ice from restart file
     log_timestep    = False 
@@ -113,7 +115,7 @@
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 3               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
     beta_const          = 1e3             ! [Pa a m−1] Constant value of basal friction coefficient to be used
-    beta_q              = 0.969             ! Dragging law exponent 
+    beta_q              = 0.567             ! Dragging law exponent 
     beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
     beta_gl_scale       = 0               !  0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling 
     beta_gl_stag        = 1               !  0: simple staggering, 1: Upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling 
@@ -140,14 +142,14 @@
     scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
     is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
-    f_sed           = 1.0               ! Scaling reduction for thick sediments 
+    f_sed           = 1.0               ! Scaling reduction for thick sediments
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction
-    z0              = -183.6            ! [m] Bedrock rel. to sea level, lower limit
+    z0              = -400.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =  400.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.01             ! [-- or deg] Minimum value of cf
     cf_ref          =  1.0              ! [-- or deg] Reference/const/max value of cf
-    cf_negis        =  0.307              ! Scaling of cf at the  NEGIS
+    cf_negis        =  1.0              ! Scaling of cf at the  NEGIS
     cf_se           =  1.0              ! Scaling of cf at the SE 
 /
 
@@ -157,7 +159,7 @@
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     set_water       = False             ! *neff_method=3* Prescribe H_w = H_w_max for temperate ice instead of using H_w field?
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    delta           = 0.034              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    delta           = 0.026              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
     Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
 /
@@ -172,7 +174,7 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 1.264
+    enh_shear               = 2.016
     enh_stream              = 1.0
     enh_shlf                = 0.7
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
@@ -212,7 +214,7 @@
 
 &yelmo_masks
     basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa-negis.nc" 
+    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa-negis-two.nc" 
     basins_nms      = "basin_sub" "basin_mask"
     regions_load    = True 
     regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
@@ -285,10 +287,10 @@
     dSo_const          = 3.0
     f_to               = 1.0   ! scaling factor for Tocn (recon and fraction method) 
     f_p                = 0.08
-    f_p_ne             = 0.04
+    f_p_ne             = 0.08
     f_stdev            = 0.0 
-    f_to_warm          = 1.5  ! scaling factor for Ne (early Hol)
-    f_to_cold          = 0.5  ! cooling factor for NE (late Hol)
+    f_to_warm          = 2.0  ! scaling factor for Ne (early Hol)
+    f_to_cold          = -1.0  ! cooling factor for NE (late Hol)
 /
 
 &snap_hybrid
@@ -388,9 +390,9 @@
     trans_a         =  0.46 
     trans_b         =  6e-5
     trans_c         =  0.01
-    itm_c           = -26.01
+    itm_c           = -25.242
     itm_t           =  10.0
-    itm_b           =  -2.968 
+    itm_b           =  -2.651 
     itm_lat0        =  65.0 
 
     ! ## Surface albedo
@@ -442,7 +444,7 @@
     gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
 
     ! bmb_method == anom
-    kappa_grz       = 3.367          ! [m/yr K-1] Heat flux coefficient [kappa*dT]
+    kappa_grz       = 6.535          ! [m/yr K-1] Heat flux coefficient [kappa*dT]
     c_grz           = 1.0           ! [-] bmb_ref scalar [c_grz*bmb_ref]
     f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
     grz_length      = 8.0          ! [km] Length scale of assumed grounding zone
@@ -461,8 +463,9 @@
 &tf_corr_grl
     ne      = 0.0                   ! [K] tf_corr for northeast/negis basin (basin=2)
     e       = 0.0                   ! [K] tf_corr for eastern basin (basin=3)
-    se      = 1.0                   ! [K] tf_corr for southeast basin (basin=4)
+    se      = 0.0 !3.0                   ! [K] tf_corr for southeast basin (basin=4)
     w       = 0.0                   ! [K] tf_corr for western basin (basins=[6,7,8])
+    nw      = 0.0 !2.0
 /
 
 
@@ -482,11 +485,9 @@
 /
 
 &isostasy 
-    method       = 2                    ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
-    fname_kelvin = "input/kelvin.res"   ! File containing precalculated zero-order Kelvin function values 
-    dt           = 50.0                 ! [yr] Time step to recalculate bedrock uplift rate 
-    tau          = 3000.0               ! [yr] Relaxation time 
-    D_lith       = 9.87e24              ! [N-m] Flexural rigidity 
-    R_lith       = 131910.0             ! [m] Radius of relative stiffness
-    
+    method          = 2                    ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
+    dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
+    dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
+    He_lith         = 100.0                 ! [km] Effective elastic thickness lithosphere
+    tau             = 1216.0                ! [yr] Relaxation time 
 /
