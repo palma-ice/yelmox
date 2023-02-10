@@ -1,0 +1,32 @@
+FC  = mpiifort
+
+INC_NC = -I/opt/cecisw/arch/easybuild/2021b/software/netCDF-Fortran/4.5.3-iimpi-2021b/include -I/opt/cecisw/arch/easybuild/2021b/software/netCDF-Fortran/4.5.3-iimpi-2021b/include
+LIB_NC = -L/opt/cecisw/arch/easybuild/2021b/software/netCDF-Fortran/4.5.3-iimpi-2021b/lib -lnetcdff
+#LIB_NC = -L/opt/cecisw/arch/easybuild/2019b/software/netCDF-Fortran/4.5.2-iimpi-2019b/lib -lnetcdff -L/opt/cecisw/arch/easybuild/2019b/software/netCDF/4.7.1-iimpi-2019b/lib64 -L/opt/cecisw/arch/easybuild/2019b/software/iccifort/2019.5.281/lib/intel64 -lnetcdf -lnetcdf -lm -liomp5 -lpthread
+
+LISROOT = /home/ulb/glaciol/jablasco/apps/lis/
+INC_LIS = -I${LISROOT}/include
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+YELMOROOT = /home/ulb/glaciol/jablasco/yelmo-ucm/yelmo_v1.10/
+INC_YELMO = -I${YELMOROOT}/libyelmo/include
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+FFLAGS  = -module $(objdir) -L$(objdir)
+
+ifeq ($(parallel), 1)
+    # Overwrite default choices with openmp relevant choices 
+
+    LISROOT = /home/ulb/glaciol/jablasco/apps/lis/
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -module $(objdir) -L$(objdir) -qopenmp 
+
+endif 
+
+LFLAGS  = $(LIB_YELMO) $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
+DFLAGS_PROFILE = -O2 -fp-model precise -pg
