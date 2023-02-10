@@ -1127,7 +1127,7 @@ contains
                 ! Read monthly values directly 
                 call nc_read(par%clim_path,varnm,var0,start=[1,1,1,k0],count=[nx,ny,nm,1])
                 call nc_read(par%clim_path,varnm,var1,start=[1,1,1,k1],count=[nx,ny,nm,1])
-                write(*,*) "Dimension of var0, tas:", size(var0)
+                
             else 
 
                 ! Read annual values 
