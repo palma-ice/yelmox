@@ -96,6 +96,9 @@ program yelmox
     logical  :: laurentide_init_const_H 
     real(wp) :: laurentide_time_equil 
 
+    logical  :: running_greenland
+    logical  :: greenland_init_marine_H
+
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
     real(wp), parameter :: time_pd  =   1950.0_wp  ! [yr CE] ==  0 kyr ago 
     
@@ -230,6 +233,10 @@ program yelmox
 
     ! Define specific regions of interest =====================
 
+    ! Shortcut switches for later use
+    running_laurentide = .FALSE. 
+    running_greenland  = .FALSE. 
+
     select case(trim(domain))
 
         case("Antarctica")
@@ -271,6 +278,29 @@ program yelmox
 
         case("Laurentide")
 
+            running_laurentide = .TRUE. 
+
+            ctl%use_lgm_step        = .FALSE.
+            ctl%use_pd_step         = .FALSE.
+
+            laurentide_init_const_H = .FALSE.
+
+            if (laurentide_init_const_H) then 
+                ! Make sure relaxation spinup is short, but transient spinup
+                ! with modified positive smb over North America is reasonably long.
+
+                ctl%time_equil        = 10.0 
+                laurentide_time_equil = 5e3 
+
+            else 
+                ! When starting from ice-6g, positive smb spinup is not necessary.
+                ! however ctl%time_equil should not be changed, as it may be useful
+                ! for spinning up thermodynamics.
+
+                laurentide_time_equil = 0.0 
+
+            end if 
+
             ! Make sure to set ice_allowed to prevent ice from growing in 
             ! Greenland (and on grid borders)
 
@@ -295,14 +325,18 @@ program yelmox
 
         case("Greenland")
 
+            running_greenland = .TRUE.
+
+            ! Should extra ice be imposed over continental shelf to mimic LGM state to start
+            greenland_init_marine_H = .TRUE. 
+
             ! Make sure to set ice_allowed to prevent ice from growing in 
             ! Iceland and Svaalbard (on grid borders)
 
             where(abs(yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
             where(abs(yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
-                        
-
+            where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE.            
+            
         case DEFAULT 
 
             reg1%write = .FALSE. 
@@ -312,38 +346,6 @@ program yelmox
     end select
 
     ! === Initialize external models (forcing for ice sheet) ======
-
-    if (trim(yelmo1%par%domain) .eq. "Laurentide") then 
-        ! Set local Laurentide parameters 
-
-        ctl%use_lgm_step        = .FALSE.
-        ctl%use_pd_step         = .FALSE.
-
-        running_laurentide      = .TRUE. 
-        laurentide_init_const_H = .FALSE.
-
-        if (laurentide_init_const_H) then 
-            ! Make sure relaxation spinup is short, but transient spinup
-            ! with modified positive smb over North America is reasonably long.
-
-            ctl%time_equil        = 10.0 
-            laurentide_time_equil = 5e3 
-
-        else 
-            ! When starting from ice-6g, positive smb spinup is not necessary.
-            ! however ctl%time_equil should not be changed, as it may be useful
-            ! for spinning up thermodynamics.
-
-            laurentide_time_equil = 0.0 
-
-        end if 
-
-    else
-        ! This is not the Laurentide domain, so disable switch 
-
-        running_laurentide = .FALSE. 
-
-    end if 
 
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
@@ -519,6 +521,25 @@ program yelmox
 
             end if 
 
+        else if (running_greenland) then
+            ! Special start-up steps for Greenland
+
+            if (greenland_init_marine_H) then
+                ! Add extra ice-thickness over continental shelf to start with
+                ! an LGM-like state
+
+                where(yelmo1%bnd%ice_allowed .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
+                        .and. yelmo1%bnd%z_bed .gt. -500.0)
+
+                        yelmo1%tpo%now%H_ice = 600.0 
+
+                end where
+
+                ! Run yelmo for a few years with constant boundary conditions
+                ! to synchronize all model fields a bit
+                call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+
+            end if
                 
         else 
             ! Run simple startup equilibration step 
