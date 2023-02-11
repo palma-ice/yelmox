@@ -66,6 +66,7 @@ program yelmox
         real(wp) :: dt2D_out
         real(wp) :: dt2D_small_out
         real(wp) :: dt_restart
+        real(wp) :: dt_clim
 
         logical  :: transient_clim
         logical  :: use_lgm_step
@@ -124,6 +125,9 @@ program yelmox
     call nml_read(path_par,"ctrl","use_pd_step",    ctl%use_pd_step)        ! Use pd_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
+
+    ! Hard-coded for now:
+    ctl%dt_clim = 10.0      ! [yrs] Frequency to update snapclim snapshot
 
     ! Consistency checks ===
 
@@ -672,8 +676,10 @@ program yelmox
         
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
-        ! Update snapclim
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+        if (mod(nint(time*100),nint(ctl%dt_clim*100))==0) then
+            ! Update snapclim
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+        end if 
 
         ! == SURFACE MASS BALANCE ==============================================
 
