@@ -98,6 +98,7 @@ program yelmox
 
     logical  :: running_greenland
     logical  :: greenland_init_marine_H
+    logical  :: scale_glacial_smb
 
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
     real(wp), parameter :: time_pd  =   1950.0_wp  ! [yr CE] ==  0 kyr ago 
@@ -330,6 +331,9 @@ program yelmox
             ! Should extra ice be imposed over continental shelf to mimic LGM state to start
             greenland_init_marine_H = .TRUE. 
 
+            ! Should glacial smb be modified to reduce negative smb values
+            scale_glacial_smb = .FALSE. 
+            
             ! Make sure to set ice_allowed to prevent ice from growing in 
             ! Iceland and Svaalbard (on grid borders)
 
@@ -404,9 +408,9 @@ program yelmox
     yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-    if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+    if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
         ! Modify glacial smb
-        call scale_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
+        call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
     end if
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
@@ -531,7 +535,7 @@ program yelmox
                 where(yelmo1%bnd%ice_allowed .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
                         .and. yelmo1%bnd%z_bed .gt. -500.0)
 
-                        yelmo1%tpo%now%H_ice = 600.0 
+                        yelmo1%tpo%now%H_ice = 800.0 
 
                 end where
 
@@ -713,9 +717,9 @@ program yelmox
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
-        if (trim(yelmo1%par%domain) .eq. "Greenland") then 
+        if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
             ! Modify glacial smb
-            call scale_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
+            call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
         end if
     
         ! yelmo1%bnd%smb   = yelmo1%dta%pd%smb
@@ -1127,7 +1131,7 @@ contains
 
 
 
-    subroutine scale_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
+    subroutine calc_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
 
         implicit none
 
@@ -1178,7 +1182,7 @@ contains
 
         return
 
-    end subroutine scale_glacial_smb
+    end subroutine calc_glacial_smb
 
 end program yelmox
 
