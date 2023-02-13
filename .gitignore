@@ -4,6 +4,7 @@ yelmo
 ice_data
 tests/plots
 output
+tmp
 tests/.DS_Store
 .DS_Store
 runylmox.js
