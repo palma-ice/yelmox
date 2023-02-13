@@ -9,7 +9,7 @@
     scenario        = "ctrl" ! if "ctrl" - ctrl experiment. Else, projection (RCP85)
     !gcm             = "noresm"
     gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
-
+    write_formatted = False
 /
 
 &spinup
