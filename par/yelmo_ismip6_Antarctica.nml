@@ -6,7 +6,10 @@
 
 &ismip6
     par_file        = "input/ismip6/ismip6_ant.nml"
-    gcm             = "noresm"
+    scenario        = "ctrl" ! if "ctrl" - ctrl experiment. Else, projection (RCP85)
+    !gcm             = "noresm"
+    gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
+
 /
 
 &spinup

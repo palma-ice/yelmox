@@ -174,7 +174,7 @@ program yelmox
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
 
-    file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
+    !file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
     
     ! Print summary of run settings 
     write(*,*)
@@ -259,23 +259,23 @@ program yelmox
             reg1%mask = .FALSE. 
             where(abs(regions_mask - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
 
-            ! WAIS region (region=1.0 in regions map)
+            ! WAIS region (region=4.0 in regions map)
             reg2%write = .TRUE. 
             reg2%name  = "WAIS" 
             reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
 
             allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
             reg2%mask = .FALSE. 
-            where(abs(regions_mask - 1.0) .lt. 1e-3) reg2%mask = .TRUE.
+            where(abs(regions_mask - 4.0) .lt. 1e-3) reg2%mask = .TRUE.
 
-            ! EAIS region (region=2.0 in regions map)
+            ! EAIS region (region=5.0 in regions map)
             reg3%write = .TRUE. 
             reg3%name  = "EAIS" 
             reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
 
             allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
             reg3%mask = .FALSE. 
-            where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
+            where(abs(regions_mask - 5.0) .lt. 1e-3) reg3%mask = .TRUE.
 
         case("Laurentide")
 
@@ -415,7 +415,11 @@ program yelmox
 
 !     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
 !     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-    
+    write(*,*) "jablasco: ANT-16KM resolution - before marshelf update"
+    write(*,*) "jablasco: shape to_ann now:", SHAPE(snp1%now%to_ann)
+    write(*,*) "jablasco: shape to_ann clim0:", SHAPE(snp1%clim0%to_ann)
+    !dto_ann=snp1%now%to_ann-snp1%clim0%to_ann
+    !write(*,*) "jablasco: shape dto_ann:", SHAPE(dto_ann)
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -712,7 +716,10 @@ program yelmox
         dT_now = 0.0 
         !if (time .gt. 7000.0) dT_now = 4.0 
 
-        call smbpal_update_monthly(smbpal1,snp1%now%tas+dT_now,snp1%now%pr, &
+        ! jablasco
+        write(*,*) "jablasco: yelmox l697" 
+        write(*,*) "jablasco:  dT_now=",  dT_now
+        call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                    yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
@@ -751,8 +758,8 @@ program yelmox
         end if
 
         if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
-               call yelmo_write_step(yelmo1,file2D_small,time,compare_pd=.FALSE.)
-           end if
+            call yelmo_write_step(yelmo1,file2D_small,time,compare_pd=.FALSE.)
+        end if
 
         if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
@@ -883,15 +890,19 @@ contains
         call nc_write(filename,"taub",ylmo%dyn%now%taub,units="Pa",long_name="Basal stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
+! HEAD
         ! Strain-rate and stress tensors 
+
+        ! Strain-rate and stress tensors (jablasco) 
+!END HEAD
         if (.FALSE.) then
 
-            ! call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
-            !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-            ! call nc_write(filename,"te",ylmo%mat%now%strs%te,units="Pa",long_name="Effective stress", &
-            !           dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-            ! call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
-            !           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
+                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+            call nc_write(filename,"te",ylmo%mat%now%strs%te,units="Pa",long_name="Effective stress", &
+                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+            call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
          
             call nc_write(filename,"de2D",ylmo%mat%now%strn2D%de,units="yr^-1",long_name="Effective strain rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -925,11 +936,13 @@ contains
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
-                     dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
+        !             dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         
 !        call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
 !                     dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
+        !             dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 !        call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
@@ -943,14 +956,30 @@ contains
         
 !        call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
 !                      dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+        !call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Vertical velocity (z)", &
+        !               dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        !call nc_write(filename,"uz_star",ylmo%thrm%now%uz_star,units="m yr-1",long_name="Advection-adjusted vertical velocity", &
+        !              dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
+        
+        !call nc_write(filename,"T_rock",ylmo%thrm%now%T_rock,units="K",long_name="Bedrock temperature", &
+        !              dim1="xc",dim2="yc",dim3="zeta_rock",dim4="time",start=[1,1,1,n],ncid=ncid)
         
  !       call nc_write(filename,"Q_rock",ylmo%thrm%now%Q_rock,units="mW m-2",long_name="Bedrock surface heat flux", &
  !                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+
 !        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
 !                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
 
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1044,10 +1073,14 @@ contains
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing applied correction factor", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
             call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,units="K",long_name="Shelf thermal forcing basin-wide correction factor", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"slope_base",mshlf%now%slope_base,units="",long_name="Shelf-base slope", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+            !call nc_write(filename,"slope_base",mshlf%now%slope_base,units="",long_name="Shelf-base slope", &
+            !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         end if 
 
