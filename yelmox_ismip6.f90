@@ -340,9 +340,8 @@ program yelmox_ismip6
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%ismip6_gcm),  &
-                            scenario=trim(ctl%ismip6_scenario),domain=domain,grid_name=grid_name)
-
+    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,ctl%ismip6_gcm,ctl%ismip6_scenario)
+    
     ! ===== tf_corr initialization ======
 
     ! Make sure that tf is prescribed externally

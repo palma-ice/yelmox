@@ -51,10 +51,12 @@ module varslice
     end type 
 
     private 
+    public :: varslice_param_class
     public :: varslice_class
     public :: varslice_update
     public :: varslice_init_nml 
     public :: varslice_init_arg
+    public :: varslice_init_data
     public :: varslice_end 
 
 contains
@@ -779,8 +781,7 @@ contains
 
     end subroutine calc_vec_value
 
-    ! jablasco: add gcm and scenario
-    subroutine varslice_init_nml(vs,filename,group,domain,grid_name,gcm,verbose)
+    subroutine varslice_init_nml(vs,filename,group,domain,grid_name,verbose)
         ! Routine to load information related to a given 
         ! transient variable, so that it can be processed properly.
 
@@ -791,12 +792,11 @@ contains
         character(len=*),       intent(IN)    :: group
         character(len=*),       intent(IN), optional :: domain
         character(len=*),       intent(IN), optional :: grid_name
-        character(len=*),       intent(IN), optional :: gcm
         logical,                intent(IN), optional :: verbose 
         ! Local variables 
         
         ! First load parameters from nml file 
-        call varslice_par_load(vs%par,filename,group,domain,grid_name,gcm,verbose)
+        call varslice_par_load(vs%par,filename,group,domain,grid_name,verbose)
 
         ! Perform remaining init operations 
         call varslice_init_data(vs) 
@@ -1044,16 +1044,13 @@ contains
 
     end subroutine varslice_end
 
-    ! jablasco added gcm scen
-    subroutine varslice_par_load(par,filename,group,domain,grid_name,gcm,init,verbose)
+    subroutine varslice_par_load(par,filename,group,domain,grid_name,verbose)
 
         type(varslice_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: group
         character(len=*), intent(IN), optional :: domain
-        character(len=*), intent(IN), optional :: grid_name  
-        character(len=*), intent(IN), optional :: gcm
-        logical, optional :: init 
+        character(len=*), intent(IN), optional :: grid_name   
         logical, optional :: verbose 
 
         ! Local variables
@@ -1062,7 +1059,6 @@ contains
         logical  :: print_summary 
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
 
         print_summary = .TRUE. 
         if (present(verbose)) print_summary = verbose 
@@ -1080,11 +1076,6 @@ contains
         if (present(domain) .and. present(grid_name)) then
             call parse_path(par%filename,domain,grid_name)
         end if 
-
-        ! Parse filename as needed
-        if (present(gcm)) then
-            call parse_path_ismip6(par%filename,gcm)
-        end if
 
         ! Make sure time parameters are consistent time_par=[x0,x1,dx]
         if (par%time_par(3) .eq. 0) par%time_par(2) = par%time_par(1) 
@@ -1121,21 +1112,7 @@ contains
         return 
 
     end subroutine parse_path
-   
-    ! jablasco
-    subroutine parse_path_ismip6(path,gcm)
-
-        implicit none
-
-        character(len=*), intent(INOUT) :: path
-        character(len=*), intent(IN)    :: gcm
-
-        call nml_replace(path,"{gcm}",   trim(gcm))
-
-        return
-
-    end subroutine parse_path_ismip6
- 
+    
     subroutine axis_init(x,x0,x1,dx,nx)
 
         implicit none 

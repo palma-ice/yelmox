@@ -46,7 +46,7 @@
 
 &gcm_ts_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
-    name        = "ts_anomaly"
+    name        = "ts"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
@@ -57,7 +57,7 @@
 
 &gcm_pr_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
-    name        = "pr_anomaly"
+    name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
     unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
@@ -68,7 +68,7 @@
 
 &gcm_smb_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
-    name        = "smb_anomaly"
+    name        = "smb"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
     unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
@@ -78,7 +78,7 @@
 /
 
 &gcm_ts_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}/1995-2300/{gcm}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "ts_anomaly"
     units_in    = "K"
     units_out   = "K"
@@ -89,7 +89,7 @@
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}/1995-2300/{gcm}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "pr_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -100,7 +100,7 @@
 /
 
 &gcm_smb_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}/1995-2300/{gcm}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "smb_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "m i.e. yr-1"
@@ -201,7 +201,7 @@
 /
 
 &gcm_to_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}/1995-2300/{gcm}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "temperature"
     units_in    = "degrees C"
     units_out   = "K"
@@ -212,7 +212,7 @@
 /
 
 &gcm_so_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}/1995-2300/{gcm}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "salinity"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -222,7 +222,7 @@
     time_par    = 1995, 2299, 1
 /
 &gcm_tf_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}/1995-2300/{gcm}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "thermal_forcing"
     units_in    = "K"
     units_out   = "K"
