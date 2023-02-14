@@ -258,8 +258,6 @@ contains
                                    file_out_mon,file_out_day,write_init,calc_mon,write_now)
         
         else
-            ! jablasco: test llego
-            write(*,*) "jablasco: linea 262: smpbal.f90" 
             ! PDD method 
 
             allocate(t2m_ann(size(t2m,1),size(t2m,2)))
