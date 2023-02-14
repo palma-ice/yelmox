@@ -77,8 +77,7 @@ program yelmox_ismip6
         character(len=56) :: equil_method
         real(wp) :: time0 
         real(wp) :: time1 
-        character(len=256) :: scenario     
- 
+
         character(len=56) :: abumip_scenario
         real(wp)          :: abumip_bmb 
         
@@ -128,8 +127,7 @@ program yelmox_ismip6
     
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
-    call nml_read(path_par,trim(ctl%run_step),"scenario",      ctl%scenario)
-    
+
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
@@ -342,8 +340,8 @@ program yelmox_ismip6
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%ismip6_gcm),scen=trim(ctl%ismip6_scenario), &
-                                            domain=domain,grid_name=grid_name)
+    call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%ismip6_gcm),  &
+                            scenario=trim(ctl%ismip6_scenario),domain=domain,grid_name=grid_name)
 
     ! ===== tf_corr initialization ======
 
@@ -650,7 +648,7 @@ program yelmox_ismip6
         write(*,*)
         write(*,*) "Performing transient."
         write(*,*) 
-        
+
         ! Additionally make sure isostasy is updated every timestep 
         isos1%par%dt_step = 1.0_wp 
         isos1%par%dt_lith = 10.0_wp 

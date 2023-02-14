@@ -23,7 +23,7 @@ module ismip6
         
         ! Experiment information 
         character(len=256)     :: gcm 
-        character(len=256)     :: scen 
+        character(len=256)     :: scenario
         character(len=256)     :: experiment 
         character(len=256)     :: domain 
         character(len=256)     :: grid_name 
@@ -120,14 +120,14 @@ module ismip6
 
 contains
     
-    subroutine ismip6_forcing_init(ism,filename,gcm,scen,domain,grid_name)
+    subroutine ismip6_forcing_init(ism,filename,gcm,scenario,domain,grid_name)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: gcm
-        character(len=*), intent(IN) :: scen
+        character(len=*), intent(IN) :: scenario
         character(len=*), intent(IN) :: domain 
         character(len=*), intent(IN) :: grid_name 
 
@@ -139,11 +139,11 @@ contains
 
             case("Antarctica")
                 
-                call ismip6_ant_forcing_init(ism,filename,gcm,scen,domain,grid_name)
+                call ismip6_ant_forcing_init(ism,filename,gcm,scenario,domain,grid_name)
 
             case("Greenland")
 
-                call ismip6_grl_forcing_init(ism,filename,gcm,scen,domain,grid_name)
+                call ismip6_grl_forcing_init(ism,filename,gcm,scenario,domain,grid_name)
 
             case DEFAULT
 
@@ -188,14 +188,14 @@ contains
 
     end subroutine ismip6_forcing_update
 
-    subroutine ismip6_ant_forcing_init(ism,filename,gcm,scen,domain,grid_name)
+    subroutine ismip6_ant_forcing_init(ism,filename,gcm,scenario,domain,grid_name)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: gcm
-        character(len=*), intent(IN) :: scen
+        character(len=*), intent(IN) :: scenario
         character(len=*), intent(IN), optional :: domain 
         character(len=*), intent(IN), optional :: grid_name 
 
@@ -230,15 +230,26 @@ contains
         
         ! Define the current experiment characteristics
         ism%gcm        = trim(gcm)
-        ism%scen       = trim(scen) 
-        ism%experiment = trim(ism%gcm)//"_"//trim(ism%scen) 
+        ism%scenario   = trim(scenario) 
+        ism%experiment = trim(ism%gcm)//"_"//trim(ism%scenario) 
 
-        ! jablasco
-        !select case(trim(ism%experiment))
-        select case(trim(ism%gcm))
+        ! Special case for control runs, use "NorESM1-M_RCP26-repeat"
+        if (trim(ism%scenario) .eq. "ctrl" .or. trim(ism%scenario) .eq. "ctrl0") then
+            ism%experiment = "NorESM1-M_RCP26-repeat"
+        end if
 
-            case("CCSM4_RCP85","CESM2-WACCM_ssp585","CESM2-WACCM_ssp585-repeat","HadGEM2-ES_RCP85","HadGEM2-ES_RCP85-repeat",&
-                 "NorESM1-M_RCP26-repeat","NorESM1-M_RCP85-repeat","UKESM1-0-LL_ssp126","UKESM1-0-LL_ssp585","UKESM1-0-LL_ssp585-repeat")
+        select case(trim(ism%experiment))
+
+            case("CCSM4_RCP85",                 &
+                 "CESM2-WACCM_ssp585",          &
+                 "CESM2-WACCM_ssp585-repeat",   &
+                 "HadGEM2-ES_RCP85",            &
+                 "HadGEM2-ES_RCP85-repeat",     &
+                 "NorESM1-M_RCP26-repeat",      &
+                 "NorESM1-M_RCP85-repeat",      &
+                 "UKESM1-0-LL_ssp126",          &
+                 "UKESM1-0-LL_ssp585",          &
+                 "UKESM1-0-LL_ssp585-repeat")
                 ! Control and RCP85 scenarios use the same files 
                 ! since ctrl specific forcing adapted in update step 
 
@@ -269,10 +280,10 @@ contains
                 
             case DEFAULT 
 
-     
-
-                write(*,*) "ismip6_forcing_init:: Error: GCM not recognized."
-                write(*,*) "gcm = ", trim(ism%gcm) 
+                write(*,*) "ismip6_forcing_init:: Error: exeriment (== gcm_scenario) not recognized."
+                write(*,*) "experiment = ", trim(ism%experiment) 
+                write(*,*) "gcm        = ", trim(ism%gcm) 
+                write(*,*) "scenario   = ", trim(ism%scenario) 
 
                 stop 
 
@@ -348,18 +359,7 @@ contains
             end if
         end do
 
-      ! HEAD
-      !  ! Additional variables to zero
-      !  ism%z_srf = ism%basins 
-      !  ism%z_srf%var = 0.0_wp 
-
-      !  ism%dts_dz          = ism%z_srf
-      !  ism%dsmb_dz         = ism%z_srf
-      !  ism%dts_dz_proj     = ism%z_srf
-      !  ism%dsmb_dz_proj    = ism%z_srf
-      !END HEAD  
-
-        ! jablasco: Initialize variables and allocate
+        ! Initialize iceberg_mask variable in case it is needed
         allocate(ism%iceberg_mask(size(ism%to_ref%var,1),size(ism%to_ref%var,2)))
         ism%iceberg_mask = 0.0
 
@@ -389,7 +389,7 @@ contains
         ! === Atmospheric fields ==================================
         
        !HEAD
-       ! if (trim(ism%scen) .eq. "ctrl") then 
+       ! if (trim(ism%scenario) .eq. "ctrl") then 
        !     ! For control scenario, override time choices and 
        !     ! set control atm and ocn 
 
@@ -475,7 +475,7 @@ contains
         ! === Oceanic fields ==================================
 
        !HEAD
-       ! if (trim(ism%scen) .eq. "ctrl") then 
+       ! if (trim(ism%scenario) .eq. "ctrl") then 
        !     ! For control scenario, override time choices and 
        !     ! set control atm and ocn 
 
@@ -563,7 +563,7 @@ contains
 
         ! === Additional calculations ======================
 
-        if (trim(ism%scen) .eq. "ctrl") then 
+        if (trim(ism%scenario) .eq. "ctrl") then 
             ! For control scenario, override above choices and 
             ! set control atm and ocn 
 
@@ -643,14 +643,14 @@ contains
     end subroutine ismip6_ant_forcing_update
 
 
-    subroutine ismip6_grl_forcing_init(ism,filename,gcm,scen,domain,grid_name)
+    subroutine ismip6_grl_forcing_init(ism,filename,gcm,scenario,domain,grid_name)
 
         implicit none 
 
         type(ismip6_forcing_class), intent(INOUT) :: ism
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: gcm
-        character(len=*), intent(IN) :: scen
+        character(len=*), intent(IN) :: scenario
         character(len=*), intent(IN), optional :: domain 
         character(len=*), intent(IN), optional :: grid_name 
 
@@ -674,13 +674,13 @@ contains
         
         ! Define the current experiment characteristics
         ism%gcm        = trim(gcm)
-        ism%scen       = trim(scen) 
-        ism%experiment = trim(ism%gcm)//"_"//trim(ism%scen) 
+        ism%scenario   = trim(scenario) 
+        ism%experiment = trim(ism%gcm)//"_"//trim(ism%scenario) 
 
         ! Define group prefix
-        group_prefix = trim(ism%gcm)//"_"//trim(ism%scen)//"_"
+        group_prefix = trim(ism%gcm)//"_"//trim(ism%scenario)//"_"
 
-        if (trim(ism%scen) .eq. "ctrl") then 
+        if (trim(ism%scenario) .eq. "ctrl") then 
             ! Use files from rcp85 scenario as control, just 
             ! to load something. Anomalies are set to zero in any case
 
@@ -790,7 +790,7 @@ contains
 
         ! === Atmospheric and oceanic fields ==================================
         
-        if (trim(ism%scen) .eq. "ctrl") then 
+        if (trim(ism%scenario) .eq. "ctrl") then 
             ! For control scenario, override time choices and 
             ! set control atm and ocn 
 

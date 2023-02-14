@@ -6,9 +6,8 @@
 
 &ismip6
     par_file        = "input/ismip6/ismip6_ant.nml"
-    scenario        = "ctrl" ! if "ctrl" - ctrl experiment. Else, projection (RCP85)
-    !gcm             = "noresm"
-    gcm             = "CESM2-WACCM_ssp585" ! ISMIP6 GCM model
+    gcm             = "NorESM1-M"       ! ISMIP6 GCM model
+    scenario        = "RCP26-repeat"    ! ISMIP6 scenario
     write_formatted = False
 /
 
@@ -33,7 +32,6 @@
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "relax"           ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
 /
 
 &transient_lgm_to_proj
@@ -46,7 +44,6 @@
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85"
 /
 
 &transient_proj
@@ -59,7 +56,6 @@
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
 /
 
 &abumip_proj
@@ -72,7 +68,6 @@
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
 /
 
 &abumip
