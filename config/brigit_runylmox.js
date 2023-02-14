@@ -22,7 +22,7 @@
 
     "par_paths" : {},
 
-    "files" : [], 
+    "files" : ["par/rembo_Greenland.nml","git_yelmo.txt"], 
 
     "dir-special" : {},
 

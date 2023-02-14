@@ -236,6 +236,8 @@ contains
 
         ! Special case for control runs, use "NorESM1-M_RCP26-repeat"
         if (trim(ism%scenario) .eq. "ctrl" .or. trim(ism%scenario) .eq. "ctrl0") then
+            ism%gcm        =  "NorESM1-M"
+            ism%scenario   =  "RCP26-repeat"
             ism%experiment = "NorESM1-M_RCP26-repeat"
         end if
 
@@ -251,7 +253,7 @@ contains
                  "UKESM1-0-LL_ssp126",          &
                  "UKESM1-0-LL_ssp585",          &
                  "UKESM1-0-LL_ssp585-repeat")
-                ! Control and RCP85 scenarios use the same files 
+                ! Control and scenarios use the same files 
                 ! since ctrl specific forcing adapted in update step 
 
                 group_prefix = "gcm_"
