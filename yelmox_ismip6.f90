@@ -46,11 +46,6 @@ program yelmox_ismip6
     type(geothermal_class)      :: gthrm1
     type(isos_class)            :: isos1
     type(ismip6_forcing_class)  :: ismp1 
-
-    type(snapclim_class)        :: snp2
-    type(smbpal_class)          :: smbpal2
-    type(marshelf_class)        :: mshlf2 
-
     type(hyster_class)          :: hyst1 
 
     type reg_def_class 
@@ -82,8 +77,7 @@ program yelmox_ismip6
         character(len=56) :: equil_method
         real(wp) :: time0 
         real(wp) :: time1 
-        character(len=256) :: scenario 
-        character(len=256) :: gcm       
+        character(len=256) :: scenario     
  
         character(len=56) :: abumip_scenario
         real(wp)          :: abumip_bmb 
@@ -105,6 +99,9 @@ program yelmox_ismip6
 
     type(ctrl_params)     :: ctl
     type(ice_opt_params)  :: opt 
+
+    ! Decide whether to include mask shelf collapse or not (hard coded switch)
+    logical, parameter :: running_mask_shlf_collapse = .FALSE. 
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
@@ -333,7 +330,7 @@ program yelmox_ismip6
                                       regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
         
     end if
-
+    
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
@@ -343,6 +340,31 @@ program yelmox_ismip6
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
+    ! Initialize variables inside of ismip6 object 
+    ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
+    call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%ismip6_gcm),scen=trim(ctl%ismip6_scenario), &
+                                            domain=domain,grid_name=grid_name)
+
+    ! ===== tf_corr initialization ======
+
+    ! Make sure that tf is prescribed externally
+    mshlf1%par%tf_method = 0  
+    
+    if (yelmo1%par%use_restart) then
+        ! Load tf_corr field from file 
+
+        call load_tf_corr_from_restart(mshlf1%now%tf_corr,yelmo1%par%restart, &
+                                                yelmo1%par%domain,yelmo1%par%grid_name)
+    
+    else 
+        ! Initialize tf_corr to be equal to tf_corr_basin, and
+        ! set tf_corr_basin to zero (all corrections will be contained in one field)
+
+        mshlf1%now%tf_corr       = mshlf1%now%tf_corr_basin
+        mshlf1%now%tf_corr_basin = 0.0_wp
+
+    end if 
+        
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
@@ -383,6 +405,18 @@ program yelmox_ismip6
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+    ! Update forcing to present-day reference using ISMIP6 forcing
+    call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
+                time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+
+    yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+    yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+    yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+
+    ! Store geothermal heat flow field
     yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
     
     call yelmo_print_bound(yelmo1%bnd)
@@ -404,111 +438,6 @@ program yelmox_ismip6
 
     select case(trim(ctl%run_step)) 
 
-    case("spinup")
-        ! Model can start from no spinup or equilibration (using restart file), 
-        ! here it is run under constant boundary conditions to spinup 
-        ! desired state. 
-
-        write(*,*)
-        write(*,*) "Performing spinup."
-        write(*,*) 
-
-        ! Start timing 
-        call yelmo_cpu_time(cpu_start_time)
-    
-        ! Run yelmo alone for several years with constant boundary conditions and topo
-        ! to equilibrate thermodynamics and dynamics
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_wp,     dt=1.0_wp,topo_fixed=.FALSE.)
-        call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=1.0_wp,topo_fixed=.TRUE.)
-
-        write(*,*) "Initial equilibration complete."
-
-        ! Initialize output files for checking progress 
-
-        ! Initialize output files for checking progress 
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-        
-        ! Write initial state to file 
-        ! (do so within the time loop below with n=0)
-        ! call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
-        ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-        
-        ! Next perform 'coupled' model simulations for desired time
-        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
-
-            ! Get current time 
-            time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp 
-            time_elapsed = time - ctl%time_init 
-
-            ! == SEA LEVEL ==========================================================
-            call sealevel_update(sealev,year_bp=time_bp)
-            yelmo1%bnd%z_sl  = sealev%z_sl 
-
-            ! == ISOSTASY ==========================================================
-            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-
-            ! == ICE SHEET ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
-            
-
-            ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
-            if (mod(time,ctl%dtt)==0) then
-                ! Update snapclim (for elevation changes, but keep time=time_init)
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
-            end if 
-
-            ! == SURFACE MASS BALANCE ==============================================
-
-            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
-            yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                            snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-            ! == MODEL OUTPUT ===================================
-
-            if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
-            end if
-
-            if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
-                call yelmo_write_reg_step(yelmo1,file1D,time=time)
-                 
-            end if 
-
-            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
-                write(*,"(a,f14.4)") "yelmo:: time = ", time
-            end if 
-            
-        end do 
-
-        write(*,*)
-        write(*,*) "Spinup complete."
-        write(*,*)
-
-        ! Write the restart file for the end of the simulation
-        call yelmo_restart_write(yelmo1,file_restart,time=time_bp) 
-
-        ! Stop timing 
-        call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-
-        write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-        write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
-    
     case("spinup_ismip6")
         ! Model can start from no spinup or equilibration (using restart file), 
         ! here it is run under constant boundary conditions to spinup 
@@ -521,52 +450,6 @@ program yelmox_ismip6
         ! Start timing 
         call yelmo_cpu_time(cpu_start_time)
 
-        ! Initialize variables inside of ismip6 object 
-        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%gcm),scen=trim(ctl%scenario), &
-                                                domain=domain,grid_name=grid_name)
-
-        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
-        
-        snp2    = snp1 
-        smbpal2 = smbpal1
-        mshlf2  = mshlf1
-        
-        ! Update forcing to present-day reference
-        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
-                    time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
-        ! Overwrite original mshlf and snp with ismip6 derived ones 
-        snp1    = snp2
-        smbpal1 = smbpal2  
-        mshlf1  = mshlf2 
-
-        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-        ! ===== tf_corr initialization ======
-
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0  
-        
-        if (yelmo1%par%use_restart) then
-            ! Load tf_corr field from file 
-
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
-                                                    yelmo1%par%domain,yelmo1%par%grid_name)
-        
-        else 
-            ! Initialize tf_corr to be equal to tf_corr_basin, and
-            ! set tf_corr_basin to zero (all corrections will be contained in one field)
-
-            mshlf2%now%tf_corr       = mshlf2%now%tf_corr_basin
-            mshlf2%now%tf_corr_basin = 0.0_wp
-
-        end if 
-        
         ! ===== basal friction optimization ======
         if (trim(ctl%equil_method) .eq. "opt") then 
             
@@ -662,16 +545,14 @@ program yelmox_ismip6
                     if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
                         ! Perform tf_corr optimization
 
-                        call optimize_tf_corr(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
+                        call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
                                                 opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
-                        ! call optimize_tf_corr_basin(mshlf2%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
+                        ! call optimize_tf_corr_basin(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
                         !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
                         !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                     
                     end if 
-
-            
 
                 case("relax")
                     ! ===== relaxation spinup ==================
@@ -722,13 +603,8 @@ program yelmox_ismip6
 
             ! Update forcing to present-day reference, but 
             ! adjusting to ice topography
-            call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
+            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                         time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
-            ! Overwrite original mshlf and snp with ismip6 derived ones 
-            snp1    = snp2
-            smbpal1 = smbpal2  
-            mshlf1  = mshlf2 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -775,51 +651,7 @@ program yelmox_ismip6
         write(*,*) "Performing transient."
         write(*,*) 
         
-        ! Initialize variables inside of ismip6 object 
-         ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=trim(ctl%gcm),scen=trim(ctl%scenario), &
-                                                domain=domain,grid_name=grid_name)
-
-        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
-        
-        snp2    = snp1 
-        smbpal2 = smbpal1
-        mshlf2  = mshlf1
-        
-        ! ===== tf_corr initialization ======
-
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-        mshlf2%now%tf_corr   = 0.0_wp 
-        
-        if (yelmo1%par%use_restart) then
-            ! Load tf_corr field from file 
-
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
-                                                    yelmo1%par%domain,yelmo1%par%grid_name)
-            
-        end if 
-        
-
-
-        ! Update forcing to present-day reference 
-         call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
-                                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-      
-
-        ! Overwrite original mshlf and snp with ismip6 derived ones 
-        snp1    = snp2
-        smbpal1 = smbpal2  
-        mshlf1  = mshlf2 
-
-        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-       
-
- 
-        ! Additionally make sure isostasy is update every timestep 
+        ! Additionally make sure isostasy is updated every timestep 
         isos1%par%dt_step = 1.0_wp 
         isos1%par%dt_lith = 10.0_wp 
         
@@ -848,14 +680,15 @@ program yelmox_ismip6
             time         = ctl%time_init + n*ctl%dtt
             time_bp      = time - 1950.0_wp 
             time_elapsed = time - ctl%time_init
-            
-            ! jablasco: mask_shlf_collapse; set H to 0; then compute with Yelmo
-            if(time .ge. 2015 .and. .False.) then
 
-                where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0               
+if (running_mask_shlf_collapse) then
+            ! Perform mask_shlf_collapse experiments
+            ! Set H to zero where mask==1, then compute Yelmo.
 
+            if(time .ge. 2015) then
+                where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
             end if
-
+end if
 
             ! == SEA LEVEL ==========================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
@@ -868,48 +701,31 @@ program yelmox_ismip6
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
+if (running_mask_shlf_collapse) then
+            ! Clean up icebergs for mask_shlf_collapse experiments
+            call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
+            where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
+end if 
 
-            ! jablasco: delete icebergs -> inside yelmo_update
-            !call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
-            !where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
+            ! == CLIMATE and OCEAN ==========================================
 
- 
-if (.TRUE.) then 
-
-            ! Get hybrid snapclim + ISMIP6 climatic forcing 
-            call calc_climate_hybrid(snp1,smbpal1,mshlf1,snp2,smbpal2,mshlf2, &
-                                     ismp1,yelmo1,time,time_bp,ctl%time0,ctl%time1)
-            
-
-else
-        ! ISMIP6 only - to make sure it's working well.
-
-            call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
-                            time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
-            ! Overwrite original mshlf and snp with ismip6 derived ones 
-            snp1    = snp2
-            smbpal1 = smbpal2
-            mshlf1  = mshlf2
+            ! Get ISMIP6 climate and ocean forcing
+            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,time,time_bp)
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
-           
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
-          
+            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
-end if
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf   
+
             ! == MODEL OUTPUT ===================================
 
             if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
-                                                  file2D,time,snp2,mshlf2,smbpal2)
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
                 
                 ! ISMIP6 output if desired:
                  if (ctl%ismip6_write_formatted) then
-                    call write_step_2D_ismip6(yelmo1,isos1,snp1,mshlf1,smbpal1, &
-                                                  file1D_ismip6,time,snp2,mshlf2,smbpal2)
+                    call write_step_2D_ismip6(yelmo1,isos1,snp1,mshlf1,smbpal1,file1D_ismip6,time)
                 end if
             end if
            
@@ -959,52 +775,7 @@ end if
         write(*,*)
         write(*,*) "Performing transient. [abumip]"
         write(*,*) 
- 
-        ! Initialize variables inside of ismip6 object 
-         ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        !call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario)
-         !                                       domain=domain,grid_name=grid_name)
 
-         ! Initialize variables inside of ismip6 object 
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm="noresm",scen=trim(ctl%scenario), &
-                                                domain="Antarctica",grid_name=grid_name)
-
-
-        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
-        
-        snp2    = snp1 
-        smbpal2 = smbpal1
-        mshlf2  = mshlf1
-        
-        ! Update forcing to present-day reference 
-        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp1,yelmo1, &
-                                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-            
-        ! Overwrite original mshlf and snp with ismip6 derived ones 
-        snp1    = snp2
-        smbpal1 = smbpal2  
-        mshlf1  = mshlf2 
-
-        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-        ! ===== tf_corr initialization ======
-
-        ! Make sure that tf is prescribed externally
-        mshlf2%par%tf_method = 0 
-        mshlf2%now%tf_corr   = 0.0_wp 
-        
-        if (yelmo1%par%use_restart) then
-            ! Load tf_corr field from file 
-
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
-                                                    yelmo1%par%domain,yelmo1%par%grid_name)
-            
-        end if 
-        
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt_step = 1.0_wp 
         isos1%par%dt_lith = 10.0_wp 
@@ -1069,68 +840,61 @@ end if
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
  
             
-                ! ISMIP6 forcing 
+            ! ISMIP6 forcing 
 
-                ! Update ismip6 forcing to current time
-                call ismip6_forcing_update(ismp1,ctl%time_const)
+            ! Update ismip6 forcing to current time
+            call ismip6_forcing_update(ismp1,ctl%time_const)
 
-                ! Set climate to present day 
-                snp2%now = snp2%clim0
+            ! Set climate to present day 
+            snp1%now = snp1%clim0
 
-                ! == SURFACE MASS BALANCE ==============================================
+            ! == SURFACE MASS BALANCE ==============================================
 
 if (n .eq. 0) then 
                 ! Calculate smb for present day 
-                call smbpal_update_monthly(smbpal2,snp2%now%tas,snp2%now%pr, &
+                call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                            yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ctl%time_const) 
                 
                 ! Apply ISMIP6 anomalies
                 ! (apply to climate just for consistency)
 
-                smbpal2%ann%smb  = smbpal2%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-                smbpal2%ann%tsrf = smbpal2%ann%tsrf + ismp1%ts%var(:,:,1,1)
+                smbpal1%ann%smb  = smbpal1%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+                smbpal1%ann%tsrf = smbpal1%ann%tsrf + ismp1%ts%var(:,:,1,1)
 
                 do m = 1,12
-                    snp2%now%tas(:,:,m) = snp2%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                    snp2%now%pr(:,:,m)  = snp2%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
+                    snp1%now%tas(:,:,m) = snp1%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
+                    snp1%now%pr(:,:,m)  = snp1%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
                 end do 
 
-                snp2%now%ta_ann = sum(snp2%now%tas,dim=3) / 12.0_wp 
+                snp1%now%ta_ann = sum(snp1%now%tas,dim=3) / 12.0_wp 
                 if (trim(domain) .eq. "Antarctica") then 
-                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
+                    snp1%now%ta_sum  = sum(snp1%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
                 else 
-                    snp2%now%ta_sum  = sum(snp2%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
+                    snp1%now%ta_sum  = sum(snp1%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
                 end if 
-                snp2%now%pr_ann = sum(snp2%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
+                snp1%now%pr_ann = sum(snp1%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
 
 end if 
                 
-                ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-                ! jablasco: ocean is in absolute value, hence dto_ann = ismp1%to%var(:,:,:,1)*0.0
-                ! robinson: dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1)
-                ! jablasco: leave previous version
-                call marshelf_update_shelf(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
-                                ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                                dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
-                                tf_ann=ismp1%tf%var(:,:,:,1))
+            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
 
-                ! Update temperature forcing field with tf_corr and tf_corr_basin
-                mshlf2%now%tf_shlf = mshlf2%now%tf_shlf + mshlf2%now%tf_corr + mshlf2%now%tf_corr_basin
+            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
+                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
+                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
+                            tf_ann=ismp1%tf%var(:,:,:,1))
 
-                call marshelf_update(mshlf2,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+            ! Update temperature forcing field with tf_corr and tf_corr_basin
+            mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + mshlf1%now%tf_corr + mshlf1%now%tf_corr_basin
 
-            ! Overwrite original mshlf and snp with ismip6 derived ones 
-            snp1    = snp2
-            smbpal1 = smbpal2  
-            mshlf1  = mshlf2 
-            
-            yelmo1%bnd%smb      = smbpal2%ann%smb*conv_we_ie*1e-3
-            yelmo1%bnd%T_srf    = smbpal2%ann%tsrf 
+            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
+                                    yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
-            yelmo1%bnd%bmb_shlf = mshlf2%now%bmb_shlf  
-            yelmo1%bnd%T_shlf   = mshlf2%now%T_shlf  
+            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3
+            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
+
+            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
+            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
             if (trim(ctl%abumip_scenario) .eq. "abum") then 
                 ! Ensure bmb_shlf output is consistent with what is applied 
@@ -1142,8 +906,7 @@ end if
             ! == MODEL OUTPUT ===================================
 
             if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1, &
-                                                  file2D,time,snp2,mshlf2,smbpal2)
+                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
             end if
 
             if (mod(nint(time_elapsed*100),nint(ctl%dt1D_out*100))==0) then
@@ -1188,28 +951,6 @@ end if
         write(*,*) "Performing transient. [hysteresis]"
         write(*,*) 
         
-        ! Initialize variables inside of ismip6 object 
-        ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-        call ismip6_forcing_init(ismp1,ismip6_path_par,gcm=ctl%ismip6_gcm,scen=trim(ctl%scenario), &
-                                                domain=domain,grid_name=grid_name)
-
-        ! Initialize duplicate climate/smb/mshlf objects for use with ismip data
-            
-        snp2    = snp1 
-        smbpal2 = smbpal1
-        mshlf2  = mshlf1
-        
-        ! Make sure that tf is prescribed externally
-        mshlf1%par%tf_method = 0 
-
-        if (yelmo1%par%use_restart) then 
-            ! Load tf_corr field from file 
-
-            call load_tf_corr_from_restart(mshlf2%now%tf_corr,yelmo1%par%restart, &
-                                                    yelmo1%par%domain,yelmo1%par%grid_name)
-            
-        end if 
-
         ! Additionally make sure isostasy is update every timestep 
         isos1%par%dt_step = 1.0_wp 
         isos1%par%dt_lith = 10.0_wp 
@@ -1321,7 +1062,6 @@ end if
 
             ! == CLIMATE (ATMOSPHERE, OCEAN and SMB) ====================================
 
-if (.TRUE.) then 
             ! Update forcing to initial time with initial hyst forcing
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                         time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
@@ -1332,80 +1072,6 @@ if (.TRUE.) then
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-else 
-    ! Old method 
-
-            ! These will be used as anomalies against ISMIP6 control forcing
-            
-            ! Update snapclim
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain, &
-                                                dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
-                                                dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
-
-            ! Update surface mass balance
-            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time) 
-            
-
-            ! == ISMIP6 control forcing ====================================
-
-            ! Update ismip6 forcing to current time
-            call ismip6_forcing_update(ismp1,ctl%time_const)
-
-            ! Apply ISMIP6 anomalies
-            
-            smbpal1%ann%smb  = smbpal1%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-            smbpal1%ann%tsrf = smbpal1%ann%tsrf + ismp1%ts%var(:,:,1,1)
-
-            ! (apply to climate just for consistency)
-
-            do m = 1,12
-                snp1%now%tas(:,:,m) = snp1%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                snp1%now%pr(:,:,m)  = snp1%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
-            end do 
-
-            snp1%now%ta_ann = sum(snp1%now%tas,dim=3) / 12.0_wp 
-            if (trim(domain) .eq. "Antarctica") then 
-                snp1%now%ta_sum  = sum(snp1%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
-            else 
-                snp1%now%ta_sum  = sum(snp1%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
-            end if 
-            snp1%now%pr_ann = sum(snp1%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-
-
-            ! == MARINE-SHELF ===============================
-            ! jablasco: ocean in absolute value
-            ! robinson: dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1) 
-            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%lev, &
-                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                            dto_ann=ismp1%to%var(:,:,:,1)*0.0, &
-                            tf_ann=ismp1%tf%var(:,:,:,1))
-
-            ! Update temperature forcing field with tf_corr and tf_corr_basin
-            mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + mshlf1%now%tf_corr + mshlf1%now%tf_corr_basin
-
-            ! jablasco: no?
-            ! Update temperature fields with hysteresis anomaly 
-            !mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + hyst1%f_now*ctl%hyst_f_to
-            !mshlf1%now%dT_shlf = mshlf1%now%dT_shlf + hyst1%f_now*ctl%hyst_f_to
-            !mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + hyst1%f_now*ctl%hyst_f_to
-
-            ! Calculate bmb_shlf
-            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                 yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-
-            ! Store new boundary data in yelmo1 boundary fields
-
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3
-            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-end if 
 
             ! == MODEL OUTPUT ===================================
 
@@ -1463,7 +1129,7 @@ end if
 
 contains
     
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time,snp2,mshlf2,srf2,ismip6)
+    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none
 
@@ -1479,40 +1145,9 @@ contains
         character(len=*),       intent(IN) :: filename
         real(wp),               intent(IN) :: time
 
-        type(snapclim_class),   intent(IN), optional :: snp2
-        type(marshelf_class),   intent(IN), optional :: mshlf2
-        type(smbpal_class),     intent(IN), optional :: srf2
-        logical,                intent(IN), optional :: ismip6
-
         ! Local variables
         integer  :: ncid, n
         real(wp) :: time_prev
-        real(wp) :: density_corr, m3yr_to_kgs, ismip6_correction, yr_to_sec
-        ! ismip6 variables
-        real(wp), allocatable :: bmb_grnd_mask(:,:), bmb_shlf_mask(:,:)
-        real(wp), allocatable :: z_base(:,:), T_top_ice(:,:), T_base_grnd(:,:), T_base_flt(:,:), flux_grl(:,:)
-        ! allocate
-        allocate(bmb_grnd_mask(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(bmb_shlf_mask(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(z_base(ylmo%grd%nx,ylmo%grd%ny)) 
-        allocate(T_top_ice(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(T_base_grnd(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(T_base_flt(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(flux_grl(ylmo%grd%nx,ylmo%grd%ny))
-
-        ! Data conversion
-        density_corr = 917.0/1000.0 ! ice density correction with pure water
-        m3yr_to_kgs  = 3.2e-5       ! m3/yr of pure water to kg/s
-        ismip6_correction = m3yr_to_kgs*density_corr
-        yr_to_sec    = 31556952.0
-        ! Initialize
-        bmb_shlf_mask = 0.0_wp
-        bmb_grnd_mask = 0.0_wp
-        z_base = 0.0_wp
-        T_top_ice   = 0.0_wp
-        T_base_grnd = 0.0_wp
-        T_base_flt  = 0.0_wp 
-        flux_grl    = 0.0_wp
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -1774,58 +1409,6 @@ contains
         !call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
         !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        if (.FALSE. .and. present(snp2) .and. present(mshlf2)) then
-            ! Output values from second set of climate objects 
-            call nc_write(filename,"Ta_ann_2",snp2%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"Ta_sum_2",snp2%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"Pr_ann_2",snp2%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-            call nc_write(filename,"T_shlf_2",mshlf2%now%T_shlf,units="K",long_name="Shelf temperature", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"S_shlf_2",mshlf2%now%S_shlf,units="PSU",long_name="Shelf salinity", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"dT_shlf_2",mshlf2%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-            if (trim(mshlf2%par%bmb_method) .eq. "pico") then
-                call nc_write(filename,"d_shlf_2",mshlf2%pico%now%d_shlf,units="km",long_name="Shelf distance to grounding line", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"d_if_2",mshlf2%pico%now%d_if,units="km",long_name="Shelf distance to ice front", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"boxes_2",mshlf2%pico%now%boxes,units="",long_name="Shelf boxes", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"r_shlf_2",mshlf2%pico%now%r_shlf,units="",long_name="Ratio of ice shelf", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"T_box_2",mshlf2%pico%now%T_box,units="K?",long_name="Temperature of boxes", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"S_box_2",mshlf2%pico%now%S_box,units="PSU",long_name="Salinity of boxes", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"A_box_2",mshlf2%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            else
-                call nc_write(filename,"tf_basin_2",mshlf2%now%tf_basin,units="K",long_name="Mean basin thermal forcing", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"tf_shlf_2",mshlf2%now%tf_shlf,units="K",long_name="Shelf thermal forcing", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"tf_corr_2",mshlf2%now%tf_corr,units="K",long_name="Shelf thermal forcing applied correction factor", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"slope_base_2",mshlf2%now%slope_base,units="",long_name="Shelf-base slope", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-            end if
-
-            call nc_write(filename,"dTa_ann_2",snp2%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"dTa_sum_2",snp2%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"dPr_ann_2",(snp2%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        end if
-        
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1833,11 +1416,6 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        !call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
-        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
-        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dzsdx",ylmo%tpo%now%dzsdx,units="m/m",long_name="Surface slope", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -2112,114 +1690,6 @@ contains
         return
 
     end subroutine calc_climate_ismip6
-
-
-
-    subroutine calc_climate_hybrid(snp1,smbp1,mshlf1,snp2,smbp2,mshlf2, &
-                                        ismp,ylmo,time,time_bp,time0,time1)
-
-        implicit none 
-
-        type(snapclim_class),       intent(INOUT) :: snp1
-        type(smbpal_class),         intent(INOUT) :: smbp1
-        type(marshelf_class),       intent(INOUT) :: mshlf1
-        type(snapclim_class),       intent(INOUT) :: snp2 
-        type(smbpal_class),         intent(INOUT) :: smbp2
-        type(marshelf_class),       intent(INOUT) :: mshlf2 
-        type(ismip6_forcing_class), intent(INOUT) :: ismp
-        type(yelmo_class),          intent(INOUT) :: ylmo
-        real(wp),                   intent(IN)    :: time 
-        real(wp),                   intent(IN)    :: time_bp 
-        real(wp),                   intent(IN)    :: time0 
-        real(wp),                   intent(IN)    :: time1 
-
-        ! Local variables 
-        real(wp) :: time_wt 
-
-if (.TRUE.) then 
-    !ajr : testing, proceed as normal here...
-
-        if (time .le. time1) then 
-
-            call calc_climate_standard(snp1,smbp1,mshlf1,ylmo,time,time_bp)
-
-        end if 
-
-        if (time .ge. time0) then 
-            ! ISMIP6 forcing 
-
-            call calc_climate_ismip6(snp2,smbp2,mshlf2,ismp,ylmo,time,time_bp)
-
-        end if
-
-        ! Determine which forcing to use based on time period 
-        ! LGM to time0 CE      == snapclim 
-        ! time0 CE to time1 CE == linear transition from snapclim to ismip6 
-        ! time1 CE to future   == ismip6 
-
-
-        if (time .le. time0) then 
-            ! Only snapclim-based forcing 
-
-            ylmo%bnd%smb      = smbp1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-            ylmo%bnd%T_srf    = smbp1%ann%tsrf 
-
-            ylmo%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            ylmo%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-        else if (time .gt. time0 .and. time .le. time1) then 
-            ! Linear-weighted average between snapclim and ismip6 forcing 
-
-            time_wt = (time-time0) / (time1 - time0)
-
-            ylmo%bnd%smb      = (time_wt*smbp2%ann%smb  + (1.0-time_wt)*smbp1%ann%smb)  * conv_we_ie*1e-3
-            ylmo%bnd%T_srf    =  time_wt*smbp2%ann%tsrf + (1.0-time_wt)*smbp1%ann%tsrf
-
-            ylmo%bnd%bmb_shlf = time_wt*mshlf2%now%bmb_shlf + (1.0-time_wt)*mshlf1%now%bmb_shlf 
-            ylmo%bnd%T_shlf   = time_wt*mshlf2%now%T_shlf   + (1.0-time_wt)*mshlf1%now%T_shlf  
-
-        else    ! time > time1
-            ! Only ISMIP6 forcing 
-
-            ! Overwrite original mshlf and snp with ismip6 derived ones 
-            snp1   = snp2
-            smbp1  = smbp2  
-            mshlf1 = mshlf2 
-            
-            ylmo%bnd%smb      = smbp1%ann%smb*conv_we_ie*1e-3
-            ylmo%bnd%T_srf    = smbp1%ann%tsrf 
-
-            ylmo%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-            ylmo%bnd%T_shlf   = mshlf1%now%T_shlf  
-
-    
-
- 
-        end if
-
-else 
-    ! ajr: impose ISMIP6 forcing directly for testing
-
-        call calc_climate_ismip6(snp2,smbpal2,mshlf2,ismp,ylmo,time,time_bp)
-
-        ! Overwrite original mshlf and snp with ismip6 derived ones 
-        snp1    = snp2
-        smbpal1 = smbpal2  
-        mshlf1  = mshlf2 
-
-        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
-        yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
-        yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-        yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf   
-
-
-
-        return
-
-end if 
-      
-    end subroutine calc_climate_hybrid
 
     subroutine load_tf_corr_from_restart(tf_corr,file_restart,domain,grid_name)
 
@@ -2814,7 +2284,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     ! ===== ISMIP6 output routines =========
 
-    subroutine write_step_2D_ismip6(ylmo,isos,snp,mshlf,srf,filename,time,snp2,mshlf2,srf2)
+    subroutine write_step_2D_ismip6(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none
 
@@ -2823,16 +2293,8 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         type(snapclim_class),   intent(IN) :: snp
         type(marshelf_class),   intent(IN) :: mshlf
         type(smbpal_class),     intent(IN) :: srf
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
-
         character(len=*),       intent(IN) :: filename
         real(wp),               intent(IN) :: time
-
-        type(snapclim_class),   intent(IN), optional :: snp2
-        type(marshelf_class),   intent(IN), optional :: mshlf2
-        type(smbpal_class),     intent(IN), optional :: srf2
 
         ! Local variables
         integer  :: ncid, n
