@@ -296,9 +296,7 @@ contains
             ! Note: annual values are output with units of [mm/a]
 
         end if 
-
-        write(*,*) "jablasco: ante sde init: l300"
- 
+        
         ! Annual I/O 
         if (write_out_now) then
             if (init_now) call smbpal_write_init(smb%par,file_out,z_srf,H_ice)
