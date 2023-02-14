@@ -174,7 +174,7 @@ program yelmox
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
 
-    !file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
+    file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
     
     ! Print summary of run settings 
     write(*,*)
@@ -413,13 +413,6 @@ program yelmox
         call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
     end if
 
-!     yelmo1%bnd%smb   = yelmo1%dta%pd%smb
-!     yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-    write(*,*) "jablasco: ANT-16KM resolution - before marshelf update"
-    write(*,*) "jablasco: shape to_ann now:", SHAPE(snp1%now%to_ann)
-    write(*,*) "jablasco: shape to_ann clim0:", SHAPE(snp1%clim0%to_ann)
-    !dto_ann=snp1%now%to_ann-snp1%clim0%to_ann
-    !write(*,*) "jablasco: shape dto_ann:", SHAPE(dto_ann)
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -569,7 +562,6 @@ program yelmox
     
     call yelmo_write_init(yelmo1,file2D,time_init=time,units="years") 
     call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    
     call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years") 
     
     if (reg1%write) then 
@@ -716,9 +708,6 @@ program yelmox
         dT_now = 0.0 
         !if (time .gt. 7000.0) dT_now = 4.0 
 
-        ! jablasco
-        write(*,*) "jablasco: yelmox l697" 
-        write(*,*) "jablasco:  dT_now=",  dT_now
         call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                    yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
         yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -890,12 +879,8 @@ contains
         call nc_write(filename,"taub",ylmo%dyn%now%taub,units="Pa",long_name="Basal stress", &
                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-! HEAD
-        ! Strain-rate and stress tensors 
-
-        ! Strain-rate and stress tensors (jablasco) 
-!END HEAD
         if (.FALSE.) then
+            ! Strain-rate and stress tensors 
 
             call nc_write(filename,"de",ylmo%mat%now%strn%de,units="a^-1",long_name="Effective strain rate", &
                        dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
