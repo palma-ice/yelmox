@@ -391,7 +391,6 @@ contains
 
     end subroutine ismip6_ant_forcing_init
 
-
     subroutine ismip6_ant_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
 
         implicit none 
@@ -412,59 +411,11 @@ contains
 
         ! === Atmospheric fields ==================================
         
-       !HEAD
-       ! if (trim(ism%scenario) .eq. "ctrl") then 
-       !     ! For control scenario, override time choices and 
-       !     ! set control atm and ocn 
+        if (trim(ism%scenario) .eq. "ctrl0") then 
+            ! For control scenario "ctrl0" with no variability at all, 
+            ! override time choices and set control atm and ocn 
 
-        !    ! Set atm fields to reference values (ie, zero anomaly) 
-        !    ism%ts  = ism%ts_ref 
-        !    ism%pr  = ism%pr_ref 
-        !    ism%smb = ism%smb_ref 
-
-         !   ! Since atm fields are anomalies, also set actual variable to zero 
-         !   ism%ts%var  = 0.0_wp 
-         !   ism%pr%var  = 0.0_wp 
-         !   ism%smb%var = 0.0_wp 
-            
-       ! else if (time .lt. 1995) then 
-       !END HEAD
-
-        ! 1995
-        if (time .lt. 1995) then 
-
-
-        ! ajr: ISMIP6 spinup you want with any forcing
-        ! historical run with MIROC forcing. 
-        ! PD climatologies: 1995-2014. NorESM
-        ! Historical: 1950-1994.
-        ! Future: 1995-2300. 
-
-            ! jablasco
-         !!  call varslice_update(ism%ts_hist, [time],method=slice_method)
-         !!  call varslice_update(ism%pr_hist, [time],method=slice_method)
-         !!  call varslice_update(ism%smb_hist,[time],method=slice_method)
-
-         !!   ism%ts  = ism%ts_hist
-         !!   ism%pr  = ism%pr_hist
-         !!   ism%smb = ism%smb_hist
-
-         !!ajr:
-            ism%ts  = ism%ts_ref
-            ism%pr  = ism%pr_ref
-            ism%smb = ism%smb_ref
-
-            ! Since atm fields are anomalies, also set actual variable to zero
-            ism%ts%var  = 0.0_wp
-            ism%pr%var  = 0.0_wp
-            ism%smb%var = 0.0_wp
-
-        ! 2015 pa 2300
-
-        ! targeted experiments: jablasco
-        ! 2015 -> 2301
-        else if (time .ge. 1995 .and. time .lt. 2015) then
-
+            ! Set atm fields to reference values (ie, zero anomaly) 
             ism%ts  = ism%ts_ref 
             ism%pr  = ism%pr_ref 
             ism%smb = ism%smb_ref 
@@ -472,9 +423,34 @@ contains
             ! Since atm fields are anomalies, also set actual variable to zero 
             ism%ts%var  = 0.0_wp 
             ism%pr%var  = 0.0_wp 
-            ism%smb%var = 0.0_wp
+            ism%smb%var = 0.0_wp 
+        
+        else if (time .lt. 1950) then
+            ! No data available, impose climatological mean 
+
+            ! Set atm fields to reference values (ie, zero anomaly) 
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+        
+        else if (time .ge. 1950 .and. time .lt. 2015) then
+            ! Get data from historical forcing datasets
+
+            call varslice_update(ism%ts_hist, [time],method=slice_method)
+            call varslice_update(ism%pr_hist, [time],method=slice_method)
+            call varslice_update(ism%smb_hist,[time],method=slice_method)
+
+            ism%ts  = ism%ts_hist
+            ism%pr  = ism%pr_hist
+            ism%smb = ism%smb_hist
 
         else if (time .ge. 2015 .and. time .le. 2300) then
+            ! Get data from projection forcing datasets
 
             call varslice_update(ism%ts_proj, [time],method=slice_method)
             call varslice_update(ism%pr_proj, [time],method=slice_method)
@@ -485,6 +461,7 @@ contains
             ism%smb = ism%smb_proj
 
         else ! time .gt. 2300
+            ! Take the average of the last 10 years of projection forcing data
 
             call varslice_update(ism%ts_proj, [2290.0_wp,2300.0_wp],method="range_mean")
             call varslice_update(ism%pr_proj, [2290.0_wp,2300.0_wp],method="range_mean")
@@ -497,47 +474,38 @@ contains
         end if
 
         ! === Oceanic fields ==================================
+        
+        if (trim(ism%scenario) .eq. "ctrl0") then 
+            ! For control scenario "ctrl0" with no variability at all, 
+            ! override time choices and set control atm and ocn 
 
-       !HEAD
-       ! if (trim(ism%scenario) .eq. "ctrl") then 
-       !     ! For control scenario, override time choices and 
-       !     ! set control atm and ocn 
+            ! Set ocn fields to reference values 
+            ism%to = ism%to_ref 
+            ism%so = ism%so_ref 
+            ism%tf = ism%tf_ref 
 
-       !     ! Set ocn fields to reference values 
-       !     ism%to = ism%to_ref 
-       !     ism%so = ism%so_ref 
-       !     ism%tf = ism%tf_ref 
+        else if (time .lt. 1950) then 
+            ! No data available, impose climatological mean 
 
-       ! else if (time .lt. 1995) then 
-     !END HEAD
-        ! 2501
-        if (time .lt. 1995) then 
+            ism%to = ism%to_ref
+            ism%so = ism%so_ref
+            ism%tf = ism%tf_ref
+
+        else if (time .ge. 1950 .and. time .lt. 2015) then
             ! Historic 
 
-            ! jablasco
+            ism%to = ism%to_ref
+            ism%so = ism%so_ref
+            ism%tf = ism%tf_ref
+
             ! Oceanic fields 
-            !!call varslice_update(ism%to_hist,[time],method=slice_method)
-            !!call varslice_update(ism%so_hist,[time],method=slice_method)
-            !!call varslice_update(ism%tf_hist,[time],method=slice_method)
+            call varslice_update(ism%to_hist,[time],method=slice_method)
+            call varslice_update(ism%so_hist,[time],method=slice_method)
+            call varslice_update(ism%tf_hist,[time],method=slice_method)
 
-            !!ism%to = ism%to_hist
-            !!ism%so = ism%so_hist
-            !!ism%tf = ism%tf_hist
-            
-            !!ajr:
-            ism%to = ism%to_ref
-            ism%so = ism%so_ref
-            ism%tf = ism%tf_ref
-
-        ! jablasco: only atm; 2015 -> 2301
-        !!else if (time .ge. 1995 .and. time .lt. 2301) then
-        !!ajr:
-        else if (time .ge. 1995 .and. time .lt. 2015) then
-            ! Historic 
-
-            ism%to = ism%to_ref
-            ism%so = ism%so_ref
-            ism%tf = ism%tf_ref
+            ism%to = ism%to_proj
+            ism%so = ism%so_proj
+            ism%tf = ism%tf_proj
 
         else if (time .ge. 2015 .and. time .le. 2300) then
             ! Projection period 1 
@@ -589,10 +557,12 @@ contains
 
         if (trim(ism%scenario) .eq. "ctrl") then 
             ! For control scenario, override above choices and 
-            ! set control atm and ocn 
+            ! set control atm and ocn for projection time periods.
+            ! This means historical variability is allowed, but 
+            ! then the climatological average is imposed for the future.
+            ! See protocol at: https://www.climate-cryosphere.org/wiki/index.php?title=ISMIP6-Projections2300-Antarctica#Initialization.2C_historical_run.2C_control_run.2C_and_projection_runs
 
-            ! jablasco (mantain hist runs)
-            if (time .ge. 1995) then
+            if (time .ge. 2015) then
 
                 ! Set atm fields to reference values (ie, zero anomaly) 
                 ism%ts  = ism%ts_ref 
