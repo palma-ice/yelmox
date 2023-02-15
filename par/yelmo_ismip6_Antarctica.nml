@@ -1,13 +1,11 @@
 &ctrl
-    run_step        = "spinup_ismip6"
-    time0           =  850.0
-    time1           = 1850.0 
+    run_step        = "spinup_ismip6" 
 /
 
 &ismip6
     par_file        = "input/ismip6/ismip6_ant.nml"
     gcm             = "NorESM1-M"       ! ISMIP6 GCM model
-    scenario        = "RCP26-repeat"    ! ISMIP6 scenario
+    scenario        = "ctrl0"           ! ISMIP6 scenario ! RCP26-repeat
     write_formatted = False
 /
 
@@ -29,7 +27,7 @@
     dtt             = 5.0               ! [yr] Main loop timestep 
     dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
     dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
-    time_const      = 1950.0            ! [yr] Year that equilibration represents
+    time_const      = 1990.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "relax"           ! "none", "relax", "opt"
 /

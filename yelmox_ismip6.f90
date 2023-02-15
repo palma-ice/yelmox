@@ -24,8 +24,6 @@ program yelmox_ismip6
     character(len=256) :: outfldr, file1D, file2D, file2D_small
     character(len=256) :: file1D_ismip6, file2D_ismip6
     character(len=256) :: file_restart
-    character(len=256) :: file_restart_hist
-    character(len=256) :: file_restart_trans
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
     character(len=512) :: path_tf_corr 
@@ -75,8 +73,6 @@ program yelmox_ismip6
 
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
-        real(wp) :: time0 
-        real(wp) :: time1 
 
         character(len=56) :: abumip_scenario
         real(wp)          :: abumip_bmb 
@@ -107,8 +103,6 @@ program yelmox_ismip6
 
     ! Control parameters 
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
-    call nml_read(path_par,"ctrl","time0",      ctl%time0)
-    call nml_read(path_par,"ctrl","time1",      ctl%time1)
     
     ! ismip6 parameters 
     call nml_read(path_par,"ismip6","par_file",         ctl%ismip6_par_file)
@@ -166,16 +160,9 @@ program yelmox_ismip6
     file2D              = trim(outfldr)//"yelmo2D.nc" 
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"    
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
-    file_restart_hist   = trim(outfldr)//"yelmo_restart_1950ce.nc"
 
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc" 
-
-    if (ctl%time0 .lt. 1e3) then 
-        write(file_restart_trans,"(a,i3,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), "ce.nc"
-    else 
-        write(file_restart_trans,"(a,i4,a)") trim(outfldr)//"yelmo_restart_", int(ctl%time0), "ce.nc"
-    end if
 
     !  =========================================================
 
@@ -387,21 +374,6 @@ program yelmox_ismip6
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp,time_equil=100.0)
     end if 
     
-    call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp) 
-    yelmo1%bnd%smb   = smbpal1%ann%smb*conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-    yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-    call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-    call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-    yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
-
     ! Update forcing to present-day reference using ISMIP6 forcing
     call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
@@ -740,16 +712,6 @@ end if
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
-            if (time == ctl%time0) then 
-                ! Write restart file at start of transition period
-                call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
-            end if 
-
-            if (time == 1950.0_wp) then 
-                ! Write restart file at start of hist period
-                call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
-            end if 
-
         end do 
 
         write(*,*)
@@ -915,16 +877,6 @@ end if
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
             end if 
             
-            if (time == ctl%time0) then 
-                ! Write restart file at start of transition period
-                call yelmo_restart_write(yelmo1,file_restart_trans,time=time) 
-            end if 
-
-            if (time == 1950.0_wp) then 
-                ! Write restart file at start of hist period
-                call yelmo_restart_write(yelmo1,file_restart_hist,time=time) 
-            end if 
-
         end do 
 
         write(*,*)
@@ -1672,6 +1624,16 @@ contains
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
+        write(*,*) "Checking...."
+        write(*,*) "tf_shlf:       ", minval(mshlf%now%tf_shlf), maxval(mshlf%now%tf_shlf)
+        write(*,*) "tf_corr:       ", minval(mshlf%now%tf_corr), maxval(mshlf%now%tf_corr)
+        write(*,*) "tf_corr_basin: ", minval(mshlf%now%tf_corr_basin), maxval(mshlf%now%tf_corr_basin)
+        write(*,*) "ismp%tf%var(:,:,:,1): ", minval(ismp%tf%var(:,:,:,1)), maxval(ismp%tf%var(:,:,:,1))
+        write(*,*) "ismp%to%var(:,:,:,1): ", minval(ismp%to%var(:,:,:,1)), maxval(ismp%to%var(:,:,:,1))
+        write(*,*) "ismp%to_ref%var(:,:,:,1): ", minval(ismp%to_ref%var(:,:,:,1)), maxval(ismp%to_ref%var(:,:,:,1))
+        write(*,*) "ismp%so%var(:,:,:,1): ", minval(ismp%so%var(:,:,:,1)), maxval(ismp%so%var(:,:,:,1))
+        stop 
+        
         if (present(dTo)) then 
             ! Update temperature fields with hysteresis anomaly 
             mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo

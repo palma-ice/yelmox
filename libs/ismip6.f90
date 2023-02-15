@@ -21,12 +21,13 @@ module ismip6
     ! Class for holding ice-forcing data from ISMIP6 archives
     type ismip6_forcing_class
         
-        ! Experiment information 
+        ! Experiment information
         character(len=256)     :: gcm 
         character(len=256)     :: scenario
         character(len=256)     :: experiment 
         character(len=256)     :: domain 
         character(len=256)     :: grid_name 
+        character(len=256)     :: ctrl_run_type
 
         ! Current state:
 
@@ -229,16 +230,28 @@ contains
         real(wp) :: tmp 
         real(wp) :: time_par(3)
 
-        ! Define the current experiment characteristics
-        ism%gcm        = trim(gcm)
-        ism%scenario   = trim(scenario) 
-        ism%experiment = trim(ism%gcm)//"_"//trim(ism%scenario) 
-
+        
         ! Special case for control runs, use "NorESM1-M_RCP26-repeat"
-        if (trim(ism%scenario) .eq. "ctrl" .or. trim(ism%scenario) .eq. "ctrl0") then
+        if (trim(scenario) .eq. "ctrl" .or. trim(scenario) .eq. "ctrl0") then
+            ! Assign specific gcm+scenario for control runs
+
             ism%gcm        =  "NorESM1-M"
             ism%scenario   =  "RCP26-repeat"
             ism%experiment = "NorESM1-M_RCP26-repeat"
+            
+            ! Save control run name ("ctrl0" or "ctrl") here
+            ism%ctrl_run_type = trim(scenario)
+
+        else
+            ! Define the current experiment characteristics
+
+            ism%gcm        = trim(gcm)
+            ism%scenario   = trim(scenario) 
+            ism%experiment = trim(ism%gcm)//"_"//trim(ism%scenario) 
+
+            ! Not a control simulation
+            ism%ctrl_run_type = "none"
+
         end if
 
         select case(trim(ism%experiment))
@@ -411,7 +424,7 @@ contains
 
         ! === Atmospheric fields ==================================
         
-        if (trim(ism%scenario) .eq. "ctrl0") then 
+        if (trim(ism%ctrl_run_type) .eq. "ctrl0") then 
             ! For control scenario "ctrl0" with no variability at all, 
             ! override time choices and set control atm and ocn 
 
@@ -475,7 +488,7 @@ contains
 
         ! === Oceanic fields ==================================
         
-        if (trim(ism%scenario) .eq. "ctrl0") then 
+        if (trim(ism%ctrl_run_type) .eq. "ctrl0") then 
             ! For control scenario "ctrl0" with no variability at all, 
             ! override time choices and set control atm and ocn 
 
@@ -555,8 +568,8 @@ contains
 
         ! === Additional calculations ======================
 
-        if (trim(ism%scenario) .eq. "ctrl") then 
-            ! For control scenario, override above choices and 
+        if (trim(ism%ctrl_run_type) .eq. "ctrl") then 
+            ! For control scenario "ctrl", override above choices and 
             ! set control atm and ocn for projection time periods.
             ! This means historical variability is allowed, but 
             ! then the climatological average is imposed for the future.
