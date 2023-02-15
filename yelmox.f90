@@ -6,6 +6,7 @@ program yelmox
     use yelmo 
     use yelmo_tools, only : smooth_gauss_2D
     use ice_optimization
+    use basal_dragging, only : calc_lambda_bed_lin, calc_lambda_bed_exp
 
     ! External libraries
     use sealevel 
@@ -340,6 +341,15 @@ program yelmox
             where(abs(yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
             where(abs(yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE. 
             where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%ice_allowed = .FALSE.            
+            
+            if (yelmo1%dyn%par%till_method .eq. -1) then 
+                ! Initialize cb_ref to constant value to start
+                ! (will be updated in the time loop)
+
+                yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%till_cf_ref 
+
+            end if 
+
             
         case DEFAULT 
 
@@ -690,7 +700,7 @@ program yelmox
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
-         
+        
         ! == ICE SHEET ===================================================
         if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
@@ -1148,7 +1158,6 @@ contains
     end subroutine write_step_2D_combined
 
 
-
     subroutine calc_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
 
         implicit none
@@ -1201,6 +1210,174 @@ contains
         return
 
     end subroutine calc_glacial_smb
+
+    ! ===== NEGIS routines ============================
+
+    subroutine calc_cb_ref_negis(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,f_sed,H_sed_min,H_sed_max, &
+                                            cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
+        ! Update cb_ref [--] based on parameter choices
+
+        implicit none
+        
+        real(wp), intent(OUT) :: cb_ref(:,:) 
+        real(wp), intent(IN)  :: z_bed(:,:) 
+        real(wp), intent(IN)  :: z_bed_sd(:,:)
+        real(wp), intent(IN)  :: z_sl(:,:) 
+        real(wp), intent(IN)  :: H_sed(:,:) 
+        real(wp), intent(IN)  :: f_sed 
+        real(wp), intent(IN)  :: H_sed_min
+        real(wp), intent(IN)  :: H_sed_max  
+        real(wp), intent(IN)  :: cf_ref 
+        real(wp), intent(IN)  :: cf_min
+        real(wp), intent(IN)  :: z0 
+        real(wp), intent(IN)  :: z1
+        integer,  intent(IN) :: n_sd 
+        character(len=*), intent(IN) :: till_scale
+        integer,  intent(IN) :: till_method
+        
+        ! Local variables
+        integer :: q, i, j, nx, ny 
+        real(wp) :: f_sd_min, f_sd_max
+        real(wp) :: lambda_bed  
+        real(wp), allocatable :: cb_ref_samples(:) 
+        real(wp), allocatable :: f_sd(:) 
+        real(wp), allocatable :: w_sd(:) 
+
+        nx = size(cb_ref,1)
+        ny = size(cb_ref,2)
+        
+        if (n_sd .le. 0) then 
+            write(io_unit_err,*) "calc_cb_ref_negis:: Error: ytill.n_sd must be > 0."
+            write(io_unit_err,*) "ytill.n_sd = ", n_sd 
+            stop 
+        end if 
+
+        allocate(cb_ref_samples(n_sd))
+        allocate(f_sd(n_sd))
+        allocate(w_sd(n_sd))
+     
+        if (n_sd .eq. 1) then 
+            ! No sampling performed
+            f_sd = 0.0 
+            w_sd = 0.0
+
+        else 
+
+            ! Sample over range, e.g., +/- 1-sigma 
+            f_sd_min = -1.0 
+            f_sd_max =  1.0 
+
+            do q = 1, n_sd 
+                f_sd(q) = f_sd_min + (f_sd_max-f_sd_min)*real(q-1,wp)/real(n_sd-1,wp)
+                w_sd(q) = (1.0_wp/sqrt(2.0_wp*pi)) * exp(-f_sd(q)**2/2.0_wp)
+            end do 
+
+            ! Normalize weighting 
+            w_sd = w_sd/sum(w_sd)
+
+        end if 
+
+        if (till_method .eq. -1) then 
+            ! Do nothing - cb_ref defined externally
+
+        else 
+            ! Calculate cb_ref following parameter choices 
+            ! lambda_bed: scaling as a function of bedrock elevation
+
+            ! Sample bedrock according to its standard deviation to account for uncertainty
+            ! and possible pinning points, etc. 
+
+            ! Finally, scale according to sediment parameterization too.
+
+            select case(trim(till_scale))
+
+                case("none")
+                    ! No scaling with elevation, set reference value 
+
+                    cb_ref = cf_ref
+                    
+                case("lin")
+                    ! Linear scaling function with bedrock elevation
+
+                    do j = 1, ny 
+                    do i = 1, nx 
+
+                        do q = 1, n_sd
+
+                            lambda_bed = calc_lambda_bed_lin(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
+                                                                                    z_sl(i,j),z0,z1)
+
+                            ! Calculate cb_ref 
+                            cb_ref_samples(q) = cf_ref * lambda_bed 
+                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
+
+                        end do 
+
+                        ! Average samples 
+                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
+
+                    end do 
+                    end do 
+
+                case("exp") 
+
+                    do j = 1, ny 
+                    do i = 1, nx 
+
+                        do q = 1, n_sd
+
+                            lambda_bed = calc_lambda_bed_exp(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
+                                                                                    z_sl(i,j),z0,z1)
+
+                            ! Calculate cb_ref 
+                            cb_ref_samples(q) = cf_ref * lambda_bed 
+                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
+
+                        end do 
+
+                        ! Average samples 
+                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
+
+                    end do 
+                    end do 
+
+                case DEFAULT
+                    ! Scaling not recognized.
+
+                    write(io_unit_err,*) "calc_cb_ref_negis:: Error: scaling of cb_ref with &
+                    &elevation not recognized."
+                    write(io_unit_err,*) "ydyn.till_scale = ", till_scale 
+                    stop 
+                    
+            end select 
+            
+            ! Sediment scaling if desired
+            if (f_sed .lt. 1.0) then 
+
+                do j = 1, ny 
+                do i = 1, nx 
+
+                    ! Get linear scaling as a function of sediment thickness
+                    lambda_bed = (H_sed(i,j) - H_sed_min) / (H_sed_max - H_sed_min)
+                    if (lambda_bed .lt. 0.0) lambda_bed = 0.0
+                    if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
+
+                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_min) to 1.0(H_sed=H_sed_max)
+                    lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
+
+                    ! Apply scaling to cb_ref 
+                    cb_ref(i,j) = cb_ref(i,j) * lambda_bed 
+
+                end do
+                end do
+
+            end if 
+
+        end if 
+
+        return 
+
+    end subroutine calc_cb_ref_negis
 
 end program yelmox
 
