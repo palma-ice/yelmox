@@ -1635,16 +1635,15 @@ contains
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
 
-
-        write(*,*) "Checking..."
-        write(*,*) "bmb_shlf:      ", minval(mshlf%now%bmb_shlf), maxval(mshlf%now%bmb_shlf)
-        write(*,*) "tf_shlf:       ", minval(mshlf%now%tf_shlf), maxval(mshlf%now%tf_shlf)
-        write(*,*) "tf_corr:       ", minval(mshlf%now%tf_corr), maxval(mshlf%now%tf_corr)
-        write(*,*) "tf_corr_basin: ", minval(mshlf%now%tf_corr_basin), maxval(mshlf%now%tf_corr_basin)
-        write(*,*) "ismp%tf%var(:,:,:,1): ", minval(ismp%tf%var(:,:,:,1)), maxval(ismp%tf%var(:,:,:,1))
-        write(*,*) "ismp%to%var(:,:,:,1): ", minval(ismp%to%var(:,:,:,1)), maxval(ismp%to%var(:,:,:,1))
-        write(*,*) "ismp%to_ref%var(:,:,:,1): ", minval(ismp%to_ref%var(:,:,:,1)), maxval(ismp%to_ref%var(:,:,:,1))
-        write(*,*) "ismp%so%var(:,:,:,1): ", minval(ismp%so%var(:,:,:,1)), maxval(ismp%so%var(:,:,:,1))
+        ! write(*,*) "Checking..."
+        ! write(*,*) "bmb_shlf:      ", minval(mshlf%now%bmb_shlf), maxval(mshlf%now%bmb_shlf)
+        ! write(*,*) "tf_shlf:       ", minval(mshlf%now%tf_shlf), maxval(mshlf%now%tf_shlf)
+        ! write(*,*) "tf_corr:       ", minval(mshlf%now%tf_corr), maxval(mshlf%now%tf_corr)
+        ! write(*,*) "tf_corr_basin: ", minval(mshlf%now%tf_corr_basin), maxval(mshlf%now%tf_corr_basin)
+        ! write(*,*) "ismp%tf%var(:,:,:,1): ", minval(ismp%tf%var(:,:,:,1)), maxval(ismp%tf%var(:,:,:,1))
+        ! write(*,*) "ismp%to%var(:,:,:,1): ", minval(ismp%to%var(:,:,:,1)), maxval(ismp%to%var(:,:,:,1))
+        ! write(*,*) "ismp%to_ref%var(:,:,:,1): ", minval(ismp%to_ref%var(:,:,:,1)), maxval(ismp%to_ref%var(:,:,:,1))
+        ! write(*,*) "ismp%so%var(:,:,:,1): ", minval(ismp%so%var(:,:,:,1)), maxval(ismp%so%var(:,:,:,1))
         
         return
 
