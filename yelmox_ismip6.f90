@@ -1624,16 +1624,6 @@ contains
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
-        write(*,*) "Checking...."
-        write(*,*) "tf_shlf:       ", minval(mshlf%now%tf_shlf), maxval(mshlf%now%tf_shlf)
-        write(*,*) "tf_corr:       ", minval(mshlf%now%tf_corr), maxval(mshlf%now%tf_corr)
-        write(*,*) "tf_corr_basin: ", minval(mshlf%now%tf_corr_basin), maxval(mshlf%now%tf_corr_basin)
-        write(*,*) "ismp%tf%var(:,:,:,1): ", minval(ismp%tf%var(:,:,:,1)), maxval(ismp%tf%var(:,:,:,1))
-        write(*,*) "ismp%to%var(:,:,:,1): ", minval(ismp%to%var(:,:,:,1)), maxval(ismp%to%var(:,:,:,1))
-        write(*,*) "ismp%to_ref%var(:,:,:,1): ", minval(ismp%to_ref%var(:,:,:,1)), maxval(ismp%to_ref%var(:,:,:,1))
-        write(*,*) "ismp%so%var(:,:,:,1): ", minval(ismp%so%var(:,:,:,1)), maxval(ismp%so%var(:,:,:,1))
-        stop 
-        
         if (present(dTo)) then 
             ! Update temperature fields with hysteresis anomaly 
             mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo
@@ -1646,6 +1636,16 @@ contains
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
 
 
+        write(*,*) "Checking..."
+        write(*,*) "bmb_shlf:      ", minval(mshlf%now%bmb_shlf), maxval(mshlf%now%bmb_shlf)
+        write(*,*) "tf_shlf:       ", minval(mshlf%now%tf_shlf), maxval(mshlf%now%tf_shlf)
+        write(*,*) "tf_corr:       ", minval(mshlf%now%tf_corr), maxval(mshlf%now%tf_corr)
+        write(*,*) "tf_corr_basin: ", minval(mshlf%now%tf_corr_basin), maxval(mshlf%now%tf_corr_basin)
+        write(*,*) "ismp%tf%var(:,:,:,1): ", minval(ismp%tf%var(:,:,:,1)), maxval(ismp%tf%var(:,:,:,1))
+        write(*,*) "ismp%to%var(:,:,:,1): ", minval(ismp%to%var(:,:,:,1)), maxval(ismp%to%var(:,:,:,1))
+        write(*,*) "ismp%to_ref%var(:,:,:,1): ", minval(ismp%to_ref%var(:,:,:,1)), maxval(ismp%to_ref%var(:,:,:,1))
+        write(*,*) "ismp%so%var(:,:,:,1): ", minval(ismp%so%var(:,:,:,1)), maxval(ismp%so%var(:,:,:,1))
+        
         return
 
     end subroutine calc_climate_ismip6

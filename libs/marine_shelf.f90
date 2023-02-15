@@ -206,8 +206,6 @@ contains
         allocate(wt_shlf(nz)) 
         wt_shlf = 0.0 
 
-        write(*,*) "jablasco: ANT-16KM resolution"
-
         ! Loop over domain and update variables at each point (vertical interpolation)
         do j = 1, ny 
         do i = 1, nx 
@@ -302,7 +300,6 @@ contains
         
         implicit none
        
-        ! jablasco: added regions 
         type(marshelf_class), intent(INOUT) :: mshlf
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
@@ -416,8 +413,7 @@ contains
 
             case("pico") 
 
-                ! compute mean values at bedrock depth with ice-free points
-                ! jablasco
+                ! Compute mean values at bedrock depth with ice-free points
                 call calc_variable_basin_pico(mshlf%now%T_shlf_basin,mshlf%now%T_shlf, &
                                                         f_grnd,basins,H_ice,mshlf%now%mask_ocn)
                 call calc_variable_basin_pico(mshlf%now%S_shlf_basin,mshlf%now%S_shlf, &
