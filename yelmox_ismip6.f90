@@ -178,8 +178,7 @@ program yelmox_ismip6
     write(*,*) "dt2D_out:  ",   ctl%dt2D_out 
     write(*,*) 
     
-    if (trim(ctl%run_step) .eq. "spinup" .or. &
-        trim(ctl%run_step) .eq. "spinup_ismip6") then 
+    if (trim(ctl%run_step) .eq. "spinup_ismip6") then 
         write(*,*) "time_equil: ",    ctl%time_equil 
         write(*,*) "time_const: ",    ctl%time_const 
 
@@ -612,7 +611,7 @@ program yelmox_ismip6
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
-    case("transient_lgm_to_proj","transient_proj")
+    case("transient_proj")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
@@ -1635,16 +1634,6 @@ contains
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
 
-        ! write(*,*) "Checking..."
-        ! write(*,*) "bmb_shlf:      ", minval(mshlf%now%bmb_shlf), maxval(mshlf%now%bmb_shlf)
-        ! write(*,*) "tf_shlf:       ", minval(mshlf%now%tf_shlf), maxval(mshlf%now%tf_shlf)
-        ! write(*,*) "tf_corr:       ", minval(mshlf%now%tf_corr), maxval(mshlf%now%tf_corr)
-        ! write(*,*) "tf_corr_basin: ", minval(mshlf%now%tf_corr_basin), maxval(mshlf%now%tf_corr_basin)
-        ! write(*,*) "ismp%tf%var(:,:,:,1): ", minval(ismp%tf%var(:,:,:,1)), maxval(ismp%tf%var(:,:,:,1))
-        ! write(*,*) "ismp%to%var(:,:,:,1): ", minval(ismp%to%var(:,:,:,1)), maxval(ismp%to%var(:,:,:,1))
-        ! write(*,*) "ismp%to_ref%var(:,:,:,1): ", minval(ismp%to_ref%var(:,:,:,1)), maxval(ismp%to_ref%var(:,:,:,1))
-        ! write(*,*) "ismp%so%var(:,:,:,1): ", minval(ismp%so%var(:,:,:,1)), maxval(ismp%so%var(:,:,:,1))
-        
         return
 
     end subroutine calc_climate_ismip6
