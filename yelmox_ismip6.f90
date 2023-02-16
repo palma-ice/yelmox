@@ -677,10 +677,6 @@ end if
             ! Get ISMIP6 climate and ocean forcing
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,time,time_bp)
             
-            ! Testing constant forcing identical to spinup
-            !call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-            !            time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
