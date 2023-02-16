@@ -4,8 +4,7 @@
 
 &ismip6
     par_file        = "input/ismip6/ismip6_ant.nml"
-    gcm             = "NorESM1-M"       ! ISMIP6 GCM model
-    scenario        = "ctrl0"           ! ISMIP6 scenario ! RCP26-repeat
+    experiment      = "ctrl0"           ! "ctrl0", "ctrl", "NorESM1-M_RCP26-repeat", etc.
     write_formatted = False
 /
 

@@ -2,6 +2,8 @@ module ismip6
     ! This module contains routines that help with performing the ISMIP6 suite
     ! of experiments. 
     
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
+
     use nml  
     use ncio 
     use varslice
@@ -121,7 +123,7 @@ module ismip6
 
 contains
     
-    subroutine ismip6_forcing_init(ism,filename,domain,grid_name,gcm,scenario)
+    subroutine ismip6_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
 
         implicit none 
 
@@ -129,9 +131,10 @@ contains
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain 
         character(len=*), intent(IN) :: grid_name 
-        character(len=*), intent(IN) :: gcm
-        character(len=*), intent(IN) :: scenario
-        
+        character(len=*), intent(IN), optional :: gcm
+        character(len=*), intent(IN), optional :: scenario
+        character(len=*), intent(IN), optional :: experiment
+
         ! Assign domain and grid_name 
         ism%domain    = trim(domain)
         ism%grid_name = trim(grid_name) 
@@ -140,7 +143,7 @@ contains
 
             case("Antarctica")
                 
-                call ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario)
+                call ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
 
             case("Greenland")
 
@@ -189,7 +192,7 @@ contains
 
     end subroutine ismip6_forcing_update
 
-    subroutine ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario)
+    subroutine ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
 
         implicit none 
 
@@ -197,10 +200,14 @@ contains
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain 
         character(len=*), intent(IN) :: grid_name 
-        character(len=*), intent(IN) :: gcm
-        character(len=*), intent(IN) :: scenario
+        character(len=*), intent(IN), optional :: gcm
+        character(len=*), intent(IN), optional :: scenario
+        character(len=*), intent(IN), optional :: experiment
 
         ! Local variables 
+        character(len=256) :: gcm_now
+        character(len=256) :: scenario_now
+        
         character(len=256) :: group_prefix 
 
         character(len=256) :: grp_ts_ref 
@@ -226,13 +233,52 @@ contains
 
         character(len=256) :: grp_mask_shlf_proj
         
-        integer  :: k 
+        integer  :: iloc, k 
         real(wp) :: tmp 
         real(wp) :: time_par(3)
 
-        
+        ! First determine whether gcm+scenario provided or experiment
+        ! obtain valid values for gcm and scenario to start.
+        if (present(experiment)) then 
+            ! Experiment provided, obtain gcm+scenario from it 
+
+            if (trim(experiment) .eq. "ctrl" .or. trim(experiment) .eq. "ctrl0") then 
+                gcm_now      = trim(experiment)
+                scenario_now = trim(experiment)
+            else 
+                iloc = index(experiment,"_")
+                if (iloc == 0) then
+                    write(error_unit,*) "ismip6_ant_forcing_init:: Error: experiment &
+                    &argument must be defined as gcm_scenario."
+                    write(error_unit,*) "experiment = ", trim(experiment)
+                    stop
+                end if
+
+                gcm_now = experiment(1:iloc)
+                scenario_now = experiment(iloc+1:len_trim(experiment))
+
+                write(*,*) "gcm_now: ", trim(gcm_now)
+                write(*,*) "scenario_now: ", trim(scenario_now)
+                write(*,*)
+                !stop
+
+            end if 
+
+        else if (present(gcm) .and. present(scenario)) then 
+            ! gcm and scenario provided go forward as usual 
+
+            gcm_now      = trim(gcm)
+            scenario_now = trim(scenario)
+
+        else
+            ! Arguments not provided
+            write(error_unit,*) "ismip6_ant_forcing_init:: Error: gcm+scenario or experiment must be provided &
+            &as arguments."
+            stop
+        end if
+
         ! Special case for control runs, use "NorESM1-M_RCP26-repeat"
-        if (trim(scenario) .eq. "ctrl" .or. trim(scenario) .eq. "ctrl0") then
+        if (trim(scenario_now) .eq. "ctrl" .or. trim(scenario_now) .eq. "ctrl0") then
             ! Assign specific gcm+scenario for control runs
 
             ism%gcm        =  "NorESM1-M"
@@ -240,13 +286,13 @@ contains
             ism%experiment = "NorESM1-M_RCP26-repeat"
             
             ! Save control run name ("ctrl0" or "ctrl") here
-            ism%ctrl_run_type = trim(scenario)
+            ism%ctrl_run_type = trim(scenario_now)
 
         else
             ! Define the current experiment characteristics
 
-            ism%gcm        = trim(gcm)
-            ism%scenario   = trim(scenario) 
+            ism%gcm        = trim(gcm_now)
+            ism%scenario   = trim(scenario_now) 
             ism%experiment = trim(ism%gcm)//"_"//trim(ism%scenario) 
 
             ! Not a control simulation

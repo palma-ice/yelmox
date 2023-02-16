@@ -82,8 +82,7 @@ program yelmox_ismip6
         real(wp)          :: hyst_f_ta
 
         character(len=512) :: ismip6_par_file
-        character(len=56)  :: ismip6_scenario
-        character(len=56)  :: ismip6_gcm 
+        character(len=56)  :: ismip6_experiment 
         logical            :: ismip6_write_formatted
 
         real(wp) :: isos_tau_1 
@@ -106,8 +105,7 @@ program yelmox_ismip6
     
     ! ISMIP6 parameters 
     call nml_read(path_par,"ismip6","par_file",         ctl%ismip6_par_file)
-    call nml_read(path_par,"ismip6","scenario",         ctl%ismip6_scenario)
-    call nml_read(path_par,"ismip6","gcm",              ctl%ismip6_gcm)
+    call nml_read(path_par,"ismip6","experiment",       ctl%ismip6_experiment)
     call nml_read(path_par,"ismip6","write_formatted",  ctl%ismip6_write_formatted)
     
     ! Read run_step specific control parameters
@@ -323,7 +321,7 @@ program yelmox_ismip6
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,ctl%ismip6_gcm,ctl%ismip6_scenario)
+    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ctl%ismip6_experiment)
     
     ! ===== tf_corr initialization ======
 
