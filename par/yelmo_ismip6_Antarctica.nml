@@ -9,7 +9,7 @@
     write_formatted = False
 /
 
-&spinup_ismip6
+&spinup
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 20e3              ! [yr] Ending time (model years)
     time_equil      = 0.0               ! [yr] Equilibration time 
@@ -21,7 +21,7 @@
     equil_method    = "relax"           ! "none", "relax", "opt"
 /
 
-&transient_proj
+&transient
     time_init       = 2015.0            ! [yr] Starting time (years CE)
     time_end        = 2500.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
@@ -33,7 +33,7 @@
     equil_method    = "none"            ! "none", "relax", "opt"
 /
 
-&abumip_proj
+&abumip
     time_init       = 0.0               ! [yr] Starting time (years CE)
     time_end        = 500.0             ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
@@ -43,14 +43,12 @@
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-/
 
-&abumip
     scenario        = "abuc"            ! "abuc", "abuk", "abum"
     bmb             = -400.0            ! [m/yr] Shelf basal mass balance to apply in abum
 /
 
-&hysteresis_proj
+&hysteresis
     time_init       = 0.0               ! [yr] Starting time
     time_end        = 500.0             ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
@@ -60,14 +58,12 @@
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    scenario        = "ctrl"            ! "ctrl" or "rcp85" 
-/
-
-&hysteresis
+    
     scenario        = "ctrl"            ! Scenario to run
     dt2D_small_out  = 50                ! [yr] Frequency of writing small 2D output
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
+    
 /
 
 &hyster

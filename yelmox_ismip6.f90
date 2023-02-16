@@ -132,12 +132,12 @@ program yelmox_ismip6
     ! Check if special scenario is being run, make parameter adjustments
     select case(trim(ctl%run_step))
         
-        case("abumip_proj") 
+        case("abumip") 
 
             call nml_read(path_par,"abumip","scenario",     ctl%abumip_scenario)
             call nml_read(path_par,"abumip","bmb",          ctl%abumip_bmb)
 
-        case("hysteresis_proj") 
+        case("hysteresis") 
 
             call nml_read(path_par,"hysteresis","scenario",      ctl%hyst_scenario)
             call nml_read(path_par,"hysteresis","f_to",          ctl%hyst_f_to)
@@ -178,7 +178,7 @@ program yelmox_ismip6
     write(*,*) "dt2D_out:  ",   ctl%dt2D_out 
     write(*,*) 
     
-    if (trim(ctl%run_step) .eq. "spinup_ismip6") then 
+    if (trim(ctl%run_step) .eq. "spinup") then 
         write(*,*) "time_equil: ",    ctl%time_equil 
         write(*,*) "time_const: ",    ctl%time_const 
 
@@ -186,7 +186,7 @@ program yelmox_ismip6
 
     end if 
 
-    if (trim(ctl%run_step) .eq. "abumip_proj") then 
+    if (trim(ctl%run_step) .eq. "abumip") then 
         write(*,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
     end if 
 
@@ -406,13 +406,13 @@ program yelmox_ismip6
 
     select case(trim(ctl%run_step)) 
 
-    case("spinup_ismip6")
+    case("spinup")
         ! Model can start from no spinup or equilibration (using restart file), 
         ! here it is run under constant boundary conditions to spinup 
         ! desired state. 
 
         write(*,*)
-        write(*,*) "Performing spinup_ismip6."
+        write(*,*) "Performing spinup."
         write(*,*) 
 
         ! Start timing 
@@ -599,7 +599,7 @@ program yelmox_ismip6
         end do 
 
         write(*,*)
-        write(*,*) "spinup_ismip6 complete."
+        write(*,*) "spinup complete."
         write(*,*)
 
         ! Write the restart file for the end of the simulation
@@ -611,7 +611,7 @@ program yelmox_ismip6
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
-    case("transient_proj")
+    case("transient")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
@@ -726,7 +726,7 @@ end if
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
         
-    case("abumip_proj")
+    case("abumip")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
@@ -891,7 +891,7 @@ end if
         write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
         write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
     
-    case("hysteresis_proj")
+    case("hysteresis")
         ! Here it is assumed that the model has gone through spinup 
         ! and is ready for transient simulations 
 
