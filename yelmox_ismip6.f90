@@ -104,7 +104,7 @@ program yelmox_ismip6
     ! Control parameters 
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
     
-    ! ismip6 parameters 
+    ! ISMIP6 parameters 
     call nml_read(path_par,"ismip6","par_file",         ctl%ismip6_par_file)
     call nml_read(path_par,"ismip6","scenario",         ctl%ismip6_scenario)
     call nml_read(path_par,"ismip6","gcm",              ctl%ismip6_gcm)
@@ -134,8 +134,8 @@ program yelmox_ismip6
         
         case("abumip") 
 
-            call nml_read(path_par,"abumip","scenario",     ctl%abumip_scenario)
-            call nml_read(path_par,"abumip","bmb",          ctl%abumip_bmb)
+            call nml_read(path_par,"abumip","scenario",          ctl%abumip_scenario)
+            call nml_read(path_par,"abumip","bmb",               ctl%abumip_bmb)
 
         case("hysteresis") 
 
@@ -145,11 +145,6 @@ program yelmox_ismip6
             call nml_read(path_par,"hysteresis","dt2D_small_out",ctl%dt2D_small_out)          ! [yr] Frequency of 2D output 
     
     end select
-
-
-    ! Set initial time 
-    time    = ctl%time_init 
-    time_bp = time - 1950.0_wp 
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -164,9 +159,11 @@ program yelmox_ismip6
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc" 
 
+    ! Set initial model time 
+    time    = ctl%time_init 
+    time_bp = time - 1950.0_wp 
+
     !  =========================================================
-
-
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "run_step:  ", trim(ctl%run_step) 
@@ -376,7 +373,7 @@ program yelmox_ismip6
     ! Update forcing to present-day reference using ISMIP6 forcing
     call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
-
+    
     yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
@@ -679,6 +676,10 @@ end if
 
             ! Get ISMIP6 climate and ocean forcing
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,time,time_bp)
+            
+            ! Testing constant forcing identical to spinup
+            !call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
+            !            time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
