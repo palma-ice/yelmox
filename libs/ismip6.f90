@@ -234,8 +234,8 @@ contains
         character(len=256) :: grp_mask_shlf_proj
         
         integer  :: iloc, k 
-        real(wp) :: tmp 
-        real(wp) :: time_par(3)
+        real(wp) :: tmp
+        real(wp) :: time_par_proj(3) 
 
         ! First determine whether gcm+scenario provided or experiment
         ! obtain valid values for gcm and scenario to start.
@@ -256,11 +256,6 @@ contains
 
                 gcm_now = experiment(1:iloc-1)
                 scenario_now = experiment(iloc+1:len_trim(experiment))
-
-                write(*,*) "gcm_now: ", trim(gcm_now)
-                write(*,*) "scenario_now: ", trim(scenario_now)
-                write(*,*)
-                !stop
 
             end if 
 
@@ -359,7 +354,7 @@ contains
 
         end select
 
-        ! Adjust time_par manually here, since there are inconsistencies between the projection runs
+        ! Adjust time_par_proj manually here, since there are inconsistencies between the projection runs
         ! (some runs end in 2299, 2300, or 2301). Hard code choices here to avoid many changes
         ! in parameter file
         select case(trim(ism%experiment))
@@ -367,7 +362,7 @@ contains
             case("CESM2-WACCM_ssp585","HadGEM2-ES_RCP85")
                 ! Cases that end on year 2299
 
-                time_par = [1995.0,2299.0,1.0_wp]
+                time_par_proj = [1995.0,2299.0,1.0_wp]
 
             !case()
             !    ! Cases that end on year 2301
@@ -376,44 +371,49 @@ contains
             case DEFAULT
                 ! Set negative values to time_par so that values are used directly from the file
 
-                time_par = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj = [-1.0_wp,-1.0_wp,-1.0_wp]
 
         end select
 
+        ! Note: reference fields are hard-coded in the namelist file to come from the deafult
+        ! reference simulation, which is NorESM1-M_rcp26-repeat
+
+        ! Note: for the reference and historical fields, always use the time_par from the namelist file.
+        
         ! Initialize all variables from namelist entries 
 
         ! General fields 
-        call varslice_init_nml_ismip6(ism%basins,  filename,"imbie_basins",domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%basins,  filename,"imbie_basins",domain,grid_name,ism%gcm,ism%scenario)
         
         ! Amospheric fields
-        call varslice_init_nml_ismip6(ism%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%pr_ref,  filename,trim(grp_pr_ref), domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%smb_ref, filename,trim(grp_smb_ref),domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%pr_ref,  filename,trim(grp_pr_ref), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%smb_ref, filename,trim(grp_smb_ref),domain,grid_name,ism%gcm,ism%scenario)
         
-        call varslice_init_nml_ismip6(ism%ts_hist, filename,trim(grp_ts_hist), domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%smb_hist,filename,trim(grp_smb_hist),domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%ts_hist, filename,trim(grp_ts_hist), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%smb_hist,filename,trim(grp_smb_hist),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
 
         ! Oceanic fields
-        call varslice_init_nml_ismip6(ism%to_ref,  filename,trim(grp_to_ref),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%so_ref,  filename,trim(grp_so_ref),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%tf_ref,  filename,trim(grp_tf_ref),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%tf_cor,  filename,trim(grp_tf_cor),domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%to_ref,  filename,trim(grp_to_ref),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%so_ref,  filename,trim(grp_so_ref),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_ref,  filename,trim(grp_tf_ref),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_cor,  filename,trim(grp_tf_cor),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%to_hist, filename,trim(grp_to_hist),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%so_hist, filename,trim(grp_so_hist),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%tf_hist, filename,trim(grp_tf_hist),domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%to_hist, filename,trim(grp_to_hist),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%so_hist, filename,trim(grp_so_hist),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_hist, filename,trim(grp_tf_hist),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par)
-        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par)
+        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
 
         ! Shelf collapse fields
-        call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
 
         ! Load time-independent fields
 
