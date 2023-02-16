@@ -254,7 +254,7 @@ contains
                     stop
                 end if
 
-                gcm_now = experiment(1:iloc)
+                gcm_now = experiment(1:iloc-1)
                 scenario_now = experiment(iloc+1:len_trim(experiment))
 
                 write(*,*) "gcm_now: ", trim(gcm_now)
