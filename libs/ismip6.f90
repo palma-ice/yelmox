@@ -474,7 +474,7 @@ contains
 
         ! Get slices for current time
 
-        slice_method = "interp" 
+        slice_method = "extrap" 
 
         ! === Atmospheric fields ==================================
         
