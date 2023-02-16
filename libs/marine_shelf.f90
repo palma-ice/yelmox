@@ -411,9 +411,17 @@ contains
 
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
+                ! compute mean values at bedrock depth with ice-free points
+                
+                call calc_variable_basin_pico(mshlf%now%T_shlf_basin,mshlf%now%T_shlf, &
+                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
+                call calc_variable_basin_pico(mshlf%now%S_shlf_basin,mshlf%now%S_shlf, &
+                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
 
-                call pico_update(mshlf%pico,mshlf%now%T_shlf,mshlf%now%S_shlf, &
+                call pico_update(mshlf%pico,mshlf%now%T_shlf_basin,mshlf%now%S_shlf_basin, &
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
+
+                mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
 
                 ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
                 select case(trim(mshlf%par%domain))
@@ -1530,7 +1538,91 @@ contains
         return 
 
     end subroutine calc_bmb_anom
-    
+
+    ! pico basin in bedrock outside ice shelf
+    subroutine calc_variable_basin_pico(var_basin,var2D,f_grnd,basins,H_ice,mask_ocn)
+        ! PICO needs the mean values but at bedrock depth and outside the basins
+
+        implicit none
+
+        real(wp), intent(OUT) :: var_basin(:,:)
+        real(wp), intent(IN)  :: var2D(:,:)
+        real(wp), intent(IN)  :: f_grnd(:,:)
+        real(wp), intent(IN)  :: basins(:,:)
+        real(wp), intent(IN)  :: H_ice(:,:)
+        integer,  intent(IN)  :: mask_ocn(:,:)
+
+        ! Local variables
+        integer :: i, j, m, nx, ny, npts
+        real(wp) :: var_mean
+
+        nx = size(var_basin,1)
+        ny = size(var_basin,2)
+
+        ! Initially assign to shelf values real ocean values
+        var_basin = var2D
+
+        ! Loop over each basin
+        do m=1, int(maxval(basins))
+
+            ! First calculate the basin-wide average variable value,
+            ! limited to floating ice shelf points
+
+            var_mean = 0.0
+            npts     = 0
+
+            do j = 1, ny
+            do i = 1, nx
+
+                ! Points without any ice.
+                if (basins(i,j) .eq. m .and. f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0) then
+
+                    var_mean = var_mean + var2D(i,j)
+                    npts     = npts + 1
+
+                end if
+
+            end do
+            end do
+
+            if (npts .gt. 0) then
+                ! Get mean basin value
+
+                var_mean = var_mean / real(npts,wp)
+
+            else
+                ! Set to zero for now and print a warning for safety.
+                ! This case is unlikely to happen.
+
+                var_mean = 0.0_wp
+
+                write(*,*) "Warning:: calc_variable_basin_pico:: no ice free points &
+                &available in this basin for calculating the basin-wide mean."
+                write(*,*) "basin = ", m
+                write(*,*) "n_flt = ", count(basins .eq. m .and. &
+                            (f_grnd .lt. 1.0 .and. H_ice .gt. 0.0) )
+                write(*,*) "n_ice = ", count(basins .eq. m .and. &
+                            (H_ice .gt. 0.0) )
+            end if
+
+            ! Assign bedrock value to all points in the basin
+            do j = 1, ny
+            do i = 1, nx
+
+                ! Basin point
+                if (basins(i,j) .eq. m) then
+                    var_basin(i,j) = var_mean
+                end if
+
+            end do
+            end do
+
+        end do
+
+        return
+
+    end subroutine calc_variable_basin_pico   
+ 
     ! =======================================================
     !
     ! marshelf memory management

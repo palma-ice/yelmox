@@ -1,9 +1,19 @@
 #!/bin/bash 
+
+##SBATCH -p long_nolimits
+##SBATCH -q qnolimits
+##SBATCH -J deglaciation
+##SBATCH -n 12
+##SBATCH -o yelmo.out
+##SBATCH -e yelmo.err
+##SBATCH --mem=2Gb
+##SBATCH -t 8-23:30:15
+
 #SBATCH -p long
 #SBATCH -J yelmo 
 #SBATCH -o yelmo.out
 #SBATCH -e yelmo.err
-#SBATCH --mem=1800
+#SBATCH --mem=3Gb
 #SBATCH -t 7-02:30:15
 
 # Run the job
