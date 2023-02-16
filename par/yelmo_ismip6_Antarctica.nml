@@ -103,7 +103,7 @@
 
     opt_tf          = True              ! Should thermal forcing be optimized too?
     tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
@@ -111,7 +111,7 @@
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
 
-    cf_ref_wais     = 0.01
+    cf_ref_wais     = 0.1
 /
 
 &yelmo
