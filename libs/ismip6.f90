@@ -413,7 +413,7 @@ contains
         call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
 
         ! Shelf collapse fields
-        call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj),domain,grid_name,ism%gcm,ism%scenario)
 
         ! Load time-independent fields
 
