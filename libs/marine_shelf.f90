@@ -88,8 +88,10 @@ module marine_shelf
         
         real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
         real(wp), allocatable :: dT_shlf(:,:)           ! [K] Shelf temperature anomaly relative to ref. state
-        real(wp), allocatable :: S_shlf(:,:)            ! [K] Shelf temperature
+        real(wp), allocatable :: S_shlf(:,:)            ! [PSU] Shelf salinity
         real(wp), allocatable :: T_fp_shlf(:,:)         ! [K] Shelf freezing-point temperature
+        real(wp), allocatable :: T_shlf_basin(:,:)      ! [K] Shelf temperature
+        real(wp), allocatable :: S_shlf_basin(:,:)      ! [PSU] Shelf salinity
         
         real(wp), allocatable :: tf_shlf(:,:)           ! Thermal forcing at the ice-shelf interface
         real(wp), allocatable :: tf_basin(:,:)          ! Basin-average thermal forcing at the ice-shelf interface
@@ -1648,7 +1650,9 @@ contains
         allocate(now%dT_shlf(nx,ny))
         allocate(now%S_shlf(nx,ny))
         allocate(now%T_fp_shlf(nx,ny))
-        
+        allocate(now%T_shlf_basin(nx,ny))
+        allocate(now%S_shlf_basin(nx,ny))       
+ 
         allocate(now%tf_shlf(nx,ny))
         allocate(now%tf_basin(nx,ny))
         allocate(now%tf_corr(nx,ny))
@@ -1668,7 +1672,9 @@ contains
         now%T_shlf          = 0.0
         now%dT_shlf         = 0.0
         now%S_shlf          = 0.0
-        now%T_fp_shlf       = 0.0
+        now%T_fp_shlf       = 0.0 
+        now%T_shlf_basin    = 0.0
+        now%S_shlf_basin    = 0.0 
 
         now%tf_shlf         = 0.0
         now%tf_basin        = 0.0
@@ -1701,7 +1707,9 @@ contains
         if (allocated(now%dT_shlf))         deallocate(now%dT_shlf)
         if (allocated(now%S_shlf))          deallocate(now%S_shlf)
         if (allocated(now%T_fp_shlf))       deallocate(now%T_fp_shlf)
-        
+        if (allocated(now%T_shlf_basin))    deallocate(now%T_shlf_basin)
+        if (allocated(now%S_shlf_basin))    deallocate(now%S_shlf_basin)       
+ 
         if (allocated(now%tf_shlf))         deallocate(now%tf_shlf)
         if (allocated(now%tf_basin))        deallocate(now%tf_basin)
         if (allocated(now%tf_corr))         deallocate(now%tf_corr)
