@@ -2277,11 +2277,11 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         bmb_shlf_masked   = 0.0_wp
         bmb_grnd_masked   = 0.0_wp
-        z_base          = 0.0_wp
-        T_top_ice       = 0.0_wp
-        T_base_grnd     = 0.0_wp
-        T_base_flt      = 0.0_wp 
-        flux_grl        = 0.0_wp
+        z_base            = 0.0_wp
+        T_top_ice         = 0.0_wp
+        T_base_grnd       = 0.0_wp
+        T_base_flt        = 0.0_wp 
+        flux_grl          = 0.0_wp
 
         ! === Data conversion factors ========================================
 
@@ -2291,7 +2291,6 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ismip6_correction   = m3yr_to_kgs*density_corr
         yr_to_sec           = 31556952.0
 
-        
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
@@ -2432,8 +2431,15 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         real(wp) :: ismip6_correction
         real(wp) :: yr_to_sec
         
-        integer  :: npts_grl 
-        integer  :: npts_frnt
+        real(wp) :: m3_km3
+        real(wp) :: m2_km2 
+
+        integer  :: npts_tot
+        integer  :: npts_grnd
+        integer  :: npts_flt
+        integer  :: npts_grl
+        integer  :: npts_frnt 
+
         real(wp) :: dx
         real(wp) :: dy 
         real(wp) :: smb_tot 
@@ -2447,9 +2453,10 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         real(wp) :: flux_frnt 
         
         logical, allocatable :: mask_tot(:,:) 
+        logical, allocatable :: mask_grnd(:,:)
         logical, allocatable :: mask_flt(:,:) 
-        logical, allocatable :: mask_frnt(:,:) 
         logical, allocatable :: mask_grl(:,:) 
+        logical, allocatable :: mask_frnt(:,:) 
         
         dx = dom%grd%dx 
         dy = dom%grd%dy 
@@ -2457,9 +2464,10 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Allocate variables
 
         allocate(mask_tot(dom%grd%nx,dom%grd%ny))
+        allocate(mask_grnd(dom%grd%nx,dom%grd%ny))
         allocate(mask_flt(dom%grd%nx,dom%grd%ny))
-        allocate(mask_frnt(dom%grd%nx,dom%grd%ny))
         allocate(mask_grl(dom%grd%nx,dom%grd%ny))
+        allocate(mask_frnt(dom%grd%nx,dom%grd%ny))
 
         ! === Data conversion factors ========================================
 
@@ -2469,6 +2477,9 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ismip6_correction   = m3yr_to_kgs*density_corr
         yr_to_sec           = 31556952.0
         
+        m3_km3              = 1e-9 
+        m2_km2              = 1e-6 
+        
         ! 1. Determine regional values of variables 
 
         ! Take the global regional data object that 
@@ -2477,21 +2488,18 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! Assign masks of interest
 
-        mask_tot = .FALSE.
-        where(dom%tpo%now%H_ice .gt. 0.0) mask_tot = .TRUE. 
-
-        mask_flt = .FALSE. 
-        where(dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0) mask_flt = .TRUE. 
-
-        mask_frnt = .FALSE.
-        where(dom%tpo%now%mask_frnt .eq. 1) mask_frnt = .TRUE. 
-        
-        mask_grl = .FALSE.
-        where(dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%mask_bed .eq. 4) mask_grl = .TRUE. 
+        mask_tot  = (dom%tpo%now%H_ice .gt. 0.0) 
+        mask_grnd = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0)
+        mask_flt  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0)
+        mask_grl  = (dom%tpo%now%f_grnd_bmb .gt. 0.0 .and. dom%tpo%now%f_grnd_bmb .lt. 1.0)         
+        mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%mask_bed .eq. 4)
 
         ! Determine number of points at grl and frnt
-        npts_grl  = count(mask_grl)
-        npts_frnt = count(mask_frnt)
+        npts_tot  = count(mask_tot)
+        npts_grnd = count(mask_grnd)
+        npts_flt  = count(mask_flt)
+        npts_grl  = count(mask_grl)      
+        npts_frnt = count(mask_frnt) 
 
         ! Calculate additional variables of interest for ISMIP6
 
