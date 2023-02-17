@@ -104,9 +104,11 @@ module ismip6
 
     type ismip6_experiment_class
         character(len=56)   :: expname
+        character(len=56)   :: group
+        character(len=56)   :: model
         character(len=256)  :: experiment
         logical             :: shlf_collapse
-        character(len=256)  :: file_out
+        character(len=256)  :: file_suffix
     end type
         
     ! Class for holding ice output for writing to standard formats...
@@ -133,29 +135,27 @@ module ismip6
 
 contains
     
-    subroutine ismip6_experiment_def(ie,expname,filename)
+    subroutine ismip6_experiment_def(ie,expname,filename,group,model)
 
         implicit none
 
         type(ismip6_experiment_class), intent(OUT) :: ie
         character(len=*), intent(IN) :: expname
         character(len=*), intent(IN) :: filename
-
-        ! Local variables
-        character(len=56) :: group 
-        character(len=56) :: model 
+        character(len=*), intent(IN) :: group 
+        character(len=*), intent(IN) :: model 
 
         ! Save the experiment name (ctrlAE, expAE01, etc)
         ie%expname = trim(expname)
+        ie%group   = trim(group)
+        ie%model   = trim(model)
 
         ! Load parameters associated with this experiment
         call nml_read(filename,ie%expname,"experiment",   ie%experiment)
         call nml_read(filename,ie%expname,"shlf_collapse",ie%shlf_collapse)
         
         ! Define the ouput filename according to protocol
-        group = "UCM" 
-        model = "YELMO"
-        ie%file_out = "AIS_"//trim(group)//"_"//trim(model)//"_"//trim(ie%expname)//".nc"
+        ie%file_suffix = "AIS_"//trim(group)//"_"//trim(model)//"_"//trim(ie%expname)//".nc"
 
         return
         
