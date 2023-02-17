@@ -6,6 +6,9 @@
     par_file        = "input/ismip6/ismip6_ant.nml"
     experiment      = "ctrl0"           ! "ctrl0", "ctrl", "NorESM1-M_RCP26-repeat", etc.
     write_formatted = False
+
+    shlf_collapse   = False
+    
 /
 
 &spinup

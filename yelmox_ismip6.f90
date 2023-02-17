@@ -83,6 +83,7 @@ program yelmox_ismip6
 
         character(len=512) :: ismip6_par_file
         character(len=56)  :: ismip6_experiment 
+        logical            :: ismip6_shlf_collapse
         logical            :: ismip6_write_formatted
 
         real(wp) :: isos_tau_1 
@@ -94,9 +95,7 @@ program yelmox_ismip6
     type(ctrl_params)     :: ctl
     type(ice_opt_params)  :: opt 
 
-    ! Decide whether to include mask shelf collapse or not (hard coded switch)
-    logical, parameter :: running_mask_shlf_collapse = .FALSE. 
-
+    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -108,6 +107,11 @@ program yelmox_ismip6
     call nml_read(path_par,"ismip6","experiment",       ctl%ismip6_experiment)
     call nml_read(path_par,"ismip6","write_formatted",  ctl%ismip6_write_formatted)
     
+    if (index(ctl%ismip6_par_file,"ant") .gt. 0) then
+        ! Running Antarctica domain, load Antarctica specific parameters
+        call nml_read(path_par,"ismip6","shlf_collapse",    ctl%ismip6_shlf_collapse)
+    end if
+
     ! Read run_step specific control parameters
     call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
     call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
@@ -644,7 +648,7 @@ program yelmox_ismip6
             time_bp      = time - 1950.0_wp 
             time_elapsed = time - ctl%time_init
 
-if (running_mask_shlf_collapse) then
+if (ctl%ismip6_shlf_collapse) then
             ! Perform mask_shlf_collapse experiments
             ! Set H to zero where mask==1, then compute Yelmo.
 
@@ -664,7 +668,7 @@ end if
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
-if (running_mask_shlf_collapse) then
+if (ctl%ismip6_shlf_collapse) then
             ! Clean up icebergs for mask_shlf_collapse experiments
             call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
             where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
