@@ -95,7 +95,7 @@ program yelmox_ismip6
     type(ctrl_params)     :: ctl
     type(ice_opt_params)  :: opt 
 
-    
+
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -177,17 +177,27 @@ program yelmox_ismip6
     write(*,*) "dt2D_out:  ",   ctl%dt2D_out 
     write(*,*) 
     
-    if (trim(ctl%run_step) .eq. "spinup") then 
-        write(*,*) "time_equil: ",    ctl%time_equil 
-        write(*,*) "time_const: ",    ctl%time_const 
+    select case(trim(ctl%run_step))
 
-        time_bp = ctl%time_const - 1950.0_wp
+        case("spinup")
 
-    end if 
+            write(*,*) "time_equil: ",    ctl%time_equil 
+            write(*,*) "time_const: ",    ctl%time_const 
 
-    if (trim(ctl%run_step) .eq. "abumip") then 
-        write(*,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
-    end if 
+            time_bp = ctl%time_const - 1950.0_wp
+
+        case("transient")
+
+            write(*,*) "ismip6_par_file:        ", trim(ctl%ismip6_par_file)
+            write(*,*) "ismip6_experiment:      ", trim(ctl%ismip6_experiment)
+            write(*,*) "ismip6_write_formatted: ", ctl%ismip6_write_formatted
+            write(*,*) "ismip6_shlf_collapse:   ", ctl%ismip6_shlf_collapse
+            
+        case("abumip")
+
+            write(*,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
+
+    end select
 
     write(*,*) "time    = ", time 
     write(*,*) "time_bp = ", time_bp 
