@@ -9,6 +9,88 @@
     time_par    = 1950, 1960, 1
 /
 
+! ====== ISMIP6-2300 experiment definitions ======
+
+&ctrlAE0
+    experiment      = "ctrl0"
+    shlf_collapse   = False
+/
+
+&ctrlAE
+    experiment      = "ctrl"
+    shlf_collapse   = False
+/
+
+&expAE01
+    experiment      = "NorESM1-M_RCP26-repeat"
+    shlf_collapse   = False
+/
+
+&expAE02
+    experiment      = "CCSM4_RCP85"
+    shlf_collapse   = False
+/
+
+&expAE03
+    experiment      = "HadGEM2-ES_RCP85"
+    shlf_collapse   = False
+/
+
+&expAE04
+    experiment      = "CESM2-WACCM_ssp585"
+    shlf_collapse   = False
+/
+
+&expAE05
+    experiment      = "UKESM1-0-LL_ssp585"
+    shlf_collapse   = False
+/
+
+&expAE06
+    experiment      = "UKESM1-0-LL_ssp585-repeat"
+    shlf_collapse   = False
+/
+
+&expAE07
+    experiment      = "NorESM1-M_RCP85-repeat"
+    shlf_collapse   = False
+/
+
+&expAE08
+    experiment      = "HadGEM2-ES_RCP85-repeat"
+    shlf_collapse   = False
+/
+
+&expAE09
+    experiment      = "CESM2-WACCM_ssp585-repeat"
+    shlf_collapse   = False
+/
+
+&expAE10
+    experiment      = "UKESM1-0-LL_ssp126"
+    shlf_collapse   = False
+/
+
+&expAE11
+    experiment      = "CCSM4_RCP85"
+    shlf_collapse   = True
+/
+
+&expAE12
+    experiment      = "HadGEM2-ES_RCP85"
+    shlf_collapse   = True
+/
+
+&expAE13
+    experiment      = "CESM2-WACCM_ssp585"
+    shlf_collapse   = True
+/
+
+&expAE14
+    experiment      = "UKESM1-0-LL_ssp585"
+    shlf_collapse   = True
+/
+
 ! ====== ATMOSPHERE ================
 
 &gcm_ts_ref

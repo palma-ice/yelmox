@@ -22,7 +22,6 @@ program yelmox_ismip6
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
     character(len=256) :: outfldr, file1D, file2D, file2D_small
-    character(len=256) :: file1D_ismip6, file2D_ismip6
     character(len=256) :: file_restart
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par, path_const  
@@ -82,8 +81,7 @@ program yelmox_ismip6
         real(wp)          :: hyst_f_ta
 
         character(len=512) :: ismip6_par_file
-        character(len=56)  :: ismip6_experiment 
-        logical            :: ismip6_shlf_collapse
+        character(len=56)  :: ismip6_expname
         logical            :: ismip6_write_formatted
 
         real(wp) :: isos_tau_1 
@@ -94,7 +92,7 @@ program yelmox_ismip6
 
     type(ctrl_params)     :: ctl
     type(ice_opt_params)  :: opt 
-
+    type(ismip6_experiment_class) :: ismip6exp 
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
@@ -103,13 +101,12 @@ program yelmox_ismip6
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
     
     ! ISMIP6 parameters 
-    call nml_read(path_par,"ismip6","par_file",         ctl%ismip6_par_file)
-    call nml_read(path_par,"ismip6","experiment",       ctl%ismip6_experiment)
-    call nml_read(path_par,"ismip6","write_formatted",  ctl%ismip6_write_formatted)
-    
+    call nml_read(path_par,"ismip6","par_file",   ctl%ismip6_par_file)
+    call nml_read(path_par,"ismip6","expname",    ctl%ismip6_expname)
+
     if (index(ctl%ismip6_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
-        call nml_read(path_par,"ismip6","shlf_collapse",    ctl%ismip6_shlf_collapse)
+        call ismip6_experiment_def(ismip6exp,ctl%ismip6_expname,ctl%ismip6_par_file)
     end if
 
     ! Read run_step specific control parameters
@@ -158,9 +155,6 @@ program yelmox_ismip6
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"    
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
 
-    file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
-    file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc" 
-
     ! Set initial model time 
     time    = ctl%time_init 
     time_bp = time - 1950.0_wp 
@@ -177,6 +171,10 @@ program yelmox_ismip6
     write(*,*) "dt2D_out:  ",   ctl%dt2D_out 
     write(*,*) 
     
+    write(*,*) "ismip6_par_file:        ", trim(ctl%ismip6_par_file)
+    write(*,*) "ismip6_expname:         ", trim(ctl%ismip6_expname)
+    write(*,*) "ismip6_experiment:      ", trim(ismip6exp%experiment)
+    
     select case(trim(ctl%run_step))
 
         case("spinup")
@@ -188,10 +186,9 @@ program yelmox_ismip6
 
         case("transient")
 
-            write(*,*) "ismip6_par_file:        ", trim(ctl%ismip6_par_file)
-            write(*,*) "ismip6_experiment:      ", trim(ctl%ismip6_experiment)
+            write(*,*) "ismip6_shlf_collapse:   ", ismip6exp%shlf_collapse
             write(*,*) "ismip6_write_formatted: ", ctl%ismip6_write_formatted
-            write(*,*) "ismip6_shlf_collapse:   ", ctl%ismip6_shlf_collapse
+            write(*,*) "ismip6_file_out:        ", trim(ismip6exp%file_out)
             
         case("abumip")
 
@@ -335,7 +332,7 @@ program yelmox_ismip6
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ctl%ismip6_experiment)
+    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ismip6exp%experiment)
     
     ! ===== tf_corr initialization ======
 
@@ -645,8 +642,10 @@ program yelmox_ismip6
         
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
-            call yelmo_write_init(yelmo1,file2D_ismip6,time_init=time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
+            write(*,*) "Need to make ismip6 init routines for 2D/1D output in one file!"
+            stop
+            !call yelmo_write_init(yelmo1,ismip6exp%file_out,time_init=time,units="years")
+            !call yelmo_write_reg_init(yelmo1,ismip6exp%file_out,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
         end if 
 
         ! Perform 'coupled' model simulations for desired time
@@ -658,7 +657,7 @@ program yelmox_ismip6
             time_bp      = time - 1950.0_wp 
             time_elapsed = time - ctl%time_init
 
-if (ctl%ismip6_shlf_collapse) then
+if (ismip6exp%shlf_collapse) then
             ! Perform mask_shlf_collapse experiments
             ! Set H to zero where mask==1, then compute Yelmo.
 
@@ -678,7 +677,7 @@ end if
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
-if (ctl%ismip6_shlf_collapse) then
+if (ismip6exp%shlf_collapse) then
             ! Clean up icebergs for mask_shlf_collapse experiments
             call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
             where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
@@ -702,7 +701,7 @@ end if
                 
                 ! ISMIP6 output if desired:
                  if (ctl%ismip6_write_formatted) then
-                    call write_step_2D_ismip6(yelmo1,file2D_ismip6,time)
+                    call write_step_2D_ismip6(yelmo1,ismip6exp%file_out,time)
                 end if
             end if
            
@@ -712,7 +711,7 @@ end if
 
                  ! ISMIP6 output if desired:
                  if (ctl%ismip6_write_formatted) then
-                    call write_1D_ismip6(yelmo1,file1D_ismip6,time)
+                    call write_1D_ismip6(yelmo1,ismip6exp%file_out,time)
                 end if
             end if 
 

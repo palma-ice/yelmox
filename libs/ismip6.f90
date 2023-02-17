@@ -102,6 +102,12 @@ module ismip6
         real(wp) :: unit_offset
     end type
 
+    type ismip6_experiment_class
+        character(len=56)   :: expname
+        character(len=256)  :: experiment
+        logical             :: shlf_collapse
+        character(len=256)  :: file_out
+    end type
         
     ! Class for holding ice output for writing to standard formats...
     type ismip6_ice_class
@@ -111,18 +117,50 @@ module ismip6
 
     private
     public :: ismip6_forcing_class
+    public :: ismip6_experiment_class
     public :: ismip6_ice_class
 
     ! General routines
+    public :: ismip6_experiment_def
     public :: ismip6_forcing_init
     public :: ismip6_forcing_update
 
+
+    
     public :: ismip6_write_init
     public :: ismip6_write_step
     public :: calc_iceberg_island
 
 contains
     
+    subroutine ismip6_experiment_def(ie,expname,filename)
+
+        implicit none
+
+        type(ismip6_experiment_class), intent(OUT) :: ie
+        character(len=*), intent(IN) :: expname
+        character(len=*), intent(IN) :: filename
+
+        ! Local variables
+        character(len=56) :: group 
+        character(len=56) :: model 
+
+        ! Save the experiment name (ctrlAE, expAE01, etc)
+        ie%expname = trim(expname)
+
+        ! Load parameters associated with this experiment
+        call nml_read(filename,ie%expname,"experiment",   ie%experiment)
+        call nml_read(filename,ie%expname,"shlf_collapse",ie%shlf_collapse)
+        
+        ! Define the ouput filename according to protocol
+        group = "UCM" 
+        model = "YELMO"
+        ie%file_out = "AIS_"//trim(group)//"_"//trim(model)//"_"//trim(ie%expname)//".nc"
+
+        return
+        
+    end subroutine ismip6_experiment_def
+
     subroutine ismip6_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
 
         implicit none 
