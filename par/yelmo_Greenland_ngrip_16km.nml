@@ -19,6 +19,14 @@
     cf_negis_1      = 1.0 !0.194
 /
 
+&negis
+    cf_0            = 1.0 
+    cf_1            = 1.0 
+    cf_centre       = 0.1 
+    cf_north        = 0.1
+    cf_south        = 0.1
+/
+
 &opt_L21
     cf_time         = 8e3               ! [yr] When should optimization of basal friction stop?
     cf_init         = 0.5               ! Initial value of cf_ref everywhere
