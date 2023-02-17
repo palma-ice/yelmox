@@ -2251,6 +2251,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Local variables
         integer  :: ncid, n
         real(wp) :: time_prev
+        real(wp) :: rho_ice 
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
         real(wp) :: ismip6_correction
@@ -2284,11 +2285,12 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! === Data conversion factors ========================================
 
-        density_corr        = 917.0/1000.0      ! ice density correction with pure water
+        rho_ice             = 917.0             ! ice density kg/m3
         m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
+        density_corr        = rho_ice/1000.0    ! ice density correction with pure water
         ismip6_correction   = m3yr_to_kgs*density_corr
         yr_to_sec           = 31556952.0
-        
+
         
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -2301,7 +2303,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        
+
         ! Write ismip6 variables 
 
         ! == yelmo_topography ==
@@ -2411,25 +2413,55 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine write_step_2D_ismip6
 
-    subroutine write_1D_ismip6(dom,filename,time,mask,reg_now)
+    subroutine write_1D_ismip6(dom,filename,time)
 
         implicit none
 
         type(yelmo_class),    intent(IN) :: dom
         character(len=*),     intent(IN) :: filename
         real(wp),             intent(IN) :: time
-        logical, intent(IN), optional    :: mask(:,:)
-        type(yregions_class), intent(IN), optional :: reg_now
 
         ! Local variables
+        type(yregions_class) :: reg
+        
         integer  :: ncid, n
         real(wp) :: time_prev
-        type(yregions_class) :: reg
+        real(wp) :: rho_ice
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
         real(wp) :: ismip6_correction
-        real(wp) :: rho_ice
         real(wp) :: yr_to_sec
+        
+        integer  :: npts_grl 
+        integer  :: npts_frnt
+        real(wp) :: dx
+        real(wp) :: dy 
+        real(wp) :: smb_tot 
+        real(wp) :: bmb_tot 
+        real(wp) :: bmb_shlf_t 
+
+        real(wp) :: A_ice_grl 
+        real(wp) :: flux_grl 
+        real(wp) :: A_ice_frnt 
+        real(wp) :: calv_flt 
+        real(wp) :: flux_frnt 
+        
+        logical, allocatable :: mask_tot(:,:) 
+        logical, allocatable :: mask_flt(:,:) 
+        logical, allocatable :: mask_frnt(:,:) 
+        logical, allocatable :: mask_grl(:,:) 
+        
+        dx = dom%grd%dx 
+        dy = dom%grd%dy 
+
+        ! Allocate variables
+
+        allocate(mask_tot(dom%grd%nx,dom%grd%ny))
+        allocate(mask_flt(dom%grd%nx,dom%grd%ny))
+        allocate(mask_frnt(dom%grd%nx,dom%grd%ny))
+        allocate(mask_grl(dom%grd%nx,dom%grd%ny))
+
+        ! === Data conversion factors ========================================
 
         rho_ice             = 917.0             ! ice density kg/m3
         m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
@@ -2439,72 +2471,68 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         
         ! 1. Determine regional values of variables 
 
-        if (present(mask) .and. present(reg_now)) then
-            write(*,*) "yelmo_write_reg_step:: Error: either a mask or a region &
-                       &object must be provided, not both. Try again."
-            write(*,*) "filename = ", trim(filename)
-            write(*,*) "time     = ", time
-            stop
-        end if
+        ! Take the global regional data object that 
+        ! is calculated over the whole domain at each timestep 
+        reg = dom%reg
 
-        if (present(mask)) then
-            ! If a mask is provided, assume the regional 
-            ! values must be calculated now.
+        ! Assign masks of interest
 
-            call calc_yregions(reg,dom%tpo,dom%dyn,dom%thrm,dom%mat,dom%bnd,mask)
+        mask_tot = .FALSE.
+        where(dom%tpo%now%H_ice .gt. 0.0) mask_tot = .TRUE. 
 
-        else if (present(reg_now)) then
-            ! Assume region has been calculated and is available 
-            ! in the input object reg_now 
+        mask_flt = .FALSE. 
+        where(dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0) mask_flt = .TRUE. 
 
-            reg = reg_now
+        mask_frnt = .FALSE.
+        where(dom%tpo%now%mask_frnt .eq. 1) mask_frnt = .TRUE. 
+        
+        mask_grl = .FALSE.
+        where(dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%mask_bed .eq. 4) mask_grl = .TRUE. 
 
-        else
-            ! Take the global regional data object that 
-            ! is calculated over the whole domain at each timestep 
-            reg = dom%reg
-
-        end if
-
+        ! Determine number of points at grl and frnt
+        npts_grl  = count(mask_grl)
+        npts_frnt = count(mask_frnt)
 
         ! Calculate additional variables of interest for ISMIP6
 
         ! To do: these variables should be defined locally!
         ! ISMIP6 boundary: jablasco
-        !reg%smb_tot     = sum(bnd%smb,mask=mask_tot)*(tpo%par%dx*tpo%par%dy)     ! m^3/yr: flux
-        !reg%bmb_tot     = sum(tpo%now%bmb,mask=mask_tot)*(tpo%par%dx*tpo%par%dy) ! m^3/yr: flux
-        !reg%bmb_shlf_t  = sum(tpo%now%bmb,mask=mask_flt)*(tpo%par%dx*tpo%par%dy)  ! m^3/yr: flux
+        smb_tot     = sum(dom%bnd%smb,    mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
+        bmb_tot     = sum(dom%tpo%now%bmb,mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
+        bmb_shlf_t  = sum(dom%tpo%now%bmb,mask=mask_flt)*(dx*dy)    ! m^3/yr: flux
 
-        ! if (npts_grl .gt. 0) then
+        if (npts_grl .gt. 0) then
 
-        !     reg%A_ice_grl = count(tpo%now%H_ice .gt. 0.0 .and. mask_grl)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-        !     !reg%flux_grl  = sum(tpo%now%H_ice,mask=mask_grl)*(tpo%par%dx*tpo%par%dy)                 ! m^3/yr: flux
-        !     reg%flux_grl  = sum(dyn%now%uxy_bar*tpo%now%H_ice,mask=mask_grl)*tpo%par%dx               ! m^3/yr: flux
+            A_ice_grl = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_grl)*dx*dy*m2_km2 ! [km^2]
+            !flux_grl  = sum(dom%tpo%now%H_ice,mask=mask_grl)*(dx*dy)                 ! m^3/yr: flux
+            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice,mask=mask_grl)*dx   ! m^3/yr: flux
 
-        ! else
+            ! ajr, why only *dx above? 
 
-        !     ! ISMIP6: jablasco
-        !     reg%A_ice_grl = 0.0_wp
-        !     reg%flux_grl  = 0.0_wp
+        else
 
-        ! end if
+            A_ice_grl = 0.0_wp
+            flux_grl  = 0.0_wp
+
+        end if
  
-        ! ! ===== Frontal ice-shelves variables =====
+        ! ===== Frontal ice-shelves variables =====
 
-        ! if (npts_frnt .gt. 0) then
+        if (npts_frnt .gt. 0) then
 
-        !     reg%A_ice_frnt = count(tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*tpo%par%dx*tpo%par%dy*m2_km2 ! [km^2]
-        !     reg%calv_flt   = sum(tpo%now%calv_flt*tpo%now%H_ice,mask=mask_frnt)*tpo%par%dx              ! m^3/yr: flux [m-1 yr-1]
-        !     reg%flux_frnt  = reg%calv_flt+sum(tpo%now%fmb*tpo%now%H_ice,mask=mask_frnt)*tpo%par%dx      ! m^3/yr: flux [m-1 yr-1]
+            A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
+            calv_flt   = sum(dom%tpo%now%calv_flt*dom%tpo%now%H_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
+            flux_frnt  = calv_flt+sum(dom%tpo%now%fmb*dom%tpo%now%H_ice,mask=mask_frnt)*dx      ! m^3/yr: flux [m-1 yr-1]
 
-        ! else
+            ! ajr, why only *dx above? 
 
-        !     ! ISMIP&: jablasco
-        !     reg%A_ice_frnt = 0.0_wp
-        !     reg%calv_flt   = 0.0_wp 
-        !     reg%flux_frnt  = 0.0_wp
+        else
 
-        ! end if
+            A_ice_frnt = 0.0_wp
+            calv_flt   = 0.0_wp 
+            flux_frnt  = 0.0_wp
+
+        end if
 
 
         ! 2. Begin writing step 
@@ -2537,19 +2565,19 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         call nc_write(filename,"iareafl",reg%A_ice_f*1e6,units="m^2",long_name="Floating ice area", &
                       standard_name="floating_ice_shelf_area",dim1="t",start=[n],ncid=ncid)
 
-        ! ==== Flux ====
-        ! call nc_write(filename,"tendacabf",reg%smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
-        !               standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="t",start=[n],ncid=ncid)
-        ! call nc_write(filename,"tendlibmassbf ",reg%bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
-        !               standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
-        ! call nc_write(filename,"tendlibmassbffl",reg%bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
-        !               standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
-        ! call nc_write(filename,"tendlicalvf",reg%calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
-        !               standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="t",start=[n],ncid=ncid)
-        ! call nc_write(filename,"tendlifmassbf",reg%flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
-        !               standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="t",start=[n],ncid=ncid)
-        ! call nc_write(filename,"tendligroundf",reg%flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
-        !               standard_name="tendency_of_grounded_ice_mass",dim1="t",start=[n],ncid=ncid)
+        ! ==== Fluxes ====
+        call nc_write(filename,"tendacabf",smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlibmassbf ",bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlibmassbffl",bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
+                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlicalvf",calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendlifmassbf",flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="t",start=[n],ncid=ncid)
+        call nc_write(filename,"tendligroundf",flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
+                      standard_name="tendency_of_grounded_ice_mass",dim1="t",start=[n],ncid=ncid)
 
         ! Close the netcdf file
         call nc_close(ncid)
