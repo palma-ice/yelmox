@@ -77,6 +77,18 @@ program yelmox
         character(len=56) :: equil_method
     end type 
 
+    type negis_params
+        logical  :: use_negis_par
+        real(wp) :: cf_0
+        real(wp) :: cf_1
+        real(wp) :: cf_centre
+        real(wp) :: cf_north
+        real(wp) :: cf_south
+
+        real(wp) :: cf_x
+        
+    end type
+
     type stats_class
         logical  :: defined
         real(wp) :: pd_rmse_H
@@ -91,6 +103,8 @@ program yelmox
     type(ctrl_params)    :: ctl
     type(ice_opt_params) :: opt  
     type(stats_class)    :: stats_pd_1, stats_lgm, stats_pd_2
+
+    type(negis_params)   :: ngs 
 
     ! Internal parameters
     logical  :: running_laurentide
@@ -335,6 +349,20 @@ program yelmox
             ! Should glacial smb be modified to reduce negative smb values
             scale_glacial_smb = .FALSE. 
             
+            ! Should NEGIS parameter modifications be used
+            ngs%use_negis_par = .TRUE. 
+
+            ! Load NEGIS parameters from file, if used
+            if (ngs%use_negis_par) then
+                
+                call nml_read(path_par,"negis","cf_0",       ngs%cf_0)
+                call nml_read(path_par,"negis","cf_1",       ngs%cf_1)
+                call nml_read(path_par,"negis","cf_centre",  ngs%cf_centre)
+                call nml_read(path_par,"negis","cf_north",   ngs%cf_north)
+                call nml_read(path_par,"negis","cf_north",   ngs%cf_north)
+                
+            end if 
+
             ! Make sure to set ice_allowed to prevent ice from growing in 
             ! Iceland and Svaalbard (on grid borders)
 
@@ -535,6 +563,16 @@ program yelmox
         else if (running_greenland) then
             ! Special start-up steps for Greenland
 
+            if (ngs%use_negis_par) then 
+
+                ! Ensure till method is correct, since we are updating cb_ref externally
+                yelmo1%dyn%par%till_method = -1 
+
+                ! Update cb_ref using negis parameters 
+                call negis_update_cb_ref(yelmo1,ngs,time)
+
+            end if 
+
             if (greenland_init_marine_H) then
                 ! Add extra ice-thickness over continental shelf to start with
                 ! an LGM-like state
@@ -702,6 +740,15 @@ program yelmox
         yelmo1%bnd%z_bed = isos1%now%z_bed
         
         ! == ICE SHEET ===================================================
+
+        if (running_greenland .and. ngs%use_negis_par) then 
+            ! Update cb_ref using negis parameters 
+
+            call negis_update_cb_ref(yelmo1,ngs,time)
+
+        end if
+
+        ! Update Yelmo
         if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
         
@@ -1213,171 +1260,57 @@ contains
 
     ! ===== NEGIS routines ============================
 
-    subroutine calc_cb_ref_negis(cb_ref,z_bed,z_bed_sd,z_sl,H_sed,f_sed,H_sed_min,H_sed_max, &
-                                            cf_ref,cf_min,z0,z1,n_sd,till_scale,till_method)
-        ! Update cb_ref [--] based on parameter choices
+    subroutine negis_update_cb_ref(ylmo,ngs,time)
 
         implicit none
-        
-        real(wp), intent(OUT) :: cb_ref(:,:) 
-        real(wp), intent(IN)  :: z_bed(:,:) 
-        real(wp), intent(IN)  :: z_bed_sd(:,:)
-        real(wp), intent(IN)  :: z_sl(:,:) 
-        real(wp), intent(IN)  :: H_sed(:,:) 
-        real(wp), intent(IN)  :: f_sed 
-        real(wp), intent(IN)  :: H_sed_min
-        real(wp), intent(IN)  :: H_sed_max  
-        real(wp), intent(IN)  :: cf_ref 
-        real(wp), intent(IN)  :: cf_min
-        real(wp), intent(IN)  :: z0 
-        real(wp), intent(IN)  :: z1
-        integer,  intent(IN) :: n_sd 
-        character(len=*), intent(IN) :: till_scale
-        integer,  intent(IN) :: till_method
-        
+
+        type(yelmo_class),  intent(INOUT) :: ylmo
+        type(negis_params), intent(INOUT) :: ngs 
+        real(wp), intent(IN) :: time 
+
         ! Local variables
-        integer :: q, i, j, nx, ny 
-        real(wp) :: f_sd_min, f_sd_max
-        real(wp) :: lambda_bed  
-        real(wp), allocatable :: cb_ref_samples(:) 
-        real(wp), allocatable :: f_sd(:) 
-        real(wp), allocatable :: w_sd(:) 
+        integer  :: i, j, nx, ny 
 
-        nx = size(cb_ref,1)
-        ny = size(cb_ref,2)
-        
-        if (n_sd .le. 0) then 
-            write(io_unit_err,*) "calc_cb_ref_negis:: Error: ytill.n_sd must be > 0."
-            write(io_unit_err,*) "ytill.n_sd = ", n_sd 
-            stop 
-        end if 
+        nx = ylmo%grd%nx 
+        ny = ylmo%grd%ny 
 
-        allocate(cb_ref_samples(n_sd))
-        allocate(f_sd(n_sd))
-        allocate(w_sd(n_sd))
-     
-        if (n_sd .eq. 1) then 
-            ! No sampling performed
-            f_sd = 0.0 
-            w_sd = 0.0
+        if (time .lt. -11e3) then 
+            ngs%cf_x = ngs%cf_0
+        else
+            ! Linear interpolation from cf_0 to cf_1  
+            ngs%cf_x = ngs%cf_0 + (time - (-11e3))/ ((0.0) - (-11e3)) * (ngs%cf_1 - ngs%cf_0)
+        end if
 
-        else 
+        if (time .lt. -4e3) then
+            ngs%cf_south = 1.0
+        else
+            ngs%cf_north = 1.0
+        end if
 
-            ! Sample over range, e.g., +/- 1-sigma 
-            f_sd_min = -1.0 
-            f_sd_max =  1.0 
+        ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
+        ! like normal, using the default function defined in Yelmo:
+        call calc_cb_ref(ylmo%dyn%now%cb_ref,ylmo%bnd%z_bed,ylmo%bnd%z_bed_sd,ylmo%bnd%z_sl, &
+                            ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min, &
+                            ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min, &
+                            ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1,ylmo%dyn%par%till_n_sd, &
+                            ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method)
 
-            do q = 1, n_sd 
-                f_sd(q) = f_sd_min + (f_sd_max-f_sd_min)*real(q-1,wp)/real(n_sd-1,wp)
-                w_sd(q) = (1.0_wp/sqrt(2.0_wp*pi)) * exp(-f_sd(q)**2/2.0_wp)
-            end do 
+        ! === Finally, apply NEGIS scaling =============================
 
-            ! Normalize weighting 
-            w_sd = w_sd/sum(w_sd)
+        do j = 1, ny 
+        do i = 1, nx 
 
-        end if 
+            if(ylmo%bnd%basins(i,j) .eq. 9.1) yelmo1%dyn%now%cb_ref(i,j) = yelmo1%dyn%now%cb_ref(i,j) * ngs%cf_centre
+            if(ylmo%bnd%basins(i,j) .eq. 9.2) yelmo1%dyn%now%cb_ref(i,j) = yelmo1%dyn%now%cb_ref(i,j) * ngs%cf_south
+            if(ylmo%bnd%basins(i,j) .eq. 9.3) yelmo1%dyn%now%cb_ref(i,j) = yelmo1%dyn%now%cb_ref(i,j) * ngs%cf_north
 
-        if (till_method .eq. -1) then 
-            ! Do nothing - cb_ref defined externally
+        end do
+        end do
 
-        else 
-            ! Calculate cb_ref following parameter choices 
-            ! lambda_bed: scaling as a function of bedrock elevation
+        return
 
-            ! Sample bedrock according to its standard deviation to account for uncertainty
-            ! and possible pinning points, etc. 
+    end subroutine negis_update_cb_ref
 
-            ! Finally, scale according to sediment parameterization too.
-
-            select case(trim(till_scale))
-
-                case("none")
-                    ! No scaling with elevation, set reference value 
-
-                    cb_ref = cf_ref
-                    
-                case("lin")
-                    ! Linear scaling function with bedrock elevation
-
-                    do j = 1, ny 
-                    do i = 1, nx 
-
-                        do q = 1, n_sd
-
-                            lambda_bed = calc_lambda_bed_lin(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
-                                                                                    z_sl(i,j),z0,z1)
-
-                            ! Calculate cb_ref 
-                            cb_ref_samples(q) = cf_ref * lambda_bed 
-                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
-
-                        end do 
-
-                        ! Average samples 
-                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
-
-                    end do 
-                    end do 
-
-                case("exp") 
-
-                    do j = 1, ny 
-                    do i = 1, nx 
-
-                        do q = 1, n_sd
-
-                            lambda_bed = calc_lambda_bed_exp(z_bed(i,j)+f_sd(q)*z_bed_sd(i,j), &
-                                                                                    z_sl(i,j),z0,z1)
-
-                            ! Calculate cb_ref 
-                            cb_ref_samples(q) = cf_ref * lambda_bed 
-                            if(cb_ref_samples(q) .lt. cf_min) cb_ref_samples(q) = cf_min 
-
-                        end do 
-
-                        ! Average samples 
-                        cb_ref(i,j) = sum(cb_ref_samples*w_sd)
-
-                    end do 
-                    end do 
-
-                case DEFAULT
-                    ! Scaling not recognized.
-
-                    write(io_unit_err,*) "calc_cb_ref_negis:: Error: scaling of cb_ref with &
-                    &elevation not recognized."
-                    write(io_unit_err,*) "ydyn.till_scale = ", till_scale 
-                    stop 
-                    
-            end select 
-            
-            ! Sediment scaling if desired
-            if (f_sed .lt. 1.0) then 
-
-                do j = 1, ny 
-                do i = 1, nx 
-
-                    ! Get linear scaling as a function of sediment thickness
-                    lambda_bed = (H_sed(i,j) - H_sed_min) / (H_sed_max - H_sed_min)
-                    if (lambda_bed .lt. 0.0) lambda_bed = 0.0
-                    if (lambda_bed .gt. 1.0) lambda_bed = 1.0 
-
-                    ! Get scaling factor ranging from f_sed(H_sed=H_sed_min) to 1.0(H_sed=H_sed_max)
-                    lambda_bed = 1.0 - (1.0-f_sed)*lambda_bed
-
-                    ! Apply scaling to cb_ref 
-                    cb_ref(i,j) = cb_ref(i,j) * lambda_bed 
-
-                end do
-                end do
-
-            end if 
-
-        end if 
-
-        return 
-
-    end subroutine calc_cb_ref_negis
 
 end program yelmox
 
