@@ -1,5 +1,5 @@
 &ctrl
-    run_step        = "spinup_ismip6" 
+    run_step        = "spinup" 
 /
 
 &ismip6
