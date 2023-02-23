@@ -144,7 +144,7 @@
 /
 
 &ytill
-    method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
+    method          = -1                ! -1: set externally; 1: calculate cb_ref online  
     scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
     is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
