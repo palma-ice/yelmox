@@ -1,5 +1,5 @@
 &ctrl
-    time_init       = -70000.0               ! [yr] Starting time
+    time_init       = -30000.0               ! [yr] Starting time
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
     time_const      = 0.0          ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
@@ -15,16 +15,14 @@
     use_pd_step     = False             ! Activate PD step-return in forcing at time=time_pd_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-    cf_negis_0      = 1.0 !0.496
-    cf_negis_1      = 1.0 !0.194
 /
 
 &negis
     cf_0            = 1.0 
     cf_1            = 1.0 
-    cf_centre       = 0.1 
-    cf_north        = 0.1
-    cf_south        = 0.1
+    cf_centre       = 1.0 
+    cf_north        = 1.0
+    cf_south        = 1.0
 /
 
 &opt_L21
@@ -222,7 +220,7 @@
 
 &yelmo_masks
     basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa-negis.nc" 
+    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa-negis-three.nc" 
     basins_nms      = "basin_sub" "basin_mask"
     regions_load    = True 
     regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
