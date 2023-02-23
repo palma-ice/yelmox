@@ -274,9 +274,9 @@ program yelmox_ismip6
             reg3%mask = .FALSE. 
             where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
 
-            ! Adjust optimization cf_max field specifically for the WAIS
-            !where(reg2%mask) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
+            ! Adjust optimization cf_max field specifically for the WAIS and Amery
             where(abs(yelmo1%bnd%basins - 14.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
+            where(abs(yelmo1%bnd%basins -  6.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
 
         case("Laurentide")
 
@@ -2564,29 +2564,29 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! ===== Mass ===== 
         call nc_write(filename,"lim",reg%V_ice*rho_ice*1e9,units="kg",long_name="Total ice mass", &
-                      standard_name="land_ice_mass",dim1="t",start=[n],ncid=ncid)
+                      standard_name="land_ice_mass",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
-                      standard_name="land_ice_mass_not_displacing_sea_water",dim1="t",start=[n],ncid=ncid)
+                      standard_name="land_ice_mass_not_displacing_sea_water",dim1="time",start=[n],ncid=ncid)
 
         ! ===== Area ====
         call nc_write(filename,"iareagr",reg%A_ice_g*1e6,units="m^2",long_name="Grounded ice area", &
-                      standard_name="grounded_ice_sheet_area",dim1="t",start=[n],ncid=ncid)
+                      standard_name="grounded_ice_sheet_area",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"iareafl",reg%A_ice_f*1e6,units="m^2",long_name="Floating ice area", &
-                      standard_name="floating_ice_shelf_area",dim1="t",start=[n],ncid=ncid)
+                      standard_name="floating_ice_shelf_area",dim1="time",start=[n],ncid=ncid)
 
         ! ==== Fluxes ====
         call nc_write(filename,"tendacabf",smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="t",start=[n],ncid=ncid)
+                      standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendlibmassbf ",bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
+                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendlibmassbffl",bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
-                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="t",start=[n],ncid=ncid)
+                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendlicalvf",calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="t",start=[n],ncid=ncid)
+                      standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendlifmassbf",flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="t",start=[n],ncid=ncid)
+                      standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"tendligroundf",flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
-                      standard_name="tendency_of_grounded_ice_mass",dim1="t",start=[n],ncid=ncid)
+                      standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
 
         ! Close the netcdf file
         call nc_close(ncid)
