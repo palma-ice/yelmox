@@ -404,12 +404,21 @@ program yelmox_ismip6
     call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
     
     if (yelmo1%par%use_restart) then 
-        ! If using restart file, set boundary module variables 
-        ! equal to restarted value as needed 
-         
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
+        ! Perform additional startup steps when using a restart
 
-    end if 
+        if (yelmo1%par%restart_interpolated .eq. 1) then 
+            ! Restart file was at lower resolution interpolated to higher resolution
+            ! Gradually introduce high-resolution topographic information to z_bed
+            
+            call yelmo_update_z_bed_restart(yelmo1,time)
+
+        end if 
+
+        ! Set boundary module variables equal to restarted value 
+        
+        isos1%now%z_bed  = yelmo1%bnd%z_bed
+      
+    end if
 
 ! ================= RUN STEPS ===============================================
 
