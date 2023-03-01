@@ -410,7 +410,7 @@ program yelmox_ismip6
             ! Restart file was at lower resolution interpolated to higher resolution
             ! Gradually introduce high-resolution topographic information to z_bed
             
-            call yelmo_update_z_bed_restart(yelmo1,time)
+            call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.TRUE.)
 
         end if 
 
