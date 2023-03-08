@@ -29,13 +29,6 @@
     "links" : 
         ["input","ice_data","maps"],
 
-    "const_paths" :
-        {   "EISMINT"  : "par/yelmo_const_EISMINT.nml",
-            "MISMIP3D" : "par/yelmo_const_MISMIP3D.nml"
-        },
-
-    "const_path_default" : "par/yelmo_const_Earth.nml",
-    
     "job_queues" :
         {  "normal" :
             {   "wall" : 10000 }
