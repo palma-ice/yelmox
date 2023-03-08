@@ -35,6 +35,7 @@
     domain          = "Pyrenees"
     grid_name       = "PYR-001GRAD"
     grid_path       = "ice_data_javi/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "None"
     log_timestep    = False 

@@ -22,6 +22,7 @@
     domain          = "Laurentide"
     grid_name       = "LIS-32KM"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "None"            !"/home/dmoren07/yelmo-model/yelmox/output/PMIP3/ensembles/exp_convergence/btmthd.2.cfstrm.20.sstrcnv.0.01.sstrmx.5"
     restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file

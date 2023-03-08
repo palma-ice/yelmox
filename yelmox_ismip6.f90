@@ -387,7 +387,7 @@ program yelmox_ismip6
     call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                 time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
     
-    yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+    yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
@@ -593,7 +593,7 @@ program yelmox_ismip6
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
                         time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
 
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
@@ -699,7 +699,7 @@ end if
             ! Get ISMIP6 climate and ocean forcing
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,time,time_bp)
             
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
@@ -835,7 +835,7 @@ if (n .eq. 0) then
                 ! Apply ISMIP6 anomalies
                 ! (apply to climate just for consistency)
 
-                smbpal1%ann%smb  = smbpal1%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
+                smbpal1%ann%smb  = smbpal1%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(yelmo1%bnd%c%conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
                 smbpal1%ann%tsrf = smbpal1%ann%tsrf + ismp1%ts%var(:,:,1,1)
 
                 do m = 1,12
@@ -867,7 +867,7 @@ end if
             call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3
+            yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
@@ -933,7 +933,7 @@ end if
         
         ! Initialize hysteresis module for transient forcing experiments 
         call hyster_init(hyst1,path_par,time) 
-        convert_km3_Gt = rho_ice *1e-3
+        convert_km3_Gt = yelmo1%bnd%c%rho_ice *1e-3
 
         ! =====================
 
@@ -942,7 +942,7 @@ end if
                     time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
                     dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
 
-        yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
@@ -1034,7 +1034,7 @@ end if
                         time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
                         dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
             
-            yelmo1%bnd%smb      = smbpal1%ann%smb*conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
@@ -1622,7 +1622,7 @@ contains
         snp%now%pr_ann = sum(snp%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/yr]
         
         ! Update smb fields
-        smbp%ann%smb  = smbp%ann%smb  + dsmb_now*1.0/(conv_we_ie*1e-3) ! [m ie/yr] => [mm we/yr]
+        smbp%ann%smb  = smbp%ann%smb  + dsmb_now*1.0/(yelmo1%bnd%c%conv_we_ie*1e-3) ! [m ie/yr] => [mm we/yr]
         smbp%ann%tsrf = smbp%ann%tsrf + dts_now
 
         ! Step 4: update marine_shelf based on ISMIP6 fields 
