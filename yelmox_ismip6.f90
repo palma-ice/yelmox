@@ -28,12 +28,12 @@ program yelmox_ismip6
     character(len=512) :: path_par, path_const  
     character(len=512) :: path_tf_corr 
     character(len=512) :: ismip6_path_par
-    integer    :: n, m
-    real(wp)   :: time, time_bp
-    real(wp)   :: time_elapsed
-    real(wp)   :: time_wt 
+    integer  :: n, m
+    real(wp) :: time, time_bp
+    real(wp) :: time_elapsed
+    real(wp) :: time_wt 
 
-    real(sp)   :: convert_km3_Gt
+    real(sp) :: convert_km3_Gt
 
     type(yelmo_class)           :: yelmo1 
     type(sealevel_class)        :: sealev 
@@ -1758,11 +1758,11 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         !type(isos_class),       intent(IN) :: isos
         
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
+        integer  :: ncid, n
+        real(wp) :: time_prev 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -1982,11 +1982,11 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         !type(isos_class),       intent(IN) :: isos
         
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
+        integer  :: ncid, n
+        real(wp) :: time_prev 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -2066,14 +2066,14 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         type(yelmo_class), intent(IN) :: dom 
         character(len=*),  intent(IN) :: filename, units 
-        real(prec),        intent(IN) :: time_init
+        real(wp),          intent(IN) :: time_init
         logical,           intent(IN) :: mask(:,:) 
-        real(prec),        intent(IN) :: dT_min 
-        real(prec),        intent(IN) :: dT_max
+        real(wp),          intent(IN) :: dT_min 
+        real(wp),          intent(IN) :: dT_max
 
         ! Local variables
         integer :: n 
-        real(prec), allocatable :: dT_axis(:) 
+        real(wp), allocatable :: dT_axis(:) 
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
@@ -2110,12 +2110,12 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         type(hyster_class),   intent(IN) :: hyst
         type(snapclim_class), intent(IN) :: snp 
         character(len=*),     intent(IN) :: filename
-        real(prec),           intent(IN) :: time
+        real(wp),             intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n, k
-        real(prec) :: time_prev 
-        real(prec) :: dT_axis(1000) 
+        integer  :: ncid, n, k
+        real(wp) :: time_prev 
+        real(wp) :: dT_axis(1000) 
         type(yregions_class) :: reg 
 
         ! Assume region to write is the global region of yelmo 
@@ -2254,9 +2254,9 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none
 
-        type(yelmo_class),      intent(IN) :: ylmo
-        character(len=*),       intent(IN) :: filename
-        real(wp),               intent(IN) :: time
+        type(yelmo_class), intent(IN) :: ylmo
+        character(len=*),  intent(IN) :: filename
+        real(wp),          intent(IN) :: time
 
         ! Local variables
         integer  :: ncid, n
@@ -2426,9 +2426,9 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         implicit none
 
-        type(yelmo_class),    intent(IN) :: dom
-        character(len=*),     intent(IN) :: filename
-        real(wp),             intent(IN) :: time
+        type(yelmo_class), intent(IN) :: dom
+        character(len=*),  intent(IN) :: filename
+        real(wp),          intent(IN) :: time
 
         ! Local variables
         type(yregions_class) :: reg

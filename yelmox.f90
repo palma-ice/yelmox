@@ -34,9 +34,9 @@ program yelmox
     character(len=256) :: file2D_small
     character(len=512) :: path_par, path_const
     character(len=512) :: path_lgm  
-    real(prec) :: time, time_bp, time_elapsed
-    real(wp)   :: dT_now 
-    integer    :: n
+    real(wp) :: time, time_bp, time_elapsed
+    real(wp) :: dT_now 
+    integer  :: n
     
     real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
     
@@ -469,23 +469,6 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
-    if (yelmo1%par%use_restart) then 
-        ! Perform additional startup steps when using a restart
-
-        if (yelmo1%par%restart_interpolated .eq. 1) then 
-            ! Restart file was at lower resolution interpolated to higher resolution
-            ! Gradually introduce high-resolution topographic information to z_bed
-            
-            call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.FALSE.)
-
-        end if 
-
-        ! Set boundary module variables equal to restarted value 
-        
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
-      
-    end if 
-
     ! ===== basal friction optimization ======
     if (trim(ctl%equil_method) .eq. "opt") then 
         
@@ -500,8 +483,23 @@ program yelmox
     end if 
     ! ========================================
 
-    if (ctl%with_ice_sheet .and. (.not. yelmo1%par%use_restart)) then 
-        ! Ice sheet is active, and we have not loaded a restart file 
+    if (yelmo1%par%use_restart) then 
+        ! Perform additional startup steps when using a restart
+
+        if (yelmo1%par%restart_interpolated .eq. 1) then 
+            ! Restart file was at lower resolution interpolated to higher resolution
+            ! Gradually introduce high-resolution topographic information to z_bed
+            
+            call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.FALSE.)
+
+        end if 
+
+        ! Set boundary module variables equal to restarted value 
+        
+        isos1%now%z_bed  = yelmo1%bnd%z_bed
+
+    else
+        ! No restart file used
 
         if (running_laurentide) then 
             ! Start with some ice thickness for testing
@@ -538,12 +536,14 @@ program yelmox
                         "/"//trim(yelmo1%par%grid_name)//"_SED-L97.nc"
             call nc_read(path_lgm,"z_sed",yelmo1%bnd%H_sed) 
 
-            ! Run Yelmo for briefly to update surface topography
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+            if (ctl%with_ice_sheet) then
+                ! Run Yelmo for briefly to update surface topography
+                call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
 
-            ! Addtional cleanup - remove floating ice 
-            where( yelmo1%tpo%now%mask_bed .eq. 5) yelmo1%tpo%now%H_ice = 0.0 
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+                ! Addtional cleanup - remove floating ice 
+                where( yelmo1%tpo%now%mask_bed .eq. 5) yelmo1%tpo%now%H_ice = 0.0 
+                call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+            end if 
 
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -560,13 +560,17 @@ program yelmox
                 where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
                         yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
                 
-                ! Run yelmo for several years to ensure stable central ice dome
-                call yelmo_update_equil(yelmo1,time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
+                if (ctl%with_ice_sheet) then
+                    ! Run yelmo for several years to ensure stable central ice dome
+                    call yelmo_update_equil(yelmo1,time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
+                end if 
 
             else 
 
-                ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                if (ctl%with_ice_sheet) then
+                    ! Run yelmo for several years with constant boundary conditions to stabilize fields
+                    call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                end if 
 
             end if 
 
@@ -594,26 +598,25 @@ program yelmox
 
                 end where
 
-                ! Run yelmo for a few years with constant boundary conditions
-                ! to synchronize all model fields a bit
-                call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+                if (ctl%with_ice_sheet) then
+                    ! Run yelmo for a few years with constant boundary conditions
+                    ! to synchronize all model fields a bit
+                    call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+                end if 
 
             end if
                 
         else 
             ! Run simple startup equilibration step 
             
-            ! Run yelmo for a few years with constant boundary conditions
-            ! to synchronize all model fields a bit
-            call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+            if (ctl%with_ice_sheet) then
+                ! Run yelmo for a few years with constant boundary conditions
+                ! to synchronize all model fields a bit
+                call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+            end if 
 
-        end if 
-
-    else 
-        ! Starting from restart file 
-
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.,tpo_solver="none")
-
+        end if
+        
     end if 
 
     ! ===== Initialize output files ===== 
@@ -872,11 +875,11 @@ contains
         !type(isos_class),       intent(IN) :: isos
         
         character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        real(wp), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n
-        real(prec) :: time_prev 
+        integer  :: ncid, n
+        real(wp) :: time_prev 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -1279,7 +1282,7 @@ contains
         real(wp), intent(IN) :: time 
 
         ! Local variables
-        integer  :: i, j, nx, ny 
+        integer :: i, j, nx, ny 
 
         nx = ylmo%grd%nx 
         ny = ylmo%grd%ny 

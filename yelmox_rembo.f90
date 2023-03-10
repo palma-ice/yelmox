@@ -33,10 +33,10 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file1D_hyst, file_restart, domain 
     character(len=256) :: file_rembo
     character(len=512) :: path_par, path_const  
-    real(wp)   :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
-    real(wp)   :: time_elapsed
-    integer    :: n
-    logical    :: calc_transient_climate
+    real(wp) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
+    real(wp) :: time_elapsed
+    integer  :: n
+    logical  :: calc_transient_climate
     
     logical :: use_hyster
     logical :: write_restart 
@@ -217,13 +217,6 @@ program yelmox
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=time_init,thrm_method="robin-cold")
 
-    if (yelmo1%par%use_restart) then 
-        ! If using restart file, set boundary module variables equal to restarted value 
-
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
-
-    end if 
-
     ! ===== basal friction optimization ======
     if (optimize) then 
         
@@ -239,23 +232,36 @@ program yelmox
             else 
                 ! Load cb_ref from calculated cb_tgt field
                 yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_tgt 
-
             end if 
 
         end if 
 
     end if 
     
-    ! Run yelmo for several years with constant boundary conditions and topo
-    ! to equilibrate thermodynamics and dynamics
-    if (with_ice_sheet) then 
-        call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
-        call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.TRUE.)
+    if (yelmo1%par%use_restart) then 
+        ! If using restart file, set boundary module variables equal to restarted value 
+
+        if (yelmo1%par%restart_interpolated .eq. 1) then 
+            ! Restart file was at lower resolution interpolated to higher resolution
+            ! Gradually introduce high-resolution topographic information to z_bed
+            
+            call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.FALSE.)
+
+        end if 
+        
+        isos1%now%z_bed  = yelmo1%bnd%z_bed
+
+    else 
+
+        ! Run yelmo for several years with constant boundary conditions and topo
+        ! to equilibrate thermodynamics and dynamics
+        if (with_ice_sheet) then 
+            call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+            call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.TRUE.)
+        end if 
+
     end if 
 
-    ! Now run steady-state for several thousand years
-    !call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.FALSE.)
-    
     ! 2D file 
     if (dt2D_out .ne. 0.0) then 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
@@ -268,13 +274,7 @@ program yelmox
     
     ! 1D file 
     ! call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-    ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-    
-    ! 1D file hyst 
-    ! call write_yelmo_init_combined(yelmo1,file1D_hyst,time_init=time,units="years", &
-    !                 mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
-    ! call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
-
+    ! call yelmo_write_reg_step(yelmo1,file1D,time=time)
 
     call write_yelmo_init_combined(yelmo1,file_rembo,time_init=time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
@@ -430,20 +430,19 @@ contains
 
         implicit none 
         
-        type(yelmo_class),       intent(IN) :: ylmo
-        type(hyster_class),      intent(IN) :: hyst
-        type(rembo_class),       intent(IN) :: rembo
-        type(isos_class),        intent(IN) :: isos 
-        type(marshelf_class),    intent(IN) :: mshlf 
-        
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        type(yelmo_class),    intent(IN) :: ylmo
+        type(hyster_class),   intent(IN) :: hyst
+        type(rembo_class),    intent(IN) :: rembo
+        type(isos_class),     intent(IN) :: isos 
+        type(marshelf_class), intent(IN) :: mshlf 
+        character(len=*),     intent(IN) :: filename
+        real(wp), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n, k
-        real(prec) :: time_prev 
-        real(prec) :: npmb, ntot, aar, smb_tot  
-        real(prec) :: dT_axis(1000)
+        integer  :: ncid, n, k
+        real(wp) :: time_prev 
+        real(wp) :: npmb, ntot, aar, smb_tot  
+        real(wp) :: dT_axis(1000)
         type(yregions_class) :: reg
 
         ! Assume region to write is the global region of yelmo 
@@ -552,17 +551,16 @@ contains
 
         implicit none 
         
-        type(yelmo_class),       intent(IN) :: ylmo
-        type(rembo_class),       intent(IN) :: rembo
-        type(isos_class),        intent(IN) :: isos 
-        type(marshelf_class),    intent(IN) :: mshlf 
-        
-        character(len=*),  intent(IN) :: filename
-        real(prec), intent(IN) :: time
+        type(yelmo_class),    intent(IN) :: ylmo
+        type(rembo_class),    intent(IN) :: rembo
+        type(isos_class),     intent(IN) :: isos 
+        type(marshelf_class), intent(IN) :: mshlf 
+        character(len=*),     intent(IN) :: filename
+        real(wp), intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n 
-        real(prec) :: time_prev 
+        integer  :: ncid, n 
+        real(wp) :: time_prev 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -718,111 +716,19 @@ contains
 
     end subroutine write_step_2D_combined
 
-!     subroutine write_step_2D_combined_small(ylmo,isos,snp,mshlf,srf,filename,time)
-
-!         implicit none 
-        
-!         type(yelmo_class),      intent(IN) :: ylmo
-!         type(isos_class),       intent(IN) :: isos 
-!         type(snapclim_class),   intent(IN) :: snp 
-!         type(marshelf_class),   intent(IN) :: mshlf 
-!         type(smbpal_class),     intent(IN) :: srf  
-!         !type(sediments_class),  intent(IN) :: sed 
-!         !type(geothermal_class), intent(IN) :: gthrm
-!         !type(isos_class),       intent(IN) :: isos
-        
-!         character(len=*),  intent(IN) :: filename
-!         real(prec), intent(IN) :: time
-
-!         ! Local variables
-!         integer    :: ncid, n
-!         real(prec) :: time_prev 
-
-!         ! Open the file for writing
-!         call nc_open(filename,ncid,writable=.TRUE.)
-
-!         ! Determine current writing time step 
-!         n = nc_size(filename,"time",ncid)
-!         call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-!         if (abs(time-time_prev).gt.1e-5) n = n+1 
-
-!         ! Update the time step
-!         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-!         ! Write model metrics (model speed, dt, eta)
-!         call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
-
-!         ! Write present-day data metrics (rmse[H],etc)
-!         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        
-!         ! == yelmo_topography ==
-!         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-! !         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
-! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
-!                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
-!                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         ! Boundaries
-!         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
-! !         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         ! External data
-! !         call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
-! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-! !         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
-! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-! !         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
-! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-! !         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-! !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         ! Close the netcdf file
-!         call nc_close(ncid)
-
-!         return 
-
-! !     end subroutine write_step_2D_combined_small
-
     subroutine write_step_1D_combined(ylm,hyst,filename,time)
 
         implicit none 
         
-        type(yelmo_class),    intent(IN) :: ylm
-        type(hyster_class),   intent(IN) :: hyst 
-        character(len=*),     intent(IN) :: filename
-        real(prec),           intent(IN) :: time
+        type(yelmo_class),  intent(IN) :: ylm
+        type(hyster_class), intent(IN) :: hyst 
+        character(len=*),   intent(IN) :: filename
+        real(wp),           intent(IN) :: time
 
         ! Local variables
-        integer    :: ncid, n, k 
-        real(prec) :: time_prev 
-        real(prec) :: dT_axis(1000) 
+        integer  :: ncid, n, k 
+        real(wp) :: time_prev 
+        real(wp) :: dT_axis(1000) 
         type(yregions_class) :: reg
 
         ! Assume region to write is the global region of yelmo 
@@ -958,20 +864,20 @@ contains
 
         type(yelmo_class), intent(IN) :: dom 
         character(len=*),  intent(IN) :: filename, units 
-        real(prec),        intent(IN) :: time_init
+        real(wp),          intent(IN) :: time_init
         logical,           intent(IN) :: mask(:,:) 
-        real(prec),        intent(IN) :: dT_min 
-        real(prec),        intent(IN) :: dT_max
+        real(wp),          intent(IN) :: dT_min 
+        real(wp),          intent(IN) :: dT_max
 
         ! Local variables
-        real(prec), allocatable :: dT_axis(:) 
+        real(wp), allocatable :: dT_axis(:) 
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
         call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,      units="kilometers")
         call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,      units="kilometers")
         call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,      units="1")
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_prec,nx=1,units=trim(units),unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
         
         !============================================================
         ! Add temperature axis to 1D hysteresis file 
