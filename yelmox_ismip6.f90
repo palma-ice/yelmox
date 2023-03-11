@@ -406,13 +406,13 @@ program yelmox_ismip6
     if (yelmo1%par%use_restart) then 
         ! Perform additional startup steps when using a restart
 
-        if (yelmo1%par%restart_interpolated .eq. 1) then 
-            ! Restart file was at lower resolution interpolated to higher resolution
-            ! Gradually introduce high-resolution topographic information to z_bed
+        ! if (yelmo1%par%restart_interpolated .eq. 1) then 
+        !     ! Restart file was at lower resolution interpolated to higher resolution
+        !     ! Gradually introduce high-resolution topographic information to z_bed
             
-            call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.TRUE.)
+        !     call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.TRUE.)
 
-        end if 
+        ! end if 
 
         ! Set boundary module variables equal to restarted value 
         
@@ -576,9 +576,9 @@ program yelmox_ismip6
             call sealevel_update(sealev,year_bp=time_bp)
             yelmo1%bnd%z_sl  = sealev%z_sl 
 
-
+            
             ! == ISOSTASY ==========================================================
-            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
+            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
             yelmo1%bnd%z_bed = isos1%now%z_bed
 
 

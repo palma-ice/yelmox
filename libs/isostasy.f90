@@ -295,15 +295,16 @@ contains
 
     end subroutine isos_init_state
 
-    subroutine isos_update(isos,H_ice,z_sl,time)
+    subroutine isos_update(isos,H_ice,z_sl,time,dzbdt_corr)
 
         implicit none 
 
         type(isos_class), intent(INOUT) :: isos 
-        real(wp), intent(IN) :: H_ice(:,:)        ! [m] Current ice thickness 
-        real(wp), intent(IN) :: z_sl(:,:)         ! [m] Current sea level 
-        real(wp), intent(IN) :: time              ! [a] Current time 
-
+        real(wp), intent(IN) :: H_ice(:,:)                  ! [m] Current ice thickness 
+        real(wp), intent(IN) :: z_sl(:,:)                   ! [m] Current sea level 
+        real(wp), intent(IN) :: time                        ! [yr] Current time 
+        real(wp), intent(IN), optional :: dzbdt_corr(:,:)   ! [m/yr] Basal topography adjustment rate (ie, to relax from low resolution to high resolution) 
+        
         ! Local variables 
         real(wp) :: dt, dt_now  
         integer  :: n, nstep 
@@ -389,6 +390,11 @@ contains
             if (dt_now .gt. 0.0) then 
 
                 isos%now%z_bed = isos%now%z_bed + isos%now%dzbdt*dt_now
+
+                ! Additionally apply bedrock adjustment field
+                if (present(dzbdt_corr)) then 
+                    isos%now%z_bed = isos%now%z_bed + dzbdt_corr*dt_now
+                end if 
 
                 isos%par%time_step = isos%par%time_step + dt_now  
 
