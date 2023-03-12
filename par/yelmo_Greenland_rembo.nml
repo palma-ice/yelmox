@@ -31,7 +31,9 @@
 /
 
 &opt
-    cf_time         = 15e3              ! [yr] When should optimization of basal friction stop?
+    opt_cf          = True              ! Should basal friction be optimized?
+    cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
+    cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     cf_min          = 0.001             ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
@@ -48,6 +50,8 @@
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = False             ! Should thermal forcing be optimized too?
+    tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
+    tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
     tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
