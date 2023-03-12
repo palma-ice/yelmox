@@ -241,20 +241,13 @@ program yelmox
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
 
-        if (yelmo1%par%restart_interpolated .eq. 1) then 
-            ! Restart file was at lower resolution interpolated to higher resolution
-            ! Gradually introduce high-resolution topographic information to z_bed
-            
-            call yelmo_update_z_bed_restart(yelmo1,time,write_nc_file=.FALSE.)
-
-        end if 
-        
+        ! Set boundary module variables equal to restarted value         
         isos1%now%z_bed  = yelmo1%bnd%z_bed
 
     else 
-
         ! Run yelmo for several years with constant boundary conditions and topo
         ! to equilibrate thermodynamics and dynamics
+
         if (with_ice_sheet) then 
             call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
             call yelmo_update_equil(yelmo1,time,time_tot=time_equil,dt=dtt,topo_fixed=.TRUE.)
@@ -332,7 +325,7 @@ program yelmox
         end if 
 
         ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time) 
+        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
 
 
