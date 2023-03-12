@@ -190,7 +190,7 @@ program yelmox
     if (lim_pd_ice) then 
         
         ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-        where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 2.0 
+        where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 4.0 
 
     end if 
     
@@ -352,8 +352,8 @@ if (calc_transient_climate) then
         ! Special treatment for Greenland
         if (lim_pd_ice) then 
         
-            ! Impose additional negative mass balance to no ice points of 2 [m.i.e./a] melting
-            where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 2.0 
+            ! Impose additional negative mass balance to no ice points of 4 [m.i.e./a] melting
+            where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 4.0 
 
         end if 
 
