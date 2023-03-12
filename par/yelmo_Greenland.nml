@@ -60,6 +60,7 @@
     restart         = "None"
     restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True              ! Take H_ice from restart file
+    restart_relax   = 500.0             ! [yrs] Years to relax from restart=>input topography
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
