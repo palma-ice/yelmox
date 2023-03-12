@@ -291,7 +291,8 @@ program yelmox
 
                 ! === Optimization update step =========
 
-                if (time_elapsed .le. opt%cf_time) then 
+                if (opt%opt_cf .and. &
+                        (time_elapsed .ge. opt%cf_time_init .and. time_elapsed .le. opt%cf_time_end) ) then  
                     ! Perform cf_ref optimization
                 
                     ! Update cb_ref based on error metric(s) 
@@ -304,7 +305,8 @@ program yelmox
 
                 end if
 
-                if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
+                if (opt%opt_tf .and. &
+                        (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
                     ! Perform tf_corr optimization
 
                     call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &

@@ -507,7 +507,8 @@ program yelmox_ismip6
 
                     ! === Optimization update step =========
 
-                    if (time_elapsed .le. opt%cf_time) then 
+                    if (opt%opt_cf .and. &
+                        (time_elapsed .ge. opt%cf_time_init .and. time_elapsed .le. opt%cf_time_end) ) then 
                         ! Perform cf_ref optimization
                     
                         ! Update cb_ref based on error metric(s) 
@@ -520,16 +521,14 @@ program yelmox_ismip6
 
                     end if
 
-                    if (opt%opt_tf .and. time_elapsed .le. opt%tf_time) then
+                    if (opt%opt_tf .and. &
+                        (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
                         ! Perform tf_corr optimization
 
                         call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
                                                 opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
-                        ! call optimize_tf_corr_basin(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                        !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                        !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
-                    
+
                     end if 
 
                 case("relax")
