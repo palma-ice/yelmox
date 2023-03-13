@@ -240,12 +240,13 @@ program yelmox_ismip6
             ! Load mask from file 
             call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
 
-            ! ajr: fix mask inconsistency at 16km resolution
-            ! Note: the files themselves should be fixed and made consistent!
-            if (trim(yelmo1%par%grid_name) .eq. "ANT-16KM") then 
-                where(abs(regions_mask - 4.0) .lt. 1e-3) regions_mask = 1.0 
-                where(abs(regions_mask - 5.0) .lt. 1e-3) regions_mask = 2.0 
-            end if 
+            ! ajr (2023-03-13): files are now consistent, this fix should not be needed!
+            ! ! ajr: fix mask inconsistency at 16km resolution
+            ! ! Note: the files themselves should be fixed and made consistent!
+            ! if (trim(yelmo1%par%grid_name) .eq. "ANT-16KM") then 
+            !     where(abs(regions_mask - 4.0) .lt. 1e-3) regions_mask = 1.0 
+            !     where(abs(regions_mask - 5.0) .lt. 1e-3) regions_mask = 2.0 
+            ! end if 
 
             ! APIS region (region=3.0 in regions map)
             reg1%write = .TRUE. 
@@ -275,22 +276,12 @@ program yelmox_ismip6
             where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
 
             ! Adjust optimization cf_max field specifically for the WAIS and Amery
-            where(abs(yelmo1%bnd%basins - 14.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
-            where(abs(yelmo1%bnd%basins -  6.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
-
-        case("Laurentide")
-
-            ! Hudson region (region=1.12 in regions map)
-            reg1%write = .TRUE. 
-            reg1%name  = "Hudson" 
-            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
-
-            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg1%mask = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) reg1%mask = .TRUE.
-
-            reg2%write = .FALSE. 
-            reg3%write = .FALSE. 
+            !where(abs(yelmo1%bnd%basins - 14.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
+            !where(abs(yelmo1%bnd%basins -  6.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
+            ! Note ajr (2023-03-13): this is no longer needed as long as ytill.cf_ref is set to 0.1 instead of 1.0.
+            ! Also, it was not nice having cf_ref_wais inside of the opt object in ice_optimization.f90. This
+            ! will be removed. If it is needed in the future, cf_ref_wais should be included in a parameter
+            ! section loaded in this program directly. 
 
         case DEFAULT 
 
