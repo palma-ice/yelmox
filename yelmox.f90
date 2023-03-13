@@ -75,6 +75,11 @@ program yelmox
         logical  :: with_ice_sheet 
 
         character(len=56) :: equil_method
+
+        real(wp) :: isos_tau_1 
+        real(wp) :: isos_tau_2 
+        real(wp) :: isos_sigma 
+        
     end type 
 
     type negis_params
@@ -395,6 +400,20 @@ program yelmox
     ! Initialize bedrock model 
     call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
+    if (trim(domain) .eq. "Antarctica") then 
+        ! Redefine tau (asthenosphere relaxation constant) as spatially
+        ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
+        call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
+        call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
+        call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
+ 
+        call isos_set_field(isos1%now%tau, &
+                [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
+                [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
+                                      regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
+        
+    end if
+    
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
