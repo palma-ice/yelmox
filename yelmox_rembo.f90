@@ -176,7 +176,8 @@ program yelmox
     if (use_hyster) then
         ! Update hysteresis variable 
         !var = yelmo1%reg%V_ice*convert_km3_Gt
-        var = sqrt(sum(yelmo1%tpo%now%dHidt**2))
+        !call hyster_calc_forcing(hyst1,time=time,var=var)
+        var = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
         call hyster_calc_forcing(hyst1,time=time,var=var,is_derivative=.TRUE.)
         dT_summer = hyst1%f_now 
     end if 
@@ -344,7 +345,8 @@ if (calc_transient_climate) then
         if (use_hyster) then
             ! Update forcing based on hysteresis module
             !var = yelmo1%reg%V_ice*convert_km3_Gt
-            var = sqrt(sum(yelmo1%tpo%now%dHidt**2))
+            !call hyster_calc_forcing(hyst1,time=time,var=var)
+            var = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
             call hyster_calc_forcing(hyst1,time=time,var=var,is_derivative=.TRUE.)
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
             
@@ -445,7 +447,8 @@ contains
         ! Local variables
         integer  :: ncid, n, k
         real(wp) :: time_prev 
-        real(wp) :: npmb, ntot, aar, smb_tot  
+        real(wp) :: npmb, ntot, aar, smb_tot
+        real(wp) :: var   
         real(wp) :: dT_axis(1000)
         type(yregions_class) :: reg
 
@@ -494,6 +497,10 @@ contains
         call nc_write(filename,"A_ice",reg%A_ice*1e-6,units="1e6 km^2",long_name="Ice area", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
+                      dim1="time",start=[n],ncid=ncid)
+        
+        var = sqrt(sum(ylmo%tpo%now%dHidt**2)/real(count(ylmo%tpo%now%f_ice .gt. 0.0),wp))
+        call nc_write(filename,"rms(dHidt)",reg%V_sle,units="m/yr",long_name="rms ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
         
         ! == yelmo_topography ==
