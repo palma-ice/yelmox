@@ -82,7 +82,8 @@ program yelmox
     ! Get output times
     call timeout_init(tm_1D,path_par,"tm_1D","small", time_init,time_end)
     call timeout_init(tm_2D,path_par,"tm_2D","heavy", time_init,time_end)
-         
+    !stop 
+
     if (optimize) then 
         ! Load optimization parameters 
 

@@ -175,7 +175,8 @@ contains
 
         if (verbose) then 
             ! Print summary
-            write(*,*) "timeout: ", trim(tm%method)
+            write(*,*) "timeout: ", trim(tm%label)
+            write(*,*) "  method    = ", trim(tm%method)
             write(*,*) "  time_init = ", time_init 
             write(*,*) "  time_end  = ", time_end 
             write(*,*) "  n         = ", n 
