@@ -80,8 +80,8 @@ program yelmox
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
     
     ! Get output times
-    call timeout_init(tm_1D,path_par,"timeout_1D","small", time_init,time_end)
-    call timeout_init(tm_2D,path_par,"timeout_2D","heavy", time_init,time_end)
+    call timeout_init(tm_1D,path_par,"tm_1D","small", time_init,time_end)
+    call timeout_init(tm_2D,path_par,"tm_2D","heavy", time_init,time_end)
          
     if (optimize) then 
         ! Load optimization parameters 
@@ -174,7 +174,9 @@ program yelmox
     
     if (use_hyster) then
         ! Update hysteresis variable 
-        call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
+        !var = yelmo1%reg%V_ice*convert_km3_Gt
+        var = sqrt(sum(yelmo1%tpo%now%dHidt**2))
+        call hyster_calc_forcing(hyst1,time=time,var=var,is_derivative=.TRUE.)
         dT_summer = hyst1%f_now 
     end if 
 
@@ -341,7 +343,9 @@ if (calc_transient_climate) then
         
         if (use_hyster) then
             ! Update forcing based on hysteresis module
-            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
+            !var = yelmo1%reg%V_ice*convert_km3_Gt
+            var = sqrt(sum(yelmo1%tpo%now%dHidt**2))
+            call hyster_calc_forcing(hyst1,time=time,var=var,is_derivative=.TRUE.)
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
             
             dT_summer = hyst1%f_now 

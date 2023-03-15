@@ -156,7 +156,7 @@ contains
     end subroutine hyster_init
 
   
-    subroutine hyster_calc_forcing(hyst,time,var)
+    subroutine hyster_calc_forcing(hyst,time,var,is_derivative)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         ! Subroutine :  d t T r a n s 1
         ! Author     :  Alex Robinson
@@ -167,6 +167,7 @@ contains
         type(hyster_class), intent(INOUT) :: hyst 
         real(wp),           intent(IN)    :: time
         real(wp),           intent(IN)    :: var 
+        logical, optional,  intent(IN)    :: is_derivative
 
         ! Local variables 
         real(wp) :: time_elapsed
@@ -177,7 +178,8 @@ contains
         real(wp) :: dvdt_fac 
         real(wp) :: pi_df_now 
         real(wp), allocatable :: dv_dt(:)
-        
+        logical  :: var_is_derivative
+
         ! For periodic forcing 
         real(wp) :: p 
         real(wp) :: amp
@@ -189,6 +191,12 @@ contains
         ! assume second-order PI controller parameters are needed. 
         integer, parameter :: pi_order = 2
 
+        ! Assume var is the state variable, or explicitly set it to be the derivative as input
+        var_is_derivative = .FALSE. 
+        if (present(is_derivative)) then 
+            var_is_derivative = is_derivative
+        end if
+        
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
 
@@ -222,16 +230,35 @@ contains
         ! Get currently elapsed time overall
         time_elapsed = time - hyst%time_init 
 
+         
         ! Calculate mean rate of change over time steps of interest
         
         ! Get current number of averaging points 
         nk = kmax - kmin + 1 
-        allocate(dv_dt(nk-1)) 
+        
+        if (.not. var_is_derivative) then
+            ! Calculate the derivative of var explicitly for timesteps of interest and average
 
-        dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
-                  (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
-        hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
-                                     (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
+            allocate(dv_dt(nk-1)) 
+
+            dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
+                    (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
+
+            ! Calculate the current average value of the derivative
+            hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
+                                        (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
+    
+        else
+            ! Derivative was provided at input, save it 
+
+            allocate(dv_dt(nk))
+            dv_dt = hyst%var(kmin:kmax)
+
+            ! Calculate the current average value of the derivative
+            hyst%dv_dt = sum(dv_dt,mask=(hyst%time(kmin:kmax) .ne. MV)) / real(nk,wp)
+    
+        end if
+
 
         if ( time_elapsed .le. hyst%par%dt_init) then 
             ! Initialization time period, no transient methods applied
