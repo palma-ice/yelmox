@@ -17,7 +17,7 @@
 &tm_1D
     method          = "file"           ! "const", "file", "times"
     dt              = 1.0
-    file            = "input/timeout_ramp_100kyr-short.txt"
+    file            = "input/timeout_ramp_100kyr.txt"
     times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
 /
 
