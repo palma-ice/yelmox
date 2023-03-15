@@ -80,8 +80,8 @@ program yelmox
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
     
     ! Get output times
-    call timeout_init(tm_1D,path_par,"timeout_1D",time_init,time_end)
-    call timeout_init(tm_2D,path_par,"timeout_2D",time_init,time_end)
+    call timeout_init(tm_1D,path_par,"timeout_1D","small", time_init,time_end)
+    call timeout_init(tm_2D,path_par,"timeout_2D","heavy", time_init,time_end)
          
     if (optimize) then 
         ! Load optimization parameters 
@@ -390,7 +390,7 @@ end if
         if (timeout_check(tm_2D,time)) then
             call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
         end if 
-        
+
         if (write_restart .and. mod(time,dt_restart)==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 

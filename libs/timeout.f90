@@ -15,6 +15,7 @@ module timeout
 
     type timeout_class
         character(len=56)     :: method
+        character(len=56)     :: label 
         real(wp), allocatable :: times(:)
     end type
 
@@ -53,20 +54,21 @@ contains
         end do 
 
         if (verbose .and. out_now) then 
-            write(*,*) "timeout_check:: ", time 
+            write(*,"(a16,a,2x,g12.3)") "timeout_check ", trim(tm%label), time 
         end if
 
         return
 
     end function timeout_check
 
-    subroutine timeout_init(tm,filename,group,time_init,time_end)
+    subroutine timeout_init(tm,filename,group,label,time_init,time_end)
 
         implicit none 
 
         type(timeout_class), intent(INOUT) :: tm
         character(len=*),    intent(IN)    :: filename 
         character(len=*),    intent(IN)    :: group 
+        character(len=*),    intent(IN)    :: label 
         real(wp),            intent(IN)    :: time_init 
         real(wp),            intent(IN)    :: time_end
         
@@ -77,6 +79,9 @@ contains
 
         integer, parameter :: nmax = 100000
         real(wp) :: times(nmax)
+
+        ! Store label for logging 
+        tm%label = trim(label) 
 
         ! Load parameters
         call nml_read(filename,group,"method",tm%method)
