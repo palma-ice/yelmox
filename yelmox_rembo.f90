@@ -500,7 +500,7 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         
         var = sqrt(sum(ylmo%tpo%now%dHidt**2)/real(count(ylmo%tpo%now%f_ice .gt. 0.0),wp))
-        call nc_write(filename,"rms(dHidt)",reg%V_sle,units="m/yr",long_name="rms ice thickness change", &
+        call nc_write(filename,"rms(dHidt)",var,units="m/yr",long_name="rms ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
         
         ! == yelmo_topography ==
