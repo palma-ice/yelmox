@@ -2,7 +2,7 @@
     
     ! Timing parameters 
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 50e3              ! [yr] Ending time
+    time_end        = 50.0              ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt1D_out        = 50.0              ! [yr] Frequency of writing 1D output files 
@@ -16,18 +16,26 @@
     optimize        = False             ! Optimize basal friction? 
 /
 
+&timeout
+    method          = "file"           ! "const", "file", "times"
+    dt              = 1.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
 &hyster
     method          =  "PI42"           ! const, ramp-time, ramp-slope, exp, PI42, H312b, H312PID, H321PID, PID1
     with_kill       = True              ! Should kill signal be activated at limits of forcing?
     dt_init         = 200.0             ! [yr] Initialization time window: no transient methods applied.
-    dt_ramp         = 300.0             ! [yr] Duration of ramp-up time window in method='ramp'.
+    dt_ramp         = 300.0             ! [yr] Duration of ramp-up time window in method='ramp-time'.
     dt_ave          = 100.0             ! [yr] Number of years for averaging to diagnose system rate of change 
     df_sign         =  1                ! [-1/1] Determines direction of forcing
+    df_red          = 0.0               ! [f] Reduction in f relative to the final value (f_min/f_max), for triangle methods
     eps             = 20.0              ! [Gt/yr] Target system rate of change (set point). Ice sheets: eg 20 Gt/a for 100yr averaging.
     df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.
     sigma           = 0.0               ! [f] Noise signal 
     f_min           =  0.0              ! [f] Forcing value minimum 
-    f_max           =  4.0              ! [f] Forcing value maximum 
+    f_max           =  4.0              ! [f] Forcing value maximum
 /
 
 &opt

@@ -53,6 +53,9 @@ $(objdir)/snapclim.o: $(libdir)/snapclim.f90 $(objdir)/nml.o $(objdir)/ncio.o
 $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/varslice.o: $(libdir)/varslice.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -123,12 +126,13 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 			 		    $(objdir)/sealevel.o \
 			 		    $(objdir)/sediments.o \
 			 		    $(objdir)/smbpal_precision.o \
-			 		    $(objdir)/interp_time.o \
+						$(objdir)/interp_time.o \
 					    $(objdir)/smb_itm.o \
 					    $(objdir)/smb_pdd.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/snapclim.o \
-					    $(objdir)/varslice.o \
+					    $(objdir)/timeout.o \
+			 		    $(objdir)/varslice.o \
 					    $(objdir)/xarray.o
 
 yelmox_help = 			$(objdir)/yelmox_hysteresis_help.o

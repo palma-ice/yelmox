@@ -17,7 +17,8 @@ program yelmox
     use geothermal
     
     use hyster 
-
+    use timeout 
+    
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
@@ -38,6 +39,8 @@ program yelmox
     integer  :: n
     logical  :: calc_transient_climate
     
+    type(timeout_class) :: tm
+
     logical :: use_hyster
     logical :: write_restart 
     real(4) :: convert_km3_Gt, var 
@@ -77,6 +80,9 @@ program yelmox
     call nml_read(path_par,"ctrl","lim_pd_ice",     lim_pd_ice)             ! Limit to pd ice extent (apply extra melting outside mask)
     call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
+    
+    call timeout_init(tm,path_par,"timeout",time_init,time_end)
+    stop 
     
     if (optimize) then 
         ! Load optimization parameters 
