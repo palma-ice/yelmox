@@ -11,7 +11,8 @@ module timeout
 
     real(wp), parameter :: MV  = -9999.0_wp 
 
-    logical,  parameter :: verbose = .TRUE. 
+    real(wp), parameter :: time_tol = 1e-6 
+    logical,  parameter :: verbose  = .TRUE. 
 
     type timeout_class
         character(len=56)     :: method
@@ -38,8 +39,6 @@ contains
         ! Local variables 
         integer :: k, n 
         
-        real(wp), parameter :: tol = 1e-6 
-
         ! Get total times to check 
         n = size(tm%times)
 
@@ -47,7 +46,7 @@ contains
         out_now = .FALSE. 
 
         do k = 1, n 
-            if (abs(time - tm%times(k)) .lt. tol) then 
+            if (abs(time - tm%times(k)) .lt. time_tol) then 
                 out_now = .TRUE. 
                 exit 
             end if
@@ -79,6 +78,7 @@ contains
 
         integer, parameter :: nmax = 100000
         real(wp) :: times(nmax)
+        real(wp), allocatable :: tmp(:) 
 
         ! Store label for logging 
         tm%label = trim(label) 
@@ -166,13 +166,23 @@ contains
             
         end select 
 
+        ! Make sure last timestep is also written
+        if (times(k1) .lt. time_end) then 
+            n  = n+1 
+            k1 = k0+n-1
+            times(k1) = time_end 
+        end if
+                    
         ! Store final times(k0:k1) vector of length n
         ! in timeout object for later use. 
         if (allocated(tm%times)) deallocate(tm%times)
         allocate(tm%times(n))
         tm%times(1:n) = times(k0:k1)
 
-
+        ! Finally remove any duplicate times
+        call remove_duplicate_times(tm%times)
+        n = size(tm%times)
+        
         if (verbose) then 
             ! Print summary
             write(*,*) "timeout: ", trim(tm%label)
@@ -193,6 +203,43 @@ contains
 
     end subroutine timeout_init
 
+    subroutine remove_duplicate_times(times)
+
+        implicit none 
+
+        real(wp), intent(INOUT), allocatable :: times(:) 
+
+        ! Local variables 
+        integer :: k, n, n1 
+        real(wp) :: time
+        real(wp), allocatable :: times_new(:) 
+
+        
+        n = size(times)
+        allocate(times_new(n))
+
+        times_new = MV 
+
+        n1 = 0 
+        do k = 1, n
+            time = times(k)
+            if (minval(abs(time-times_new)) .lt. time_tol) then 
+                ! Do nothing, this value is already contained in times
+            else 
+                ! This time does not exist yet, add it. 
+                n1 = n1+1 
+                times_new(n1) = time 
+            end if
+        end do 
+
+        deallocate(times)
+        allocate(times(n1))
+        times = times_new(1:n1)
+
+        return
+
+    end subroutine remove_duplicate_times
+
     subroutine timeout_parse_file(times,filename)
 
         implicit none 
@@ -201,8 +248,9 @@ contains
         character(len=*), intent(IN)    :: filename 
 
         ! Local variables 
-        integer :: q, k, nmax, io, stat  
+        integer :: q, k, ntmp, nmax, io, stat  
         character(len=256) :: line_str 
+        real(wp), allocatable :: tmp(:) 
 
         integer, parameter :: nmax_file = 10000
 
@@ -225,6 +273,12 @@ contains
                 if (index(line_str,":") .gt. 0) then 
                     ! Parse this line as a set of times time1:dtime:time2
 
+                    call parse_time_vector(tmp,trim(line_str))
+
+                    ntmp = size(tmp)
+                    k = k+1
+                    times(k:k+ntmp-1) = tmp 
+                    k = k+ntmp-1
 
                 else
                     ! Assume only one value is available
@@ -239,7 +293,6 @@ contains
 
         end do 
 
-
         close(io) 
 
         return 
@@ -247,11 +300,41 @@ contains
     end subroutine timeout_parse_file
 
     subroutine parse_time_vector(times,timestr)
-
+        ! Given a string of format time0:dt:time1,
+        ! generate a vector of times: [time0,time0+dt,...,time1]
         implicit none
 
-        real(wp),         intent(INOUT) :: times(:)
+        real(wp),         intent(INOUT), allocatable :: times(:)
         character(len=*), intent(IN)    :: timestr 
+
+        ! Local variables 
+        integer  :: k, k0, k1, n 
+        real(wp) :: t0, t1, dt 
+
+        ! Step 1: parse the string into values of t0, dt, and t1
+
+        k0 = index(timestr,":")
+        k1 = index(timestr,":",back=.TRUE.)
+
+        if (k0 .eq. 0 .or. k1 .eq. 0) then 
+            write(*,*) "parse_time_vector:: Error: timestr does not have the &
+            &right format: t0:dt:t1."
+            write(*,*) "timestr = ", trim(timestr)
+            stop 
+        end if 
+
+        read(timestr(1:k0-1),*) t0 
+        read(timestr(k0+1:k1-1),*) dt 
+        read(timestr(k1+1:len_trim(timestr)),*) t1 
+
+        n = ceiling( (t1-t0)/dt ) + 1
+
+        if (allocated(times)) deallocate(times)
+        allocate(times(n))
+
+        do k = 1, n 
+            times(k) = t0 + (k-1)*dt 
+        end do
 
         return
 
