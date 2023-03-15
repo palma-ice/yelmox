@@ -213,7 +213,7 @@ contains
         do q = 1, nmax_file 
 
             ! Read line as a string first 
-            read(io,"(a10000)",iostat=stat) line_str 
+            read(io,"(a)",iostat=stat) line_str 
             line_str = trim(adjustl(line_str))
 
             if (stat .ne. 0) exit
