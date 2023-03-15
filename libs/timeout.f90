@@ -19,10 +19,46 @@ module timeout
     end type
 
     private
+    public :: timeout_check
     public :: timeout_class
     public :: timeout_init 
 
 contains
+
+    function timeout_check(tm,time) result(out_now)
+        ! Check if the current time exists within the timeout time vector.
+
+        implicit none
+
+        type(timeout_class), intent(IN) :: tm
+        real(wp), intent(IN) :: time 
+        logical :: out_now 
+
+        ! Local variables 
+        integer :: k, n 
+        
+        real(wp), parameter :: tol = 1e-6 
+
+        ! Get total times to check 
+        n = size(tm%times)
+
+        ! Assume this timestep is not in timeout
+        out_now = .FALSE. 
+
+        do k = 1, n 
+            if (abs(time - tm%times(k)) .lt. tol) then 
+                out_now = .TRUE. 
+                exit 
+            end if
+        end do 
+
+        if (verbose .and. out_now) then 
+            write(*,*) "timeout_check:: ", time 
+        end if
+
+        return
+
+    end function timeout_check
 
     subroutine timeout_init(tm,filename,group,time_init,time_end)
 
@@ -125,6 +161,8 @@ contains
             
         end select 
 
+        ! Store final times(k0:k1) vector of length n
+        ! in timeout object for later use. 
         if (allocated(tm%times)) deallocate(tm%times)
         allocate(tm%times(n))
         tm%times(1:n) = times(k0:k1)
@@ -212,19 +250,6 @@ contains
         return
 
     end subroutine parse_time_vector
-
-    function timeout_check(tm,time) result(out_now)
-
-        implicit none
-
-        type(timeout_class), intent(IN) :: tm
-        real(wp), intent(IN) :: time 
-        real(wp) :: out_now 
-
-        return
-
-    end function timeout_check
-
 
     ! === Helper functions (borrowed from nml.f90) ===
     

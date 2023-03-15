@@ -18,7 +18,7 @@ program yelmox
     
     use hyster 
     use timeout 
-    
+
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
@@ -39,7 +39,7 @@ program yelmox
     integer  :: n
     logical  :: calc_transient_climate
     
-    type(timeout_class) :: tm
+    type(timeout_class) :: tm_1D, tm_2D 
 
     logical :: use_hyster
     logical :: write_restart 
@@ -71,8 +71,6 @@ program yelmox
     call nml_read(path_par,"ctrl","time_end",       time_end)               ! [yr] Ending time
     call nml_read(path_par,"ctrl","time_equil",     time_equil)             ! [yr] Years to equilibrate first
     call nml_read(path_par,"ctrl","dtt",            dtt)                    ! [yr] Main loop time step 
-    call nml_read(path_par,"ctrl","dt1D_out",       dt1D_out)               ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"ctrl","dt2D_out",       dt2D_out)               ! [yr] Frequency of 2D output 
     call nml_read(path_par,"ctrl","write_restart",  write_restart)
     call nml_read(path_par,"ctrl","transient",      calc_transient_climate) ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_hyster",     use_hyster)             ! Use hyster?
@@ -81,9 +79,10 @@ program yelmox
     call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
     
-    call timeout_init(tm,path_par,"timeout",time_init,time_end)
-    stop 
-    
+    ! Get output times
+    call timeout_init(tm_1D,path_par,"timeout_1D",time_init,time_end)
+    call timeout_init(tm_2D,path_par,"timeout_2D",time_init,time_end)
+         
     if (optimize) then 
         ! Load optimization parameters 
 
@@ -382,16 +381,16 @@ end if
 
         ! == MODEL OUTPUT =======================================================
 
-        if (dt2D_out .ne. 0.0 .and. mod(time,dt2D_out)==0) then 
-            call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
-        end if 
-
-        if (mod(time,dt1D_out)==0) then 
+        if (timeout_check(tm_1D,time)) then  
             ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             !call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
             call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
         end if 
 
+        if (timeout_check(tm_2D,time)) then
+            call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
+        end if 
+        
         if (write_restart .and. mod(time,dt_restart)==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
