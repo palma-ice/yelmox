@@ -34,7 +34,7 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file1D_hyst, file_restart, domain 
     character(len=256) :: file_rembo
     character(len=512) :: path_par, path_const  
-    real(wp) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt_restart   
+    real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart   
     real(wp) :: time_elapsed
     integer  :: n
     logical  :: calc_transient_climate
@@ -263,11 +263,9 @@ program yelmox
 
     end if 
 
-    ! 2D file 
-    if (dt2D_out .ne. 0.0) then 
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
-    end if 
+    ! Heavy 2D file  
+    call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
+    call write_step_2D_combined(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
 
     ! 2D small file 
     ! call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
@@ -277,6 +275,7 @@ program yelmox
     ! call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
     ! call yelmo_write_reg_step(yelmo1,file1D,time=time)
 
+    ! Small 1D-2D yelmo-rembo file
     call write_yelmo_init_combined(yelmo1,file_rembo,time_init=time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
     call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
