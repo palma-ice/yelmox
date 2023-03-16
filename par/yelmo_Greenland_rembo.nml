@@ -33,9 +33,10 @@
     with_kill       = True              ! Should kill signal be activated at limits of forcing?
     dt_init         = 200.0             ! [yr] Initialization time window: no transient methods applied.
     dt_ramp         = 300.0             ! [yr] Duration of ramp-up time window in method='ramp-time'.
+    dt_red          = -1.0              ! [yr] Duration of ramp-down time window in method='ramp-time-triangle'
     dt_ave          = 100.0             ! [yr] Number of years for averaging to diagnose system rate of change 
     df_sign         =  1                ! [-1/1] Determines direction of forcing
-    df_red          = 0.0               ! [f] Reduction in f relative to the final value (f_min/f_max), for triangle methods
+    df_red          = 0.0               ! [f] Absolute reduction in f relative to the final value (f_min/f_max), for triangle methods
     eps             = 20.0              ! [Gt/yr] Target system rate of change (set point). Ice sheets: eg 20 Gt/a for 100yr averaging.
     df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.
     sigma           = 0.0               ! [f] Noise signal 

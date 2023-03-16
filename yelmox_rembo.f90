@@ -2,6 +2,7 @@
 
 program yelmox
 
+    use nml
     use ncio 
     use yelmo 
     use ice_optimization 

@@ -20,8 +20,10 @@ module hyster
         logical  :: with_kill  
         real(wp) :: dt_init 
         real(wp) :: dt_ramp
+        real(wp) :: dt_red
         real(wp) :: dt_ave 
-        real(wp) :: df_sign 
+        real(wp) :: df_sign
+        real(wp) :: df_red 
         real(wp) :: eps
         real(wp) :: df_dt_max
         real(wp) :: sigma 
@@ -30,7 +32,8 @@ module hyster
         
         ! Internal parameters 
         real(wp) :: df_dt_min    
-        
+        logical  :: triangle_return
+
     end type 
     
     type hyster_class
@@ -82,7 +85,9 @@ contains
         call nml_read(filename,trim(par_label),"dt_ave",      hyst%par%dt_ave)
         call nml_read(filename,trim(par_label),"dt_init",     hyst%par%dt_init)
         call nml_read(filename,trim(par_label),"dt_ramp",     hyst%par%dt_ramp)
+        call nml_read(filename,trim(par_label),"dt_red",      hyst%par%dt_red)
         call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
+        call nml_read(filename,trim(par_label),"df_red",      hyst%par%df_red)
         call nml_read(filename,trim(par_label),"eps",         hyst%par%eps)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
         call nml_read(filename,trim(par_label),"sigma",       hyst%par%sigma)
@@ -103,6 +108,9 @@ contains
         ! Prescribe a very small, but nonzero minimum value 
         ! (important to be nonzero for the pi controller methods)
         hyst%par%df_dt_min = 1e-9   ! [f/yr]
+
+        ! Set triangle return false to start, since the first step is the ramp up
+        hyst%par%triangle_return = .FALSE. 
 
         ! Define label for this hyster object 
         hyst%par%label = "hyster" 
@@ -268,9 +276,40 @@ contains
 
                     hyst%df_dt = hyst%par%df_dt_max
 
-                case("ramp-time")
+                case("ramp-time","ramp-time-triangle")
                     ! Ramp up to the constant rate of change for the first N years. 
                     ! Then maintain a constant anomaly (independent of dv_dt). 
+
+                        if (trim(hyst%par%method) .eq. "ramp-time-triangle" .and. &
+                                (.not. hyst%par%triangle_return) ) then
+                            ! When first extreme value is reached sign should be
+                            ! reversed and new extreme value imposed.
+
+                            if ( (hyst%par%df_sign .lt. 0.0 .and.&
+                                    hyst%f_mean_now .le. hyst%par%f_min) ) then
+                                ! Ramp-up complete, switch directions
+
+                                hyst%par%df_sign = -hyst%par%df_sign
+                                hyst%par%dt_ramp = hyst%par%dt_red 
+                                hyst%par%f_max   = hyst%par%f_min + hyst%par%df_red
+
+                                ! Set switch to know we are on the return part of the triangle
+                                hyst%par%triangle_return = .TRUE.
+
+                            else if ( (hyst%par%df_sign .gt. 0.0 .and.&
+                                    hyst%f_mean_now .ge. hyst%par%f_max) ) then  
+                            ! Ramp-up complete, switch directions
+
+                                hyst%par%df_sign = -hyst%par%df_sign
+                                hyst%par%dt_ramp = hyst%par%dt_red 
+                                hyst%par%f_min   = hyst%par%f_max - hyst%par%df_red
+                                
+                                ! Set switch to know we are on the return part of the triangle
+                                hyst%par%triangle_return = .TRUE.
+
+                            end if
+                            
+                        end if
 
                     
                         if ( (hyst%par%df_sign .lt. 0.0 .and.&

@@ -1,6 +1,7 @@
 
 program yelmox_ismip6
 
+    use nml 
     use ncio 
     use yelmo 
     use ice_optimization 

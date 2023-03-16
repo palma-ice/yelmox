@@ -2,6 +2,7 @@
 
 program yelmox
 
+    use nml 
     use ncio 
     use yelmo 
     use yelmo_tools, only : smooth_gauss_2D
