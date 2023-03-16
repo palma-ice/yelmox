@@ -44,7 +44,7 @@ program yelmox
 
     logical :: use_hyster
     logical :: write_restart
-    real(4) :: var, dv_dt 
+    real(4) :: var, dv_dt
     real(4) :: convert_km3_Gt
     real(4) :: dTa, dT_summer
 
@@ -450,7 +450,7 @@ contains
         integer  :: ncid, n, k
         real(wp) :: time_prev 
         real(wp) :: npmb, ntot, aar, smb_tot
-        real(wp) :: var   
+        real(wp) :: dHidt_rms, dHidt_max   
         real(wp) :: dT_axis(1000)
         type(yregions_class) :: reg
 
@@ -503,8 +503,17 @@ contains
         call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
                       dim1="time",start=[n],ncid=ncid)
         
-        var = sqrt(sum(ylmo%tpo%now%dHidt**2)/real(count(ylmo%tpo%now%f_ice .gt. 0.0),wp))
-        call nc_write(filename,"rms(dHidt)",var,units="m/yr",long_name="rms ice thickness change", &
+        if (count(ylmo%tpo%now%f_ice .gt. 0.0) .gt. 0) then
+            dHidt_rms = sqrt(sum(ylmo%tpo%now%dHidt**2)/real(count(ylmo%tpo%now%f_ice .gt. 0.0),wp))
+            dHidt_max = maxval(abs(ylmo%tpo%now%dHidt),mask=ylmo%tpo%now%f_ice .gt. 0.0)
+        else
+            dHidt_rms = 0.0 
+            dHidt_max = 0.0 
+        end if
+
+        call nc_write(filename,"rms(dHidt)",dHidt_rms,units="m/yr",long_name="rms ice thickness change", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"max(dHidt)",dHidt_max,units="m/yr",long_name="max. ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
         
         ! == yelmo_topography ==
