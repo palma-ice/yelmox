@@ -42,8 +42,9 @@ program yelmox
     type(timeout_class) :: tm_1D, tm_2D 
 
     logical :: use_hyster
-    logical :: write_restart 
-    real(4) :: convert_km3_Gt, var 
+    logical :: write_restart
+    real(4) :: var, dv_dt 
+    real(4) :: convert_km3_Gt
     real(4) :: dTa, dT_summer
 
     ! No-ice mask (to impose additional melting)
@@ -175,10 +176,10 @@ program yelmox
     
     if (use_hyster) then
         ! Update hysteresis variable 
-        !var = yelmo1%reg%V_ice*convert_km3_Gt
-        !call hyster_calc_forcing(hyst1,time=time,var=var)
-        var = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
-        call hyster_calc_forcing(hyst1,time=time,var=var,is_derivative=.TRUE.)
+        var   = yelmo1%reg%V_ice*convert_km3_Gt
+        dv_dt = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
+        !call hyster_calc_forcing(hyst1,time,var)
+        call hyster_calc_forcing(hyst1,time,var,dv_dt)
         dT_summer = hyst1%f_now 
     end if 
 
@@ -344,10 +345,10 @@ if (calc_transient_climate) then
         
         if (use_hyster) then
             ! Update forcing based on hysteresis module
-            !var = yelmo1%reg%V_ice*convert_km3_Gt
-            !call hyster_calc_forcing(hyst1,time=time,var=var)
-            var = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
-            call hyster_calc_forcing(hyst1,time=time,var=var,is_derivative=.TRUE.)
+            var   = yelmo1%reg%V_ice*convert_km3_Gt
+            dv_dt = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
+            !call hyster_calc_forcing(hyst1,time,var)
+            call hyster_calc_forcing(hyst1,time,var,dv_dt)
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
             
             dT_summer = hyst1%f_now 

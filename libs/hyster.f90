@@ -40,8 +40,10 @@ module hyster
         ! variables 
         real(wp), allocatable :: time(:)
         real(wp), allocatable :: var(:)
+        real(wp), allocatable :: dv_dt(:)
+
         real(wp) :: dt 
-        real(wp) :: dv_dt
+        real(wp) :: dv_dt_ave
         real(wp) :: df_dt
         
         real(wp) :: pi_df(3)
@@ -109,16 +111,20 @@ contains
         ! (Re)initialize hyster vectors to a large value 
         ! to store many timesteps.
         ntot = 2000
-        if (allocated(hyst%time)) deallocate(hyst%time)
-        if (allocated(hyst%var))  deallocate(hyst%var)
+        if (allocated(hyst%time))  deallocate(hyst%time)
+        if (allocated(hyst%var))   deallocate(hyst%var)
+        if (allocated(hyst%dv_dt)) deallocate(hyst%dv_dt)
         allocate(hyst%time(ntot))
         allocate(hyst%var(ntot))
+        allocate(hyst%dv_dt(ntot))
 
         ! Initialize variable values
         hyst%time  = MV
-        hyst%var   = MV 
-        hyst%dv_dt = 0.0_wp 
-        hyst%df_dt = 0.0_wp
+        hyst%var   = MV
+        hyst%dv_dt = MV
+
+        hyst%dv_dt_ave = 0.0
+        hyst%df_dt     = 0.0
 
         hyst%pi_df  = hyst%par%df_dt_min 
         hyst%pi_eta = hyst%par%eps 
@@ -142,7 +148,7 @@ contains
         end if 
 
         ! Set noise to zero for now 
-        hyst%eta_now = 0.0_wp 
+        hyst%eta_now = 0.0
         hyst%f_now = hyst%f_mean_now 
         
         ! Set kill switch to false to start 
@@ -156,7 +162,7 @@ contains
     end subroutine hyster_init
 
   
-    subroutine hyster_calc_forcing(hyst,time,var,is_derivative)
+    subroutine hyster_calc_forcing(hyst,time,var,dv_dt)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         ! Subroutine :  d t T r a n s 1
         ! Author     :  Alex Robinson
@@ -167,18 +173,16 @@ contains
         type(hyster_class), intent(INOUT) :: hyst 
         real(wp),           intent(IN)    :: time
         real(wp),           intent(IN)    :: var 
-        logical, optional,  intent(IN)    :: is_derivative
+        real(wp), optional, intent(IN)    :: dv_dt
 
         ! Local variables 
         real(wp) :: time_elapsed
-        real(wp) :: dv_dt_now 
+        real(wp) :: dv_dt_now
         real(wp) :: f_scale 
         integer  :: ntot, kmin, kmax, nk, k 
         real(wp) :: dt_tot 
         real(wp) :: dvdt_fac 
-        real(wp) :: pi_df_now 
-        real(wp), allocatable :: dv_dt(:)
-        logical  :: var_is_derivative
+        real(wp) :: pi_df_now
 
         ! For periodic forcing 
         real(wp) :: p 
@@ -190,12 +194,6 @@ contains
         ! Since dv_dt is typically calculated over an averaging period,
         ! assume second-order PI controller parameters are needed. 
         integer, parameter :: pi_order = 2
-
-        ! Assume var is the state variable, or explicitly set it to be the derivative as input
-        var_is_derivative = .FALSE. 
-        if (present(is_derivative)) then 
-            var_is_derivative = is_derivative
-        end if
         
         ! Get size of hyst vectors 
         ntot = size(hyst%time,1) 
@@ -204,22 +202,32 @@ contains
         if (hyst%time(ntot) .ne. MV) then  
             hyst%dt = time - hyst%time(ntot) 
         else 
-            hyst%dt = 0.0_wp 
+            hyst%dt = 0.0
         end if 
 
-        ! Remove oldest point from beginning and add current one to the end
-        hyst%time = eoshift(hyst%time,1,boundary=time)
-        hyst%var  = eoshift(hyst%var, 1,boundary=var)
+        ! Get current derivative
+        if (present(dv_dt)) then 
+            dv_dt_now = dv_dt
+        else if (hyst%dt .gt. 0.0) then 
+            dv_dt_now = (var-hyst%var(ntot))/hyst%dt 
+        else 
+            dv_dt_now = 0.0
+        end if
 
-        ! Determine range of indices of times within our 
-        ! time-averaging window. 
+        ! Remove oldest point from beginning and add current one to the end
+        hyst%time  = eoshift(hyst%time,  1,boundary=time)
+        hyst%var   = eoshift(hyst%var,   1,boundary=var)
+        hyst%dv_dt = eoshift(hyst%dv_dt, 1,boundary=dv_dt_now)
+        
+
+        ! Determine range of indices of times within our time-averaging window. 
         ! ajr: `findloc` only available for gfotran9 and above:
         ! kmin = findloc(hyst%time .ge. time - hyst%par%dt_ave,value=.TRUE., &
         !                                              dim=1,mask=hyst%time.ne.MV)
         kmin = minloc(hyst%time,dim=1, &
                 mask=(hyst%time .ge. time - hyst%par%dt_ave) .and. hyst%time.ne.MV)
         
-        kmax = ntot 
+        kmax = ntot
 
         ! Determine currently available time window
         ! Note: do not use kmin here, in case time step does not match dt_ave,
@@ -231,34 +239,15 @@ contains
         time_elapsed = time - hyst%time_init 
 
          
-        ! Calculate mean rate of change over time steps of interest
+        ! Calculate average derivative over time steps of interest
         
         ! Get current number of averaging points 
         nk = kmax - kmin + 1 
         
-        if (.not. var_is_derivative) then
-            ! Calculate the derivative of var explicitly for timesteps of interest and average
 
-            allocate(dv_dt(nk-1)) 
-
-            dv_dt = (hyst%var(kmin+1:kmax)-hyst%var(kmin:kmax-1)) / &
-                    (hyst%time(kmin+1:kmax)-hyst%time(kmin:kmax-1))
-
-            ! Calculate the current average value of the derivative
-            hyst%dv_dt = sum(dv_dt,mask= (hyst%time(kmin+1:kmax) .ne. MV) .and. &
-                                        (hyst%time(kmin:kmax-1) .ne. MV)) / real(nk,wp)
+        ! Calculate the current average value of the derivative
+        hyst%dv_dt_ave = sum(hyst%dv_dt(kmin:kmax)) / real(nk,wp)
     
-        else
-            ! Derivative was provided at input, save it 
-
-            allocate(dv_dt(nk))
-            dv_dt = hyst%var(kmin:kmax)
-
-            ! Calculate the current average value of the derivative
-            hyst%dv_dt = sum(dv_dt,mask=(hyst%time(kmin:kmax) .ne. MV)) / real(nk,wp)
-    
-        end if
-
 
         if ( time_elapsed .le. hyst%par%dt_init) then 
             ! Initialization time period, no transient methods applied
@@ -349,7 +338,7 @@ contains
                         ! Returns scalar in range [0-1], 0.6 at dv_dt==eps
                         ! Note: apply limit to dvdt_fac of a maximum value of 10, so 
                         ! that exp function doesn't explode (exp(-10)=>0.0)
-                        dvdt_fac = min(abs(hyst%dv_dt)/hyst%par%eps,10.0_wp)
+                        dvdt_fac = min(abs(hyst%dv_dt_ave)/hyst%par%eps,10.0_wp)
                         f_scale  = exp(-dvdt_fac)
 
                         ! Get forcing rate of change magnitude
@@ -373,7 +362,7 @@ contains
                                             hyst%par%df_dt_min,hyst%par%df_dt_max,pi_order,hyst%par%method)
 
                         ! Remove oldest point from the end and insert latest point in beginning
-                        hyst%pi_eta = eoshift(hyst%pi_eta,-1,boundary=abs(hyst%dv_dt))
+                        hyst%pi_eta = eoshift(hyst%pi_eta,-1,boundary=abs(hyst%dv_dt_ave))
                         hyst%pi_df  = eoshift(hyst%pi_df, -1,boundary=abs(pi_df_now))
 
                         ! Apply limits to eta so that algorithm works well. 
@@ -429,7 +418,7 @@ contains
         ! Check if kill should be activated 
         if (hyst%par%with_kill .and. &
             .not. trim(hyst%par%method) .eq. "sin" .and. &
-            abs(hyst%dv_dt) .lt. hyst%par%eps) then 
+            abs(hyst%dv_dt_ave) .lt. hyst%par%eps) then 
 
             if (hyst%par%df_sign .gt. 0.0 .and. &
                 hyst%f_mean_now .ge. hyst%par%f_max) then 
