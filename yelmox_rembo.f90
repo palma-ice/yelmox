@@ -450,7 +450,7 @@ contains
         integer  :: ncid, n, k
         real(wp) :: time_prev 
         real(wp) :: npmb, ntot, aar, smb_tot
-        real(wp) :: dHidt_rms, dHidt_max   
+        real(wp) :: dHidt_rms, dHidt_rms_1, dHidt_max   
         real(wp) :: dT_axis(1000)
         type(yregions_class) :: reg
 
@@ -511,7 +511,16 @@ contains
             dHidt_max = 0.0 
         end if
 
+        if (count(ylmo%tpo%now%f_ice .gt. 0.0 .and. abs(ylmo%tpo%now%dHidt) .gt. 1e-3) .gt. 0) then
+            dHidt_rms_1 = sqrt(sum(ylmo%tpo%now%dHidt**2) / &
+                real(count(ylmo%tpo%now%f_ice .gt. 0.0 .and. abs(ylmo%tpo%now%dHidt) .gt. 1e-3),wp))
+        else
+            dHidt_rms_1 = 0.0
+        end if
+
         call nc_write(filename,"rms(dHidt)",dHidt_rms,units="m/yr",long_name="rms ice thickness change", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"rms1(dHidt)",dHidt_rms_1,units="m/yr",long_name="rms ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"max(dHidt)",dHidt_max,units="m/yr",long_name="max. ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
@@ -626,6 +635,9 @@ contains
         call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice fraction in grid cell", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
+        call nc_write(filename,"dHidt",ylmo%tpo%now%dHidt,units="m/yr",long_name="Ice thickness rate of change", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
 !         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
 !                       long_name="Distance to nearest grounding-line point", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
