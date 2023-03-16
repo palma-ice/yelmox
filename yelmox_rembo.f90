@@ -474,9 +474,11 @@ contains
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 yr)",long_name="hyst: forcing rate of change", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/yr",long_name="hyst: volume rate of change", &
+        ! call nc_write(filename,"hyst_dv_dt",hyst%dv_dt_ave,units="Gt/yr",long_name="hyst: volume rate of change", &
+        !               dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt_ave,units="m/yr",long_name="hyst: rms thickness rate of change", &
                       dim1="time",start=[n],ncid=ncid)
-
+        
         ! Write volume in volume-dT phase space
         call nc_read(filename,"dT_axis",dT_axis) 
         k = minloc(abs(dT_axis-hyst%f_now),dim=1)
