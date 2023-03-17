@@ -3,7 +3,8 @@
 program yelmox
 
     use nml
-    use ncio 
+    use ncio
+    use timer 
     use yelmo 
     use ice_optimization 
 
@@ -56,10 +57,11 @@ program yelmox
 
     type(ice_opt_params)  :: opt 
 
-    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
-    
-    ! Start timing 
-    call yelmo_cpu_time(cpu_start_time)
+    ! Model timing
+    type(timer_class) :: tmr_init
+    type(timer_class) :: tmr_tot
+    type(timer_class) :: tmr_yelmo
+    type(timer_class) :: tmr_rembo
     
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -108,6 +110,9 @@ program yelmox
 
     time = time_init 
 
+    ! Start timing
+    call timer_step(tmr_init,step=1,time_mod=time*1e-3) 
+    
     ! === Initialize ice sheet model =====
 
     ! General initialization of yelmo constants (used globally)
@@ -283,6 +288,9 @@ program yelmox
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
     call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
 
+    call timer_step(tmr_init,step=2,time_mod=time*1e-3) 
+    call timer_step(tmr_tot, step=1,time_mod=time*1e-3) 
+    
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
 
@@ -295,6 +303,7 @@ program yelmox
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == Yelmo ice sheet ===================================================
+        call timer_step(tmr_yelmo,step=1,time_mod=(time-dtt)*1e-3) 
         if (with_ice_sheet) then
 
             if (optimize) then 
@@ -333,13 +342,13 @@ program yelmox
 
             ! Update ice sheet to current time 
             call yelmo_update(yelmo1,time)
-
+            
         end if 
+        call timer_step(tmr_yelmo,step=2,time_mod=time*1e-3) 
 
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
-
 
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -355,9 +364,11 @@ if (calc_transient_climate) then
             dT_summer = hyst1%f_now 
         end if 
 
-        ! call REMBO1     
+        ! call REMBO1
+        call timer_step(tmr_rembo,step=1,time_mod=(time-dtt)*1e-3)    
         call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
-        
+        call timer_step(tmr_rembo,step=2,time_mod=time*1e-3) 
+
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = rembo_ann%T_srf
@@ -404,7 +415,15 @@ end if
         end if 
 
         if (mod(time,10.0)==0) then
-            write(*,"(a,f14.4)") "yelmo::       time = ", time
+            call timer_str(tmr_yelmo,units="s",label="timing yelmo")
+            call timer_str_comprate(tmr_yelmo,units="h",units_mod="kyr",label="timing rate_yelmo")
+    
+            call timer_str(tmr_rembo,units="s",label="timing rembo")
+            call timer_str_comprate(tmr_rembo,units="h",units_mod="kyr",label="timing rate_rembo")
+
+            write(*,"(a,f14.4,a,a,a,a)") "yelmo:: time = ", time
+            write(*,"(f14.4,2x,a)") time, trim(tmr_yelmo%str_rate)
+            write(*,"(f14.4,2x,a)") time, trim(tmr_rembo%str_rate)
         end if 
 
         if (use_hyster .and. hyst1%kill) then 
@@ -426,11 +445,17 @@ end if
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 
-    ! Stop timing 
-    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-
-    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
+    ! Stop timing, print summary
+    call timer_step(tmr_tot,step=2,time_mod=time*1e-3) 
+    call timer_str(tmr_init,units="m",label="timing time_init")
+    call timer_str(tmr_tot,units="m", label="timing time_tot")
+    call timer_str_comprate(tmr_tot,units="h",units_mod="kyr",label="timing rate_tot")
+    write(*,*) trim(tmr_init%str_dtime)
+    write(*,*) trim(tmr_tot%str_dtime)
+    write(*,*) trim(tmr_tot%str_rate)
+    
+    !write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
+    !write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
 contains
     
@@ -525,6 +550,8 @@ contains
         call nc_write(filename,"max(dHidt)",dHidt_max,units="m/yr",long_name="max. ice thickness change", &
                       dim1="time",start=[n],ncid=ncid)
         
+        call nc_write(filename,"dVidt",ylmo%reg%dVidt,units="km^3/a",long_name="Rate volume change", &
+                      dim1="time",start=[n],ncid=ncid)
         ! == yelmo_topography ==
 
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &

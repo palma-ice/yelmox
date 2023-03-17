@@ -56,6 +56,9 @@ $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
 $(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/timer.o: $(libdir)/timer.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/varslice.o: $(libdir)/varslice.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -132,6 +135,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/snapclim.o \
 					    $(objdir)/timeout.o \
+						$(objdir)/timer.o \
 			 		    $(objdir)/varslice.o \
 					    $(objdir)/xarray.o
 
