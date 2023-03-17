@@ -85,6 +85,7 @@ program yelmox_ismip6
         character(len=512) :: ismip6_par_file
         character(len=56)  :: ismip6_expname
         logical            :: ismip6_write_formatted
+        real(wp)           :: ismip6_dt_formatted
 
         real(wp) :: isos_tau_1 
         real(wp) :: isos_tau_2 
@@ -106,6 +107,7 @@ program yelmox_ismip6
     call nml_read(path_par,"ismip6","par_file",         ctl%ismip6_par_file)
     call nml_read(path_par,"ismip6","expname",          ctl%ismip6_expname)
     call nml_read(path_par,"ismip6","write_formatted",  ctl%ismip6_write_formatted)
+    call nml_read(path_par,"ismip6","dt_formatted",     ctl%ismip6_dt_formatted)
 
     if (index(ctl%ismip6_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
@@ -691,22 +693,20 @@ end if
 
             if (mod(nint(time_elapsed*100),nint(ctl%dt2D_out*100))==0) then
                 call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time)
-                
-                ! ISMIP6 output if desired:
-                 if (ctl%ismip6_write_formatted) then
-                    call write_step_2D_ismip6(yelmo1,file2D_ismip6,time)
-                end if
             end if
            
              
             if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
                  call yelmo_write_reg_step(yelmo1,file1D,time=time)
+            end if 
 
-                 ! ISMIP6 output if desired:
-                 if (ctl%ismip6_write_formatted) then
+            ! ISMIP6 output if desired:
+            if (ctl%ismip6_write_formatted) then
+                if (mod(nint(time_elapsed*100),nint(ctl%ismip6_dt_formatted*100))==0) then
+                    call write_step_2D_ismip6(yelmo1,file2D_ismip6,time)
                     call write_1D_ismip6(yelmo1,file1D_ismip6,time)
                 end if
-            end if 
+            end if
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time

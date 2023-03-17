@@ -5,7 +5,8 @@
 &ismip6
     par_file        = "input/ismip6/ismip6_ant.nml"
     expname         = "ctrlAE"          ! "ctrlAE0", "ctrlAE", "expAE01", etc.
-    write_formatted = False    
+    write_formatted = False
+    dt_formatted    = 1.0 
 /
 
 &spinup
@@ -26,7 +27,7 @@
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
+    dt2D_out        = 20.0              ! [yr] Frequency of writing 2D output files 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
