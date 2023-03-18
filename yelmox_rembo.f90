@@ -430,8 +430,7 @@ end if
         if (mod(time_elapsed,10.0)==0) then
             ! Print timestep timing info and write log table
             !call timer_print_summary(tmrs,units="m",units_mod="kyr",time_mod=time*1e-3)
-            if (time_elapsed .eq. 0.0) call timer_write_table_init(tmrs,tmr_file)
-            call timer_write_table(tmrs,[time,dtt]*1e-3,"m",tmr_file)
+            call timer_write_table(tmrs,[time,dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
         end if 
 
         if (use_hyster .and. hyst1%kill) then 

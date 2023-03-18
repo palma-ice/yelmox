@@ -201,40 +201,7 @@ contains
 
     end subroutine timer_print_summary_dble
 
-    subroutine timer_write_table_init(tmr,filename)
-        
-        implicit none
-
-        type(timer_class),  intent(IN) :: tmr
-        character(len=*),   intent(IN) :: filename 
-
-        ! Local variables 
-        integer :: io, q
-        character(len=56)  :: fmt 
-        character(len=512) :: str 
-
-        ! Open a new file
-        open(newunit=io, file=filename, status="replace", action="write")
-
-        ! Write the header into the file 
-        write(str,"(1x,a12,a12)") "time", "dt" 
-        do q = 1, tmr%ncomp
-            write(str,"(a,1x,a12)") trim(str), trim(tmr%label(q))
-        end do 
-        write(str,"(a,1x,a12)") trim(str), "total"
-        write(str,"(a,1x,a12)") trim(str), "rate"
-        
-        ! Write the string to file
-        write(io,*) trim(str)
-
-        ! Close the file
-        close(io)
-
-        return
-
-    end subroutine timer_write_table_init
-
-    subroutine timer_write_table_flt(tmr,time,units,filename)
+    subroutine timer_write_table_flt(tmr,time,units,filename,init)
         
         implicit none
 
@@ -242,14 +209,15 @@ contains
         real(4),            intent(IN) :: time(2)
         character(len=*),   intent(IN) :: units 
         character(len=*),   intent(IN) :: filename 
+        logical, intent(IN), optional  :: init
 
-        call timer_write_table_dble(tmr,real(time,8),units,filename)
+        call timer_write_table_dble(tmr,real(time,8),units,filename,init)
 
         return
 
     end subroutine timer_write_table_flt
 
-    subroutine timer_write_table_dble(tmr,time,units,filename)
+    subroutine timer_write_table_dble(tmr,time,units,filename,init)
         
         implicit none
 
@@ -257,6 +225,7 @@ contains
         real(8),            intent(IN) :: time(2) 
         character(len=*),   intent(IN) :: units 
         character(len=*),   intent(IN) :: filename 
+        logical, intent(IN), optional  :: init
 
         ! Local variables 
         real(8) :: time_now, dt_now
@@ -270,6 +239,13 @@ contains
         time_now = time(1)
         dt_now   = time(2) 
 
+        ! Initialize file if desired
+        if (present(init)) then
+            if (init) then
+                call timer_write_table_init(tmr,filename)
+            end if
+        end if
+        
         ! Check if file already exists
         inquire(file=filename, exist=exist)
         if (.not. exist) then
@@ -313,6 +289,39 @@ contains
         return
 
     end subroutine timer_write_table_dble
+
+    subroutine timer_write_table_init(tmr,filename)
+        
+        implicit none
+
+        type(timer_class),  intent(IN) :: tmr
+        character(len=*),   intent(IN) :: filename 
+
+        ! Local variables 
+        integer :: io, q
+        character(len=56)  :: fmt 
+        character(len=512) :: str 
+
+        ! Open a new file
+        open(newunit=io, file=filename, status="replace", action="write")
+
+        ! Write the header into the file 
+        write(str,"(1x,a12,a12)") "time", "dt" 
+        do q = 1, tmr%ncomp
+            write(str,"(a,1x,a12)") trim(str), trim(tmr%label(q))
+        end do 
+        write(str,"(a,1x,a12)") trim(str), "total"
+        write(str,"(a,1x,a12)") trim(str), "rate"
+        
+        ! Write the string to file
+        write(io,*) trim(str)
+
+        ! Close the file
+        close(io)
+
+        return
+
+    end subroutine timer_write_table_init
 
     ! === INTERNAL FUNCTIONS ===
 
