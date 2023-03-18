@@ -36,12 +36,17 @@ module timer
         module procedure    timer_print_summary_dble
     end interface
 
+    interface timer_write_table
+        module procedure    timer_write_table_flt
+        module procedure    timer_write_table_dble
+    end interface
+
     private
     public :: timer_class 
     public :: timer_step 
     public :: timer_print_summary
-    public :: timer_str
-    public :: timer_str_comprate
+    public :: timer_write_table_init
+    public :: timer_write_table
 
 contains
 
@@ -149,11 +154,11 @@ contains
 
     end subroutine timer_print_summary_flt
 
-    subroutine timer_print_summary_dble(timer,units,units_mod,time_mod)
+    subroutine timer_print_summary_dble(tmr,units,units_mod,time_mod)
 
         implicit none 
 
-        type(timer_class), intent(INOUT) :: timer
+        type(timer_class), intent(INOUT) :: tmr
         character(len=1),  intent(IN)    :: units
         character(len=*),  intent(IN)    :: units_mod
         real(8),           intent(IN)    :: time_mod 
@@ -166,10 +171,12 @@ contains
         character(len=56) :: units_rate 
 
         ! Get dtime in desired units
-        dtime = convert_dtime(timer%dtime_cpu,units)
+        dtime = 0.0
+        dtime(1:tmr%ncomp) = convert_dtime(tmr%dtime_cpu(1:tmr%ncomp),units)
         
         ! Get model time in model units
-        mtime = timer%dtime_mod 
+        mtime = 0.0
+        mtime(1:tmr%ncomp) = tmr%dtime_mod(1:tmr%ncomp)
 
         where (mtime .ne. 0.0)
             rate = dtime / mtime
@@ -184,74 +191,128 @@ contains
         write(*,"(a2,22x,a12,1x,a12,1x,a12)") &
                 timer_prefix, trim(units), trim(units_mod), trim(units_rate)
 
-        do q = 1, timer%ncomp
+        do q = 1, tmr%ncomp
             write(*,"(a2,5x,a16,1x,f12.3,1x,f12.3,1x,f12.3)") &
-                timer_prefix, trim(timer%label(q)), dtime(q), mtime(q), rate(q)
+                timer_prefix, trim(tmr%label(q)), dtime(q), mtime(q), rate(q)
         end do 
             write(*,"(a2,5x,a16,1x,f12.3,1x,f12.3,1x,f12.3)") &
-                timer_prefix, "total", sum(dtime(1:timer%ncomp)), maxval(mtime), sum(rate(1:timer%ncomp))
+                timer_prefix, "total", sum(dtime(1:tmr%ncomp)), maxval(mtime), sum(rate(1:tmr%ncomp))
         return 
 
     end subroutine timer_print_summary_dble
 
-    subroutine timer_str(timer,units,time_mod)
-
-        implicit none 
-
-        type(timer_class), intent(INOUT) :: timer
-        character(len=1),  intent(IN)    :: units
-        real(8),           intent(IN)    :: time_mod 
-
-        ! Local variables
-        character(len=512) :: time_label
-        real(8) :: dtime(ncomp_max)
-
-        ! Get dtime in desired units
-        dtime = convert_dtime(timer%dtime_cpu,units)
-
-        write(timer%str_dtime,"(a,1x,f12.3,1x,a)") trim(time_label), dtime, "["//trim(units)//"]"
-
-        return 
-
-    end subroutine timer_str
-
-    subroutine timer_str_comprate(timer,units,units_mod,label)
-
+    subroutine timer_write_table_init(tmr,filename)
+        
         implicit none
 
-        type(timer_class), intent(INOUT) :: timer
-        character(len=*),  intent(IN)    :: units 
-        character(len=*),  intent(IN)    :: units_mod
-        character(len=*),  intent(IN), optional :: label 
+        type(timer_class),  intent(IN) :: tmr
+        character(len=*),   intent(IN) :: filename 
 
-        ! Local variables
-        character(len=512) :: time_label 
-        character(len=512) :: units_rate
-        real(8) :: dtime(ncomp_max), mtime(ncomp_max)
-        real(8) :: rate(ncomp_max)
+        ! Local variables 
+        integer :: io, q
+        character(len=56)  :: fmt 
+        character(len=512) :: str 
 
-        ! Get dtime in desired units
-        dtime = convert_dtime(timer%dtime_cpu,units)
+        ! Open a new file
+        open(newunit=io, file=filename, status="replace", action="write")
 
-        ! Get model time in model units
-        mtime = timer%dtime_mod 
-
-        where (mtime .ne. 0.0)
-            rate = dtime / mtime
-        elsewhere
-            rate = 0.0
-        end where
-
-        units_rate = trim(units)//"/"//trim(units_mod)
+        ! Write the header into the file 
+        write(str,"(1x,a12,a12)") "time", "dt" 
+        do q = 1, tmr%ncomp
+            write(str,"(a,1x,a12)") trim(str), trim(tmr%label(q))
+        end do 
+        write(str,"(a,1x,a12)") trim(str), "total"
+        write(str,"(a,1x,a12)") trim(str), "rate"
         
-        time_label = "calc_rate"
-        if (present(label)) time_label = trim(label)
+        ! Write the string to file
+        write(io,*) trim(str)
 
-        write(timer%str_rate,"(a,1x,f12.3,1x,a)") trim(time_label), rate, "["//trim(units_rate)//"]"
+        ! Close the file
+        close(io)
 
         return
 
-    end subroutine timer_str_comprate
+    end subroutine timer_write_table_init
+
+    subroutine timer_write_table_flt(tmr,time,units,filename)
+        
+        implicit none
+
+        type(timer_class),  intent(IN) :: tmr
+        real(4),            intent(IN) :: time(2)
+        character(len=*),   intent(IN) :: units 
+        character(len=*),   intent(IN) :: filename 
+
+        call timer_write_table_dble(tmr,real(time,8),units,filename)
+
+        return
+
+    end subroutine timer_write_table_flt
+
+    subroutine timer_write_table_dble(tmr,time,units,filename)
+        
+        implicit none
+
+        type(timer_class),  intent(IN) :: tmr
+        real(8),            intent(IN) :: time(2) 
+        character(len=*),   intent(IN) :: units 
+        character(len=*),   intent(IN) :: filename 
+
+        ! Local variables 
+        real(8) :: time_now, dt_now
+        integer :: io, q
+        logical :: exist
+        character(len=512) :: str 
+        real(8) :: dtime(ncomp_max)
+        real(8) :: dtime_tot
+        real(8) :: rate_tot 
+
+        time_now = time(1)
+        dt_now   = time(2) 
+
+        ! Check if file already exists
+        inquire(file=filename, exist=exist)
+        if (.not. exist) then
+            write(*,*) "timer_write_table:: Error: timing log table file must be initialized &
+            &via timer_write_table_init() before writing step. File does not exist."
+            write(*,*) "filename = ", trim(filename)
+            stop
+        end if
+
+        ! Open the current table file for appending
+        open(newunit=io, file=filename, status="old", position="append", action="write")
+
+        ! Get dtime in desired units
+        dtime = 0.0
+        dtime(1:tmr%ncomp) = convert_dtime(tmr%dtime_cpu(1:tmr%ncomp),units)
+        dtime_tot = sum(dtime(1:tmr%ncomp))
+        if (dt_now .ne. 0.0) then
+            rate_tot = dtime_tot / dt_now
+        else
+            rate_tot = 0.0
+        end if
+
+        write(str,"(1x,f12.3,f12.3)") time_now, dt_now
+        do q = 1, tmr%ncomp
+            write(str,"(a,1x,f12.3)") trim(str), dtime(q)
+        end do 
+        write(str,"(a,1x,f12.3)") trim(str), dtime_tot
+
+        if (rate_tot .gt. 0.0) then
+            write(str,"(a,1x,f12.3)") trim(str), rate_tot
+        else 
+            write(str,"(a,1x,a12)") trim(str), "NaN"
+        end if 
+
+        ! Write the string to file
+        write(io,*) trim(str)
+
+        ! Close the table file 
+        close(io)
+
+        return
+
+    end subroutine timer_write_table_dble
 
     ! === INTERNAL FUNCTIONS ===
 

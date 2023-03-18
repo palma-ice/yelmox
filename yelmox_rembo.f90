@@ -38,6 +38,7 @@ program yelmox
     character(len=512) :: path_par, path_const  
     real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart   
     real(wp) :: time_elapsed
+    logical  :: timesteps_complete
     integer  :: n
     logical  :: calc_transient_climate
     
@@ -55,12 +56,13 @@ program yelmox
     logical :: with_ice_sheet 
     logical :: optimize 
 
-    type(ice_opt_params)  :: opt 
+    type(ice_opt_params) :: opt 
 
     ! Model timing
-    type(timer_class) :: tmr
-    type(timer_class) :: tmrs
-    
+    type(timer_class)  :: tmr
+    type(timer_class)  :: tmrs
+    character(len=512) :: tmr_file 
+
     ! Assume program is running from the output folder
     outfldr = "./"
     
@@ -101,6 +103,8 @@ program yelmox
     file1D_hyst  = trim(outfldr)//"yelmo1D_hyst.nc" 
 
     file_rembo   = trim(outfldr)//"yelmo-rembo.nc"
+
+    tmr_file     = trim(outfldr)//"timer_table.txt"
 
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
@@ -290,12 +294,19 @@ program yelmox
     call timer_step(tmrs,comp=-1)
     
     ! Advance timesteps
-    do n = 1, ceiling((time_end-time_init)/dtt)
+    timesteps_complete = .FALSE.
+    n = 0
+    do while (.not. timesteps_complete)
+    !do n = 1, ceiling((time_end-time_init)/dtt)+1
 
         ! Get current time 
-        time         = time_init + n*dtt
+        time = min(time_init + n*dtt,time_end)
+        n = n+1
+        if (time .eq. time_end) timesteps_complete = .TRUE. 
+
         time_elapsed = time - time_init
 
+        
         ! == SEA LEVEL ==========================================================
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -360,7 +371,7 @@ if (calc_transient_climate) then
             dv_dt = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
             !call hyster_calc_forcing(hyst1,time,var)
             call hyster_calc_forcing(hyst1,time,var,dv_dt)
-            write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt, hyst1%df_dt*1e6, hyst1%f_now 
+            write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt_ave, hyst1%df_dt*1e6, hyst1%f_now 
             
             dT_summer = hyst1%f_now 
         end if 
@@ -416,8 +427,11 @@ end if
 
         call timer_step(tmrs,comp=4,time_mod=[time-dtt,time]*1e-3,label="io") 
         
-        if (mod(time-time_init,10.0)==0) then
-            call timer_print_summary(tmrs,units="m",units_mod="kyr",time_mod=time*1e-3)
+        if (mod(time_elapsed,10.0)==0) then
+            ! Print timestep timing info and write log table
+            !call timer_print_summary(tmrs,units="m",units_mod="kyr",time_mod=time*1e-3)
+            if (time_elapsed .eq. 0.0) call timer_write_table_init(tmrs,tmr_file)
+            call timer_write_table(tmrs,[time,dtt]*1e-3,"m",tmr_file)
         end if 
 
         if (use_hyster .and. hyst1%kill) then 
@@ -429,7 +443,7 @@ end if
 
     end do 
 
-    ! Stop timing, print summary
+    ! Stop timing
     call timer_step(tmr,comp=2,time_mod=[time_init,time]*1e-3,label="timeloop") 
     
     ! Write the restart file for the end of the simulation
