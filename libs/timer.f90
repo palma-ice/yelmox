@@ -53,36 +53,34 @@ contains
         integer,           intent(IN)    :: comp
         character(len=*),  intent(IN), optional :: label
         
-        call timer_step_dble(timer,comp,real(0.0,8),real(0.0,8),label)
+        call timer_step_dble(timer,comp,real([0.0,0.0],8),label)
 
         return
 
     end subroutine timer_step_none
 
-    subroutine timer_step_flt(timer,comp,time_mod1,time_mod2,label)
+    subroutine timer_step_flt(timer,comp,time_mod,label)
 
         implicit none 
 
         type(timer_class), intent(INOUT) :: timer 
         integer,           intent(IN)    :: comp 
-        real(4),           intent(IN)    :: time_mod1
-        real(4),           intent(IN)    :: time_mod2
+        real(4),           intent(IN)    :: time_mod(2)
         character(len=*),  intent(IN), optional :: label
         
-        call timer_step_dble(timer,comp,real(time_mod1,8),real(time_mod2,8),label)
+        call timer_step_dble(timer,comp,real(time_mod,8),label)
 
         return
 
     end subroutine timer_step_flt
 
-    subroutine timer_step_dble(timer,comp,time_mod1,time_mod2,label)
+    subroutine timer_step_dble(timer,comp,time_mod,label)
 
         implicit none 
 
         type(timer_class), intent(INOUT) :: timer 
         integer,           intent(IN)    :: comp 
-        real(8),           intent(IN)    :: time_mod1
-        real(8),           intent(IN)    :: time_mod2
+        real(8),           intent(IN)    :: time_mod(2)
         character(len=*),  intent(IN), optional :: label
         
         ! Local variables
@@ -106,8 +104,8 @@ contains
 
             ! Get current cpu [s] and model [units_mod] times
             call timer_cpu_time(timer%time_cpu2) 
-            timer%time_mod1 = time_mod1
-            timer%time_mod2 = time_mod2
+            timer%time_mod1 = time_mod(1)
+            timer%time_mod2 = time_mod(2)
             
             ! Get time differences [s], [units_mod]
             timer%dtime_cpu(comp) = timer%time_cpu2 - timer%time_cpu1 
@@ -128,8 +126,7 @@ contains
 
             ! Finally, store time2 in time1 to be able to compute the next time interval as needed
             ! (alternatively, timer_step(...,comp=0) can be called to reset the timer)
-            timer%time_cpu1 = timer%time_cpu2 
-            timer%time_mod1 = timer%time_mod2 
+            timer%time_cpu1 = timer%time_cpu2
 
         end if 
 

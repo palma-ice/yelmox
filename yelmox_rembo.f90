@@ -343,13 +343,13 @@ program yelmox
             
         end if 
         
-        call timer_step(tmrs,comp=1,time_mod1=(time-dtt)*1e-3,time_mod2=time*1e-3,label="yelmo") 
+        call timer_step(tmrs,comp=1,time_mod=[time-dtt,time]*1e-3,label="yelmo") 
         
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
 
-        call timer_step(tmrs,comp=2,time_mod1=(time-dtt)*1e-3,time_mod2=time*1e-3,label="isostasy") 
+        call timer_step(tmrs,comp=2,time_mod=[time-dtt,time]*1e-3,label="isostasy") 
         
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -393,7 +393,7 @@ if (calc_transient_climate) then
                              yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
-        call timer_step(tmrs,comp=3,time_mod1=(time-dtt)*1e-3,time_mod2=time*1e-3,label="climate") 
+        call timer_step(tmrs,comp=3,time_mod=[time-dtt,time]*1e-3,label="climate") 
 
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -414,7 +414,7 @@ end if
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
 
-        call timer_step(tmrs,comp=4,time_mod1=(time-dtt)*1e-3,time_mod2=time*1e-3,label="io") 
+        call timer_step(tmrs,comp=4,time_mod=[time-dtt,time]*1e-3,label="io") 
         
         if (mod(time-time_init,10.0)==0) then
             call timer_print_summary(tmrs,units="m",units_mod="kyr",time_mod=time*1e-3)
@@ -423,13 +423,14 @@ end if
         if (use_hyster .and. hyst1%kill) then 
             write(*,"(a,f12.3,a,f12.3)") "hyster:: kill switch activated. [time, f_now] = ", &
                                                         time, ", ", hyst1%f_now 
+            write(*,*) "hyster:: exiting time loop..."
             exit  
         end if 
 
     end do 
 
     ! Stop timing, print summary
-    call timer_step(tmr,comp=2,time_mod1=time_init*1e-3,time_mod2=time*1e-3,label="timeloop") 
+    call timer_step(tmr,comp=2,time_mod=[time_init,time]*1e-3,label="timeloop") 
     
     ! Write the restart file for the end of the simulation
     if (write_restart) then 
