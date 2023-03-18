@@ -58,10 +58,8 @@ program yelmox
     type(ice_opt_params)  :: opt 
 
     ! Model timing
-    type(timer_class) :: tmr_init
-    type(timer_class) :: tmr_tot
-    type(timer_class) :: tmr_yelmo
-    type(timer_class) :: tmr_rembo
+    type(timer_class) :: tmr
+    type(timer_class) :: tmrs
     
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -111,7 +109,7 @@ program yelmox
     time = time_init 
 
     ! Start timing
-    call timer_step(tmr_init,step=1,time_mod=time*1e-3) 
+    call timer_step(tmr,comp=0,time_mod=time*1e-3,reset=.TRUE.) 
     
     ! === Initialize ice sheet model =====
 
@@ -288,8 +286,8 @@ program yelmox
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
     call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
 
-    call timer_step(tmr_init,step=2,time_mod=time*1e-3) 
-    call timer_step(tmr_tot, step=1,time_mod=time*1e-3) 
+    call timer_step(tmr,comp=1,time_mod=time*1e-3,label="initialization") 
+    call timer_step(tmrs,comp=0,time_mod=time*1e-3,reset=.TRUE.) 
     
     ! Advance timesteps
     do n = 1, ceiling((time_end-time_init)/dtt)
@@ -303,7 +301,7 @@ program yelmox
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == Yelmo ice sheet ===================================================
-        call timer_step(tmr_yelmo,step=1,time_mod=(time-dtt)*1e-3) 
+        call timer_step(tmrs,comp=0,time_mod=(time-dtt)*1e-3) 
         if (with_ice_sheet) then
 
             if (optimize) then 
@@ -344,12 +342,14 @@ program yelmox
             call yelmo_update(yelmo1,time)
             
         end if 
-        call timer_step(tmr_yelmo,step=2,time_mod=time*1e-3) 
-
+        call timer_step(tmrs,comp=1,time_mod=(time-dtt)*1e-3,label="yelmo") 
+        
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
 
+        call timer_step(tmrs,comp=2,time_mod=(time-dtt)*1e-3,label="isostasy") 
+        
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
@@ -365,10 +365,8 @@ if (calc_transient_climate) then
         end if 
 
         ! call REMBO1
-        call timer_step(tmr_rembo,step=1,time_mod=(time-dtt)*1e-3)    
         call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
-        call timer_step(tmr_rembo,step=2,time_mod=time*1e-3) 
-
+        
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = rembo_ann%T_srf
@@ -394,7 +392,8 @@ if (calc_transient_climate) then
                              yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
-
+        call timer_step(tmrs,comp=3,time_mod=(time-dtt)*1e-3,label="climate") 
+        
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
@@ -414,16 +413,18 @@ end if
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
 
+        call timer_step(tmrs,comp=4,time_mod=(time-dtt)*1e-3,label="io") 
+        
         if (mod(time,10.0)==0) then
-            call timer_str(tmr_yelmo,units="s",label="timing yelmo")
-            call timer_str_comprate(tmr_yelmo,units="h",units_mod="kyr",label="timing rate_yelmo")
+            ! call timer_str(tmr_yelmo,units="s",label="timing yelmo")
+            ! call timer_str_comprate(tmr_yelmo,units="h",units_mod="kyr",label="timing rate_yelmo")
     
-            call timer_str(tmr_rembo,units="s",label="timing rembo")
-            call timer_str_comprate(tmr_rembo,units="h",units_mod="kyr",label="timing rate_rembo")
+            ! call timer_str(tmr_rembo,units="s",label="timing rembo")
+            ! call timer_str_comprate(tmr_rembo,units="h",units_mod="kyr",label="timing rate_rembo")
 
-            write(*,"(a,f14.4,a,a,a,a)") "yelmo:: time = ", time
-            write(*,"(f14.4,2x,a)") time, trim(tmr_yelmo%str_rate)
-            write(*,"(f14.4,2x,a)") time, trim(tmr_rembo%str_rate)
+            ! write(*,"(a,f14.4,a,a,a,a)") "yelmo:: time = ", time
+            ! write(*,"(f14.4,2x,a)") time, trim(tmr_yelmo%str_rate)
+            ! write(*,"(f14.4,2x,a)") time, trim(tmr_rembo%str_rate)
         end if 
 
         if (use_hyster .and. hyst1%kill) then 
@@ -446,14 +447,14 @@ end if
     call yelmo_end(yelmo1,time=time)
 
     ! Stop timing, print summary
-    call timer_step(tmr_tot,step=2,time_mod=time*1e-3) 
-    call timer_str(tmr_init,units="m",label="timing time_init")
-    call timer_str(tmr_tot,units="m", label="timing time_tot")
-    call timer_str_comprate(tmr_tot,units="h",units_mod="kyr",label="timing rate_tot")
-    write(*,*) trim(tmr_init%str_dtime)
-    write(*,*) trim(tmr_tot%str_dtime)
-    write(*,*) trim(tmr_tot%str_rate)
-    
+    call timer_step(tmr,comp=2,time_mod=time*1e-3,label="total") 
+    ! call timer_str(tmr_init,units="m",label="timing time_init")
+    ! call timer_str(tmr_tot,units="m", label="timing time_tot")
+    ! call timer_str_comprate(tmr_tot,units="h",units_mod="kyr",label="timing rate_tot")
+    ! write(*,*) trim(tmr_init%str_dtime)
+    ! write(*,*) trim(tmr_tot%str_dtime)
+    ! write(*,*) trim(tmr_tot%str_rate)
+
     !write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
     !write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(time-time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
 
