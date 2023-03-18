@@ -189,7 +189,7 @@ contains
                 timer_prefix, trim(timer%label(q)), dtime(q), mtime(q), rate(q)
         end do 
             write(*,"(a2,5x,a16,1x,f12.3,1x,f12.3,1x,f12.3)") &
-                timer_prefix, "tot", sum(dtime(1:timer%ncomp)), maxval(mtime), sum(rate(1:timer%ncomp))
+                timer_prefix, "total", sum(dtime(1:timer%ncomp)), maxval(mtime), sum(rate(1:timer%ncomp))
         return 
 
     end subroutine timer_print_summary_dble
