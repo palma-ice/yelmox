@@ -2,6 +2,9 @@ module timer
 
     implicit none 
 
+    integer, parameter :: ncomp_max = 100 
+    character(len=2), parameter :: timer_prefix = "tt" 
+
     type timer_class
         
         real(8) :: time_cpu1
@@ -9,13 +12,14 @@ module timer
         real(8) :: time_mod1
         real(8) :: time_mod2
         
-        character(len=56) :: label(100)
-        real(8) :: dtime_cpu(100)
-        real(8) :: dtime_mod(100)
-        real(8) :: dtime_cpu_tot(100)
-        real(8) :: dtime_mod_tot(100)
-        integer :: nstep_tot(100)
-        
+        character(len=56) :: label(ncomp_max)
+        real(8) :: dtime_cpu(ncomp_max)
+        real(8) :: dtime_mod(ncomp_max)
+        real(8) :: dtime_cpu_tot(ncomp_max)
+        real(8) :: dtime_mod_tot(ncomp_max)
+        integer :: nstep_tot(ncomp_max)
+        integer :: ncomp 
+
         character(len=128) :: str_dtime 
         character(len=128) :: str_rate
 
@@ -27,79 +31,84 @@ module timer
         module procedure    timer_step_dble
     end interface
 
+    interface timer_print_summary
+        module procedure    timer_print_summary_flt
+        module procedure    timer_print_summary_dble
+    end interface
+
     private
     public :: timer_class 
     public :: timer_step 
+    public :: timer_print_summary
     public :: timer_str
     public :: timer_str_comprate
 
 contains
 
-    subroutine timer_step_none(timer,comp,label,reset)
+    subroutine timer_step_none(timer,comp,label)
 
         implicit none 
 
         type(timer_class), intent(INOUT) :: timer 
         integer,           intent(IN)    :: comp
         character(len=*),  intent(IN), optional :: label
-        logical,           intent(IN), optional :: reset
         
-        call timer_step_dble(timer,comp,real(0.0,8),label,reset)
+        call timer_step_dble(timer,comp,real(0.0,8),real(0.0,8),label)
 
         return
 
     end subroutine timer_step_none
 
-    subroutine timer_step_flt(timer,comp,time_mod,label,reset)
+    subroutine timer_step_flt(timer,comp,time_mod1,time_mod2,label)
 
         implicit none 
 
         type(timer_class), intent(INOUT) :: timer 
         integer,           intent(IN)    :: comp 
-        real(4),           intent(IN)    :: time_mod
+        real(4),           intent(IN)    :: time_mod1
+        real(4),           intent(IN)    :: time_mod2
         character(len=*),  intent(IN), optional :: label
-        logical,           intent(IN), optional :: reset
         
-        call timer_step_dble(timer,comp,real(time_mod,8),label,reset)
+        call timer_step_dble(timer,comp,real(time_mod1,8),real(time_mod2,8),label)
 
         return
 
     end subroutine timer_step_flt
 
-    subroutine timer_step_dble(timer,comp,time_mod,label,reset)
+    subroutine timer_step_dble(timer,comp,time_mod1,time_mod2,label)
 
         implicit none 
 
         type(timer_class), intent(INOUT) :: timer 
         integer,           intent(IN)    :: comp 
-        real(8),           intent(IN)    :: time_mod
+        real(8),           intent(IN)    :: time_mod1
+        real(8),           intent(IN)    :: time_mod2
         character(len=*),  intent(IN), optional :: label
-        logical,           intent(IN), optional :: reset
         
         ! Local variables
         integer :: n
 
-        if (comp .eq. 0) then 
+        if (comp .le. 0) then 
             ! Initialize time1
 
             ! Get current cpu [s] and model [units_mod] times
             call timer_cpu_time(timer%time_cpu1)
-            timer%time_mod1 = time_mod
 
-            if (present(reset)) then 
-                if (reset) then 
-                    timer%dtime_cpu_tot = 0.0
-                    timer%dtime_mod_tot = 0.0
-                    timer%nstep_tot     = 0
-                end if 
+            if (comp .lt. 0) then
+                ! Reset total timing quantities too 
+                timer%dtime_cpu_tot = 0.0
+                timer%dtime_mod_tot = 0.0
+                timer%nstep_tot     = 0
+                timer%ncomp         = 0
             end if
         else
             ! Update timer for component number `comp`. 
 
             ! Get current cpu [s] and model [units_mod] times
             call timer_cpu_time(timer%time_cpu2) 
-            timer%time_mod2 = time_mod
-
+            timer%time_mod1 = time_mod1
+            timer%time_mod2 = time_mod2
+            
             ! Get time differences [s], [units_mod]
             timer%dtime_cpu(comp) = timer%time_cpu2 - timer%time_cpu1 
             timer%dtime_mod(comp) = timer%time_mod2 - timer%time_mod1 
@@ -114,6 +123,9 @@ contains
             ! Assign label to this component if available
             if (present(label)) timer%label(comp) = trim(label) 
             
+            ! Make sure we know how many componens there are
+            timer%ncomp = max(timer%ncomp,comp)
+
             ! Finally, store time2 in time1 to be able to compute the next time interval as needed
             ! (alternatively, timer_step(...,comp=0) can be called to reset the timer)
             timer%time_cpu1 = timer%time_cpu2 
@@ -125,24 +137,81 @@ contains
 
     end subroutine timer_step_dble
 
-    subroutine timer_str(timer,units,label)
+    subroutine timer_print_summary_flt(timer,units,units_mod,time_mod)
 
         implicit none 
 
         type(timer_class), intent(INOUT) :: timer
-        character(len=1),  intent(IN)    :: units 
-        character(len=*),  intent(IN), optional :: label 
+        character(len=1),  intent(IN)    :: units
+        character(len=*),  intent(IN)    :: units_mod
+        real(4),           intent(IN)    :: time_mod 
+
+        call timer_print_summary(timer,units,units_mod,real(time_mod,8))
+
+        return
+
+    end subroutine timer_print_summary_flt
+
+    subroutine timer_print_summary_dble(timer,units,units_mod,time_mod)
+
+        implicit none 
+
+        type(timer_class), intent(INOUT) :: timer
+        character(len=1),  intent(IN)    :: units
+        character(len=*),  intent(IN)    :: units_mod
+        real(8),           intent(IN)    :: time_mod 
+
+        ! Local variables
+        integer :: q
+        real(8) :: dtime(ncomp_max)
+        real(8) :: mtime(ncomp_max)
+        real(8) :: rate(ncomp_max)
+        character(len=56) :: units_rate 
+
+        ! Get dtime in desired units
+        dtime = convert_dtime(timer%dtime_cpu,units)
+        
+        ! Get model time in model units
+        mtime = timer%dtime_mod 
+
+        where (mtime .ne. 0.0)
+            rate = dtime / mtime
+        elsewhere
+            rate = 0.0
+        end where
+
+        units_rate = trim(units)//"/"//trim(units_mod)
+        
+        write(*,"(a2,1x,a6,1x,f12.3,1x,a)") timer_prefix, "time =", time_mod, trim(units_mod)
+
+        write(*,"(a2,22x,a12,1x,a12,1x,a12)") &
+                timer_prefix, trim(units), trim(units_mod), trim(units_rate)
+
+        do q = 1, timer%ncomp
+            write(*,"(a2,5x,a16,1x,f12.3,1x,f12.3,1x,f12.3)") &
+                timer_prefix, trim(timer%label(q)), dtime(q), mtime(q), rate(q)
+        end do 
+            write(*,"(a2,5x,a16,1x,f12.3,1x,f12.3,1x,f12.3)") &
+                timer_prefix, "tot", sum(dtime(1:timer%ncomp)), maxval(mtime), sum(rate(1:timer%ncomp))
+        return 
+
+    end subroutine timer_print_summary_dble
+
+    subroutine timer_str(timer,units,time_mod)
+
+        implicit none 
+
+        type(timer_class), intent(INOUT) :: timer
+        character(len=1),  intent(IN)    :: units
+        real(8),           intent(IN)    :: time_mod 
 
         ! Local variables
         character(len=512) :: time_label
-        real(8) :: dtime(100)
+        real(8) :: dtime(ncomp_max)
 
         ! Get dtime in desired units
         dtime = convert_dtime(timer%dtime_cpu,units)
 
-        time_label = "calc_time"
-        if (present(label)) time_label = trim(label)
-        
         write(timer%str_dtime,"(a,1x,f12.3,1x,a)") trim(time_label), dtime, "["//trim(units)//"]"
 
         return 
@@ -161,8 +230,8 @@ contains
         ! Local variables
         character(len=512) :: time_label 
         character(len=512) :: units_rate
-        real(8) :: dtime(100), mtime(100)
-        real(8) :: rate(100)
+        real(8) :: dtime(ncomp_max), mtime(ncomp_max)
+        real(8) :: rate(ncomp_max)
 
         ! Get dtime in desired units
         dtime = convert_dtime(timer%dtime_cpu,units)
@@ -170,13 +239,13 @@ contains
         ! Get model time in model units
         mtime = timer%dtime_mod 
 
-        where (dtime .ne. 0.0)
-            rate = mtime / dtime
+        where (mtime .ne. 0.0)
+            rate = dtime / mtime
         elsewhere
             rate = 0.0
         end where
 
-        units_rate = trim(units_mod)//"/"//trim(units)
+        units_rate = trim(units)//"/"//trim(units_mod)
         
         time_label = "calc_rate"
         if (present(label)) time_label = trim(label)
