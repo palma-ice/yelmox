@@ -20,15 +20,15 @@ module hyster
         logical  :: with_kill  
         real(wp) :: dt_init 
         real(wp) :: dt_ramp
-        real(wp) :: dt_red
+        real(wp) :: dt_conv
         real(wp) :: dt_ave 
         real(wp) :: df_sign
-        real(wp) :: df_red 
         real(wp) :: eps
         real(wp) :: df_dt_max
         real(wp) :: sigma 
         real(wp) :: f_min 
         real(wp) :: f_max
+        real(wp) :: f_conv
         
         ! Internal parameters 
         real(wp) :: df_dt_min    
@@ -85,15 +85,15 @@ contains
         call nml_read(filename,trim(par_label),"dt_ave",      hyst%par%dt_ave)
         call nml_read(filename,trim(par_label),"dt_init",     hyst%par%dt_init)
         call nml_read(filename,trim(par_label),"dt_ramp",     hyst%par%dt_ramp)
-        call nml_read(filename,trim(par_label),"dt_red",      hyst%par%dt_red)
+        call nml_read(filename,trim(par_label),"dt_conv",      hyst%par%dt_conv)
         call nml_read(filename,trim(par_label),"df_sign",     hyst%par%df_sign)
-        call nml_read(filename,trim(par_label),"df_red",      hyst%par%df_red)
         call nml_read(filename,trim(par_label),"eps",         hyst%par%eps)
         call nml_read(filename,trim(par_label),"df_dt_max",   hyst%par%df_dt_max)
         call nml_read(filename,trim(par_label),"sigma",       hyst%par%sigma)
         call nml_read(filename,trim(par_label),"f_min",       hyst%par%f_min)
         call nml_read(filename,trim(par_label),"f_max",       hyst%par%f_max)
-
+        call nml_read(filename,trim(par_label),"f_conv",      hyst%par%f_conv)
+        
         ! Make sure sign is only +1/-1 
         hyst%par%df_sign = sign(1.0_wp,hyst%par%df_sign)
         
@@ -290,8 +290,8 @@ contains
                                 ! Ramp-up complete, switch directions
 
                                 hyst%par%df_sign = -hyst%par%df_sign
-                                hyst%par%dt_ramp = hyst%par%dt_red 
-                                hyst%par%f_max   = hyst%par%f_min + hyst%par%df_red
+                                hyst%par%dt_ramp = hyst%par%dt_conv 
+                                hyst%par%f_max   = hyst%par%f_conv
 
                                 ! Set switch to know we are on the return part of the triangle
                                 hyst%par%triangle_return = .TRUE.
@@ -301,8 +301,8 @@ contains
                             ! Ramp-up complete, switch directions
 
                                 hyst%par%df_sign = -hyst%par%df_sign
-                                hyst%par%dt_ramp = hyst%par%dt_red 
-                                hyst%par%f_min   = hyst%par%f_max - hyst%par%df_red
+                                hyst%par%dt_ramp = hyst%par%dt_conv 
+                                hyst%par%f_min   = hyst%par%f_conv
                                 
                                 ! Set switch to know we are on the return part of the triangle
                                 hyst%par%triangle_return = .TRUE.
@@ -327,7 +327,7 @@ contains
                             hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
 
                         end if 
-
+                        
                 case("ramp-slope")
                     ! Ramp up to the constant rate of change for the first N years. 
                     ! Then maintain a constant anomaly (independent of dv_dt). 
