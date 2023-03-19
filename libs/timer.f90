@@ -236,8 +236,37 @@ contains
         real(8) :: dtime_tot
         real(8) :: rate_tot 
 
+        ! ==================================================================
+        ! 1. Prepare a one-line string with timing table information
+
         time_now = time(1)
         dt_now   = time(2) 
+
+        ! Get dtime in desired units
+        dtime = 0.0
+        dtime(1:tmr%ncomp) = convert_dtime(tmr%dtime_cpu(1:tmr%ncomp),units)
+        dtime_tot = sum(dtime(1:tmr%ncomp))
+        if (dt_now .ne. 0.0) then
+            rate_tot = dtime_tot / dt_now
+        else
+            rate_tot = 0.0
+        end if
+
+        write(str,"(f12.3,f12.3)") time_now, dt_now
+        do q = 1, tmr%ncomp
+            write(str,"(a,1x,f12.3)") trim(str), dtime(q)
+        end do 
+        write(str,"(a,1x,f12.3)") trim(str), dtime_tot
+
+        if (rate_tot .gt. 0.0) then
+            write(str,"(a,1x,f12.3)") trim(str), rate_tot
+        else 
+            write(str,"(a,1x,a12)") trim(str), "NaN"
+        end if 
+
+        ! ==================================================================
+        ! 2. Write string to desired output 
+        ! ajr: to do, if filename=="", then write to standard output...
 
         ! Initialize file if desired
         if (present(init)) then
@@ -255,35 +284,9 @@ contains
             stop
         end if
 
-        ! Open the current table file for appending
+        ! Open the current table file for appending, write the string, close the file
         open(newunit=io, file=filename, status="old", position="append", action="write")
-
-        ! Get dtime in desired units
-        dtime = 0.0
-        dtime(1:tmr%ncomp) = convert_dtime(tmr%dtime_cpu(1:tmr%ncomp),units)
-        dtime_tot = sum(dtime(1:tmr%ncomp))
-        if (dt_now .ne. 0.0) then
-            rate_tot = dtime_tot / dt_now
-        else
-            rate_tot = 0.0
-        end if
-
-        write(str,"(1x,f12.3,f12.3)") time_now, dt_now
-        do q = 1, tmr%ncomp
-            write(str,"(a,1x,f12.3)") trim(str), dtime(q)
-        end do 
-        write(str,"(a,1x,f12.3)") trim(str), dtime_tot
-
-        if (rate_tot .gt. 0.0) then
-            write(str,"(a,1x,f12.3)") trim(str), rate_tot
-        else 
-            write(str,"(a,1x,a12)") trim(str), "NaN"
-        end if 
-
-        ! Write the string to file
         write(io,*) trim(str)
-
-        ! Close the table file 
         close(io)
 
         return
@@ -302,21 +305,17 @@ contains
         character(len=56)  :: fmt 
         character(len=512) :: str 
 
-        ! Open a new file
-        open(newunit=io, file=filename, status="replace", action="write")
-
-        ! Write the header into the file 
-        write(str,"(1x,a12,a12)") "time", "dt" 
+        ! Write the header info into a string
+        write(str,"(a12,a12)") "time", "dt" 
         do q = 1, tmr%ncomp
             write(str,"(a,1x,a12)") trim(str), trim(tmr%label(q))
         end do 
         write(str,"(a,1x,a12)") trim(str), "total"
         write(str,"(a,1x,a12)") trim(str), "rate"
         
-        ! Write the string to file
+        ! Open a new file, write the string info to file, close the file
+        open(newunit=io, file=filename, status="replace", action="write")
         write(io,*) trim(str)
-
-        ! Close the file
         close(io)
 
         return
