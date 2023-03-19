@@ -11,7 +11,7 @@ YELMOROOT = /home/titan/gwgk/gwgk005h/models/yelmo/v1.753/yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
-FFLAGS  = -module $(objdir) -L$(objdir)
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 LFLAGS  = $(LIB_YELMO) $(LIB_NC) $(LIB_LIS) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2 -fp-model precise
