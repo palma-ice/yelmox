@@ -21,9 +21,12 @@
 
     "grp_aliases" : {},
 
-    "par_paths" : {},
+    "par_paths" : 
+        {
+            "rembo"  : "par/rembo_Greenland.nml"
+        },
 
-    "files" : ["par/rembo_Greenland.nml","git_yelmo.txt"], 
+    "files" : ["git_yelmo.txt"], 
 
     "dir-special" : {},
 
