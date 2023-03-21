@@ -327,7 +327,13 @@ contains
                             hyst%df_dt = abs(hyst%par%f_max-hyst%par%f_min)/hyst%par%dt_ramp 
 
                         end if 
-                        
+
+                        ! write(*,"(a,f10.2,3f10.2,1x,l,1x,3f10.2)") &
+                        !                 trim(hyst%par%method), time, hyst%par%f_min, hyst%par%f_max, &
+                        !                 hyst%f_mean_now, hyst%par%triangle_return, hyst%par%dt_ramp, &
+                        !                 hyst%par%df_sign, hyst%df_dt 
+
+
                 case("ramp-slope")
                     ! Ramp up to the constant rate of change for the first N years. 
                     ! Then maintain a constant anomaly (independent of dv_dt). 
