@@ -187,8 +187,8 @@ program yelmox
         ! Update hysteresis variable 
         var   = yelmo1%reg%V_ice*convert_km3_Gt
         dv_dt = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
-        !call hyster_calc_forcing(hyst1,time,var)
-        call hyster_calc_forcing(hyst1,time,var,dv_dt)
+        call hyster_calc_forcing(hyst1,time,var)
+        !call hyster_calc_forcing(hyst1,time,var,dv_dt)
         dT_summer = hyst1%f_now 
     end if 
 
@@ -317,14 +317,12 @@ program yelmox
                         dtt_now = dtt 
                         rembo_ann%par%dtime_emb = 100.0 
                     end if 
-                    
+
                 case DEFAULT
                     ! Pass - normally do not change timestepping
             end select
         end if 
-
-        write(*,*) "tt", n, time, dtt_now 
-
+        
         if (n .gt. 0) then
             ! Get current time
             !time = min(time_init + n*dtt_now,time_end)
@@ -343,8 +341,8 @@ if (calc_transient_climate) then
             ! Update forcing based on hysteresis module
             var   = yelmo1%reg%V_ice*convert_km3_Gt
             dv_dt = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
-            !call hyster_calc_forcing(hyst1,time,var)
-            call hyster_calc_forcing(hyst1,time,var,dv_dt)
+            call hyster_calc_forcing(hyst1,time,var)
+            !call hyster_calc_forcing(hyst1,time,var,dv_dt)
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt_ave, hyst1%df_dt*1e6, hyst1%f_now 
             
             ! Store in dT_summer for forcing of rembo, etc.
