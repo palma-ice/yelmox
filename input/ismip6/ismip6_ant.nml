@@ -317,7 +317,7 @@
 ================== Ice shelf collapse mask =================
 
 &gcm_mask_shlf_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/ShelfCollapse_forcing/CESM2-WACCM_ssp585/1995-2300/CESM2-WACCM_ssp585.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/ShelfCollapse_forcing/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "mask"
     units_in    = "1"
     units_out   = "1"
