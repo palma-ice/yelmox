@@ -402,7 +402,7 @@ contains
                 ! Cases that end on year 2299
 
                 time_par_proj     = [1995.0,2299.0,1.0_wp]
-                time_par_proj_msk = [1995.0,2299.0,1.0_wp]
+                time_par_proj_msk = [1995.0,2300.0,1.0_wp]
 
             case("UKESM1-0-LL_ssp585")
                 ! Cases that end on year 2301
