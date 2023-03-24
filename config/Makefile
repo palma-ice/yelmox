@@ -47,6 +47,11 @@ yelmo-static:
 		$(MAKE) -C $(YELMOROOT) yelmo-static parallel=$(parallel)
 		cp $(YELMOROOT)/git_yelmo.txt ./
 
+# Compile the static library libisostasy,
+# using Makefile located in $(ISOSTASYROOT) directory 
+isostasy-static: 
+		$(MAKE) -C $(ISOSTASYROOT) isostasy-static parallel=$(parallel)
+
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
 rembo-static: 
@@ -80,9 +85,9 @@ yelmox_ismip6 : yelmo-static $(yelmox_libs)
 		@echo "    yelmox_ismip6.x is ready."
 		@echo " "
 
-yelmox_rembo: yelmo-static rembo-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) -o libyelmox/bin/yelmox_rembo.x \
-			yelmox_rembo.f90 $(LIB_REMBO) $(LFLAGS) $(yelmox_libs)
+yelmox_rembo: yelmo-static rembo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) $(INC_ISOSTASY) -o libyelmox/bin/yelmox_rembo.x \
+			yelmox_rembo.f90 $(LIB_REMBO) $(LIB_ISOSTASY) $(LFLAGS) $(yelmox_libs)
 	@echo " "
 	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
 	@echo " "
