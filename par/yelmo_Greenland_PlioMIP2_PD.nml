@@ -467,12 +467,22 @@
 
 /
 
-&isostasy 
-    method       = 2                    ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
-    fname_kelvin = "input/kelvin.res"   ! File containing precalculated zero-order Kelvin function values 
-    dt           = 50.0                 ! [yr] Time step to recalculate bedrock uplift rate 
-    tau          = 3000.0               ! [yr] Relaxation time 
-    D_lith       = 9.87e24              ! [N-m] Flexural rigidity 
-    R_lith       = 131910.0             ! [m] Radius of relative stiffness
-    
+&isos
+    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA, 4: ELVA
+    dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
+    dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
+    He_lith         = 88.0                  ! [km] Effective elastic thickness lithosphere
+    visc            = 1e21                  ! [Pa s] Asthenosphere's viscosity, visc=1e21 for Bueler et al (2007)  
+    tau             = 3000.0                ! [yr] Relaxation time 
+
+    ! Physical constants
+    E               = 66.0  !100.0          ! [GPa] Young's modulus | 100 for Coulon et al (2021) | 66  for Bueler et al (2007) 
+    nu              = 0.5   !0.25           ! [-]   Poisson's ratio: 0.25 for Coulon et al (2021) | 0.5 for Bueler et al (2007) 
+    rho_ice         = 910.0                 ! [kg/m^3]
+    rho_sw          = 1028.0                ! [kg/m^3] 
+    rho_w           = 1000.0                ! [kg/m^3] 
+    rho_a           = 3300.0                ! [kg/m^3] 3370 used by Coulon et al (2021)
+    g               = 9.81                  ! [m/s^2]
+    r_earth         = 6.378e6               ! [m]  Earth's radius, Coulon et al (2021) 
+    m_earth         = 5.972e24              ! [kg] Earth's mass,   Coulon et al (2021) 
 /

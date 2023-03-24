@@ -399,7 +399,7 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     if (trim(domain) .eq. "Antarctica") then 
         ! Redefine tau (asthenosphere relaxation constant) as spatially

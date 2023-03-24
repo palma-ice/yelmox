@@ -57,29 +57,29 @@ isostasy-static:
 rembo-static: 
 		$(MAKE) -C $(REMBOROOT) rembo-static 
 
-yelmox : yelmo-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox.f90 \
+yelmox : yelmo-static isostasy-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox.x yelmox.f90 \
 			$(LFLAGS) $(yelmox_libs) 
 		@echo " "
 		@echo "    yelmox.x is ready."
 		@echo " "
 
-yelmox_hyst : yelmo-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
+yelmox_hyst : yelmo-static isostasy-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
 			$(LFLAGS) $(yelmox_libs) 
 		@echo " "
 		@echo "    yelmox_hyst.x is ready."
 		@echo " "
 
-yelmox_iso : yelmo-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
+yelmox_iso : yelmo-static isostasy-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
 			$(LFLAGS) $(yelmox_libs) 
 		@echo " "
 		@echo "    yelmox_iso.x is ready."
 		@echo " "
 
-yelmox_ismip6 : yelmo-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
+yelmox_ismip6 : yelmo-static isostasy-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
 			$(LFLAGS) $(yelmox_libs)
 		@echo " "
 		@echo "    yelmox_ismip6.x is ready."
@@ -87,7 +87,7 @@ yelmox_ismip6 : yelmo-static $(yelmox_libs)
 
 yelmox_rembo: yelmo-static rembo-static isostasy-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) $(INC_ISOSTASY) -o libyelmox/bin/yelmox_rembo.x \
-			yelmox_rembo.f90 $(LIB_REMBO) $(LIB_ISOSTASY) $(LFLAGS) $(yelmox_libs)
+			yelmox_rembo.f90 $(LIB_REMBO) $(LFLAGS) $(yelmox_libs)
 	@echo " "
 	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
 	@echo " "
