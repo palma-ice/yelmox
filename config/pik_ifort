@@ -21,7 +21,7 @@ INC_LIS = -I${LISROOT}/include
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
 INC_FFTW = 
-LIB_FFTW = -L/usr/local/Cellar/fftw/3.3.10_1/lib -lfftw3 -lm
+LIB_FFTW =  -L/p/system/packages/fftw/3.3.9/lib -lfftw3 -lm
 
 FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
