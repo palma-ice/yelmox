@@ -162,6 +162,12 @@ contains
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
 
+        ! Make sure kill is not active for some methods
+        select case(trim(hyst%par%method))
+            case("sin")
+                hyst%par%with_kill = .FALSE. 
+        end select
+        
         ! Store initial simulation time for reference (for ramp method)
         hyst%time_init = time 
 
@@ -462,7 +468,6 @@ contains
 
         ! Check if kill should be activated 
         if (hyst%par%with_kill .and. &
-            .not. trim(hyst%par%method) .eq. "sin" .and. &
             abs(hyst%dv_dt_ave) .lt. hyst%par%eps) then 
 
             if (hyst%par%df_sign .gt. 0.0 .and. &
