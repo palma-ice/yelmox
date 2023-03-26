@@ -14,8 +14,6 @@
     time_end        = 20e3              ! [yr] Ending time (model years)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "relax"           ! "none", "relax", "opt"
@@ -26,8 +24,6 @@
     time_end        = 2500.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
-    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 20.0              ! [yr] Frequency of writing 2D output files 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
@@ -38,8 +34,6 @@
     time_end        = 500.0             ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
-    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
@@ -53,17 +47,35 @@
     time_end        = 500.0             ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 1e3               ! [yr] Frequency of writing 2D output files 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     
     scenario        = "ctrl"            ! Scenario to run
-    dt2D_small_out  = 50                ! [yr] Frequency of writing small 2D output
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
     
+/
+
+&tm_1D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 1.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
+&tm_2D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 200.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_2Dsm
+    method          = "const"           ! "const", "file", "times"
+    dt              = 50.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
 /
 
 &hyster

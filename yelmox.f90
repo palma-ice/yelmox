@@ -4,6 +4,8 @@ program yelmox
 
     use nml 
     use ncio 
+    use timer
+    use timeout 
     use yelmo 
     use yelmo_tools, only : smooth_gauss_2D
     use ice_optimization
@@ -39,8 +41,13 @@ program yelmox
     real(wp) :: dT_now 
     integer  :: n
     
-    real(8) :: cpu_start_time, cpu_end_time, cpu_dtime  
-    
+    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm
+
+    ! Model timing
+    type(timer_class)  :: tmr
+    type(timer_class)  :: tmrs
+    character(len=512) :: tmr_file 
+
     type reg_def_class 
         character(len=56)  :: name 
         character(len=512) :: fnm
@@ -64,9 +71,6 @@ program yelmox
         real(wp) :: time_lgm_step 
         real(wp) :: time_pd_step
         real(wp) :: dtt
-        real(wp) :: dt1D_out
-        real(wp) :: dt2D_out
-        real(wp) :: dt2D_small_out
         real(wp) :: dt_restart
         real(wp) :: dt_clim
 
@@ -124,12 +128,6 @@ program yelmox
     real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
     real(wp), parameter :: time_pd  =   1950.0_wp  ! [yr CE] ==  0 kyr ago 
     
-    ! Initially set to zero 
-    opt%tf_basins = 0 
-
-    ! Start timing 
-    call yelmo_cpu_time(cpu_start_time)
-    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
@@ -141,9 +139,6 @@ program yelmox
     call nml_read(path_par,"ctrl","time_lgm_step",  ctl%time_lgm_step) 
     call nml_read(path_par,"ctrl","time_pd_step",   ctl%time_pd_step) 
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
-    call nml_read(path_par,"ctrl","dt1D_out",       ctl%dt1D_out)           ! [yr] Frequency of 1D output 
-    call nml_read(path_par,"ctrl","dt2D_out",       ctl%dt2D_out)           ! [yr] Frequency of 2D output 
-    call nml_read(path_par,"ctrl","dt2D_small_out", ctl%dt2D_small_out)     ! [yr] Frequency of small 2D output 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","transient_clim", ctl%transient_clim)     ! Calculate transient climate? 
     call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
@@ -151,9 +146,14 @@ program yelmox
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
+    ! Get output times
+    call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
+    call timeout_init(tm_2D,  path_par,"tm_2D",  "heavy",  ctl%time_init,ctl%time_end)
+    call timeout_init(tm_2Dsm,path_par,"tm_2Dsm","medium", ctl%time_init,ctl%time_end)
+    
     ! Hard-coded for now:
     ctl%dt_clim = 10.0      ! [yrs] Frequency to update snapclim snapshot
-
+    
     ! Consistency checks ===
 
     ! transient_clim overrides use_lgm_step 
@@ -178,6 +178,9 @@ program yelmox
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
 
+        ! Initially set to zero 
+        opt%tf_basins = 0 
+
         call optimize_par_load(opt,path_par,"opt")
 
     end if 
@@ -186,6 +189,9 @@ program yelmox
     time    = ctl%time_init 
     time_bp = time - 1950.0_wp 
 
+    ! Start timing
+    call timer_step(tmr,comp=-1) 
+    
     ! Assume program is running from the output folder
     outfldr = "./"
 
@@ -197,6 +203,8 @@ program yelmox
 
     file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
     
+    tmr_file     = trim(outfldr)//"timer_table.txt"
+
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "transient_clim: ",  ctl%transient_clim
@@ -208,8 +216,6 @@ program yelmox
     write(*,*) "time_init:  ",      ctl%time_init 
     write(*,*) "time_end:   ",      ctl%time_end 
     write(*,*) "dtt:        ",      ctl%dtt 
-    write(*,*) "dt1D_out:   ",      ctl%dt1D_out 
-    write(*,*) "dt2D_out:   ",      ctl%dt2D_out 
     write(*,*) "dt_restart: ",      ctl%dt_restart 
     write(*,*) 
     
@@ -653,6 +659,9 @@ program yelmox
     stats_lgm%defined  = .FALSE. 
     stats_pd_2%defined = .FALSE. 
     
+    call timer_step(tmr,comp=1,label="initialization") 
+    call timer_step(tmrs,comp=-1)
+    
     ! ==== Begin main time loop =====
 
     ! Advance timesteps
@@ -757,6 +766,8 @@ program yelmox
 
         end select 
 
+        call timer_step(tmrs,comp=0) 
+        
         ! == SEA LEVEL ==========================================================
         call sealevel_update(sealev,year_bp=time_bp)
         yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -764,6 +775,8 @@ program yelmox
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
+        
+        call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
         
         ! == ICE SHEET ===================================================
 
@@ -777,6 +790,7 @@ program yelmox
         ! Update Yelmo
         if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
 
+        call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
         
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
@@ -823,17 +837,19 @@ program yelmox
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
         
+        call timer_step(tmrs,comp=3,time_mod=[time-ctl%dtt,time]*1e-3,label="climate") 
+
         ! == MODEL OUTPUT =======================================================
 
-        if (mod(nint(time*100),nint(ctl%dt2D_out*100))==0) then
+        if (timeout_check(tm_2D,time)) then
             call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if
 
-        if (mod(nint(time*100),nint(ctl%dt2D_small_out*100))==0) then
+        if (timeout_check(tm_2Dsm,time)) then 
             call yelmo_write_step(yelmo1,file2D_small,time,compare_pd=.FALSE.)
         end if
 
-        if (mod(nint(time*100),nint(ctl%dt1D_out*100))==0) then
+        if (timeout_check(tm_1D,time)) then 
             call yelmo_write_reg_step(yelmo1,file1D,time=time)
 
             if (reg1%write) then 
@@ -854,24 +870,31 @@ program yelmox
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
         end if 
 
+        call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
+        
+        if (mod(time_elapsed,10.0)==0) then
+            ! Print timestep timing info and write log table
+            call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
+        end if 
+
         if (mod(time,10.0)==0 .and. (.not. yelmo_log)) then
             write(*,"(a,f14.4)") "yelmo:: time = ", time
         end if 
         
     end do 
 
+    ! Stop timing
+    call timer_step(tmr,comp=2,time_mod=[ctl%time_init,time]*1e-3,label="timeloop") 
+    
     ! Write the restart file for the end of the simulation
     call yelmo_restart_write(yelmo1,file_restart,time=time) 
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 
-    ! Stop timing 
-    call yelmo_cpu_time(cpu_end_time,cpu_start_time,cpu_dtime)
-
-    write(*,"(a,f12.3,a)") "Time  = ",cpu_dtime/60.0 ," min"
-    write(*,"(a,f12.1,a)") "Speed = ",(1e-3*(ctl%time_end-ctl%time_init))/(cpu_dtime/3600.0), " kiloyears / hr"
-
+    ! Print timing summary
+    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=time*1e-3)
+    
 contains
     
     subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
