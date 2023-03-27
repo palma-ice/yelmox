@@ -4,8 +4,6 @@
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 100.0             ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 100.0             ! [yr] Frequency of writing 2D output files 
     transient       = True              ! Calculate transient climate? 
 
     load_cf_ref     = FALSE             ! Load cf_ref from file?
@@ -25,6 +23,27 @@
 
     file_vel        = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     
+/
+
+&tm_1D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 1.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
+&tm_2D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 200.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_2Dsm
+    method          = "const"           ! "const", "file", "times"
+    dt              = 50.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
 /
 
 &opt
