@@ -4,9 +4,12 @@ FC  = mpiifort
 INC_NC  = -I${NETCDF_FORTRANROOT}/include
 LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf
 
-REMBOROOT = rembo1
-INC_REMBO = -I${REMBOROOT}/librembo/include 
-LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+INC_FFTW = 
+LIB_FFTW =  -L/p/system/packages/fftw/3.3.9/lib -lfftw3 -lm
+
+LISROOT = /home/robinson/apps/lis/lis
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
 
 ISOSTASYROOT = isostasy
 INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
@@ -16,12 +19,9 @@ YELMOROOT = yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
-LISROOT = /home/robinson/apps/lis/lis
-INC_LIS = -I${LISROOT}/include 
-LIB_LIS = -L${LISROOT}/lib/ -llis
-
-INC_FFTW = 
-LIB_FFTW =  -L/p/system/packages/fftw/3.3.9/lib -lfftw3 -lm
+REMBOROOT = rembo1
+INC_REMBO = -I${REMBOROOT}/librembo/include 
+LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
 FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
