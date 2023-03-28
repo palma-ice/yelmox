@@ -59,51 +59,44 @@ rembo-static:
 
 yelmox : yelmo-static isostasy-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox.x yelmox.f90 \
-			$(LFLAGS) $(yelmox_libs) 
+			$(yelmox_libs) $(LFLAGS)
 		@echo " "
 		@echo "    yelmox.x is ready."
 		@echo " "
 
 yelmox_hyst : yelmo-static isostasy-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
-			$(LFLAGS) $(yelmox_libs) 
+			$(yelmox_libs) $(LFLAGS)
 		@echo " "
 		@echo "    yelmox_hyst.x is ready."
 		@echo " "
 
 yelmox_iso : yelmo-static isostasy-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
-			$(LFLAGS) $(yelmox_libs) 
+			$(yelmox_libs) $(LFLAGS)
 		@echo " "
 		@echo "    yelmox_iso.x is ready."
 		@echo " "
 
 yelmox_ismip6 : yelmo-static isostasy-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
-			$(LFLAGS) $(yelmox_libs)
+			$(yelmox_libs) $(LFLAGS)
 		@echo " "
 		@echo "    yelmox_ismip6.x is ready."
 		@echo " "
 
 yelmox_rembo: yelmo-static rembo-static isostasy-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) $(INC_ISOSTASY) -o libyelmox/bin/yelmox_rembo.x \
-			yelmox_rembo.f90 $(LIB_REMBO) $(LFLAGS) $(yelmox_libs)
+			yelmox_rembo.f90 $(LIB_REMBO) $(yelmox_libs) $(LFLAGS)
 	@echo " "
 	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
 	@echo " "
 
 check_sim : $(objdir)/ncio.o
 		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
-			$(LFLAGS) $(objdir)/ncio.o
+			$(objdir)/ncio.o $(LFLAGS)
 		@echo " "
 		@echo "    check_sim.x is ready."
-		@echo " "
-
-test_isostasy : yelmo-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) -o $(bindir)/test_isostasy.x tests/test_isostasy.f90 \
-			$(LFLAGS) $(yelmox_libs)
-		@echo " "
-		@echo "    test_isostasy.x is ready."
 		@echo " "
 
 .PHONY : usage
