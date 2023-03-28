@@ -5,6 +5,7 @@ program yelmox
     use nml
     use ncio
     use timer 
+    use timeout 
     use yelmo 
     use ice_optimization 
 
@@ -19,8 +20,7 @@ program yelmox
     use geothermal
     
     use hyster 
-    use timeout 
-
+    
     implicit none 
 
     type(yelmo_class)      :: yelmo1 
@@ -150,7 +150,7 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(time_init,8))
@@ -351,12 +351,19 @@ if (calc_transient_climate) then
         end if 
 end if 
 
+        call timer_step(tmrs,comp=0) 
+
         ! == SEA LEVEL ==========================================================
         call sealevel_update(sealev,year_bp=time)
         yelmo1%bnd%z_sl  = sealev%z_sl 
 
+        ! == ISOSTASY ==========================================================
+        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
+        yelmo1%bnd%z_bed = isos1%now%z_bed
+
+        call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
+        
         ! == Yelmo ice sheet ===================================================
-        call timer_step(tmrs,comp=0) 
         if (with_ice_sheet) then
 
             if (optimize) then 
@@ -398,13 +405,7 @@ end if
             
         end if 
         
-        call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="yelmo") 
-        
-        ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-        yelmo1%bnd%z_bed = isos1%now%z_bed
-
-        call timer_step(tmrs,comp=2,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
+        call timer_step(tmrs,comp=2,time_mod=[time-dtt_now,time]*1e-3,label="yelmo") 
         
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -437,10 +438,11 @@ if (calc_transient_climate) then
                              yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
 
 end if 
-        call timer_step(tmrs,comp=3,time_mod=[time-dtt_now,time]*1e-3,label="climate") 
-
+        
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+        call timer_step(tmrs,comp=3,time_mod=[time-dtt_now,time]*1e-3,label="climate") 
 
         ! == MODEL OUTPUT =======================================================
 
@@ -462,7 +464,6 @@ end if
         
         if (mod(time_elapsed,10.0)==0) then
             ! Print timestep timing info and write log table
-            !call timer_print_summary(tmrs,units="m",units_mod="kyr",time_mod=time*1e-3)
             call timer_write_table(tmrs,[time,dtt_now]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
         end if 
 
@@ -592,6 +593,8 @@ contains
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

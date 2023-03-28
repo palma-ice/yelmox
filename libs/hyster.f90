@@ -32,7 +32,7 @@ module hyster
         
         ! Internal parameters 
         real(wp) :: df_dt_min    
-        logical  :: triangle_return
+        logical  :: after_step
 
     end type 
     
@@ -109,8 +109,8 @@ contains
         ! (important to be nonzero for the pi controller methods)
         hyst%par%df_dt_min = 1e-9   ! [f/yr]
 
-        ! Set triangle return false to start, since the first step is the ramp up
-        hyst%par%triangle_return = .FALSE. 
+        ! Set after_step false to start, since the first step is the initial ramp
+        hyst%par%after_step = .FALSE. 
 
         ! Define label for this hyster object 
         hyst%par%label = "hyster" 
@@ -161,6 +161,12 @@ contains
         
         ! Set kill switch to false to start 
         hyst%kill = .FALSE. 
+
+        ! Make sure kill is not active for some methods
+        select case(trim(hyst%par%method))
+            case("sin")
+                hyst%par%with_kill = .FALSE. 
+        end select
 
         ! Store initial simulation time for reference (for ramp method)
         hyst%time_init = time 
@@ -276,36 +282,55 @@ contains
 
                     hyst%df_dt = hyst%par%df_dt_max
 
-                case("ramp-time","ramp-time-triangle")
+                case("ramp-time","ramp-time-step")
                     ! Ramp up to the constant rate of change for the first N years. 
                     ! Then maintain a constant anomaly (independent of dv_dt). 
 
-                        if (trim(hyst%par%method) .eq. "ramp-time-triangle" .and. &
-                                (.not. hyst%par%triangle_return) ) then
-                            ! When first extreme value is reached sign should be
-                            ! reversed and new extreme value imposed.
+                        if (trim(hyst%par%method) .eq. "ramp-time-step" .and. &
+                                (.not. hyst%par%after_step) ) then
+                            ! When first extreme value is reached, 
+                            ! new extreme value should be imposed and 
+                            ! df_sign possibly reversed.
 
                             if ( (hyst%par%df_sign .lt. 0.0 .and.&
                                     hyst%f_mean_now .le. hyst%par%f_min) ) then
-                                ! Ramp-up complete, switch directions
+                                ! Ramp-down complete, start second step
 
-                                hyst%par%df_sign = -hyst%par%df_sign
+                                if (hyst%par%f_conv .le. hyst%par%f_min) then 
+                                    ! Rate still going down or constant in second step.
+                                    hyst%par%f_max   = hyst%par%f_min
+                                    hyst%par%f_min   = hyst%par%f_conv
+                                else
+                                    ! Rate changes sign in second step.
+                                    hyst%par%f_max   = hyst%par%f_conv
+                                    hyst%par%df_sign = -hyst%par%df_sign
+                                end if 
+
+                                ! Update duration of current step
                                 hyst%par%dt_ramp = hyst%par%dt_conv 
-                                hyst%par%f_max   = hyst%par%f_conv
-
+                                
                                 ! Set switch to know we are on the return part of the triangle
-                                hyst%par%triangle_return = .TRUE.
+                                hyst%par%after_step = .TRUE.
 
                             else if ( (hyst%par%df_sign .gt. 0.0 .and.&
                                     hyst%f_mean_now .ge. hyst%par%f_max) ) then  
                             ! Ramp-up complete, switch directions
 
-                                hyst%par%df_sign = -hyst%par%df_sign
+                                if (hyst%par%f_conv .ge. hyst%par%f_max) then 
+                                    ! Rate still going up or constant in second step.
+                                    hyst%par%f_min = hyst%par%f_max
+                                    hyst%par%f_max = hyst%par%f_conv
+                                else
+                                    ! Rate changes sign in second step.
+                                    hyst%par%f_min   = hyst%par%f_conv
+                                    hyst%par%df_sign = -hyst%par%df_sign
+                                end if 
+
+                                ! Update duration of current step
                                 hyst%par%dt_ramp = hyst%par%dt_conv 
-                                hyst%par%f_min   = hyst%par%f_conv
                                 
                                 ! Set switch to know we are on the return part of the triangle
-                                hyst%par%triangle_return = .TRUE.
+                                hyst%par%after_step = .TRUE.
 
                             end if
                             
@@ -462,7 +487,6 @@ contains
 
         ! Check if kill should be activated 
         if (hyst%par%with_kill .and. &
-            .not. trim(hyst%par%method) .eq. "sin" .and. &
             abs(hyst%dv_dt_ave) .lt. hyst%par%eps) then 
 
             if (hyst%par%df_sign .gt. 0.0 .and. &

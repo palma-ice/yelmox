@@ -14,8 +14,6 @@
     time_end        = 30e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 2014.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none"
@@ -27,8 +25,6 @@
     time_end        = 30e3              ! [yr] Ending time (model years)
     time_equil      = 10.0              ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 500.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 1900.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"             ! "none", "relax", "opt"
@@ -40,8 +36,6 @@
     time_end        = 2300.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 200.0             ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
@@ -53,8 +47,6 @@
     time_end        = 2120.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
-    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 10.0              ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
@@ -66,12 +58,31 @@
     time_end        = 500.0             ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 1.0               ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 1e3               ! [yr] Frequency of writing 2D output files 
     time_const      = 1950.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     scenario        = "ctrl"            ! "ctrl" or "rcp85" 
+/
+
+&tm_1D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 1.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
+&tm_2D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 200.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_2Dsm
+    method          = "const"           ! "const", "file", "times"
+    dt              = 50.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
 /
 
 &hysteresis
@@ -545,11 +556,22 @@
 
 /
 
-&isostasy 
-    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA
+&isos
+    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA, 4: ELVA
     dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
     dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
-    He_lith         = 100.0                 ! [km] Effective elastic thickness lithosphere
+    He_lith         = 88.0                  ! [km] Effective elastic thickness lithosphere
+    visc            = 1e21                  ! [Pa s] Asthenosphere's viscosity, visc=1e21 for Bueler et al (2007)  
     tau             = 3000.0                ! [yr] Relaxation time 
-    
+
+    ! Physical constants
+    E               = 66.0  !100.0          ! [GPa] Young's modulus | 100 for Coulon et al (2021) | 66  for Bueler et al (2007) 
+    nu              = 0.5   !0.25           ! [-]   Poisson's ratio: 0.25 for Coulon et al (2021) | 0.5 for Bueler et al (2007) 
+    rho_ice         = 910.0                 ! [kg/m^3]
+    rho_sw          = 1028.0                ! [kg/m^3] 
+    rho_w           = 1000.0                ! [kg/m^3] 
+    rho_a           = 3300.0                ! [kg/m^3] 3370 used by Coulon et al (2021)
+    g               = 9.81                  ! [m/s^2]
+    r_earth         = 6.378e6               ! [m]  Earth's radius, Coulon et al (2021) 
+    m_earth         = 5.972e24              ! [kg] Earth's mass,   Coulon et al (2021) 
 /
