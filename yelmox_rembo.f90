@@ -56,6 +56,7 @@ program yelmox
     logical :: lim_pd_ice 
     logical :: with_ice_sheet 
     logical :: optimize 
+    logical :: greenland_init_marine_H
 
     type(ice_opt_params) :: opt 
 
@@ -82,6 +83,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dT",             dT_summer)              ! Initial summer temperature anomaly
     call nml_read(path_par,"ctrl","lim_pd_ice",     lim_pd_ice)             ! Limit to pd ice extent (apply extra melting outside mask)
     call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
+    call nml_read(path_par,"ctrl","greenland_init_marine_H", greenland_init_marine_H)   ! Initialize ice thickness with extra marine ice?
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
     
     ! Get output times
@@ -257,6 +259,20 @@ program yelmox
 
     end if 
     
+    if (greenland_init_marine_H) then
+        ! Add extra ice-thickness over continental shelf to start with
+        ! an LGM-like state
+        ! (Note: this can be done even if running from a restart file...)
+        
+        where(yelmo1%bnd%ice_allowed .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
+                .and. yelmo1%bnd%z_bed .gt. -500.0)
+
+                yelmo1%tpo%now%H_ice = 800.0 
+
+        end where
+
+    end if
+        
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
 

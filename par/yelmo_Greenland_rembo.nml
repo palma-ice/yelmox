@@ -10,6 +10,7 @@
     use_hyster      = True              ! Use hysteresis module? 
     dT              = 0.0               ! [K]  Contant summer warming anomaly              
     lim_pd_ice      = True              ! Apply extra melting outside of PD ice extent
+    greenland_init_marine_H = False     ! Initialize ice thickness to LGM-like state
     with_ice_sheet  = True              ! Active ice sheet? 
     optimize        = False             ! Optimize basal friction? 
 /
