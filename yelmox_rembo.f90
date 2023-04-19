@@ -65,6 +65,9 @@ program yelmox
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file 
 
+    real(wp) :: hyst_f_to 
+    real(wp) :: hyst_f_ta
+
     ! Assume program is running from the output folder
     outfldr = "./"
     
@@ -85,6 +88,9 @@ program yelmox
     call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
     call nml_read(path_par,"ctrl","greenland_init_marine_H", greenland_init_marine_H)   ! Initialize ice thickness with extra marine ice?
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
+    
+    call nml_read(path_par,"ctrl","f_to",           hyst_f_to)              ! Scale hyster forcing to temp (ocean)
+    call nml_read(path_par,"ctrl","f_ta",           hyst_f_ta)              ! Scale hyster forcing to temp (atm)
     
     ! Get output times
     call timeout_init(tm_1D,path_par,"tm_1D","small", time_init,time_end)
@@ -191,7 +197,7 @@ program yelmox
         dv_dt = sqrt(sum(yelmo1%tpo%now%dHidt**2)/real(count(yelmo1%tpo%now%f_ice .gt. 0.0),wp))
         call hyster_calc_forcing(hyst1,time,var)
         !call hyster_calc_forcing(hyst1,time,var,dv_dt)
-        dT_summer = hyst1%f_now 
+        dT_summer = hyst1%f_now*hyst_f_ta
     end if 
 
     ! Update REMBO, with correct topography, let it equilibrate for several years 
@@ -322,7 +328,7 @@ program yelmox
         if (use_hyster) then
 
             select case(trim(hyst1%par%method))
-                case("ramp-time","ramp-time-triangle")
+                case("ramp-time","ramp-time-step")
 
                     deltat_tot = hyst1%par%dt_init + hyst1%par%dt_ramp + hyst1%par%dt_conv + 100.0
 
@@ -362,7 +368,7 @@ if (calc_transient_climate) then
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt_ave, hyst1%df_dt*1e6, hyst1%f_now 
             
             ! Store in dT_summer for forcing of rembo, etc.
-            dT_summer = hyst1%f_now 
+            dT_summer = hyst1%f_now*hyst_f_ta
 
         end if 
 end if 
@@ -446,6 +452,11 @@ if (calc_transient_climate) then
         ! Update snapclim
         call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
 
+        if (use_hyster) then 
+            ! Apply hyst ocean temp anomaly as needed 
+            snp1%now%to_ann = snp1%now%to_ann + hyst1%f_now*hyst_f_to 
+        end if 
+        
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)

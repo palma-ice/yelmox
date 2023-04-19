@@ -357,7 +357,7 @@ program yelmox
 
             ! Should extra ice be imposed over continental shelf to mimic LGM state to start
             greenland_init_marine_H = .TRUE. 
-
+            
             ! Should glacial smb be modified to reduce negative smb values
             scale_glacial_smb = .FALSE. 
             
