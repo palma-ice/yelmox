@@ -2117,13 +2117,13 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Add temperature axis to 1D hysteresis file 
         allocate(dT_axis(1000))
         do n = 1, 1000 
-            dT_axis(n) = dT_min + (dT_max-dT_min)*(n-1)/real(1000-1,prec)
+            dT_axis(n) = dT_min + (dT_max-dT_min)*(n-1)/real(1000-1,wp)
         end do 
         call nc_write_dim(filename,"dT_axis",x=dT_axis,units="degC")
         
         ! Populate variable with missing values for now to initialize it
         dT_axis = missing_value 
-        call nc_write(filename,"V_dT",dT_axis,dim1="dT_axis")
+        call nc_write(filename,"V_dT",dT_axis,dim1="dT_axis",missing_value=missing_value)
         !============================================================
         
         ! Static information
