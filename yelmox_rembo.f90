@@ -44,6 +44,7 @@ program yelmox
     logical  :: calc_transient_climate
     
     type(timeout_class) :: tm_1D, tm_2D 
+    logical :: file_rembo_write_ocn_forcing
 
     logical :: use_hyster
     logical :: write_restart
@@ -88,6 +89,7 @@ program yelmox
     call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
     call nml_read(path_par,"ctrl","greenland_init_marine_H", greenland_init_marine_H)   ! Initialize ice thickness with extra marine ice?
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
+    call nml_read(path_par,"ctrl","write_ocn_forcing", file_rembo_write_ocn_forcing)
     
     call nml_read(path_par,"ctrl","f_to",           hyst_f_to)              ! Scale hyster forcing to temp (ocean)
     call nml_read(path_par,"ctrl","f_ta",           hyst_f_ta)              ! Scale hyster forcing to temp (atm)
@@ -311,7 +313,7 @@ program yelmox
     ! Small 1D-2D yelmo-rembo file
     call write_yelmo_init_combined(yelmo1,file_rembo,time_init=time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
-    call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
+    call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time,file_rembo_write_ocn_forcing)
 
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)
@@ -456,7 +458,7 @@ if (calc_transient_climate) then
             ! Apply hyst ocean temp anomaly as needed 
             snp1%now%to_ann = snp1%now%to_ann + hyst1%f_now*hyst_f_to 
         end if 
-        
+
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -476,7 +478,7 @@ end if
         if (timeout_check(tm_1D,time)) then  
             ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             !call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
-            call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time)
+            call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time,file_rembo_write_ocn_forcing)
         end if 
 
         if (timeout_check(tm_2D,time)) then
@@ -522,7 +524,7 @@ end if
     
 contains
     
-    subroutine write_step_2D_combined_small(ylmo,hyst,rembo,isos,mshlf,filename,time)
+    subroutine write_step_2D_combined_small(ylmo,hyst,rembo,isos,mshlf,filename,time,write_ocn_forcing)
 
         implicit none 
         
@@ -533,6 +535,7 @@ contains
         type(marshelf_class), intent(IN) :: mshlf 
         character(len=*),     intent(IN) :: filename
         real(wp), intent(IN) :: time
+        logical, intent(IN), optional :: write_ocn_forcing
 
         ! Local variables
         integer  :: ncid, n, k
@@ -606,12 +609,12 @@ contains
             dHidt_rms_1 = 0.0
         end if
 
-        call nc_write(filename,"rms(dHidt)",dHidt_rms,units="m/yr",long_name="rms ice thickness change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"rms1(dHidt)",dHidt_rms_1,units="m/yr",long_name="rms ice thickness change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"max(dHidt)",dHidt_max,units="m/yr",long_name="max. ice thickness change", &
-                      dim1="time",start=[n],ncid=ncid)
+        ! call nc_write(filename,"rms(dHidt)",dHidt_rms,units="m/yr",long_name="rms ice thickness change", &
+        !               dim1="time",start=[n],ncid=ncid)
+        ! call nc_write(filename,"rms1(dHidt)",dHidt_rms_1,units="m/yr",long_name="rms ice thickness change", &
+        !               dim1="time",start=[n],ncid=ncid)
+        ! call nc_write(filename,"max(dHidt)",dHidt_max,units="m/yr",long_name="max. ice thickness change", &
+        !               dim1="time",start=[n],ncid=ncid)
         
         call nc_write(filename,"dVidt",ylmo%reg%dVidt,units="km^3/a",long_name="Rate volume change", &
                       dim1="time",start=[n],ncid=ncid)
@@ -628,6 +631,11 @@ contains
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/yr",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer thickness", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
         ! == rembo climate == 
         call nc_write(filename,"ta_ann",rembo%T_ann,units="K",long_name="REMBO Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -639,6 +647,17 @@ contains
         call nc_write(filename,"smb",rembo%smb*1e-3,units="m/yr water equiv.",long_name="REMBO Surface mass balance (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
+        ! == ocean forcing ==
+        if (write_ocn_forcing) then 
+
+            call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        end if 
 
         ! == ice-sheet wide metrics == 
 
@@ -801,7 +820,7 @@ contains
         
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
+
         ! External data
         call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -809,6 +828,7 @@ contains
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
+        
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -888,7 +908,7 @@ contains
         k = minloc(abs(dT_axis-hyst%f_now),dim=1)
         call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
                       dim1="time",start=[k],ncid=ncid)
-        
+
         ! ===== Total ice variables =====
         
         call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &

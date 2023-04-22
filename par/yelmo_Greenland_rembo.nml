@@ -15,6 +15,7 @@
     optimize        = False             ! Optimize basal friction? 
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
+    write_ocn_forcing = False 
     
 /
 
