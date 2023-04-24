@@ -50,7 +50,7 @@ program yelmox
     logical :: write_restart
     real(4) :: var, dv_dt
     real(4) :: convert_km3_Gt
-    real(4) :: dTa, dT_summer
+    real(4) :: dT_summer, dT_ann, dT_ocn
 
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
@@ -200,6 +200,13 @@ program yelmox
         call hyster_calc_forcing(hyst1,time,var)
         !call hyster_calc_forcing(hyst1,time,var,dv_dt)
         dT_summer = hyst1%f_now*hyst_f_ta
+        dT_ann    = 1.3*dT_summer       ! == 0.5* ( (1.6)*dT_summer + (1.0)*dT_summer), given T_wintfac=1.6
+        dT_ocn    = dT_ann*hyst_f_to 
+    
+    else
+        dT_summer = 0.0
+        dT_ann    = 0.0
+        dT_ocn    = 0.0 
     end if 
 
     ! Update REMBO, with correct topography, let it equilibrate for several years 
@@ -225,6 +232,13 @@ program yelmox
     
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_init,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+
+    if (use_hyster .and. trim(snp1%par%ocn_type) .eq. "const") then 
+        ! Apply oceanic anomaly from hyster method 
+        
+        snp1%now%to_ann = snp1%now%to_ann + dT_ocn
+
+    end if 
 
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
@@ -370,8 +384,15 @@ if (calc_transient_climate) then
             write(*,*) "hyst: ", time, hyst1%dt, hyst1%dv_dt_ave, hyst1%df_dt*1e6, hyst1%f_now 
             
             ! Store in dT_summer for forcing of rembo, etc.
+            ! Also get regional dT_ann, given T_wintfac used by rembo
             dT_summer = hyst1%f_now*hyst_f_ta
+            dT_ann    = 1.3*dT_summer       ! == 0.5* ( (1.6)*dT_summer + (1.0)*dT_summer), given T_wintfac=1.6
+            dT_ocn    = dT_ann*hyst_f_to 
 
+        else
+            dT_summer = 0.0
+            dT_ann    = 0.0
+            dT_ocn    = 0.0 
         end if 
 end if 
 
@@ -454,10 +475,12 @@ if (calc_transient_climate) then
         ! Update snapclim
         call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
 
-        if (use_hyster) then 
-            ! Apply hyst ocean temp anomaly as needed 
-            snp1%now%to_ann = snp1%now%to_ann + hyst1%f_now*hyst_f_to 
-        end if 
+        if (use_hyster .and. trim(snp1%par%ocn_type) .eq. "const") then 
+            ! Apply oceanic anomaly from hyster method 
+
+            snp1%now%to_ann = snp1%now%to_ann + dT_ocn
+            
+        end if
 
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &

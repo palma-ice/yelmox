@@ -16,7 +16,7 @@
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
     write_ocn_forcing = False 
-    
+
 /
 
 &tm_1D
@@ -306,7 +306,7 @@
 
 &snap
     atm_type           = "snap_1ind_new"
-    ocn_type           = "fraction"
+    ocn_type           = "const"
     fname_at           = "input/alpha_orbital_r2020.dat"
     fname_ao           = "input/alpha_orbital_r2020.dat"
     fname_ap           = "input/alpha_orbital_r2020.dat"
