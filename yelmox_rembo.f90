@@ -286,12 +286,15 @@ program yelmox
         ! an LGM-like state
         ! (Note: this can be done even if running from a restart file...)
         
-        where(yelmo1%bnd%ice_allowed .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
-                .and. yelmo1%bnd%z_bed .gt. -500.0)
+        ! Increase ice thickness everywhere to start
+        yelmo1%tpo%now%H_ice = yelmo1%tpo%now%H_ice*1.2
 
-                yelmo1%tpo%now%H_ice = 800.0 
+        ! where(yelmo1%bnd%ice_allowed .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
+        !         .and. yelmo1%bnd%z_bed .gt. -500.0)
 
-        end where
+        !         yelmo1%tpo%now%H_ice = 800.0 
+
+        ! end where
 
     end if
         
