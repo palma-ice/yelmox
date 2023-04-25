@@ -327,7 +327,8 @@ program yelmox
     ! Small 1D-2D yelmo-rembo file
     call write_yelmo_init_combined(yelmo1,file_rembo,time_init=time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
-    call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time,file_rembo_write_ocn_forcing)
+    call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time, &
+                                                        dT_summer,dT_ann,dT_ocn,file_rembo_write_ocn_forcing)
 
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)
@@ -501,7 +502,8 @@ end if
         if (timeout_check(tm_1D,time)) then  
             ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
             !call write_step_1D_combined(yelmo1,hyst1,file1D_hyst,time=time)
-            call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time,file_rembo_write_ocn_forcing)
+            call write_step_2D_combined_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time, &
+                                                        dT_summer,dT_ann,dT_ocn,file_rembo_write_ocn_forcing)
         end if 
 
         if (timeout_check(tm_2D,time)) then
@@ -547,7 +549,8 @@ end if
     
 contains
     
-    subroutine write_step_2D_combined_small(ylmo,hyst,rembo,isos,mshlf,filename,time,write_ocn_forcing)
+    subroutine write_step_2D_combined_small(ylmo,hyst,rembo,isos,mshlf,filename,time, &
+                                                            dT_jja,dT_ann,dT_ocn,write_ocn_forcing)
 
         implicit none 
         
@@ -558,6 +561,9 @@ contains
         type(marshelf_class), intent(IN) :: mshlf 
         character(len=*),     intent(IN) :: filename
         real(wp), intent(IN) :: time
+        real(wp), intent(IN) :: dT_jja
+        real(wp), intent(IN) :: dT_ann
+        real(wp), intent(IN) :: dT_ocn
         logical, intent(IN), optional :: write_ocn_forcing
 
         ! Local variables
@@ -700,7 +706,11 @@ contains
             aar = 0.0
         end if  
 
-        call nc_write(filename,"dT_jja",hyst%f_now,units="K",long_name="hyst: forcing value", &
+        call nc_write(filename,"dT_jja",hyst%f_now,units="K",long_name="Temp. anomaly, regional JJA mean", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"dT_ann",dT_ann,units="K",long_name="Temp. anomaly, regional annual mean", &
+                      dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"dT_ocn",dT_ocn,units="K",long_name="Temp. anomaly, regional oceanic mean", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"smb_mean",smb_tot,units="Gt/yr",long_name="Mean smb over the ice sheet", &
                       dim1="time",start=[n],ncid=ncid)
