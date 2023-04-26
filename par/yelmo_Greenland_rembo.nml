@@ -115,7 +115,7 @@
 
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
-    calv_flt_method     = "kill"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = ""vm-l19""        ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
@@ -499,17 +499,8 @@
 
 /
 
-&isos_old
-    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA
-    dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
-    dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
-    He_lith         = 100.0                 ! [km] Effective elastic thickness lithosphere
-    tau             = 3000.0                ! [yr] Relaxation time 
-    
-/
-
 &isos
-    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA, 4: ELVA
+    method          = 4                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA, 4: ELVA
     dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
     dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
     He_lith         = 88.0                  ! [km] Effective elastic thickness lithosphere
