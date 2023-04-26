@@ -115,7 +115,7 @@
 
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
-    calv_flt_method     = ""vm-l19""        ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
