@@ -185,3 +185,15 @@
     h_dVdt_window       =  1000
     h_fac               = -10.0
 /
+
+&emb_init_topo_default
+    init_topo_load    = True 
+    init_topo_path    = "ice_data/Greenland/GRL-16KM/GRL-16KM_TOPO-M17-v5.nc"
+    init_topo_names   = "H_ice" "z_bed"         ! Ice thickness, bedrock elevation
+/
+
+&emb_init_topo
+    init_topo_load    = False 
+    init_topo_path    = "/Users/robinson/GoogleDriveUCM/wrk/mypapers/TIPMIP/wrk/data_heiko/snaps/ISMIP6_grid16/snaps_geo_050_16km.nc"
+    init_topo_names   = "thk" "topg"            ! Ice thickness, bedrock elevation
+/
