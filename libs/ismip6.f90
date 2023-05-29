@@ -30,6 +30,7 @@ module ismip6
         character(len=256)     :: domain 
         character(len=256)     :: grid_name 
         character(len=256)     :: ctrl_run_type
+        logical                :: shlf_collapse
 
         ! Current state:
 
@@ -161,7 +162,7 @@ contains
         
     end subroutine ismip6_experiment_def
 
-    subroutine ismip6_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
+    subroutine ismip6_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment,shlf_collapse)
 
         implicit none 
 
@@ -172,6 +173,7 @@ contains
         character(len=*), intent(IN), optional :: gcm
         character(len=*), intent(IN), optional :: scenario
         character(len=*), intent(IN), optional :: experiment
+        logical,          intent(IN), optional :: shlf_collapse
 
         ! Assign domain and grid_name 
         ism%domain    = trim(domain)
@@ -181,7 +183,8 @@ contains
 
             case("Antarctica")
                 
-                call ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
+                call ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario, &
+                                                                    experiment,shlf_collapse)
 
             case("Greenland")
 
@@ -230,7 +233,7 @@ contains
 
     end subroutine ismip6_forcing_update
 
-    subroutine ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
+    subroutine ismip6_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment,shlf_collapse)
 
         implicit none 
 
@@ -241,6 +244,7 @@ contains
         character(len=*), intent(IN), optional :: gcm
         character(len=*), intent(IN), optional :: scenario
         character(len=*), intent(IN), optional :: experiment
+        logical,          intent(IN), optional :: shlf_collapse
 
         ! Local variables 
         character(len=256) :: gcm_now
@@ -334,12 +338,17 @@ contains
 
         end if
 
+        ! Finally, whether shlf_collapse should be included 
+        ism%shlf_collapse = .FALSE. 
+        if (present(shlf_collapse)) ism%shlf_collapse = shlf_collapse
+
         write(*,*)
         write(*,*) "ismip6_ant_forcing_init:: summary"
         write(*,*) "ctrl_run_type: ", trim(ism%ctrl_run_type)
         write(*,*) "gcm:           ", trim(ism%gcm)
         write(*,*) "scenario:      ", trim(ism%scenario)
         write(*,*) "experiment:    ", trim(ism%experiment)
+        write(*,*) "shlf_collapse: ", ism%shlf_collapse
         write(*,*) 
 
         select case(trim(ism%experiment))
@@ -455,9 +464,11 @@ contains
         call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
         call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
 
-        ! Shelf collapse fields
-        call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj), &
-                                            domain,grid_name,ism%gcm,ism%scenario,time_par_proj_msk)
+        if (ism%shlf_collapse) then 
+            ! Shelf collapse fields
+            call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj), &
+                                                domain,grid_name,ism%gcm,ism%scenario,time_par_proj_msk)
+        end if
 
         ! Load time-independent fields
 
@@ -644,25 +655,27 @@ contains
 
         ! === Mask shelf collapse ==========================
 
-        if (time .lt. 2015) then
+        if (ism%shlf_collapse) then 
+            if (time .lt. 2015) then
+                
+                ! Note: the year 2000 is used for this mask, however, any value from 2000 to 2015 
+                ! could be used as nothing really changes with the mask in the historical period.
+                ! Retreat only begins to be seen some decades later.
+                call varslice_update(ism%mask_shlf_proj,[2000.0_wp],method=slice_method)
+                ism%mask_shlf = ism%mask_shlf_proj
+
+            else if (time .ge. 2015 .and. time .le. 2300) then
+
+                call varslice_update(ism%mask_shlf_proj,[time],method=slice_method)
+                ism%mask_shlf = ism%mask_shlf_proj
             
-            ! Note: the year 2000 is used for this mask, however, any value from 2000 to 2015 
-            ! could be used as nothing really changes with the mask in the historical period.
-            ! Retreat only begins to be seen some decades later.
-            call varslice_update(ism%mask_shlf_proj,[2000.0_wp],method=slice_method)
-            ism%mask_shlf = ism%mask_shlf_proj
+            else
 
-        else if (time .ge. 2015 .and. time .le. 2300) then
+                call varslice_update(ism%mask_shlf_proj,[2300.0_wp],method=slice_method)
+                ism%mask_shlf  = ism%mask_shlf_proj
 
-            call varslice_update(ism%mask_shlf_proj,[time],method=slice_method)
-            ism%mask_shlf = ism%mask_shlf_proj
-        
-        else
-
-            call varslice_update(ism%mask_shlf_proj,[2300.0_wp],method=slice_method)
-            ism%mask_shlf  = ism%mask_shlf_proj
-
-        end if
+            end if
+        end if 
 
         ! === Additional calculations ======================
 
