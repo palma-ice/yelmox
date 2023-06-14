@@ -26,7 +26,7 @@ program yelmox_ismip6
     character(len=256) :: file1D_ismip6, file2D_ismip6
     character(len=256) :: file_restart
     character(len=256) :: domain, grid_name 
-    character(len=512) :: path_par, path_const  
+    character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
     character(len=512) :: ismip6_path_par
     integer  :: n, m
@@ -160,7 +160,6 @@ program yelmox_ismip6
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const          = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc" 
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"    
@@ -220,10 +219,7 @@ program yelmox_ismip6
     call timer_step(tmr,comp=-1) 
     
     ! === Initialize ice sheet model =====
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
-
+    
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
 

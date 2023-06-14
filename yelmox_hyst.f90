@@ -32,7 +32,7 @@ program yelmox
     type(hyster_class)     :: hyst1 
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small, file1D_hyst, file_restart, domain 
-    character(len=512) :: path_par, path_const  
+    character(len=512) :: path_par  
     real(wp) :: time_init, time_end, time_equil, time, dtt, dt1D_out, dt2D_out, dt2D_small_out, dt_restart   
     integer  :: n
     logical  :: calc_transient_climate
@@ -65,7 +65,6 @@ program yelmox
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
@@ -76,9 +75,6 @@ program yelmox
     dt_restart   = 20e3                 ! [yr] 
 
     ! === Initialize ice sheet model =====
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time_init)

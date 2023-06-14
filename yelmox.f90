@@ -35,7 +35,7 @@ program yelmox
     
     character(len=256) :: outfldr, file1D, file2D, file_restart, domain
     character(len=256) :: file2D_small
-    character(len=512) :: path_par, path_const
+    character(len=512) :: path_par
     character(len=512) :: path_lgm  
     real(wp) :: time, time_bp, time_elapsed
     real(wp) :: dT_now 
@@ -196,7 +196,6 @@ program yelmox
     outfldr = "./"
 
     ! Define input and output locations 
-    path_const   = trim(outfldr)//"yelmo_const_Earth.nml"
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
@@ -242,9 +241,6 @@ program yelmox
     
 
     ! === Initialize ice sheet model =====
-
-    ! General initialization of yelmo constants (used globally)
-    call yelmo_global_init(path_const)
 
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
