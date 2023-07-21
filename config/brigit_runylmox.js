@@ -12,17 +12,21 @@
     },
 
     "exe_aliases" :
-        {   "yelmox" : "libyelmox/bin/yelmox.x",
-            "iso"    : "libyelmox/bin/yelmox_iso.x",
-            "hyst"   : "libyelmox/bin/yelmox_hyst.x",
-            "rembo"  : "libyelmox/bin/yelmox_rembo.x"
-        },
+    {   "yelmox" : "libyelmox/bin/yelmox.x",
+        "iso"    : "libyelmox/bin/yelmox_iso.x",
+        "hyst"   : "libyelmox/bin/yelmox_hyst.x",
+        "rembo"  : "libyelmox/bin/yelmox_rembo.x",
+        "ismip6" : "libyelmox/bin/yelmox_ismip6.x"
+    },
 
     "grp_aliases" : {},
 
-    "par_paths" : {},
+    "par_paths" : 
+        {
+            "rembo"  : "par/rembo_Greenland.nml"
+        },
 
-    "files" : ["par/rembo_Greenland.nml","git_yelmo.txt"], 
+    "files" : ["git_yelmo.txt"], 
 
     "dir-special" : {},
 
