@@ -35,6 +35,8 @@ module ncio
     double precision, parameter :: NC_TOL = 1d-7
     double precision, parameter :: NC_LIM = 1d25
 
+    double precision, parameter :: NCIO_TOL_UNDERFLOW = 1d-30 
+
     character(len=NC_STRLEN), parameter :: NC_CHARDIM = "strlen"
 
     character(len=3), parameter :: GRID_MAPPING_NAME_DEFAULT = "crs" 
@@ -185,13 +187,19 @@ contains
 
         if (present(missing_value_int)) then
             v%missing_set = .TRUE.
+            v%FillValue_set = .TRUE.
             v%missing_value = dble(missing_value_int)
+            v%FillValue = v%missing_value
         else if (present(missing_value_float)) then
             v%missing_set = .TRUE.
+            v%FillValue_set = .TRUE.
             v%missing_value = dble(missing_value_float)
+            v%FillValue = v%missing_value
         else if (present(missing_value_double)) then
             v%missing_set = .TRUE.
+            v%FillValue_set = .TRUE.
             v%missing_value = missing_value_double
+            v%FillValue = v%missing_value
         end if
 
         ! Open the file in write mode from filename or ncid
@@ -435,7 +443,7 @@ contains
               v%count(i) = size_in(i)
             end do
         end if
-
+        
         ! Read the variable data from the file
         ! (NF90 converts dat to proper type (int, real, dble)
         call nc_check( nf90_get_var(nc_id, v%varid, dat, v%start, v%count) )
@@ -444,16 +452,23 @@ contains
         ! associated with the file.
         if (.not. present(ncid)) call nc_check( nf90_close(nc_id) )
 
+
+        ! === SPECIAL CASE: missing_value == NaN ==== 
+
+        ! Replace NaNs with internal missing value to avoid crashes.
+        ! IF NaNs are found, it may mean that the missing value
+        ! in the file is also set to NaN, which this program cannot
+        ! handle. Therefore, we replace all NaN values with the
+        ! default missing value, and then set the missing value. 
+        where ( ieee_is_nan(dat) ) dat = missing_value_default
+        v%missing_value = missing_value_default 
+        v%missing_set   = .TRUE. 
+
+        ! ===========================================
+        
+
         if (v%missing_set) then
 
-            ! === SPECIAL CASE: missing_value == NaN ==== 
-
-            ! Replace NaNs with internal missing value to avoid crashes
-            where ( ieee_is_nan(dat) ) dat = missing_value_default
-            v%missing_value = missing_value_default 
-
-            ! ===========================================
-            
             where( dabs(dat-v%missing_value) .gt. NC_TOL ) dat = dat*v%scale_factor + v%add_offset
 
             ! Fill with user-desired missing value
@@ -470,7 +485,10 @@ contains
               dat = dat*v%scale_factor + v%add_offset
         end if
 
-        ! Also eliminate crazy values (in case they are not handled by missing_value for some reason)
+        ! Finally, eliminate tiny values that may cause underflow errors
+        where ( dabs(dat) .lt. NCIO_TOL_UNDERFLOW ) dat = 0.0d0
+        
+        ! Also eliminate crazy high values (in case they are not handled by missing_value for some reason)
         ! Fill with user-desired missing value
         if (present(missing_value_int)) &
             where( dabs(dat) .ge. NC_LIM ) dat = dble(missing_value_int)
@@ -554,10 +572,10 @@ contains
         v%add_offset    = 0.d0
         v%scale_factor  = 1.d0
         v%actual_range  = (/ 0.d0, 0.d0 /)
-        v%missing_set   = .TRUE.
+        v%missing_set   = .FALSE.
         v%missing_value = -9999d0
         v%FillValue     = v%missing_value
-        v%FillValue_set = .TRUE.
+        v%FillValue_set = .FALSE.
 
         v%xtype = "NF90_DOUBLE"
         v%coord = .FALSE.
@@ -833,8 +851,6 @@ contains
 
         integer, parameter :: noerr = NF90_NOERR
 
-        ndims = size(v%dims)
-
         ! Check if variable already exists - if so, gets the varid
         stat = nf90_inq_varid(ncid, trim(v%name), v%varid)
 
@@ -851,6 +867,7 @@ contains
             else
                 ! This is a data variable
                 ! Determine ids of dimensions
+                ndims = size(v%dims)
                 allocate(dimids(ndims))
                 do i = 1, ndims
                     call nc_check ( nf90_inq_dimid(ncid, v%dims(i), dimids(i)) )

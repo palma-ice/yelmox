@@ -13,34 +13,34 @@ module snapclim
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = sp 
+    integer,  parameter :: prec = sp
     integer,  parameter :: wp   = sp 
 
-    real(prec), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
-    real(prec), parameter :: pi        = 3.14159265359
+    real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
+    real(wp), parameter :: pi        = 3.14159265359
 
     type series_type
         character(len=512) :: filename 
-        real(prec), allocatable :: time(:), var(:), sigma(:)
+        real(wp), allocatable :: time(:), var(:), sigma(:)
     end type 
 
     type series_2D_type
         character(len=512) :: filename 
-        real(prec), allocatable :: time(:), var(:,:), sigma(:,:)
+        real(wp), allocatable :: time(:), var(:,:), sigma(:,:)
     end type     
 
     type snapshot_param_class 
         character(len=512) :: clim_path 
         character(len=56)  :: clim_names(4)
         logical            :: clim_monthly 
-        real(prec)         :: clim_time 
+        real(wp)         :: clim_time 
         character(len=512) :: clim_stdev_path 
         character(len=56)  :: clim_stdev_name
 
         character(len=512) :: ocn_path 
         character(len=56)  :: ocn_names(4)
         logical            :: ocn_monthly 
-        real(prec)         :: ocn_time 
+        real(wp)         :: ocn_time 
         
     end type 
 
@@ -49,19 +49,19 @@ module snapclim
         character(len=56)       :: clim_names(4)
         character(len=56)       :: clim_type 
         logical                 :: clim_monthly 
-        real(prec), allocatable :: clim_times(:) 
+        real(wp), allocatable :: clim_times(:) 
 
         character(len=512)      :: ocn_path
         character(len=56)       :: ocn_names(4)
         character(len=56)       :: ocn_type
         logical                 :: ocn_monthly
-        real(prec), allocatable :: ocn_times(:)
+        real(wp), allocatable :: ocn_times(:)
 
     end type 
 
     type hybrid_class 
         character(len=512)   :: hybrid_path 
-        real(prec)           :: f_eem, f_glac, f_hol, f_seas, f_to
+        real(wp)           :: f_eem, f_glac, f_hol, f_seas, f_to
         type(series_2D_type) :: dTmon
     
     end type 
@@ -72,13 +72,14 @@ module snapclim
         character(len=56)  :: ocn_type
         character(len=512) :: fname_at, fname_ao, fname_ap, fname_as 
         character(len=512) :: fname_bt, fname_bo, fname_bp, fname_bs   
-        real(prec) :: lapse(2)
-        real(prec) :: dTa_const 
-        real(prec) :: dTo_const
-        real(prec) :: dSo_const 
-        real(prec) :: f_to 
-        real(prec) :: f_p
-        real(prec) :: f_stdev
+        real(wp) :: lapse(2)
+        real(wp) :: dTa_const 
+        real(wp) :: dTo_const
+        real(wp) :: dSo_const 
+        real(wp) :: f_to 
+        real(wp) :: f_p
+        real(wp) :: f_p_ne
+        real(wp) :: f_stdev
 
     end type
 
@@ -87,35 +88,36 @@ module snapclim
         type(snapshot_param_class) :: par 
 
         ! Climate variables 
-        real(prec), allocatable :: mask(:,:)     
-        real(prec), allocatable :: z_srf(:,:)
+        real(wp), allocatable :: mask(:,:)     
+        real(wp), allocatable :: z_srf(:,:)
 
-        real(prec), allocatable :: tas(:,:,:)
-        real(prec), allocatable :: pr(:,:,:)
-        real(prec), allocatable :: pr_stdev_frac(:,:,:)
-        real(prec), allocatable :: sf(:,:,:)
+        real(wp), allocatable :: tas(:,:,:)
+        real(wp), allocatable :: pr(:,:,:)
+        real(wp), allocatable :: pr_stdev_frac(:,:,:)
+        real(wp), allocatable :: sf(:,:,:)
 
-        real(prec), allocatable :: ta_ann(:,:)
-        real(prec), allocatable :: ta_sum(:,:)
-        real(prec), allocatable :: pr_ann(:,:)
+        real(wp), allocatable :: ta_ann(:,:)
+        real(wp), allocatable :: ta_sum(:,:)
+        real(wp), allocatable :: pr_ann(:,:)
         
-        real(prec), allocatable :: pr_ann_stdev_frac(:,:)
+        real(wp), allocatable :: pr_ann_stdev_frac(:,:)
 
-        real(prec), allocatable :: tsl(:,:,:)
-        real(prec), allocatable :: prcor(:,:,:)
-        real(prec), allocatable :: tsl_ann(:,:)
-        real(prec), allocatable :: tsl_sum(:,:)
-        real(prec), allocatable :: prcor_ann(:,:)
-        
+        real(wp), allocatable :: tsl(:,:,:)
+        real(wp), allocatable :: prcor(:,:,:)
+        real(wp), allocatable :: tsl_ann(:,:)
+        real(wp), allocatable :: tsl_sum(:,:)
+        real(wp), allocatable :: prcor_ann(:,:)
+        real(wp), allocatable :: beta_p(:,:)        
+
         ! Oceanic variables
         integer :: nzo
-        real(prec), allocatable :: depth(:) 
-        real(prec), allocatable :: mask_ocn(:,:,:) 
-        real(prec), allocatable :: to_ann(:,:,:) 
-        real(prec), allocatable :: so_ann(:,:,:) 
+        real(wp), allocatable :: depth(:) 
+        real(wp), allocatable :: mask_ocn(:,:,:) 
+        real(wp), allocatable :: to_ann(:,:,:) 
+        real(wp), allocatable :: so_ann(:,:,:) 
         
-        real(prec) :: at, ao, ap, as 
-        real(prec) :: bt, bo, bp, bs
+        real(wp) :: at, ao, ap, as 
+        real(wp) :: bt, bo, bp, bs
 
     end type 
 
@@ -191,7 +193,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -203,12 +205,13 @@ contains
         character(len=*),     intent(IN)    :: filename 
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
+        real(wp), intent(IN) :: basins(:,:)
 
         ! Local variables 
         logical :: load_atm1, load_atm2, load_atm3 
         logical :: load_ocn1, load_ocn2, load_ocn3
         integer :: k, nzo  
-        real(prec), allocatable :: depth(:) 
+        real(wp), allocatable :: depth(:) 
 
         ! Load parameters 
         call snapclim_par_load(snp%par,snp%hybrid,filename)
@@ -238,7 +241,7 @@ contains
                 load_atm2 = .TRUE. 
                 load_atm3 = .FALSE. 
 
-            case("snap_2ind","snap_2ind_abs") 
+            case("snap_1ind_miocene","snap_2ind","snap_2ind_abs") 
                 load_atm1 = .TRUE.
                 load_atm2 = .TRUE. 
                 load_atm3 = .TRUE. 
@@ -263,7 +266,7 @@ contains
                 load_ocn2 = .TRUE. 
                 load_ocn3 = .FALSE. 
 
-            case("snap_2ind","snap_2ind_abs") 
+            case("snap_1ind_miocene","snap_2ind","snap_2ind_abs") 
                 load_ocn1 = .TRUE.
                 load_ocn2 = .TRUE. 
                 load_ocn3 = .TRUE. 
@@ -298,14 +301,14 @@ contains
         ! == clim0: reference climate (eg, present day) ==
 
         call snapshot_par_load(snp%clim0%par,filename,"snap_clim0",domain,grid_name,init=.TRUE.)
-        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
         call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,"snap_clim1",domain,grid_name,init=.TRUE.)                
-            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
         end if 
@@ -314,7 +317,7 @@ contains
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,"snap_clim2",domain,grid_name,init=.TRUE.)                
-            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
         end if 
@@ -323,7 +326,7 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,"snap_clim3",domain,grid_name,init=.TRUE.)
-            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,domain)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
         end if 
@@ -361,25 +364,46 @@ contains
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo)
+    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo,dx,basins)
 
         implicit none 
 
         type(snapclim_class), intent(INOUT) :: snp
-        real(prec), intent(IN)    :: z_srf(:,:) 
-        real(prec), intent(IN)    :: time    ! Current simulation year
+        real(wp), intent(IN)    :: z_srf(:,:) 
+        real(wp), intent(IN)    :: time    ! Current simulation year
         character(len=*), intent(IN) :: domain 
-        real(prec), intent(IN), optional :: dTa   ! For atm_type='anom'
-        real(prec), intent(IN), optional :: dTo   ! For atm_type='anom'
-        real(prec), intent(IN), optional :: dSo   ! For atm_type='anom'
-        
+        real(wp), intent(IN)    :: basins(:,:)
+        real(wp), intent(IN), optional :: dTa   ! For atm_type='anom'
+        real(wp), intent(IN), optional :: dTo   ! For atm_type='anom'
+        real(wp), intent(IN), optional :: dSo   ! For atm_type='anom'
+        real(wp), intent(IN), optional :: dx    ! Grid resolution, needed for smoothing
         ! Local variables
-        real(prec) :: at, ao, ap, as, bt, bo, bp, bs, a1, a2 
-        real(prec) :: dTa_now, dTo_now, dSo_now  
-        real(prec) :: dT(12) 
+        real(wp) :: at, ao, ap, as, bt, bo, bp, bs, a1, a2 
+        real(wp) :: dTa_now, dTo_now, dSo_now  
+        real(wp) :: dT(12) 
         logical :: south 
         integer :: m 
         integer :: nx, ny, i, j
+
+        real(wp) :: dT_mean 
+        real(wp) :: f_corr 
+        real(wp) :: t1, t2 
+        real(wp), allocatable :: clim0_tsl_smooth(:,:) 
+        real(wp), allocatable :: clim0_tsl_corr(:,:,:) 
+        real(wp), allocatable :: clim0_prcor_smooth(:,:) 
+        real(wp), allocatable :: clim0_prcor_corr(:,:,:) 
+        real(wp), allocatable :: zs_corr(:,:) 
+        real(wp), allocatable :: dT_corr(:,:) 
+
+        nx = size(z_srf,1)
+        ny = size(z_srf,2) 
+
+        allocate(clim0_tsl_smooth(nx,ny))
+        allocate(clim0_tsl_corr(nx,ny,12))
+        allocate(clim0_prcor_smooth(nx,ny))
+        allocate(clim0_prcor_corr(nx,ny,12))
+        allocate(zs_corr(nx,ny))
+        allocate(dT_corr(nx,ny)) 
 
         ! Determine the current values of various indices 
         at     = series_interp(snp%at, time)
@@ -449,13 +473,68 @@ contains
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
-                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
 
             case("snap_1ind","snap_1ind_new")
 
-                call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-                call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
-                  
+ !HEAD
+                if (present(dx)) then 
+                    ! Allow smoothing...
+
+                    ! Get smoother version of tsl from clim0 for cold climates
+                    do m = 1, 12 
+
+                        ! Calculate the fully smoothed tsl field 
+                        clim0_tsl_smooth = snp%clim0%tsl(:,:,m)
+                        call smooth_gauss_2D(clim0_tsl_smooth,dx=dx,f_sigma=80e3_wp/dx)
+
+                        ! Calculate fully smoothed precip field too 
+                        clim0_prcor_smooth = snp%clim0%prcor(:,:,m) 
+                        call smooth_gauss_2D(clim0_prcor_smooth,dx=dx,f_sigma=80e3_wp/dx)
+                        
+                        t1 = -8e3       ! [kyr ago] Before this time, f_corr=1
+                        t2 = -1e3       ! [kyr ago] After this time, f_corr=0
+
+                        if (time .le. t1) then 
+                            f_corr = 1.0 
+                        else if (time .ge. t2) then 
+                            f_corr = 0.0 
+                        else
+                            f_corr = 1.0_wp - (time-t1)/(t2-t1)
+                        end if 
+                        
+                        ! Get corrected clim0_tsl
+                        !f_corr = min(at,1.0)
+                        clim0_tsl_corr(:,:,m)   = snp%clim0%tsl(:,:,m)*(1.0_wp-f_corr) + clim0_tsl_smooth*f_corr 
+                        
+                        ! Get corrected clim0_prcor
+                        !f_corr = min(ap,1.0)
+                        clim0_prcor_corr(:,:,m) = snp%clim0%prcor(:,:,m)*(1.0_wp-f_corr) + clim0_prcor_smooth*f_corr 
+                        
+                    end do 
+
+                else 
+                    ! No smoothing 
+
+                    clim0_tsl_corr   = snp%clim0%tsl
+                    clim0_prcor_corr = snp%clim0%prcor
+
+                end if 
+
+                call calc_temp_1ind(snp%now%tsl,clim0_tsl_corr,snp%clim1%tsl,snp%clim2%tsl,at)
+                call calc_precip_1ind(snp%now%prcor,clim0_prcor_corr,snp%clim1%prcor,snp%clim2%prcor,ap)
+                
+!END HEAD
+  !             call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
+  !             call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
+            
+            ! jablasco: miocene
+            case("snap_1ind_miocene")
+
+                call calc_temp_1ind_miocene(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at)
+                call calc_precip_1ind_miocene(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,snp%clim3%prcor,ap)
+      
+
             case("snap_2ind")
                 
                 call calc_temp_2ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,snp%clim3%tsl,at,bt)
@@ -483,7 +562,7 @@ contains
                 end do 
 
                 ! Calculate monthly precip anomaly
-                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%par%f_p)
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
 
                 ! Update external index
                 at = sum(dT)/real(size(dT,1))   ! Annual mean
@@ -500,7 +579,7 @@ contains
 
                 ! Load reconstruction fields of tas and pr for the current time 
                 call read_climate_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%z_srf, &
-                                                                    snp%par%lapse,snp%par%f_p,time,domain) 
+                                                                    snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,time,domain,basins) 
 
                 ! We  have loaded dT and pr/pr_0 fields, apply to reference climate  
                 ! to get current climate snapshot 
@@ -564,7 +643,7 @@ contains
                 ! ajr: untested!! 
                 
                 dTo_now = snp%par%f_to * &
-                        sum(snp%now%ta_ann-snp%clim0%ta_ann) / real(snp%par%nx*snp%par%ny,prec)
+                        sum(snp%now%ta_ann-snp%clim0%ta_ann) / real(snp%par%nx*snp%par%ny,wp)
 
                 call calc_temp_anom(snp%now%to_ann,snp%clim0%to_ann,dTo_now)
                 
@@ -595,16 +674,23 @@ contains
                 call calc_temp_1ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
                 call calc_salinity_1ind(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,as)
                         
+            ! jablasco: miocene
+            case("snap_1ind_miocene")
+                call calc_temp_1ind_miocene(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao)
+                call calc_salinity_1ind_miocene(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as)
+            
             case("snap_2ind")
                 call calc_temp_2ind(snp%now%to_ann,snp%clim0%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo)
                 call calc_salinity_2ind(snp%now%so_ann,snp%clim0%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as,bs)
 
             case("snap_1ind_abs")
                 call calc_temp_1ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,ao)
+                call calc_salinity_1ind_abs(snp%now%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,as)
 
             case("snap_2ind_abs")
                 call calc_temp_2ind_abs(snp%now%to_ann,snp%clim1%to_ann,snp%clim2%to_ann,snp%clim3%to_ann,ao,bo) 
-            
+                call calc_salinity_2ind_abs(snp%now%so_ann,snp%clim1%so_ann,snp%clim2%so_ann,snp%clim3%so_ann,as,bs)            
+
             case("hybrid") 
                 ! Use hybrid method 
 
@@ -627,6 +713,42 @@ contains
 
         end select 
 
+
+!        ! Finally apply temperature correction to now%tsl, if needed. 
+!        ! This is intended to smooth out temperature anomalies so that
+!        ! the PD pattern is not so strongly imprinted on a glacial anomaly,
+!        ! and to account for a lack of atmospheric dynamics that would reduce
+!       ! temperatures over land at low elevations. 
+!
+!        ! First, define a correction factor as a function of elevation, so that
+!        ! 100% of correction is applied at low elevations (below 100m)
+!        ! and 0% of correction is applied at high elevation (above 500m)
+!        zs_corr = 0.0_wp 
+!        where(z_srf .lt. 100.0) zs_corr = 1.0 
+!        where(z_srf .ge. 100.0 .and. z_srf .le. 1000.0)
+!            zs_corr = 1.0 - (z_srf-100.0)/(1000.0-100.0)
+!        end where
+!
+!        ! Calculate and apply correction by month
+!        do m = 1, 12
+!
+!            ! Calculate mean tsl temp anomaly for this month
+!            dT_mean = sum(snp%now%tsl(:,:,m)-snp%clim0%tsl(:,:,m))/real(nx*ny,wp)
+!
+!            ! Calculate attenuation factor based on current climatic anomaly
+!            ! A value of zero when dT_mean is zero, and 
+!            ! a value of one when dT_mean is <= -5deg. 
+!            f_corr = max(min(dT_mean/(-5.0),1.0),0.0)
+!            
+!            ! Given temporal and elevation factors, determine the desired 
+!            ! additional reduction in temperature, eg., -3deg
+!            dT_corr = f_corr*zs_corr * (-5.0_wp)
+!
+!            ! Apply the correction
+!            snp%now%tsl(:,:,m) = snp%now%tsl(:,:,m) + dT_corr 
+!
+!        end do 
+
         ! Step 3: Now, using the monthly sea-level temperature and precipitation fields calculated above,
         ! correct for elevation
 
@@ -641,15 +763,15 @@ contains
                     z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-15.0)/360.0))
             end if 
         end do 
-
+           
         ! 3b: Calculate monthly precipitation accounting for current surface elevation
 
-        call calc_precip_anom(snp%now%pr,snp%now%prcor,snp%now%tas-snp%now%tsl,snp%par%f_p)
+        call calc_precip_anom(snp%now%pr,snp%now%prcor,snp%now%tas-snp%now%tsl,snp%now%beta_p)
 
         ! Step 4: Calculate annual and summer averages
 
-        snp%now%tsl_ann = sum(snp%now%tsl,dim=3) / 12.0_prec 
-        snp%now%ta_ann  = sum(snp%now%tas,dim=3) / 12.0_prec 
+        snp%now%tsl_ann = sum(snp%now%tsl,dim=3) / 12.0_wp
+        snp%now%ta_ann  = sum(snp%now%tas,dim=3) / 12.0_wp
 
         ! Summer (jja or djf) temperature [K]
         if (south) then 
@@ -701,9 +823,9 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: temp_now 
-        real(prec), intent(IN)  :: temp0 
-        real(prec), intent(IN)  :: dT            ! Current anomaly value to impose
+        real(wp), intent(OUT) :: temp_now 
+        real(wp), intent(IN)  :: temp0 
+        real(wp), intent(IN)  :: dT            ! Current anomaly value to impose
         
         temp_now = temp0 + dT 
         
@@ -715,9 +837,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: temp_now 
-        real(prec), intent(IN)  :: temp0, temp1, temp2 
-        real(prec), intent(IN)  :: aa  
+        real(wp), intent(OUT) :: temp_now 
+        real(wp), intent(IN)  :: temp0, temp1, temp2 
+        real(wp), intent(IN)  :: aa  
         
         temp_now = temp0 + aa*(temp2-temp1)
 
@@ -729,9 +851,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: salt_now
-        real(prec), intent(IN)  :: salt0, salt1, salt2
-        real(prec), intent(IN)  :: aa
+        real(wp), intent(OUT) :: salt_now
+        real(wp), intent(IN)  :: salt0, salt1, salt2
+        real(wp), intent(IN)  :: aa
 
         salt_now = salt0 + aa*(salt2-salt1)
 
@@ -739,13 +861,27 @@ contains
 
     end subroutine calc_salinity_1ind
 
+    elemental subroutine calc_salinity_1ind_abs(salt_now,salt1,salt2,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt1, salt2
+        real(prec), intent(IN)  :: aa
+
+        salt_now = (1.0-aa)*salt1 + aa*salt2
+
+        return
+
+    end subroutine calc_salinity_1ind_abs
+
     elemental subroutine calc_temp_2ind(temp_now,temp0,temp1,temp2,temp3,aa,bb)
 
         implicit none
 
-        real(prec), intent(OUT) :: temp_now 
-        real(prec), intent(IN)  :: temp0, temp1, temp2, temp3 
-        real(prec), intent(IN)  :: aa, bb 
+        real(wp), intent(OUT) :: temp_now 
+        real(wp), intent(IN)  :: temp0, temp1, temp2, temp3 
+        real(wp), intent(IN)  :: aa, bb 
 
         ! option 1 : strictly correct (needs checking)
 
@@ -759,13 +895,28 @@ contains
 
     end subroutine calc_temp_2ind
 
+    ! jablasco: 2ind for miocene simulation
+    elemental subroutine calc_temp_1ind_miocene(temp_now,temp0,temp1,temp2,temp3,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: temp_now
+        real(prec), intent(IN)  :: temp0, temp1, temp2, temp3
+        real(prec), intent(IN)  :: aa
+
+        temp_now = temp0 + temp1 - temp3 + aa*(temp2-temp1)
+
+        return
+
+    end subroutine calc_temp_1ind_miocene
+
     elemental subroutine calc_salinity_2ind(salt_now,salt0,salt1,salt2,salt3,aa,bb)
 
         implicit none
 
-        real(prec), intent(OUT) :: salt_now
-        real(prec), intent(IN)  :: salt0, salt1, salt2, salt3
-        real(prec), intent(IN)  :: aa, bb
+        real(wp), intent(OUT) :: salt_now
+        real(wp), intent(IN)  :: salt0, salt1, salt2, salt3
+        real(wp), intent(IN)  :: aa, bb
 
         salt_now = salt0 + aa*(salt2-salt1) + bb*(salt3-salt2)
 
@@ -773,13 +924,44 @@ contains
 
     end subroutine calc_salinity_2ind
 
+    ! jablasco: 2ind salinity for miocene simulation
+    elemental subroutine calc_salinity_1ind_miocene(salt_now,salt0,salt1,salt2,salt3,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt0, salt1, salt2, salt3
+        real(prec), intent(IN)  :: aa
+
+        salt_now = salt0 + salt1 - salt3 + aa*(salt2-salt1)
+
+        return
+
+    end subroutine calc_salinity_1ind_miocene
+
+
+    elemental subroutine calc_salinity_2ind_abs(salt_now,salt1,salt2,salt3,aa,bb)
+
+        implicit none
+
+        real(prec), intent(OUT) :: salt_now
+        real(prec), intent(IN)  :: salt1, salt2, salt3
+        real(prec), intent(IN)  :: aa, bb
+
+        ! needs checking
+        salt_now = aa*((1.0-bb)*(salt2) + bb*salt3)  + aa*salt1
+
+        return
+
+    end subroutine calc_salinity_2ind_abs
+
     elemental subroutine calc_temp_1ind_abs(temp_now,temp1,temp2,aa)
 
         implicit none
 
-        real(prec), intent(OUT) :: temp_now 
-        real(prec), intent(IN)  :: temp1, temp2
-        real(prec), intent(IN)  :: aa
+        real(wp), intent(OUT) :: temp_now 
+        real(wp), intent(IN)  :: temp1, temp2
+        real(wp), intent(IN)  :: aa
 
         temp_now = (1.0-aa)*temp1 + aa*temp2
 
@@ -791,9 +973,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: temp_now 
-        real(prec), intent(IN)  :: temp1, temp2, temp3 
-        real(prec), intent(IN)  :: aa, bb
+        real(wp), intent(OUT) :: temp_now 
+        real(wp), intent(IN)  :: temp1, temp2, temp3 
+        real(wp), intent(IN)  :: aa, bb
 
         ! needs checking
         temp_now = aa*((1.0-bb)*(temp2) + bb*temp3)  + aa*temp1 
@@ -802,19 +984,24 @@ contains
 
     end subroutine calc_temp_2ind_abs
 
-    elemental subroutine calc_precip_anom(pr_now,pr0,dT,f_p)
+    subroutine calc_precip_anom(pr_now,pr0,dT,betap)
         ! Calculate current precipitation value given 
         ! a temperature anomaly (independent of how dT was obtained)
 
         implicit none 
 
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr0 
-        real(prec), intent(IN)  :: dT       ! Current temperature anomaly
-        real(prec), intent(IN)  :: f_p 
+        real(wp), intent(OUT) :: pr_now(:,:,:)
+        real(wp), intent(IN)  :: pr0(:,:,:) 
+        real(wp), intent(IN)  :: dT(:,:,:)       ! Current temperature anomaly
+        real(wp), intent(IN)  :: betap(:,:) 
 
-        pr_now = pr0*exp(f_p*dT)
-        
+        ! Local variables
+        integer :: m
+
+        do m = 1, 12 
+           pr_now(:,:,m) = pr0(:,:,m)*exp(betap*dT(:,:,m))
+        end do 
+
         return
          
     end subroutine calc_precip_anom
@@ -825,9 +1012,9 @@ contains
 
         implicit none 
 
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr0 
-        real(prec), intent(IN)  :: frac 
+        real(wp), intent(OUT) :: pr_now 
+        real(wp), intent(IN)  :: pr0 
+        real(wp), intent(IN)  :: frac 
 
         pr_now = pr0*frac
         
@@ -839,9 +1026,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr0, pr1, pr2 
-        real(prec), intent(IN)  :: aa  
+        real(wp), intent(OUT) :: pr_now 
+        real(wp), intent(IN)  :: pr0, pr1, pr2 
+        real(wp), intent(IN)  :: aa  
         
         !pr_now = pr0 + aa*(pr2-pr1)
         !where (pr1.ne.0.0)
@@ -855,13 +1042,32 @@ contains
 
     end subroutine calc_precip_1ind
 
+    ! jablasco: precipitation miocene
+    elemental subroutine calc_precip_1ind_miocene(pr_now,pr0,pr1,pr2,pr3,aa)
+
+        implicit none
+
+        real(prec), intent(OUT) :: pr_now
+        real(prec), intent(IN)  :: pr0, pr1, pr2, pr3
+        real(prec), intent(IN)  :: aa
+
+        if (pr3.ne.0.0) then
+            pr_now = pr0 * (pr1 + aa*(pr2-pr1))/pr3
+        else
+            pr_now = pr0
+        end if
+
+        return
+
+    end subroutine calc_precip_1ind_miocene
+
     elemental subroutine calc_precip_2ind(pr_now,pr0,pr1,pr2,pr3,aa,bb)
 
         implicit none
 
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr0, pr1, pr2, pr3 
-        real(prec), intent(IN)  :: aa, bb 
+        real(wp), intent(OUT) :: pr_now 
+        real(wp), intent(IN)  :: pr0, pr1, pr2, pr3 
+        real(wp), intent(IN)  :: aa, bb 
 
         if ((pr1.ne.0.0).and.(pr2.ne.0.0)) then
            ! option 1 : strictly correct (needs checking)   
@@ -881,9 +1087,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr1, pr2
-        real(prec), intent(IN)  :: aa
+        real(wp), intent(OUT) :: pr_now 
+        real(wp), intent(IN)  :: pr1, pr2
+        real(wp), intent(IN)  :: aa
 
         pr_now = (1.0-aa)*pr1 + aa*pr2
 
@@ -895,9 +1101,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: pr_now 
-        real(prec), intent(IN)  :: pr1, pr2, pr3 
-        real(prec), intent(IN)  :: aa, bb
+        real(wp), intent(OUT) :: pr_now 
+        real(wp), intent(IN)  :: pr1, pr2, pr3 
+        real(wp), intent(IN)  :: aa, bb
 
         ! needs checking
         pr_now = (1.0-aa)*pr1 + aa*((1.0-bb)*(pr2) + bb*pr3)
@@ -912,9 +1118,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: sal_now
-        real(prec), intent(IN)  :: sal0
-        real(prec), intent(IN)  :: dS            ! Current anomaly value to impose
+        real(wp), intent(OUT) :: sal_now
+        real(wp), intent(IN)  :: sal0
+        real(wp), intent(IN)  :: dS            ! Current anomaly value to impose
 
         sal_now = sal0 + dS
 
@@ -922,7 +1128,7 @@ contains
 
     end subroutine calc_salinity_anom
 
-    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,time,domain)
+    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,f_p_ne,time,domain,basins)
         ! Given a predefined climate snapshot clim (already allocated),
         ! repopulate it with new snapshot based on current time 
 
@@ -930,23 +1136,25 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: clim 
         type(recon_param_class), intent(IN)       :: par 
-        real(prec),       intent(IN) :: z_srf(:,:) 
-        real(prec),       intent(IN) :: lapse(2) 
-        real(prec),       intent(IN) :: f_p 
-        real(prec),       intent(IN) :: time 
+        real(wp),       intent(IN) :: z_srf(:,:) 
+        real(wp),       intent(IN) :: lapse(2) 
+        real(wp),       intent(IN) :: f_p 
+        real(wp),       intent(IN) :: f_p_ne
+        real(wp),       intent(IN) :: time 
         character(len=*), intent(IN) :: domain 
+        real(wp),       intent(IN) :: basins(:,:)
 
         ! Local variables 
         integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j   
-        real(prec) :: t0, t1, alpha
+        real(wp) :: t0, t1, alpha
         character(len=56) :: varnm
-        real(prec) :: lapse_now_south, lapse_now_north  
-        real(prec), allocatable :: var0(:,:,:)
-        real(prec), allocatable :: var1(:,:,:)
-        real(prec), allocatable :: var(:,:,:)      
-        real(prec), allocatable :: z_srf_pd(:,:)  
+        real(wp) :: lapse_now_south, lapse_now_north  
+        real(wp), allocatable :: var0(:,:,:)
+        real(wp), allocatable :: var1(:,:,:)
+        real(wp), allocatable :: var(:,:,:)      
+        real(wp), allocatable :: z_srf_pd(:,:)  
 
-        real(prec) :: lapse_mon(12)   
+        real(wp) :: lapse_mon(12)   
         logical :: south 
 
         south = .FALSE. 
@@ -961,7 +1169,11 @@ contains
         allocate(var0(nx,ny,nm))
         allocate(var1(nx,ny,nm))
         allocate(var(nx,ny,nm))
-        allocate(z_srf_pd(nx,ny))        
+        allocate(z_srf_pd(nx,ny))    
+
+        ! Define beta_p from f_p
+        clim%beta_p = f_p    
+        where(basins .eq. 2.0 .or. basins .eq. 9.0) clim%beta_p = f_p * f_p_ne    
 
         ! Determine the indices of reconstruction time slices 
         ! bracketing the current time 
@@ -997,7 +1209,7 @@ contains
         if (t0 .ne. t1) then 
             alpha = (time-t0)/(t1-t0)
         else 
-            alpha = 0.0_prec 
+            alpha = 0.0_wp
         end if 
 
 
@@ -1014,7 +1226,7 @@ contains
                 ! Read monthly values directly 
                 call nc_read(par%clim_path,varnm,var0,start=[1,1,1,k0],count=[nx,ny,nm,1])
                 call nc_read(par%clim_path,varnm,var1,start=[1,1,1,k1],count=[nx,ny,nm,1])
-                write(*,*) "Dimension of var0, tas:", size(var0)
+                
             else 
 
                 ! Read annual values 
@@ -1103,7 +1315,7 @@ contains
             end if 
 
             ! Precip (scale by a fraction)
-            clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
+            clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(clim%beta_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
         end do
 
@@ -1120,20 +1332,20 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: ocn
         type(recon_param_class), intent(IN)       :: par
-        real(prec),       intent(IN) :: depth(:)
-        real(prec),       intent(IN) :: time
+        real(wp),       intent(IN) :: depth(:)
+        real(wp),       intent(IN) :: time
 
         ! Local variables 
         integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j
         integer    :: nz, nz0
-        real(prec) :: t0, t1, alpha
+        real(wp) :: t0, t1, alpha
         character(len=56) :: varnm
-        real(prec), allocatable :: var0(:,:,:,:)
-        real(prec), allocatable :: var1(:,:,:,:)
-        real(prec), allocatable :: var(:,:,:,:)
-        real(prec), allocatable :: depth0(:)
+        real(wp), allocatable :: var0(:,:,:,:)
+        real(wp), allocatable :: var1(:,:,:,:)
+        real(wp), allocatable :: var(:,:,:,:)
+        real(wp), allocatable :: depth0(:)
         integer,    allocatable :: mask3D(:,:,:)
-        real(prec), allocatable :: tocn3D(:,:,:)
+        real(wp), allocatable :: tocn3D(:,:,:)
 
         nt = size(par%ocn_times,1)
         nx = size(ocn%to_ann,1)
@@ -1192,7 +1404,7 @@ contains
         if (t0 .ne. t1) then
             alpha = (time-t0)/(t1-t0)
         else
-            alpha = 0.0_prec
+            alpha = 0.0_wp
         end if
 
         
@@ -1316,6 +1528,7 @@ contains
         call nml_read(filename,"snap","dSo_const",          par%dSo_const,      init=init_pars)
         call nml_read(filename,"snap","f_to",               par%f_to,           init=init_pars)
         call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
+        !call nml_read(filename,"snap","f_p_ne",             par%f_p_ne,         init=init_pars)
         call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
         
         call nml_read(filename,"snap_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
@@ -1325,6 +1538,11 @@ contains
         call nml_read(filename,"snap_hybrid","f_seas",      hpar%f_seas,       init=init_pars)
         call nml_read(filename,"snap_hybrid","f_to",        hpar%f_to,         init=init_pars)
         
+        ! For now, impose the value of f_p_ne=1.0 to use the unmodified value of f_p everywhere
+        ! ajr: note that this parameter is domain specific (to Greenland). 
+        ! Code should be adjusted to allow for variable f_p, but in a general way...
+        par%f_p_ne = 1.0_wp 
+
         return 
 
     end subroutine snapclim_par_load
@@ -1420,7 +1638,7 @@ contains
 
     end subroutine snapshot_par_load
 
-    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_stdev,domain)
+    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_p_ne,f_stdev,domain,basins)
         ! `names` is a vector of names in the netcdf file that 
         ! correspond to the fields to be read in:
         ! (1) 2D elevation field
@@ -1432,14 +1650,16 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: clim
         integer,          intent(IN) :: nx, ny  
-        real(prec),       intent(IN) :: lapse(2)
-        real(prec),       intent(IN) :: f_p 
-        real(prec),       intent(IN) :: f_stdev
+        real(wp),       intent(IN) :: lapse(2)
+        real(wp),       intent(IN) :: f_p 
+        real(wp),       intent(IN) :: f_p_ne
+        real(wp),       intent(IN) :: f_stdev
         character(len=*), intent(IN) :: domain   
-        
+        real(wp),       intent(IN) :: basins(:,:)       
+  
         ! Local variables
-        real(prec) :: lapse_mon(12)   
-        real(prec), allocatable :: rf(:,:,:)
+        real(wp) :: lapse_mon(12)   
+        real(wp), allocatable :: rf(:,:,:)
         character(len=56)  :: tmp_str 
         integer :: m 
         logical :: south 
@@ -1465,7 +1685,8 @@ contains
             clim%sf        = 0.0 
             clim%ta_ann    = 0.0 
             clim%ta_sum    = 0.0 
-            
+            clim%beta_p    = 0.0           
+ 
             clim%tsl       = 0.0 
             clim%tsl_ann   = 0.0 
             clim%tsl_sum   = 0.0 
@@ -1481,6 +1702,10 @@ contains
             ! Define mask based on elevations 
             clim%mask = 0.0 
             where(clim%z_srf .gt. 0.0) clim%mask = 1.0 
+
+            ! Define beta_p
+            clim%beta_p = f_p
+            where(basins .eq. 2.1 .or. basins .eq. 2.2 .or. basins .eq. 9.0) clim%beta_p = f_p * f_p_ne
 
             if (clim%par%clim_monthly) then 
                 ! Read in monthly climate fields, then get the averages
@@ -1616,7 +1841,7 @@ contains
             clim%pr     = clim%pr     * (1.0 + f_stdev*clim%pr_stdev_frac)
             
             ! Calculate sea-level corrected precip 
-            clim%prcor_ann = clim%pr_ann/exp(f_p*(clim%ta_ann-clim%tsl_ann))
+            clim%prcor_ann = clim%pr_ann/exp(clim%beta_p*(clim%ta_ann-clim%tsl_ann))
 
             do m = 1, 12
 
@@ -1630,7 +1855,7 @@ contains
                 end if 
 
                 ! Precip
-                clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(f_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
+                clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(clim%beta_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
             end do 
         
@@ -1673,15 +1898,15 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: ocn 
         integer,    intent(IN) :: nx, ny
-        real(prec), intent(IN) :: depth(:)
+        real(wp), intent(IN) :: depth(:)
 
         ! Local helping variables 
-        real(prec), allocatable :: depth0(:) 
+        real(wp), allocatable :: depth0(:) 
         integer,    allocatable :: mask3D(:,:,:)
-        real(prec), allocatable :: tocn3D(:,:,:)
-        real(prec), allocatable :: socn3D(:,:,:)
-        real(prec), allocatable :: tocn4D(:,:,:,:)
-        real(prec), allocatable :: socn4D(:,:,:,:)
+        real(wp), allocatable :: tocn3D(:,:,:)
+        real(wp), allocatable :: socn3D(:,:,:)
+        real(wp), allocatable :: tocn4D(:,:,:,:)
+        real(wp), allocatable :: socn4D(:,:,:,:)
         integer :: nz, nz0, m 
         integer :: i, j, k 
 
@@ -1726,7 +1951,7 @@ contains
                 ! Ocean will be a 2D field, set nz0 to 1 layer 
                 nz0 = 1
                 allocate(depth0(nz0))
-                depth0 = 0.0_prec 
+                depth0 = 0.0_wp
 
                 ! Allocate additional arrays
                 allocate(mask3D(nx,ny,nz0))
@@ -1859,7 +2084,7 @@ contains
 
         integer :: i, stat, n 
         character(len=256) :: str, str1 
-        real(prec) :: x(nmax), y(nmax) 
+        real(wp) :: x(nmax), y(nmax) 
 
         ! Open file for reading 
         open(f,file=filename,status="old")
@@ -1914,11 +2139,11 @@ contains
 
         type(series_2D_type), intent(OUT) :: series 
         character(len=*),     intent(IN)  :: filename 
-        real(prec),              intent(IN)  :: f_eem,f_glac,f_hol,f_seas
+        real(wp),              intent(IN)  :: f_eem,f_glac,f_hol,f_seas
 
         ! Local variables
         integer :: nm, nt, i  
-        real(prec), allocatable :: dTann(:), dataset(:), dTseas(:,:)
+        real(wp), allocatable :: dTann(:), dataset(:), dTseas(:,:)
 
         ! Initialize dimensions and data object 
         nm = 12 
@@ -1961,9 +2186,9 @@ contains
         implicit none 
 
         type(series_2D_type), intent(IN) :: series 
-        real(prec),           intent(IN) :: time 
+        real(wp),           intent(IN) :: time 
         
-        real(prec) :: var(size(series%var,1))
+        real(wp) :: var(size(series%var,1))
         
         ! Local variables
         integer :: nt, nm, i 
@@ -1984,8 +2209,8 @@ contains
         implicit none 
 
         type(series_type) :: series 
-        real(prec) :: time 
-        real(prec) :: var 
+        real(wp) :: time 
+        real(wp) :: var 
         integer :: nt, i 
 
         ! Interpolate series object
@@ -2000,11 +2225,11 @@ contains
 
         implicit none 
  
-        real(prec), dimension(:), intent(IN) :: x, y
-        real(prec), intent(IN) :: xout
-        real(prec) :: yout 
+        real(wp), dimension(:), intent(IN) :: x, y
+        real(wp), intent(IN) :: xout
+        real(wp) :: yout 
         integer :: i, j, n, nout 
-        real(prec) :: alph
+        real(wp) :: alph
 
         n    = size(x) 
 
@@ -2063,7 +2288,8 @@ contains
         if (allocated(clim%prcor_ann))          deallocate(clim%prcor_ann)
         if (allocated(clim%z_srf))              deallocate(clim%z_srf)
         if (allocated(clim%mask))               deallocate(clim%mask)
-        
+        if (allocated(clim%beta_p))             deallocate(clim%beta_p)        
+ 
         allocate(clim%tas(nx,ny,12))
         allocate(clim%tsl(nx,ny,12))
         allocate(clim%pr(nx,ny,12))
@@ -2080,6 +2306,7 @@ contains
         allocate(clim%prcor_ann(nx,ny))
         allocate(clim%z_srf(nx,ny))
         allocate(clim%mask(nx,ny))
+        allocate(clim%beta_p(nx,ny))
 
         return 
 
@@ -2168,4 +2395,151 @@ contains
 
     end subroutine parse_path
 
-end module snapclim 
+
+    subroutine smooth_gauss_2D(var,dx,f_sigma,mask_apply,mask_use)
+        ! Smooth out a field to avoid noise 
+        ! mask_apply designates where smoothing should be applied 
+        ! mask_use   designates which points can be considered in the smoothing filter 
+
+        implicit none
+
+        real(wp),   intent(INOUT) :: var(:,:)      ! [nx,ny] 2D variable
+        real(wp),   intent(IN)    :: dx 
+        real(wp),   intent(IN)    :: f_sigma  
+        logical,    intent(IN), optional :: mask_apply(:,:) 
+        logical,    intent(IN), optional :: mask_use(:,:) 
+
+        ! Local variables
+        integer  :: i, j, nx, ny, n, n2
+        real(wp) :: sigma    
+        real(wp), allocatable :: filter0(:,:), filter(:,:) 
+        real(wp), allocatable :: var_old(:,:) 
+        logical,  allocatable :: mask_apply_local(:,:) 
+        logical,  allocatable :: mask_use_local(:,:) 
+
+        nx    = size(var,1)
+        ny    = size(var,2)
+
+        ! Safety check
+        if (f_sigma .lt. 1.0_wp) then 
+            write(*,*) ""
+            write(*,*) "smooth_gauss_2D:: Error: f_sigma must be >= 1."
+            write(*,*) "f_sigma: ", f_sigma 
+            write(*,*) "dx:      ", dx 
+            stop 
+        end if 
+
+        ! Get smoothing radius as standard devation of Gaussian function
+        sigma = dx*f_sigma 
+
+        ! Determine half-width of filter as 2-sigma
+        n2 = 2*ceiling(f_sigma)
+
+        ! Get total number of points for filter window in each direction
+        n = 2*n2+1
+        
+        allocate(var_old(nx,ny))
+        allocate(mask_apply_local(nx,ny))
+        allocate(mask_use_local(nx,ny))
+        allocate(filter0(n,n))
+        allocate(filter(n,n))
+
+        ! Check whether mask_apply is available 
+        if (present(mask_apply)) then 
+            ! use mask_use to define neighborhood points
+            
+            mask_apply_local = mask_apply 
+
+        else
+            ! Assume that everywhere should be smoothed
+
+            mask_apply_local = .TRUE.
+        
+        end if
+
+        ! Check whether mask_use is available 
+        if (present(mask_use)) then 
+            ! use mask_use to define neighborhood points
+            
+            mask_use_local = mask_use 
+
+        else
+            ! Assume that mask_apply also gives the points to use for smoothing 
+
+            mask_use_local = mask_apply_local
+        
+        end if
+
+        ! Calculate default 2D Gaussian smoothing kernel
+        filter0 = gauss_values(dx,dx,sigma=sigma,n=n)
+
+        var_old = var 
+
+        do j = n2+1, ny-n2
+        do i = n2+1, nx-n2
+
+            if (mask_apply_local(i,j)) then 
+                ! Apply smoothing to this point 
+
+                ! Limit filter input to neighbors of interest
+                filter = filter0 
+                where(.not. mask_use_local(i-n2:i+n2,j-n2:j+n2)) filter = 0.0
+
+                ! If neighbors are available, normalize and perform smoothing  
+                if (sum(filter) .gt. 0.0) then 
+                    filter = filter/sum(filter)
+                    var(i,j) = sum(var_old(i-n2:i+n2,j-n2:j+n2)*filter) 
+                end if  
+
+            end if 
+
+        end do 
+        end do 
+
+        return 
+
+    end subroutine smooth_gauss_2D
+
+    function gauss_values(dx,dy,sigma,n) result(filt)
+        ! Calculate 2D Gaussian smoothing kernel
+        ! https://en.wikipedia.org/wiki/Gaussian_blur
+
+        implicit none 
+
+        real(wp), intent(IN) :: dx 
+        real(wp), intent(IN) :: dy 
+        real(wp), intent(IN) :: sigma 
+        integer,  intent(IN) :: n 
+        real(wp) :: filt(n,n) 
+
+        ! Local variables 
+        real(wp) :: x, y  
+        integer  :: n2, i, j, i1, j1  
+
+        if (mod(n,2) .ne. 1) then 
+            write(*,*) "gauss_values:: error: n can only be odd."
+            write(*,*) "n = ", n 
+        end if 
+
+        n2 = (n-1)/2 
+
+        do j = -n2, n2 
+        do i = -n2, n2 
+            x = i*dx 
+            y = j*dy 
+
+            i1 = i+1+n2 
+            j1 = j+1+n2 
+            filt(i1,j1) = 1.0/(2.0*pi*sigma**2)*exp(-(x**2+y**2)/(2*sigma**2))
+
+        end do 
+        end do 
+        
+        ! Normalize to ensure sum to 1
+        filt = filt / sum(filt)
+
+        return 
+
+    end function gauss_values
+
+end module snapclim

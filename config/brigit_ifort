@@ -1,9 +1,10 @@
-FC = ifort
+FC  = mpiifort
+#FC  = ifort
 
 INC_NC  = -I/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/include
 LIB_NC  = -L/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/lib -lnetcdff -L/opt/ohpc/pub/libs/intel/impi/hdf5/1.10.5/lib -L/opt/ohpc/pub/libs/intel/impi/netcdf/4.6.3/lib -lnetcdf -lnetcdf -lhdf5_hl -lhdf5 -lz -lm
 
-YELMOROOT = /home/jablasco/yelmo-ucm/yelmo_v1.5
+YELMOROOT = /home/jablasco/yelmo-ucm/yelmo_v1.75
 #YELMOROOT = /home/jablasco/yelmo-ucm/yelmo_alex_stable
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
@@ -12,7 +13,7 @@ LISROOT = ${HOME}/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
-FFLAGS  = -module $(objdir) -L$(objdir)
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
 ifeq ($(parallel), 1)
     # Overwrite default choices with openmp relevant choices 
@@ -21,7 +22,7 @@ ifeq ($(parallel), 1)
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
-    FFLAGS  = -module $(objdir) -L$(objdir) -qopenmp 
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
 
 endif 
 

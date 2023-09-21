@@ -1,10 +1,16 @@
 Makefile
 libyelmox
 yelmo
+isostasy
+rembo1
 ice_data
 tests/plots
 output
+tmp
 tests/.DS_Store
 .DS_Store
 runylmox.js
-rembo1
+check_sim.x
+git_yelmo.txt
+maps/*.nc
+.vscode

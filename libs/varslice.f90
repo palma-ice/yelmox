@@ -51,10 +51,12 @@ module varslice
     end type 
 
     private 
+    public :: varslice_param_class
     public :: varslice_class
     public :: varslice_update
     public :: varslice_init_nml 
     public :: varslice_init_arg
+    public :: varslice_init_data
     public :: varslice_end 
 
 contains
@@ -789,7 +791,7 @@ contains
         character(len=*),       intent(IN)    :: filename
         character(len=*),       intent(IN)    :: group
         character(len=*),       intent(IN), optional :: domain
-        character(len=*),       intent(IN), optional :: grid_name  
+        character(len=*),       intent(IN), optional :: grid_name
         logical,                intent(IN), optional :: verbose 
         ! Local variables 
         
@@ -1002,7 +1004,25 @@ contains
 
         end select
 
-        return 
+        ! Make sure all axis variables exist
+        if (.not. allocated(vs%x)) then 
+            allocate(vs%x(1))
+            vs%x = 0.0_wp 
+        end if 
+        if (.not. allocated(vs%y)) then 
+            allocate(vs%y(1))
+            vs%y = 0.0_wp 
+        end if 
+        if (.not. allocated(vs%lev)) then 
+            allocate(vs%lev(1))
+            vs%lev = 0.0_wp 
+        end if 
+        if (.not. allocated(vs%time)) then 
+            allocate(vs%time(1))
+            vs%time = 0.0_wp 
+        end if 
+
+        return  
 
     end subroutine varslice_init_data
 
@@ -1024,14 +1044,13 @@ contains
 
     end subroutine varslice_end
 
-    subroutine varslice_par_load(par,filename,group,domain,grid_name,init,verbose)
+    subroutine varslice_par_load(par,filename,group,domain,grid_name,verbose)
 
         type(varslice_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: group
         character(len=*), intent(IN), optional :: domain
-        character(len=*), intent(IN), optional :: grid_name  
-        logical, optional :: init 
+        character(len=*), intent(IN), optional :: grid_name   
         logical, optional :: verbose 
 
         ! Local variables
@@ -1040,7 +1059,6 @@ contains
         logical  :: print_summary 
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
 
         print_summary = .TRUE. 
         if (present(verbose)) print_summary = verbose 

@@ -4,13 +4,32 @@
     time_equil      = 10.0              ! [yr] Equilibration time 
     time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     dtt             = 5.0               ! [yr] Main loop timestep 
-    dt1D_out        = 100.0             ! [yr] Frequency of writing 1D output files 
-    dt2D_out        = 2000.0             ! [yr] Frequency of writing 2D output files 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = True             ! Calculate transient climate? 
     with_ice_sheet  = True              ! Is the ice sheet active?
     optimize        = False             ! Should basal friction be optimized?
     
+/
+
+&tm_1D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 1.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
+&tm_2D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 200.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_2Dsm
+    method          = "const"           ! "const", "file", "times"
+    dt              = 50.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
 /
 
 &opt_L21
@@ -35,6 +54,7 @@
     domain          = "Pirineos"
     grid_name       = "Pirineos"
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     restart         = "None"
     log_timestep    = False 
@@ -51,13 +71,13 @@
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 5.0               ! Predictor-corrector tolerance 
+    pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 1.0               ! Predictor-corrector tolerance 
     
 /
 
 &ytopo
-    solver              = "impl-upwind"     ! "expl", "impl-upwind"
+    solver              = "impl-lis"        ! "expl", "impl-lis"
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
@@ -67,20 +87,28 @@
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
-    calv_H_lim          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     calv_tau            = 1.0               ! [a] Characteristic calving time
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
     H_min_flt           = 100.0             ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <  = sd_min)     = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >  = sd_max)     = calv_max  
-    calv_max            = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+    calv_grnd_max       = 10.0              ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     grad_lim            = 0.1               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    grad_lim_zb         = 0.05              ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gl_sep_nx           = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    diffuse_bmb_shlf    = False             ! Allow bmb_shlf to permeate inland at the grounding line 
+    gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
+    gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
     fmb_scale           = 10.0              ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
-    kt                  = 0.0001            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter (L21 use 0.0025)
+    k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
+    kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
+    kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
+    Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
+    zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
+    zb_sigma            = 0.0               ! [m] Gaussian filtering of bedrock for calving transition to deep ocean
 /
 
 &ydyn
@@ -430,12 +458,22 @@
 
 /
 
-&isostasy 
-    method       = 2                    ! 0: constant lithosphere depression; 1: LLRA (not tested); 2: ELRA
-    fname_kelvin = "input/kelvin.res"   ! File containing precalculated zero-order Kelvin function values 
-    dt           = 50.0                 ! [yr] Time step to recalculate bedrock uplift rate 
-    tau          = 3000.0               ! [yr] Relaxation time 
-    D_lith       = 9.87e24              ! [N-m] Flexural rigidity 
-    R_lith       = 131910.0             ! [m] Radius of relative stiffness
-    
+&isos
+    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA, 4: ELVA
+    dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
+    dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
+    He_lith         = 88.0                  ! [km] Effective elastic thickness lithosphere
+    visc            = 1e21                  ! [Pa s] Asthenosphere's viscosity, visc=1e21 for Bueler et al (2007)  
+    tau             = 3000.0                ! [yr] Relaxation time 
+
+    ! Physical constants
+    E               = 66.0  !100.0          ! [GPa] Young's modulus | 100 for Coulon et al (2021) | 66  for Bueler et al (2007) 
+    nu              = 0.5   !0.25           ! [-]   Poisson's ratio: 0.25 for Coulon et al (2021) | 0.5 for Bueler et al (2007) 
+    rho_ice         = 910.0                 ! [kg/m^3]
+    rho_sw          = 1028.0                ! [kg/m^3] 
+    rho_w           = 1000.0                ! [kg/m^3] 
+    rho_a           = 3300.0                ! [kg/m^3] 3370 used by Coulon et al (2021)
+    g               = 9.81                  ! [m/s^2]
+    r_earth         = 6.378e6               ! [m]  Earth's radius, Coulon et al (2021) 
+    m_earth         = 5.972e24              ! [kg] Earth's mass,   Coulon et al (2021) 
 /

@@ -257,7 +257,7 @@ contains
             call smbpal_update_itm(smb,daily,t2m_daily,pr_daily,sf_daily,z_srf,H_ice,time_bp, &
                                    file_out_mon,file_out_day,write_init,calc_mon,write_now)
         
-        else 
+        else
             ! PDD method 
 
             allocate(t2m_ann(size(t2m,1),size(t2m,2)))
@@ -285,16 +285,18 @@ contains
                 
                 call calc_temp_effective(tmp4,smb%now%t2m-273.15,smb%now%sigma)
                 PDDs_ann = PDDs_ann + tmp4*30.0
+
             end do 
 
             ! Populate the ann object with the now object, then calculate the annual values 
             smb%ann = smb%now 
+             
             call smbpal_update_pdd(smb%ann,smb%par,PDDs_ann,z_srf,H_ice,t2m_ann,pr_ann,sf_ann)
 
             ! Note: annual values are output with units of [mm/a]
 
         end if 
-
+        
         ! Annual I/O 
         if (write_out_now) then
             if (init_now) call smbpal_write_init(smb%par,file_out,z_srf,H_ice)
@@ -352,12 +354,20 @@ contains
         insol_time = time_bp
         if (smb%par%const_insol) insol_time = smb%par%const_kabp*1e3
         
+! HEAD
         ! Set sigma to snow sigma everywhere for pdd calcs
-        smb%now%sigma = par%sigma_snow
+     !   smb%now%sigma = smb%par%sigma_snow
         
+!END HEAD
+
         ! Fill in local versions for easier access 
         par = smb%par 
         now = smb%now 
+      
+        ! jablasco
+        ! Set sigma to snow sigma everywhere for pdd calcs
+        !smb%now%sigma = par%sigma_snow
+        now%sigma = par%sigma_snow
 
         ! First calculate PDDs for the whole year (input to itm)
         now%PDDs = 0.0 
@@ -620,7 +630,7 @@ contains
 
         return 
 
-    end function calc_snowfrac 
+    end function calc_snowfrac
 
     ! =======================================================
     !
@@ -641,7 +651,7 @@ contains
         call nc_write_dim(filename,"yc",x=par%y)
         call nc_write_dim(filename,"day",  x=1,nx=360,dx=1)
         call nc_write_dim(filename,"month",x=1,nx=12,dx=1)
-        call nc_write_dim(filename,"time",x=0.0,units="ka BP",unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",x=0.0,units="kiloyears",unlimited=.TRUE.)
         
         ! Write the 2D latitude field to file
         call nc_write(filename,"lat2D",par%lats,dim1="xc",dim2="yc")
@@ -651,7 +661,7 @@ contains
 
         return 
 
-    end subroutine smbpal_write_init 
+    end subroutine smbpal_write_init
 
     subroutine smbpal_write(now,filename,time_bp,step,nstep)
 
