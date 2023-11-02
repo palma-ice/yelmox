@@ -507,11 +507,11 @@ def generate_jobscript(template,cmd,jobname,group,email,qos,wall,partition,omp,q
                         "{} not in {}".format(qos,"-".join(queues))
             raise Exception(error_msg)
 
-        # Check that wall time was set properly
-        if wall > queues[qos]['wall']:
-            error_msg = "Error generating jobscript. Wall time too large for desired queue. \n" \
-                        "wall={} greater than limit of {} for queue '{}'".format(wall,queues[qos]['wall'],qos)
-            raise Exception(error_msg)
+        # # Check that wall time was set properly
+        # if wall > queues[qos]['wall']:
+        #     error_msg = "Error generating jobscript. Wall time too large for desired queue. \n" \
+        #                 "wall={} greater than limit of {} for queue '{}'".format(wall,queues[qos]['wall'],qos)
+        #     raise Exception(error_msg)
 
     # If omp has been set, generate a jobscript string with appropriate settings
     if omp > 0:
