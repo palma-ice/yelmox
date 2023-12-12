@@ -208,11 +208,13 @@ program yelmox
     ! Update REMBO, with correct topography, let it equilibrate for several years 
     ! do n = 1, 100
     !     time = time_init + real(n,8)    
-    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+    !                                     real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     ! end do 
     ! rembo_ann%time_emb = time_init 
     ! rembo_ann%time_smb = time_init  
-    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -456,7 +458,8 @@ if (calc_transient_climate) then
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! call REMBO1
-        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
         
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
