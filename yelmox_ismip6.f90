@@ -307,7 +307,7 @@ program yelmox_ismip6
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
 
 
     if (trim(domain) .eq. "Antarctica") then 
@@ -1328,7 +1328,7 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
                         
         ! External data
-        call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Comparison with present-day 

@@ -156,7 +156,7 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(time_init,8))
@@ -180,10 +180,10 @@ program yelmox
 
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
-                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
-                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
-                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
+    call isos_init_state(isos1,z_bed=real(yelmo1%bnd%z_bed,dp),H_ice=real(yelmo1%tpo%now%H_ice,dp), &
+                                    z_sl=real(yelmo1%bnd%z_sl,dp),z_bed_ref=real(yelmo1%bnd%z_bed_ref,dp), &
+                                    H_ice_ref=real(yelmo1%bnd%H_ice_ref,dp), &
+                                    z_sl_ref=real(yelmo1%bnd%z_sl*0.0,dp),time=real(time,dp))
                                     
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -407,7 +407,7 @@ end if
         ! == ISOSTASY ==========================================================
         call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
         yelmo1%bnd%z_bed = isos1%now%z_bed
-
+        
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
         ! == Yelmo ice sheet ===================================================
@@ -859,7 +859,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! External data
-        call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
  
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &

@@ -190,6 +190,11 @@ contains
 
                 call ismip6_grl_forcing_init(ism,filename,domain,grid_name,gcm,scenario)
 
+            case("nahosmip-ant")
+
+                call nahosmip_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario, &
+                                                                    experiment,shlf_collapse)
+
             case DEFAULT
 
                 write(*,*) "ismip6_forcing_init:: Error: domain not recognized."
@@ -220,7 +225,11 @@ contains
             case("Greenland")
 
                 call ismip6_grl_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
-                
+            
+            case("nahosmip-ant")
+
+                call nahosmip_ant_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
+
             case DEFAULT
 
                 write(*,*) "ismip6_forcing_init:: Error: domain not recognized."
@@ -1482,5 +1491,545 @@ end if
         return
 
     end subroutine calc_iceberg_island
+
+
+
+
+
+
+
+
+
+
+! ==== NAHOSMIP =============
+
+    ! Two routines: nahosmip_ant_forcing_init, nahosmip_ant_forcing_update
+
+    subroutine nahosmip_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment,shlf_collapse)
+
+        implicit none 
+
+        type(ismip6_forcing_class), intent(INOUT) :: ism
+        character(len=*), intent(IN) :: filename
+        character(len=*), intent(IN) :: domain 
+        character(len=*), intent(IN) :: grid_name 
+        character(len=*), intent(IN), optional :: gcm
+        character(len=*), intent(IN), optional :: scenario
+        character(len=*), intent(IN), optional :: experiment
+        logical,          intent(IN), optional :: shlf_collapse
+
+        ! Local variables 
+        character(len=256) :: gcm_now
+        character(len=256) :: scenario_now
+        
+        character(len=256) :: group_prefix 
+
+        character(len=256) :: grp_ts_ref 
+        character(len=256) :: grp_pr_ref 
+        character(len=256) :: grp_smb_ref 
+        character(len=256) :: grp_ts_hist 
+        character(len=256) :: grp_pr_hist 
+        character(len=256) :: grp_smb_hist 
+        character(len=256) :: grp_ts_proj 
+        character(len=256) :: grp_pr_proj 
+        character(len=256) :: grp_smb_proj 
+        
+        character(len=256) :: grp_to_ref 
+        character(len=256) :: grp_so_ref 
+        character(len=256) :: grp_tf_ref 
+        character(len=256) :: grp_tf_cor
+        character(len=256) :: grp_to_hist 
+        character(len=256) :: grp_so_hist 
+        character(len=256) :: grp_tf_hist 
+        character(len=256) :: grp_to_proj 
+        character(len=256) :: grp_so_proj 
+        character(len=256) :: grp_tf_proj
+
+        character(len=256) :: grp_mask_shlf_proj
+        
+        integer  :: iloc, k 
+        real(wp) :: tmp
+        real(wp) :: time_par_proj(3) 
+        real(wp) :: time_par_proj_msk(3) 
+
+        ! First determine whether gcm+scenario provided or experiment
+        ! obtain valid values for gcm and scenario to start.
+        if (present(experiment)) then 
+            ! Experiment provided, obtain gcm+scenario from it 
+
+            if (trim(experiment) .eq. "ctrl" .or. trim(experiment) .eq. "ctrl0") then 
+                gcm_now      = trim(experiment)
+                scenario_now = trim(experiment)
+            else 
+                iloc = index(experiment,"_")
+                if (iloc == 0) then
+                    write(error_unit,*) "nahosmip_ant_forcing_init:: Error: experiment &
+                    &argument must be defined as gcm_scenario."
+                    write(error_unit,*) "experiment = ", trim(experiment)
+                    stop
+                end if
+
+                gcm_now = experiment(1:iloc-1)
+                scenario_now = experiment(iloc+1:len_trim(experiment))
+
+            end if 
+
+        else if (present(gcm) .and. present(scenario)) then 
+            ! gcm and scenario provided go forward as usual 
+
+            gcm_now      = trim(gcm)
+            scenario_now = trim(scenario)
+
+        else
+            ! Arguments not provided
+            write(error_unit,*) "nahosmip_ant_forcing_init:: Error: gcm+scenario or experiment must be provided &
+            &as arguments."
+            stop
+        end if
+
+        ! Special case for control runs, use "NorESM1-M_RCP26-repeat"
+        if (trim(scenario_now) .eq. "ctrl" .or. trim(scenario_now) .eq. "ctrl0") then
+            ! Assign specific gcm+scenario for control runs
+
+            ism%gcm        =  "NorESM1-M"
+            ism%scenario   =  "RCP26-repeat"
+            ism%experiment = "NorESM1-M_RCP26-repeat"
+            
+            ! Save control run name ("ctrl0" or "ctrl") here
+            ism%ctrl_run_type = trim(scenario_now)
+
+        else
+            ! Define the current experiment characteristics
+
+            ism%gcm        = trim(gcm_now)
+            ism%scenario   = trim(scenario_now) 
+            ism%experiment = trim(ism%gcm)//"_"//trim(ism%scenario) 
+
+            ! Not a control simulation
+            ism%ctrl_run_type = "none"
+
+        end if
+
+        ! Finally, whether shlf_collapse should be included 
+        ism%shlf_collapse = .FALSE. 
+        if (present(shlf_collapse)) ism%shlf_collapse = shlf_collapse
+
+        write(*,*)
+        write(*,*) "nahosmip_ant_forcing_init:: summary"
+        write(*,*) "ctrl_run_type: ", trim(ism%ctrl_run_type)
+        write(*,*) "gcm:           ", trim(ism%gcm)
+        write(*,*) "scenario:      ", trim(ism%scenario)
+        write(*,*) "experiment:    ", trim(ism%experiment)
+        write(*,*) "shlf_collapse: ", ism%shlf_collapse
+        write(*,*) 
+
+        select case(trim(ism%experiment))
+
+            case("CCSM4_RCP85",                 &
+                 "CESM2-WACCM_ssp585",          &
+                 "CESM2-WACCM_ssp585-repeat",   &
+                 "HadGEM2-ES_RCP85",            &
+                 "HadGEM2-ES_RCP85-repeat",     &
+                 "NorESM1-M_RCP26-repeat",      &
+                 "NorESM1-M_RCP85-repeat",      &
+                 "UKESM1-0-LL_ssp126",          &
+                 "UKESM1-0-LL_ssp585",          &
+                 "UKESM1-0-LL_ssp585-repeat")
+                ! Control and scenarios use the same files 
+                ! since ctrl specific forcing adapted in update step 
+
+                group_prefix = "gcm_"
+
+                grp_ts_ref   = trim(group_prefix)//"ts_ref"
+                grp_pr_ref   = trim(group_prefix)//"pr_ref"
+                grp_smb_ref  = trim(group_prefix)//"smb_ref"
+                grp_ts_hist  = trim(group_prefix)//"ts_hist"
+                grp_pr_hist  = trim(group_prefix)//"pr_hist"
+                grp_smb_hist = trim(group_prefix)//"smb_hist"
+                grp_ts_proj  = trim(group_prefix)//"ts_proj"
+                grp_pr_proj  = trim(group_prefix)//"pr_proj"
+                grp_smb_proj = trim(group_prefix)//"smb_proj"
+                
+                grp_to_ref   = "to_ref"
+                grp_so_ref   = "so_ref"
+                grp_tf_ref   = "tf_ref"
+                grp_tf_cor   = "tf_cor"
+                grp_to_hist  = trim(group_prefix)//"to_hist"
+                grp_so_hist  = trim(group_prefix)//"so_hist"
+                grp_tf_hist  = trim(group_prefix)//"tf_hist"
+                grp_to_proj  = trim(group_prefix)//"to_proj"
+                grp_so_proj  = trim(group_prefix)//"so_proj"
+                grp_tf_proj  = trim(group_prefix)//"tf_proj"
+
+                grp_mask_shlf_proj = trim(group_prefix)//"mask_shlf_proj"
+                
+            case DEFAULT 
+
+                write(*,*) "nahosmip_ant_forcing_init:: Error: exeriment (== gcm_scenario) not recognized."
+                write(*,*) "experiment = ", trim(ism%experiment) 
+                write(*,*) "gcm        = ", trim(ism%gcm) 
+                write(*,*) "scenario   = ", trim(ism%scenario) 
+
+                stop 
+
+        end select
+
+        ! Adjust time_par_proj manually here, since there are inconsistencies between the projection runs
+        ! (some runs end in 2299, 2300, or 2301). Hard code choices here to avoid many changes
+        ! in parameter file
+        select case(trim(ism%experiment))
+
+            case("CESM2-WACCM_ssp585","HadGEM2-ES_RCP85")
+                ! Cases that end on year 2299
+
+                time_par_proj     = [1995.0,2299.0,1.0_wp]
+                time_par_proj_msk = [1995.0,2300.0,1.0_wp]
+
+            case("UKESM1-0-LL_ssp585")
+                ! Cases that end on year 2301
+            
+                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj_msk = [1995.0,2301.0,1.0_wp]
+
+            case DEFAULT
+                ! Set negative values to time_par so that values are used directly from the file
+
+                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj_msk = [-1.0_wp,-1.0_wp,-1.0_wp]
+
+        end select
+
+        ! Note: reference fields are hard-coded in the namelist file to come from the deafult
+        ! reference simulation, which is NorESM1-M_rcp26-repeat
+
+        ! Note: for the reference and historical fields, always use the time_par from the namelist file.
+        
+        ! Initialize all variables from namelist entries 
+
+        ! General fields 
+        call varslice_init_nml_ismip6(ism%basins,  filename,"imbie_basins",domain,grid_name,ism%gcm,ism%scenario)
+        
+        ! Amospheric fields
+        call varslice_init_nml_ismip6(ism%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%pr_ref,  filename,trim(grp_pr_ref), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%smb_ref, filename,trim(grp_smb_ref),domain,grid_name,ism%gcm,ism%scenario)
+        
+        call varslice_init_nml_ismip6(ism%ts_hist, filename,trim(grp_ts_hist), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%smb_hist,filename,trim(grp_smb_hist),domain,grid_name,ism%gcm,ism%scenario)
+
+        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+
+        ! Oceanic fields
+        call varslice_init_nml_ismip6(ism%to_ref,  filename,trim(grp_to_ref),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%so_ref,  filename,trim(grp_so_ref),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_ref,  filename,trim(grp_tf_ref),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_cor,  filename,trim(grp_tf_cor),domain,grid_name,ism%gcm,ism%scenario)
+
+        call varslice_init_nml_ismip6(ism%to_hist, filename,trim(grp_to_hist),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%so_hist, filename,trim(grp_so_hist),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_hist, filename,trim(grp_tf_hist),domain,grid_name,ism%gcm,ism%scenario)
+
+        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+
+        if (ism%shlf_collapse) then 
+            ! Shelf collapse fields
+            call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj), &
+                                                domain,grid_name,ism%gcm,ism%scenario,time_par_proj_msk)
+        end if
+
+        ! Load time-independent fields
+
+        ! Amospheric fields 
+        call varslice_update(ism%ts_ref)
+        call varslice_update(ism%pr_ref)
+        call varslice_update(ism%smb_ref)
+
+        ! Oceanic fields
+        call varslice_update(ism%to_ref)
+        call varslice_update(ism%so_ref)
+        call varslice_update(ism%tf_ref)
+        call varslice_update(ism%tf_cor)
+
+        ! Remove missing values from the ocean, if possible
+        do k = 1, size(ism%to_ref%var,3)
+            if (count(ism%to_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = minval(ism%to_ref%var(:,:,k,1),mask=ism%to_ref%var(:,:,k,1) .ne. mv)
+                where(ism%to_ref%var(:,:,k,1) .eq. mv) 
+                    ism%to_ref%var(:,:,k,1) = tmp
+                end where 
+            end if
+            if (count(ism%so_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%so_ref%var(:,:,k,1),mask=ism%so_ref%var(:,:,k,1) .ne. mv)
+                where(ism%so_ref%var(:,:,k,1) .eq. mv) 
+                    ism%so_ref%var(:,:,k,1) = tmp
+                end where 
+            end if
+            if (count(ism%tf_ref%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%tf_ref%var(:,:,k,1),mask=ism%tf_ref%var(:,:,k,1) .ne. mv)
+                where(ism%tf_ref%var(:,:,k,1) .eq. mv) 
+                    ism%tf_ref%var(:,:,k,1) = tmp
+                end where 
+            end if
+        end do
+
+        ! Initialize iceberg_mask variable in case it is needed
+        allocate(ism%iceberg_mask(size(ism%to_ref%var,1),size(ism%to_ref%var,2)))
+        ism%iceberg_mask = 0.0
+
+        return 
+
+    end subroutine nahosmip_ant_forcing_init
+
+    subroutine nahosmip_ant_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
+
+        implicit none 
+
+        type(ismip6_forcing_class), intent(INOUT) :: ism
+        real(wp), intent(IN) :: time
+        logical,  intent(IN), optional :: use_ref_atm 
+        logical,  intent(IN), optional :: use_ref_ocn 
+
+        ! Local variables 
+        integer  :: k 
+        real(wp) :: tmp 
+        character(len=56) :: slice_method 
+
+        ! Get slices for current time
+
+        slice_method = "extrap" 
+
+        ! === Atmospheric fields ==================================
+        
+        if (trim(ism%ctrl_run_type) .eq. "ctrl0") then 
+            ! For control scenario "ctrl0" with no variability at all, 
+            ! override time choices and set control atm and ocn 
+
+            ! Set atm fields to reference values (ie, zero anomaly) 
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+        
+        else if (time .lt. 1950) then
+            ! No data available, impose climatological mean 
+
+            ! Set atm fields to reference values (ie, zero anomaly) 
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+        
+        else if (time .ge. 1950 .and. time .lt. 2015) then
+            ! Get data from historical forcing datasets
+
+            call varslice_update(ism%ts_hist, [time],method=slice_method)
+            call varslice_update(ism%pr_hist, [time],method=slice_method)
+            call varslice_update(ism%smb_hist,[time],method=slice_method)
+
+            ism%ts  = ism%ts_hist
+            ism%pr  = ism%pr_hist
+            ism%smb = ism%smb_hist
+
+        else if (time .ge. 2015 .and. time .le. 2300) then
+            ! Get data from projection forcing datasets
+
+            call varslice_update(ism%ts_proj, [time],method=slice_method)
+            call varslice_update(ism%pr_proj, [time],method=slice_method)
+            call varslice_update(ism%smb_proj,[time],method=slice_method) 
+
+            ism%ts  = ism%ts_proj
+            ism%pr  = ism%pr_proj
+            ism%smb = ism%smb_proj
+
+        else ! time .gt. 2300
+            ! Take the average of the last 10 years of projection forcing data
+
+            call varslice_update(ism%ts_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%pr_proj, [2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%smb_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+
+            ism%ts  = ism%ts_proj
+            ism%pr  = ism%pr_proj
+            ism%smb = ism%smb_proj
+
+        end if
+
+        ! === Oceanic fields ==================================
+        
+        if (trim(ism%ctrl_run_type) .eq. "ctrl0") then 
+            ! For control scenario "ctrl0" with no variability at all, 
+            ! override time choices and set control atm and ocn 
+
+            ! Set ocn fields to reference values 
+            ism%to = ism%to_ref 
+            ism%so = ism%so_ref 
+            ism%tf = ism%tf_ref 
+
+        else if (time .lt. 1950) then 
+            ! No data available, impose climatological mean 
+
+            ism%to = ism%to_ref
+            ism%so = ism%so_ref
+            ism%tf = ism%tf_ref
+
+        else if (time .ge. 1950 .and. time .lt. 2015) then
+            ! Historic 
+
+            ism%to = ism%to_ref
+            ism%so = ism%so_ref
+            ism%tf = ism%tf_ref
+
+            ! Oceanic fields 
+            call varslice_update(ism%to_hist,[time],method=slice_method)
+            call varslice_update(ism%so_hist,[time],method=slice_method)
+            call varslice_update(ism%tf_hist,[time],method=slice_method)
+
+            ism%to = ism%to_proj
+            ism%so = ism%so_proj
+            ism%tf = ism%tf_proj
+
+        else if (time .ge. 2015 .and. time .le. 2300) then
+            ! Projection period 1 
+
+            call varslice_update(ism%to_proj,[time],method=slice_method)
+            call varslice_update(ism%so_proj,[time],method=slice_method)
+            call varslice_update(ism%tf_proj,[time],method=slice_method)
+
+            ism%to = ism%to_proj
+            ism%so = ism%so_proj
+            ism%tf = ism%tf_proj
+
+        else ! time .gt. 2300
+            ! Projection period 2 
+
+            call varslice_update(ism%to_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%so_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+            call varslice_update(ism%tf_proj,[2290.0_wp,2300.0_wp],method="range_mean")
+
+            ism%to = ism%to_proj
+            ism%so = ism%so_proj
+            ism%tf = ism%tf_proj
+
+        end if
+
+        ! === Mask shelf collapse ==========================
+
+        if (ism%shlf_collapse) then 
+            if (time .lt. 2015) then
+                
+                ! Note: the year 2000 is used for this mask, however, any value from 2000 to 2015 
+                ! could be used as nothing really changes with the mask in the historical period.
+                ! Retreat only begins to be seen some decades later.
+                call varslice_update(ism%mask_shlf_proj,[2000.0_wp],method=slice_method)
+                ism%mask_shlf = ism%mask_shlf_proj
+
+            else if (time .ge. 2015 .and. time .le. 2300) then
+
+                call varslice_update(ism%mask_shlf_proj,[time],method=slice_method)
+                ism%mask_shlf = ism%mask_shlf_proj
+            
+            else
+
+                call varslice_update(ism%mask_shlf_proj,[2300.0_wp],method=slice_method)
+                ism%mask_shlf  = ism%mask_shlf_proj
+
+            end if
+        end if 
+
+        ! === Additional calculations ======================
+
+        if (trim(ism%ctrl_run_type) .eq. "ctrl") then 
+            ! For control scenario "ctrl", override above choices and 
+            ! set control atm and ocn for projection time periods.
+            ! This means historical variability is allowed, but 
+            ! then the climatological average is imposed for the future.
+            ! See protocol at: https://www.climate-cryosphere.org/wiki/index.php?title=ISMIP6-Projections2300-Antarctica#Initialization.2C_historical_run.2C_control_run.2C_and_projection_runs
+
+            if (time .ge. 2015) then
+
+                ! Set atm fields to reference values (ie, zero anomaly) 
+                ism%ts  = ism%ts_ref 
+                ism%pr  = ism%pr_ref 
+                ism%smb = ism%smb_ref 
+
+                ! Since atm fields are anomalies, also set actual variable to zero 
+                ism%ts%var  = 0.0_wp 
+                ism%pr%var  = 0.0_wp 
+                ism%smb%var = 0.0_wp 
+            
+                ! Set ocn fields to reference values 
+                ism%to = ism%to_ref 
+                ism%so = ism%so_ref 
+                ism%tf = ism%tf_ref 
+
+            end if
+
+        end if 
+        
+        ! If desired, override other choices and use reference atm fields
+        if (present(use_ref_atm)) then 
+        if (use_ref_atm) then  
+
+            ism%ts  = ism%ts_ref 
+            ism%pr  = ism%pr_ref 
+            ism%smb = ism%smb_ref 
+
+            ! Since atm fields are anomalies, also set actual variable to zero 
+            ism%ts%var  = 0.0_wp 
+            ism%pr%var  = 0.0_wp 
+            ism%smb%var = 0.0_wp 
+            
+        end if 
+        end if
+
+        ! If desired, override other choices and use reference ocean fields
+        if (present(use_ref_ocn)) then 
+        if (use_ref_ocn) then  
+
+            ism%to = ism%to_ref 
+            ism%so = ism%so_ref 
+            ism%tf = ism%tf_ref 
+
+        end if 
+        end if
+
+        ! Remove missing values from the ocean, if possible
+        do k = 1, size(ism%to%var,3)
+            if (count(ism%to%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = minval(ism%to%var(:,:,k,1),mask=ism%to%var(:,:,k,1) .ne. mv)
+                where(ism%to%var(:,:,k,1) .eq. mv) 
+                    ism%to%var(:,:,k,1) = tmp
+                end where 
+            end if
+            if (count(ism%so%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%so%var(:,:,k,1),mask=ism%so%var(:,:,k,1) .ne. mv)
+                where(ism%so%var(:,:,k,1) .eq. mv) 
+                    ism%so%var(:,:,k,1) = tmp
+                end where 
+            end if
+            if (count(ism%tf%var(:,:,k,1) .ne. mv) .gt. 0) then
+                tmp = maxval(ism%tf%var(:,:,k,1),mask=ism%tf%var(:,:,k,1) .ne. mv)
+                where(ism%tf%var(:,:,k,1) .eq. mv) 
+                    ism%tf%var(:,:,k,1) = tmp
+                end where 
+            end if
+        end do
+        
+        return 
+
+    end subroutine nahosmip_ant_forcing_update
 
 end module ismip6
