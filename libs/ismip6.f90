@@ -1505,7 +1505,7 @@ end if
 
     ! Two routines: nahosmip_ant_forcing_init, nahosmip_ant_forcing_update
 
-    subroutine nahosmip_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment,shlf_collapse)
+    subroutine nahosmip_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario,experiment)
 
         implicit none 
 
@@ -1516,7 +1516,6 @@ end if
         character(len=*), intent(IN), optional :: gcm
         character(len=*), intent(IN), optional :: scenario
         character(len=*), intent(IN), optional :: experiment
-        logical,          intent(IN), optional :: shlf_collapse
 
         ! Local variables 
         character(len=256) :: gcm_now
@@ -1610,17 +1609,12 @@ end if
 
         end if
 
-        ! Finally, whether shlf_collapse should be included 
-        ism%shlf_collapse = .FALSE. 
-        if (present(shlf_collapse)) ism%shlf_collapse = shlf_collapse
-
         write(*,*)
         write(*,*) "nahosmip_ant_forcing_init:: summary"
         write(*,*) "ctrl_run_type: ", trim(ism%ctrl_run_type)
         write(*,*) "gcm:           ", trim(ism%gcm)
         write(*,*) "scenario:      ", trim(ism%scenario)
         write(*,*) "experiment:    ", trim(ism%experiment)
-        write(*,*) "shlf_collapse: ", ism%shlf_collapse
         write(*,*) 
 
         select case(trim(ism%experiment))
