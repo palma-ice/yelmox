@@ -1699,7 +1699,7 @@ end if
 
         end select
 
-        ! Note: reference fields are hard-coded in the namelist file to come from the deafult
+        ! Note: reference fields are hard-coded in the namelist file to come from the default
         ! reference simulation, which is NorESM1-M_rcp26-repeat
 
         ! Note: for the reference and historical fields, always use the time_par from the namelist file.
@@ -1735,12 +1735,6 @@ end if
         call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
         call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
         call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-
-        if (ism%shlf_collapse) then 
-            ! Shelf collapse fields
-            call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj), &
-                                                domain,grid_name,ism%gcm,ism%scenario,time_par_proj_msk)
-        end if
 
         ! Load time-independent fields
 

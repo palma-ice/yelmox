@@ -88,7 +88,7 @@ contains
         ! 12 values along dimension.
 
         ! fill: method to handle missing values. By default, no treatment and missing values
-        ! are included in returned fields.
+        ! are included in returned fields. TODO
 
         implicit none 
 
@@ -141,6 +141,12 @@ contains
         fill_method = "none"
         if (present(fill)) fill_method = trim(fill) 
 
+        if (trim(fill_method) .ne. "none") then 
+            write(io_unit_err,*) "Error: varslice: fill methods have not yet been implemented. &
+            &Set fill_method='none' for now."
+            stop
+        end if
+        
         range_rep = 1
         if (present(rep)) range_rep = rep 
 
