@@ -62,16 +62,41 @@ module varslice
 contains
 
     
-    subroutine varslice_update(vs,time,method,rep)
+    subroutine varslice_update(vs,time,method,fill,rep)
         ! Routine to update transient climate forcing to match 
         ! current `time`. 
+
+        ! time = a specific time or a range of times
+
+        ! method = ["exact","range","interp","extrap","range_min","range_mean","range_max"]
+        ! difference time-slicing methods applied to the data read from the file.
+        ! Check routine `get_indices()` to see how data is loaded for each slice_method.
+        ! ["exact","range"] produce data identical to the input file, where
+        ! "exact" loads the data from the file for the time index matching the desired time
+        ! exactly - if it is not available, missing values are returned.
+        ! "range" loads all the data within a certain time range.
+        ! ["interp","extrap"] both return a time slice by interpolating to the
+        ! desired time from the two closest bracketing timesteps available in the file. "extrap"
+        ! allows for setting the time slice equal to the first or last timestep available, if
+        ! the desired time is out of bounds, while "interp" returns missing values in this case. 
+        ! "range_*" methods return one time slice with the method applied to the data within the 
+        ! range given by `time`. 
+
+        ! rep: frequency to apply slice_method over time. If rep=1, then calculation (mean/sd/etc)
+        ! will be applied to each time index, returning a field with no time dimension. 
+        ! If rep=12, then calculation will be applied to every 12th index, resulting in 
+        ! 12 values along dimension.
+
+        ! fill: method to handle missing values. By default, no treatment and missing values
+        ! are included in returned fields.
 
         implicit none 
 
         type(varslice_class),       intent(INOUT) :: vs
-        real(wp),         optional, intent(IN)    :: time(:)    ! [yr] Current time, or time range 
-        character(len=*), optional, intent(IN)    :: method     ! slice_method (only if with_time==True)
-        integer,          optional, intent(IN)    :: rep        ! Only if with_time==True, and slice_method==range_*
+        real(wp),         optional, intent(IN)    :: time(:)        ! [yr] Current time, or time range 
+        character(len=*), optional, intent(IN)    :: method         ! slice_method (only if with_time==True)
+        character(len=*), optional, intent(IN)    :: fill           ! none, min, max, mean (how to fill in missing values)
+        integer,          optional, intent(IN)    :: rep            ! Only if with_time==True, and slice_method==range_*
         
         ! Local variables 
         integer :: k, k0, k1, nt, nt_now, nt_out
@@ -81,6 +106,7 @@ contains
         real(wp) :: time_range(2) 
         real(wp) :: time_wt(2)
         character(len=56) :: slice_method
+        character(len=56) :: fill_method
         character(len=56) :: vec_method 
         integer  :: range_rep 
         integer,  allocatable :: kk(:) 
@@ -111,6 +137,9 @@ contains
 
         slice_method = "exact"
         if (present(method)) slice_method = trim(method)
+
+        fill_method = "none"
+        if (present(fill)) fill_method = trim(fill) 
 
         range_rep = 1
         if (present(rep)) range_rep = rep 
