@@ -498,21 +498,34 @@
 /
 
 &isos
-    method          = 2                     ! 0: constant lithospheric displacement; 1: LLRA; 2: ELRA, 3: EGIA, 4: ELVA
-    dt_step         = 10.0                  ! [yr] Max. timestep to recalculate bedrock uplift and rate of change
-    dt_lith         = 50.0                  ! [yr] Min. timestep to recalculate equilibrium lithospheric displacement
-    He_lith         = 88.0                  ! [km] Effective elastic thickness lithosphere
-    visc            = 1e21                  ! [Pa s] Asthenosphere's viscosity, visc=1e21 for Bueler et al (2007)  
-    tau             = 3000.0                ! [yr] Relaxation time 
+    ! Options
+    interactive_sealevel = .true.  ! Sea level interacts with solid Earth deformation?
+    correct_distortion = .false.    ! Account for distortion of projection?
+    method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
+    dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
+    dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
+    visc_method     = "laty"        ! Type of viscosity field for sub-lithospheric mantle
+    rigidity_method = "laty"        ! Type of thickness filed for elastic lithosphere
+
+    ! 1D reference model
+    nl          = 2                 ! [1] Number of viscous layers for sub-lithospheric mantle
+    boundaries  = 88.0, 600.0       ! [km] Depth of layer boundaries. The first value is overwritten
+                                    ! if a lithospheric thickness filed is provided.
+    viscosities = 1.e21, 2.e21      ! [Pa s] Layer viscosities. The values are overwritten if a 3D
+                                    ! viscosity field is provided.
+    tau         = 2000.0            ! [yr] Relaxation time
 
     ! Physical constants
-    E               = 66.0  !100.0          ! [GPa] Young's modulus | 100 for Coulon et al (2021) | 66  for Bueler et al (2007) 
-    nu              = 0.5   !0.25           ! [-]   Poisson's ratio: 0.25 for Coulon et al (2021) | 0.5 for Bueler et al (2007) 
-    rho_ice         = 910.0                 ! [kg/m^3]
-    rho_sw          = 1028.0                ! [kg/m^3] 
-    rho_w           = 1000.0                ! [kg/m^3] 
-    rho_a           = 3300.0                ! [kg/m^3] 3370 used by Coulon et al (2021)
-    g               = 9.81                  ! [m/s^2]
-    r_earth         = 6.378e6               ! [m]  Earth's radius, Coulon et al (2021) 
-    m_earth         = 5.972e24              ! [kg] Earth's mass,   Coulon et al (2021) 
+    E               = 66.0      ! [GPa] Young modulus
+    nu              = 0.28      ! [-] Poisson ratio
+    rho_ice         = 910.      ! [kg/m^3]
+    rho_seawater    = 1028.0    ! [kg/m^3]
+    rho_water       = 1000.0    ! [kg/m^3]
+    rho_uppermantle = 3400.0    ! [kg/m^3]
+    rho_litho       = 3200.0    ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
+    g               = 9.81      ! [m/s^2]
+    r_earth         = 6.378e6   ! [m]  Earth radius, Coulon et al. (2021)
+    m_earth         = 5.972e24  ! [kg] Earth mass,   Coulon et al. (2021)
+    A_ocean_pd      = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
 /
+
