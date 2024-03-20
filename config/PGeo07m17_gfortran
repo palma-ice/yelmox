@@ -7,7 +7,7 @@ INC_NC  = -I${NC_FROOT}/include
 LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf
 
 INC_FFTW = 
-LIB_FFTW = -L/usr/local/Cellar/fftw/3.3.10_1/lib -lfftw3 -lm
+LIB_FFTW = -L/opt/homebrew/Cellar/fftw/3.3.10_1/lib -lfftw3 -lm
 
 LISROOT = /Users/alrobi001/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
