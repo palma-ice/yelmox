@@ -172,23 +172,32 @@ program yelmox
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
                         domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
-    ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
+    ! Sediments
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    yelmo1%bnd%H_sed = sed1%now%H 
+    
+    ! Geothermal heat flow
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
+    
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Initialize isostasy using present-day topography 
-    ! values to calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=real(yelmo1%bnd%z_bed,dp),H_ice=real(yelmo1%tpo%now%H_ice,dp), &
-                                    z_ss=real(yelmo1%bnd%z_sl,dp),z_bed_ref=real(yelmo1%bnd%z_bed_ref,dp), &
-                                    H_ice_ref=real(yelmo1%bnd%H_ice_ref,dp), &
-                                    z_sl_ref=real(yelmo1%bnd%z_sl*0.0,dp),time=real(time,dp))
-                                    
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
-    yelmo1%bnd%H_sed = sed1%now%H 
     
+    ! Initialize isostasy reference state using present-day reference topography
+    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
+        dble(yelmo1%bnd%z_sl*0.0), dble(0.0), dble(time), set_ref=.TRUE.)
+    
+    ! Initialize isostasy using current topography to calibrate the reference rebound
+    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
+    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
+        dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
+    
+    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+
     if (use_hyster) then
         ! Update hysteresis variable 
         var   = yelmo1%reg%V_ice*convert_km3_Gt
@@ -248,7 +257,6 @@ program yelmox
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
     
     call yelmo_print_bound(yelmo1%bnd)
 

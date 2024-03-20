@@ -360,11 +360,20 @@ program yelmox_ismip6
         mshlf1%now%tf_corr_basin = 0.0_wp
 
     end if 
-        
-    ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
-    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
-    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
+    
+    ! === Update external modules and pass variables to yelmo boundaries =======
 
+    ! Sediments
+    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
+    yelmo1%bnd%H_sed = sed1%now%H 
+
+    ! Geothermal heat flow
+    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
+
+    ! Barystatic sea level
+    call sealevel_update(sealev,year_bp=time_bp)
+    yelmo1%bnd%z_sl  = sealev%z_sl 
 
     ! Initialize isostasy reference state using present-day reference topography
     call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
@@ -375,11 +384,8 @@ program yelmox_ismip6
     call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
         dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
     
-    ! === Update external modules and pass variables to yelmo boundaries =======
-
-    call sealevel_update(sealev,year_bp=time_bp)
-    yelmo1%bnd%z_sl  = sealev%z_sl 
-    yelmo1%bnd%H_sed = sed1%now%H 
+    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -400,10 +406,6 @@ program yelmox_ismip6
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-
-    ! Store geothermal heat flow field
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
-    
     call yelmo_print_bound(yelmo1%bnd)
 
     ! Initialize state variables (dyn,therm,mat)
