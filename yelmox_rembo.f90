@@ -181,7 +181,7 @@ program yelmox
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
     call isos_init_state(isos1,z_bed=real(yelmo1%bnd%z_bed,dp),H_ice=real(yelmo1%tpo%now%H_ice,dp), &
-                                    z_sl=real(yelmo1%bnd%z_sl,dp),z_bed_ref=real(yelmo1%bnd%z_bed_ref,dp), &
+                                    z_ss=real(yelmo1%bnd%z_sl,dp),z_bed_ref=real(yelmo1%bnd%z_bed_ref,dp), &
                                     H_ice_ref=real(yelmo1%bnd%H_ice_ref,dp), &
                                     z_sl_ref=real(yelmo1%bnd%z_sl*0.0,dp),time=real(time,dp))
                                     
@@ -400,14 +400,15 @@ end if
 
         call timer_step(tmrs,comp=0) 
 
-        ! == SEA LEVEL ==========================================================
+        ! == SEA LEVEL (BARYSTATIC) ======================================================
         call sealevel_update(sealev,year_bp=time)
-        yelmo1%bnd%z_sl  = sealev%z_sl 
 
-        ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-        yelmo1%bnd%z_bed = isos1%now%z_bed
-        
+        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+        call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                    dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+        yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+        yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
         ! == Yelmo ice sheet ===================================================

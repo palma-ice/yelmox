@@ -564,14 +564,15 @@ program yelmox_ismip6
 
             call timer_step(tmrs,comp=0) 
             
-            ! == SEA LEVEL ==========================================================
+            ! == SEA LEVEL (BARYSTATIC) ======================================================
             call sealevel_update(sealev,year_bp=time_bp)
-            yelmo1%bnd%z_sl  = sealev%z_sl 
 
-            ! == ISOSTASY ==========================================================
-            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-            
+            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+            call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================
@@ -675,14 +676,15 @@ end if
 
             call timer_step(tmrs,comp=0) 
             
-            ! == SEA LEVEL ==========================================================
+            ! == SEA LEVEL (BARYSTATIC) ======================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
-            yelmo1%bnd%z_sl  = sealev%z_sl
 
-            ! == ISOSTASY ==========================================================
-            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-
+            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+            call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================
@@ -810,14 +812,15 @@ end if
             
             call timer_step(tmrs,comp=0) 
             
-            ! == SEA LEVEL ==========================================================
+            ! == SEA LEVEL (BARYSTATIC) ======================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
-            yelmo1%bnd%z_sl  = sealev%z_sl
 
-            ! == ISOSTASY ==========================================================
-            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-
+            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+            call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================
@@ -1021,14 +1024,15 @@ end if
 
             call timer_step(tmrs,comp=0) 
             
-            ! == SEA LEVEL ==========================================================
+            ! == SEA LEVEL (BARYSTATIC) ======================================================
             call sealevel_update(sealev,year_bp=0.0_wp)
-            yelmo1%bnd%z_sl  = sealev%z_sl
 
-            ! == ISOSTASY ==========================================================
-            call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-
+            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+            call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================
