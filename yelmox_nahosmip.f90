@@ -305,8 +305,7 @@ program yelmox_ismip6
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ismip6exp%experiment, &
-                                                                    shlf_collapse=ismip6exp%shlf_collapse)
+    call nahosmip_ant_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ismip6exp%experiment)
     
     ! ===== tf_corr initialization ======
 
@@ -1182,7 +1181,7 @@ contains
         
         ! Step 2: update the ISMIP6 forcing to the current year
 
-        call ismip6_forcing_update(ismp,time)
+        call nahosmip_ant_forcing_update(ismp,time)
         
         ! Calculate anomaly fields accounting for elevation difference with reference topo
         dts_now  = ismp%ts%var(:,:,1,1)  !+ ismp%dts_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))

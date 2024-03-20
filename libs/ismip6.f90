@@ -127,13 +127,14 @@ module ismip6
     public :: ismip6_experiment_def
     public :: ismip6_forcing_init
     public :: ismip6_forcing_update
-
-
     
     public :: ismip6_write_init
     public :: ismip6_write_step
     public :: calc_iceberg_island
 
+    public :: nahosmip_ant_forcing_init
+    public :: nahosmip_ant_forcing_update 
+    
 contains
     
     subroutine ismip6_experiment_def(ie,expname,filename,group,model)
@@ -190,11 +191,6 @@ contains
 
                 call ismip6_grl_forcing_init(ism,filename,domain,grid_name,gcm,scenario)
 
-            case("nahosmip-ant")
-
-                call nahosmip_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario, &
-                                                                    experiment)
-
             case DEFAULT
 
                 write(*,*) "ismip6_forcing_init:: Error: domain not recognized."
@@ -226,10 +222,6 @@ contains
 
                 call ismip6_grl_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
             
-            case("nahosmip-ant")
-
-                call nahosmip_ant_forcing_update(ism,time,use_ref_atm,use_ref_ocn)
-
             case DEFAULT
 
                 write(*,*) "ismip6_forcing_init:: Error: domain not recognized."
