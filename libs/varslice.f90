@@ -1,5 +1,6 @@
 module varslice
 
+    use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
     use ncio 
     use nml 
 
@@ -44,10 +45,11 @@ module varslice
         ! Variable information
         real(wp), allocatable :: x(:) 
         real(wp), allocatable :: y(:)
-        real(wp), allocatable :: lev(:)  
+        real(wp), allocatable :: z(:)  
+        real(wp), allocatable :: time(:)
 
-        real(wp), allocatable :: time(:)  
-        real(wp), allocatable :: var(:,:,:,:) 
+        real(wp), allocatable :: var(:,:,:,:)
+                
     end type 
 
     private 
@@ -142,7 +144,7 @@ contains
         if (present(fill)) fill_method = trim(fill) 
 
         if (trim(fill_method) .ne. "none") then 
-            write(io_unit_err,*) "Error: varslice: fill methods have not yet been implemented. &
+            write(error_unit,*) "Error: varslice: fill methods have not yet been implemented. &
             &Set fill_method='none' for now."
             stop
         end if
@@ -982,7 +984,7 @@ contains
                 else 
                     allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%y(vs%par%dim(2)))
-                    allocate(vs%lev(vs%par%dim(3)))
+                    allocate(vs%z(vs%par%dim(3)))
                     allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3),1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
@@ -996,9 +998,9 @@ contains
                         call axis_init(vs%y,nx=vs%par%dim(2))
                     end if
                     if (nc_exists_var(vs%par%filename,dim_names(3))) then 
-                        call nc_read(vs%par%filename,dim_names(3),vs%lev)
+                        call nc_read(vs%par%filename,dim_names(3),vs%z)
                     else
-                        call axis_init(vs%lev,nx=vs%par%dim(3))
+                        call axis_init(vs%z,nx=vs%par%dim(3))
                     end if
                     
                 end if
@@ -1007,7 +1009,7 @@ contains
                 if (with_time) then 
                     allocate(vs%x(vs%par%dim(1)))
                     allocate(vs%y(vs%par%dim(2)))
-                    allocate(vs%lev(vs%par%dim(3)))
+                    allocate(vs%z(vs%par%dim(3)))
                     allocate(vs%var(vs%par%dim(1),vs%par%dim(2),vs%par%dim(3),1))
 
                     if (nc_exists_var(vs%par%filename,dim_names(1))) then 
@@ -1021,9 +1023,9 @@ contains
                         call axis_init(vs%y,nx=vs%par%dim(2))
                     end if
                     if (nc_exists_var(vs%par%filename,dim_names(3))) then 
-                        call nc_read(vs%par%filename,dim_names(3),vs%lev)
+                        call nc_read(vs%par%filename,dim_names(3),vs%z)
                     else
-                        call axis_init(vs%lev,nx=vs%par%dim(3))
+                        call axis_init(vs%z,nx=vs%par%dim(3))
                     end if
                     
                 else 
@@ -1048,9 +1050,9 @@ contains
             allocate(vs%y(1))
             vs%y = 0.0_wp 
         end if 
-        if (.not. allocated(vs%lev)) then 
-            allocate(vs%lev(1))
-            vs%lev = 0.0_wp 
+        if (.not. allocated(vs%z)) then 
+            allocate(vs%z(1))
+            vs%z = 0.0_wp 
         end if 
         if (.not. allocated(vs%time)) then 
             allocate(vs%time(1))
@@ -1071,7 +1073,7 @@ contains
         if (allocated(vs%par%dim))  deallocate(vs%par%dim)
         if (allocated(vs%x))        deallocate(vs%x)
         if (allocated(vs%y))        deallocate(vs%y)
-        if (allocated(vs%lev))      deallocate(vs%lev)
+        if (allocated(vs%z))      deallocate(vs%z)
         if (allocated(vs%time))     deallocate(vs%time)
         if (allocated(vs%var))      deallocate(vs%var)
         

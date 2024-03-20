@@ -193,7 +193,7 @@ contains
             case("nahosmip-ant")
 
                 call nahosmip_ant_forcing_init(ism,filename,domain,grid_name,gcm,scenario, &
-                                                                    experiment,shlf_collapse)
+                                                                    experiment)
 
             case DEFAULT
 
