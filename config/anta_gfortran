@@ -3,6 +3,10 @@ FC = gfortran
 INC_NC  = -I/usr/include
 LIB_NC  = -L/usr/lib -lnetcdff -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -lnetcdf -lnetcdf -ldl -lz -lcurl -lm
 
+FFTWROOT = /home/jalvarez/apps/fftw-3.3.10
+INC_FFTW =
+LIB_FFTW = -L$(FFTWROOT)/ -lfftw3 -lm
+
 LISROOT = /home/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
@@ -11,8 +15,15 @@ YELMOROOT = yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
+#ISOSTASYROOT = ${HOME}/models/yelmox/isostasy
+ISOSTASYROOT = /home/jalvarez/models/yelmox/isostasy
+INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include
+LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
+
+
 FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
-LFLAGS  = $(LIB_YELMO) $(LIB_LIS) $(LIB_NC) -Wl,-zmuldefs
+LFLAGS  = $(LIB_YELMO) $(LIB_NC) $(LIB_LIS) $(LIB_ISOSTASY) $(LIB_FFTW) -Wl,-zmuldefs
+
 
 DFLAGS_NODEBUG = -O2
 DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow,underflow -fbacktrace -fcheck=all

@@ -403,19 +403,27 @@ program yelmox
     ! Initialize bedrock model 
     call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
 
-    if (trim(domain) .eq. "Antarctica") then 
+    ! jalv: adding ajr's comment and disabling the following call in order to be 
+    ! consistent in every yelmox executable. This was previously done only for 
+    ! yelmox_ismip6 and yelmox_nahosmip
+
+    ! ajr: for now, spatially variable tau is disabled, since it is not clear how to 
+    ! pass the information from an isos1%output field back to the correlary extended 
+    ! isos1%domain field. 
+
+    !if (trim(domain) .eq. "Antarctica") then 
         ! Redefine tau (asthenosphere relaxation constant) as spatially
         ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
-        call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
-        call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
-        call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
+    !    call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
+    !    call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
+    !    call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
  
-        call isos_set_field(isos1%now%tau, &
-                [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
-                [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
-                                      regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
+    !    call isos_set_field(isos1%now%tau, &
+    !            [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
+    !            [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
+    !                                  regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
         
-    end if
+    !end if
     
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
@@ -432,17 +440,38 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
+    ! jalv: Making the following calls compatible with the latest isostasy interface
+    !       (As in yelmox_ismip6) 
+
+    ! Barystatic sea level
+    call sealevel_update(sealev,year_bp=time_bp)
+    yelmo1%bnd%z_sl  = sealev%z_sl
+
+    ! Initialize isostasy reference state using present-day reference topography
+    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
+        dble(yelmo1%bnd%z_sl*0.0), dble(0.0), dble(time), set_ref=.TRUE.)
+
+    ! Initialize isostasy using current topography to calibrate the reference rebound
+    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
+    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
+        dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
+
+    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+  
+
     ! Initialize isostasy using present-day topography 
     ! values to calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
-                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
-                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
-                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
+    !call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
+    !                                z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+    !                                H_ice_ref=yelmo1%bnd%H_ice_ref, &
+    !                                z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
                                        
 
-    call sealevel_update(sealev,year_bp=time_bp)
-    yelmo1%bnd%z_sl  = sealev%z_sl 
-    yelmo1%bnd%H_sed = sed1%now%H 
+
+    !call sealevel_update(sealev,year_bp=time_bp)
+    !yelmo1%bnd%z_sl  = sealev%z_sl 
+    !yelmo1%bnd%H_sed = sed1%now%H 
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -763,17 +792,31 @@ program yelmox
         end select 
 
         call timer_step(tmrs,comp=0) 
-        
+       
         ! == SEA LEVEL ==========================================================
-        call sealevel_update(sealev,year_bp=time_bp)
-        yelmo1%bnd%z_sl  = sealev%z_sl 
+        !call sealevel_update(sealev,year_bp=time_bp)
+        !yelmo1%bnd%z_sl  = sealev%z_sl 
 
         ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-        yelmo1%bnd%z_bed = isos1%now%z_bed
+        !call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
+        !yelmo1%bnd%z_bed = isos1%now%z_bed
         
-        call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
+        !call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
+
+        ! jalv: adjusting the calls to make it compatible with latest isostasy interface
         
+        ! == SEA LEVEL (BARYSTATIC) ======================================================
+        call sealevel_update(sealev,year_bp=time_bp)
+
+        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+        call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+        yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+        yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+
+        call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
+
+
         ! == ICE SHEET ===================================================
 
         if (running_greenland .and. ngs%use_negis_par) then 
