@@ -7,7 +7,7 @@ jobrun ./runcx -r -- -o output/run -p ctl.nyears=5000
 '''
 import subprocess as subp 
 import sys, os, socket, argparse, shutil, glob, datetime, json
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree # Deprecated from v3.12
 from pandas import DataFrame
 
 # Check whether runner library is installed or not:
@@ -99,7 +99,7 @@ def main():
         help='Run the executable after preparing the job by submitting to the queue?')
     parser.add_argument('-q','--qos',type=str, default=default_qos,
         help='Name of the qos the job should be submitted to (priority,short,medium,long)')
-    parser.add_argument('-w','--wall', type=int, default=default_wall,
+    parser.add_argument('-w','--wall', type=str, default=default_wall,
         help='Maximum wall time [hrs] to allow for job (only for jobs submitted to queue)')
     parser.add_argument('--part',type=str, metavar="PARTITION", default=default_part,
         help='Name of the partition the job should be submitted to (e.g., haswell, broadwell)')
@@ -377,18 +377,13 @@ def submitjob(path_template,rundir,cmd,qos,wall,partition,group,email,omp,jobnam
     nm_jobscript   = 'job.submit'
     path_jobscript = "{}/{}".format(rundir,nm_jobscript)
     
-    if "brigit" in hostname:
-        # Host is the UCM brigit cluster, use the following submit script
-        script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
-        jobfile = open(path_jobscript,'w').write(script)
-        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
-    
-    else:
-        # Host is the PIK 2015 cluster, use the following submit script
-        script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
-        jobfile = open(path_jobscript,'w').write(script)
-        cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
-    
+    # Generate a job submission script, write to path
+    script  = generate_jobscript(path_template,cmd,jobname,group,email,qos,wall,partition,omp,queues)
+    jobfile = open(path_jobscript,'w').write(script)
+
+    # Prepare job command
+    cmd_job = "cd {} && sbatch {}".format(rundir,nm_jobscript)
+
     # Run the command (ie, change to output directory and submit job)
     # Note: the argument `shell=True` can be a security hazard, but should
     # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
@@ -427,8 +422,8 @@ def copy_dir(path,rundir,target):
     '''Copy file(s) to run directory.'''
 
     dst = os.path.join(rundir,target)
-    #shutil.copytree(path,dst,dirs_exist_ok=True)  # Only v3.8+
-    copy_tree(path, dst)
+    shutil.copytree(path,dst,dirs_exist_ok=True)  # Only v3.8+
+    #copy_tree(path, dst) # Deprecated after v3.12+
 
     return 
 
@@ -512,11 +507,11 @@ def generate_jobscript(template,cmd,jobname,group,email,qos,wall,partition,omp,q
                         "{} not in {}".format(qos,"-".join(queues))
             raise Exception(error_msg)
 
-        # Check that wall time was set properly
-        if wall > queues[qos]['wall']:
-            error_msg = "Error generating jobscript. Wall time too large for desired queue. \n" \
-                        "wall={} greater than limit of {} for queue '{}'".format(wall,queues[qos]['wall'],qos)
-            raise Exception(error_msg)
+        # # Check that wall time was set properly
+        # if wall > queues[qos]['wall']:
+        #     error_msg = "Error generating jobscript. Wall time too large for desired queue. \n" \
+        #                 "wall={} greater than limit of {} for queue '{}'".format(wall,queues[qos]['wall'],qos)
+        #     raise Exception(error_msg)
 
     # If omp has been set, generate a jobscript string with appropriate settings
     if omp > 0:

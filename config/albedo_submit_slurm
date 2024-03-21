@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --qos=<QOS>
+#SBATCH --account=<GROUP>
 #SBATCH --time=<WALL>
 #SBATCH --job-name=<JOBNAME>
-#SBATCH --account=<GROUP>
 #SBATCH --mail-user=<EMAIL>
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL

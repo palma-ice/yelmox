@@ -2,13 +2,13 @@
     "defaults" :
     {
         "jobname"       : "Yelmo",
-        "email"         : "USER@pik-potsdam.de",
-        "group"         : "anthroia", 
+        "email"         : "USER@awi.de",
+        "group"         : "envi", 
         "omp"           : 0,
-        "wall"          : 24, 
-        "qos"           : "priority",
+        "wall"          : "48:00:00", 
+        "qos"           : "48h",
         "partition"     : "haswell",
-        "job_template"  : "config/pik_submit_slurm"
+        "job_template"  : "config/albedo_submit_slurm"
     },
 
     "exe_aliases" :
@@ -34,13 +34,13 @@
         ["input","ice_data","maps"],
 
     "job_queues" :
-        {   "priority" :
-            {   "wall" : "24:00:00"  },
-            "short" :
-            {   "wall" : "24:00:00"  },
-            "medium" :
-            {   "wall" : "168:00:00" },
-            "long" :
-            {   "wall" : "720:00:00" }
+        {   "12h" :
+            {   "wall" : "12:00:00"  },
+            "48h" :
+            {   "wall" : "48:00:00"  },
+            "30min" :
+            {   "wall" : "00:30:00" },
+            "1wk" :
+            {   "wall" : "168:00:00" }
         }
 }

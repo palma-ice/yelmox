@@ -156,7 +156,7 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(time_init,8))
@@ -172,23 +172,32 @@ program yelmox
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
                         domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
-    ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
+    ! Sediments
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    yelmo1%bnd%H_sed = sed1%now%H 
+    
+    ! Geothermal heat flow
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
+    
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Initialize isostasy using present-day topography 
-    ! values to calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
-                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
-                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
-                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
-                                    
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
-    yelmo1%bnd%H_sed = sed1%now%H 
     
+    ! Initialize isostasy reference state using present-day reference topography
+    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
+        dble(yelmo1%bnd%z_sl*0.0), dble(0.0), dble(time), set_ref=.TRUE.)
+    
+    ! Initialize isostasy using current topography to calibrate the reference rebound
+    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
+    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
+        dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
+    
+    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+
     if (use_hyster) then
         ! Update hysteresis variable 
         var   = yelmo1%reg%V_ice*convert_km3_Gt
@@ -208,11 +217,13 @@ program yelmox
     ! Update REMBO, with correct topography, let it equilibrate for several years 
     ! do n = 1, 100
     !     time = time_init + real(n,8)    
-    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+    !                                     real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     ! end do 
     ! rembo_ann%time_emb = time_init 
     ! rembo_ann%time_smb = time_init  
-    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -246,7 +257,6 @@ program yelmox
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
     
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -398,13 +408,14 @@ end if
 
         call timer_step(tmrs,comp=0) 
 
-        ! == SEA LEVEL ==========================================================
+        ! == SEA LEVEL (BARYSTATIC) ======================================================
         call sealevel_update(sealev,year_bp=time)
-        yelmo1%bnd%z_sl  = sealev%z_sl 
 
-        ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
-        yelmo1%bnd%z_bed = isos1%now%z_bed
+        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+        call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
+                                                    dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+        yelmo1%bnd%z_bed = real(isos1%now%z_bed)
+        yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
 
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
@@ -456,7 +467,8 @@ if (calc_transient_climate) then
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! call REMBO1
-        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8),real(yelmo1%tpo%now%H_ice,8))
+        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
         
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -856,7 +868,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! External data
-        call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
  
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
