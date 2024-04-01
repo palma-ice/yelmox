@@ -80,6 +80,10 @@ module snapclim
         real(wp) :: f_p
         real(wp) :: f_p_ne
         real(wp) :: f_stdev
+        real(wp) :: climsens
+        real(wp) :: ci
+        real(wp) :: Cinit
+
 
     end type
 
@@ -108,6 +112,10 @@ module snapclim
         real(wp), allocatable :: tsl_sum(:,:)
         real(wp), allocatable :: prcor_ann(:,:)
         real(wp), allocatable :: beta_p(:,:)        
+        real(wp), allocatable :: deltaT(:,:,:)                 ! Temperature anomaly field calculated in the ebm case        
+        real(wp)              :: C                             ! Carbon dyoxide for the ebm case
+        real(wp)              :: Cref                          ! Reference Carbon dyoxide for the ebm case (function of T changes)
+
 
         ! Oceanic variables
         integer :: nzo
@@ -230,7 +238,7 @@ contains
         ! Determine which snapshots should be loaded (atm)
         select case(trim(snp%par%atm_type))
 
-            case("const","hybrid","anom","recon")
+            case("const","hybrid","anom","recon","ebm")
 
                 load_atm1 = .FALSE.
                 load_atm2 = .FALSE. 
@@ -255,7 +263,7 @@ contains
         ! Determine which snapshots should be loaded (atm)
         select case(trim(snp%par%ocn_type))
 
-            case("const","hybrid","anom","fraction","recon")
+            case("const","hybrid","anom","fraction","recon","ebm")
 
                 load_ocn1 = .FALSE.
                 load_ocn2 = .FALSE. 
@@ -360,11 +368,15 @@ contains
         ! (this also allocates the now variables).
         snp%now = snp%clim0 
 
+        ! jalv initializing carbon dyoxide here from parameter Cinit
+        snp%now%C =snp%par%Cinit
+
+
         return 
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo,dx,basins)
+    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo,dx,basins,Sref,Ssols)
 
         implicit none 
 
@@ -373,6 +385,8 @@ contains
         real(wp), intent(IN)    :: time    ! Current simulation year
         character(len=*), intent(IN) :: domain 
         real(wp), intent(IN)    :: basins(:,:)
+        real(wp), intent(IN)    :: Sref(:,:)
+        real(wp), intent(IN)    :: Ssols(:,:)        
         real(wp), intent(IN), optional :: dTa   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dTo   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dSo   ! For atm_type='anom'
@@ -394,6 +408,7 @@ contains
         real(wp), allocatable :: clim0_prcor_corr(:,:,:) 
         real(wp), allocatable :: zs_corr(:,:) 
         real(wp), allocatable :: dT_corr(:,:) 
+
 
         nx = size(z_srf,1)
         ny = size(z_srf,2) 
@@ -464,16 +479,61 @@ contains
             case("anom")
                 ! Apply a simple spatially homogeneous anomaly
 
-                if (present(dTa)) then 
+                if (present(dTa)) then
                     ! If available, use argument to define anomaly
-                    dTa_now = dTa 
-                else 
+                    dTa_now = dTa
+                else
                     ! Calculate the current anomaly from the index
                     dTa_now = at*snp%par%dTa_const
                 end if
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
                 call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
+
+            case("ebm")
+                !snp%now%C = snp%par%Cinit
+
+                ! Calcultate the carbon cycle to determine current co2 (C) values:
+                call calc_carbon(snp%now%C,snp%now%Cref,sum(snp%now%tas)/size(snp%now%tas),sum(snp%clim0%tas)/size(snp%clim0%tas))
+                !call calc_carbon(snp%now%C,snp%now%Cref,snp%now%C,snp%now%C)
+                !call calc_carbon(snp%par%Cinit,snp%now%Cref,snp%now%tas,snp%clim0%tas)
+
+
+                ! Calculate the current anomaly from insolation and co2
+                ! We do it monthly for consistency even if no seasonal cycle in the anomalies
+                ! (For now the dependency with the insolation is just based on the summer anomalies)
+                ! To do we could rely on the monthly insolation values (more relevant?? not sure)
+                do m = 1, 12
+
+                       !snp%now%deltaT(:,:,m) = snp%par%climsens*(snp%now%C-snp%par%Cref)/snp%par%Cref + snp%par%ci*(Ssols-Sref)/Sref
+                       snp%now%deltaT(:,:,m) = snp%par%climsens*log(snp%now%C/snp%par%Cinit)/log(2.0) + snp%par%ci*(Ssols-Sref)/Sref 
+                       !snp%now%deltaT(:,:,m) = snp%par%ci*(Ssols-Sref)/Sref                       
+                       !snp%now%deltaT(:,:,m) = snp%par%climsens*(snp%now%C-snp%par%Cref)/snp%par%Cref
+                       !snp%now%deltaT(:,:,m) = 0.0
+
+                !print*, 'jalv: after first calculation of deltaT | C='
+                !write(*,*) snp%now%C
+
+                !print*, 'jalv: after first calculation of deltaT | climsens='
+                !write(*,*) snp%par%climsens
+
+                !print*, 'jalv: after first calculation of deltaT | Cref='
+                !write(*,*) snp%par%Cref                
+
+                !print*, 'jalv: after first calculation of deltaT | Ssols='
+                !write(*,*) minval(Ssols), maxval(Ssols) 
+
+                !print*, 'jalv: after first calculation of deltaT | Sref='
+                !write(*,*) minval(Sref), maxval(Sref)  
+
+                !print*, 'jalv: after first calculation of deltaT | deltaT='        
+                !write(*,*) minval(snp%now%deltaT), maxval(snp%now%deltaT) 
+
+                end do   
+
+                call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,snp%now%deltaT)
+                call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
+
 
             case("snap_1ind","snap_1ind_new")
 
@@ -832,6 +892,34 @@ contains
         return
 
     end subroutine calc_temp_anom
+
+    elemental subroutine calc_carbon(C,Cref,temp_now,temp0)
+        ! Calculate the reference co2 value from the difference between current surface temperature and the clim0 one  
+
+        implicit none
+
+        real(wp), intent(INOUT) :: C               ! Current carbon dyoxide value
+        real(wp), intent(OUT) :: Cref            ! Current carbon dyoxide value
+        real(wp), intent(IN)  :: temp_now        ! Surface temperature (not sea level as in cal_temp_anom) 
+        real(wp), intent(IN)  :: temp0
+
+        ! local variables
+        real(wp) :: Cdot
+        real(wp), parameter :: Cc = 10.0         ![ppms/K] ! Constant to determine how many ppms we remove per a given deltaT
+        real(wp), parameter :: tau_C = 100.0     ! [yrs] Characteristic time to relax to Cref
+
+        !Cref = Cc * (sum(temp_now)/size(temp_now) - sum(temp0)/size(temp0))
+        Cref = Cc *(temp_now - temp0)
+
+        Cdot = 10*(C -Cref)/tau_C                ! jalv: multiplied by 10, beacuse the time step dt_clim seems to be hard coded
+                                                 ! to that value in yelmox
+
+        C = C + Cdot 
+
+
+        return
+
+    end subroutine calc_carbon
 
     elemental subroutine calc_temp_1ind(temp_now,temp0,temp1,temp2,aa)
 
@@ -1530,7 +1618,11 @@ contains
         call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
         !call nml_read(filename,"snap","f_p_ne",             par%f_p_ne,         init=init_pars)
         call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
-        
+        call nml_read(filename,"snap","climsens",           par%climsens,       init=init_pars)
+        call nml_read(filename,"snap","ci",                 par%ci,             init=init_pars)
+        call nml_read(filename,"snap","Cinit",              par%Cinit,          init=init_pars)
+
+
         call nml_read(filename,"snap_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
         call nml_read(filename,"snap_hybrid","f_eem",       hpar%f_eem,        init=init_pars)
         call nml_read(filename,"snap_hybrid","f_glac",      hpar%f_glac,       init=init_pars)
@@ -2288,8 +2380,10 @@ contains
         if (allocated(clim%prcor_ann))          deallocate(clim%prcor_ann)
         if (allocated(clim%z_srf))              deallocate(clim%z_srf)
         if (allocated(clim%mask))               deallocate(clim%mask)
-        if (allocated(clim%beta_p))             deallocate(clim%beta_p)        
- 
+        if (allocated(clim%beta_p))             deallocate(clim%beta_p)       
+        if (allocated(clim%deltaT))             deallocate(clim%deltaT)        
+
+
         allocate(clim%tas(nx,ny,12))
         allocate(clim%tsl(nx,ny,12))
         allocate(clim%pr(nx,ny,12))
@@ -2307,6 +2401,8 @@ contains
         allocate(clim%z_srf(nx,ny))
         allocate(clim%mask(nx,ny))
         allocate(clim%beta_p(nx,ny))
+        allocate(clim%deltaT(nx,ny,12))        
+
 
         return 
 

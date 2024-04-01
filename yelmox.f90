@@ -33,7 +33,7 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain
+    character(len=256) :: outfldr, file1D, file2D, file_restart, domain, file1D_ebm
     character(len=256) :: file2D_small
     character(len=512) :: path_par
     character(len=512) :: path_lgm  
@@ -199,9 +199,10 @@ program yelmox
     file1D       = trim(outfldr)//"yelmo1D.nc"
     file2D       = trim(outfldr)//"yelmo2D.nc"
     file_restart = trim(outfldr)//"yelmo_restart.nc"          
-
     file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
-    
+
+    file1D_ebm   = trim(outfldr)//"yelmo1D_ebm.nc"
+
     tmr_file     = trim(outfldr)//"timer_table.txt"
 
     ! Print summary of run settings 
@@ -474,8 +475,19 @@ program yelmox
     !yelmo1%bnd%H_sed = sed1%now%H 
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins,Sref=smbpal1%now%Sref,Ssols=smbpal1%now%Ssols)
 
+
+    yelmo1%bnd%ta_ann = snp1%now%ta_ann
+    yelmo1%bnd%dTa_ann = snp1%now%ta_ann-snp1%clim0%ta_ann
+
+    yelmo1%bnd%CO2 = snp1%now%C 
+    yelmo1%bnd%Cref = snp1%now%Cref
+
+    !yelmo1%bnd%Sref = snp1%now%Sref
+    !yelmo1%bnd%Ssols = snp1%now%Ssols
+    
+    
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -588,7 +600,7 @@ program yelmox
             end if 
 
             ! Update snapclim to reflect new topography 
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins,Sref=smbpal1%now%Sref,Ssols=smbpal1%now%Ssols)
 
             ! Update smbpal
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -835,7 +847,7 @@ program yelmox
         
         if (mod(nint(time*100),nint(ctl%dt_clim*100))==0) then
             ! Update snapclim
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins,Sref=smbpal1%now%Sref,Ssols=smbpal1%now%Ssols) 
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
@@ -1226,6 +1238,19 @@ contains
         
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+         call nc_write(filename,"S",srf%ann%S,units="W/m2",long_name="Insolation", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+         call nc_write(filename,"Sref",srf%now%Sref,units="W/m2",long_name="Reference Insolation", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)              
+         call nc_write(filename,"Ssols",srf%now%Ssols,units="W/m2",long_name="Solstice Insolation", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+         call nc_write(filename,"Sdelta",srf%now%Ssols-srf%now%Sref,units="W/m2",long_name="Insolation difference", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)              
+         call nc_write(filename,"Srel",(srf%now%Ssols-srf%now%Sref)/srf%now%Sref,units="--",long_name="Relative Insolation", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)               
+         call nc_write(filename,"Albedo",srf%ann%alb_s,units="--",long_name="planetary albedo", &
+                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)               
+
 
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
@@ -1291,6 +1316,164 @@ contains
         return 
 
     end subroutine write_step_2D_combined
+
+    subroutine write_1D_ebm(dom,filename,time)
+        ! jalv: to be done
+        ! for now C and Cref are writen trough write_step_reg routines
+        implicit none
+
+        type(yelmo_class), intent(IN) :: dom
+        character(len=*),  intent(IN) :: filename
+        real(wp),          intent(IN) :: time
+
+        ! Local variables
+        type(yregions_class) :: reg
+
+        integer  :: ncid, n
+        real(wp) :: time_prev
+        real(wp) :: rho_ice
+        real(wp) :: density_corr
+        real(wp) :: m3yr_to_kgs
+        real(wp) :: ismip6_correction
+        real(wp) :: yr_to_sec
+
+        real(wp) :: m3_km3
+        real(wp) :: m2_km2
+
+        integer  :: npts_tot
+        integer  :: npts_grnd
+        integer  :: npts_flt
+        integer  :: npts_grl
+        integer  :: npts_frnt
+
+        real(wp) :: dx
+        real(wp) :: dy
+       real(wp) :: smb_tot
+        real(wp) :: bmb_tot
+        real(wp) :: bmb_shlf_t
+
+        real(wp) :: A_ice_grl
+        real(wp) :: flux_grl
+        real(wp) :: A_ice_frnt
+        real(wp) :: calv_flt
+        real(wp) :: flux_frnt
+
+        logical, allocatable :: mask_tot(:,:)
+        logical, allocatable :: mask_grnd(:,:)
+        logical, allocatable :: mask_flt(:,:)
+        logical, allocatable :: mask_grl(:,:)
+        logical, allocatable :: mask_frnt(:,:)
+
+        dx = dom%grd%dx
+        dy = dom%grd%dy
+
+       ! Allocate variables
+
+        allocate(mask_tot(dom%grd%nx,dom%grd%ny))
+        allocate(mask_grnd(dom%grd%nx,dom%grd%ny))
+        allocate(mask_flt(dom%grd%nx,dom%grd%ny))
+        allocate(mask_grl(dom%grd%nx,dom%grd%ny))
+        allocate(mask_frnt(dom%grd%nx,dom%grd%ny))
+
+        ! === Data conversion factors ========================================
+
+        rho_ice             = 917.0             ! ice density kg/m3
+        m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
+        density_corr        = rho_ice/1000.0    ! ice density correction with pure water
+        ismip6_correction   = m3yr_to_kgs*density_corr
+        yr_to_sec           = 31556952.0
+
+        m3_km3              = 1e-9
+        m2_km2              = 1e-6
+
+        ! 1. Determine regional values of variables 
+
+        ! Take the global regional data object that 
+        ! is calculated over the whole domain at each timestep 
+        reg = dom%reg
+
+        ! Assign masks of interest
+        mask_tot  = (dom%tpo%now%H_ice .gt. 0.0)
+        mask_grnd = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0)
+        mask_flt  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0)
+        mask_grl  = (dom%tpo%now%f_grnd_bmb .gt. 0.0 .and. dom%tpo%now%f_grnd_bmb .lt. 1.0)
+        mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%mask_bed .eq. 4)
+
+        ! Determine number of points at grl and frnt
+        npts_tot  = count(mask_tot)
+        npts_grnd = count(mask_grnd)
+        npts_flt  = count(mask_flt)
+        npts_grl  = count(mask_grl)
+        npts_frnt = count(mask_frnt)
+
+        ! Calculate additional variables of interest for ISMIP6
+
+        ! To do: these variables should be defined locally!
+        ! ISMIP6 boundary: jablasco
+        smb_tot     = sum(dom%bnd%smb,    mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
+        bmb_tot     = sum(dom%tpo%now%bmb,mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
+        bmb_shlf_t  = sum(dom%tpo%now%bmb,mask=mask_flt)*(dx*dy)    ! m^3/yr: flux
+
+        if (npts_grl .gt. 0) then
+
+            A_ice_grl = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_grl)*dx*dy*m2_km2 ! [km^2]
+            !flux_grl  = sum(dom%tpo%now%H_ice,mask=mask_grl)*(dx*dy)                 ! m^3/yr: flux
+            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice,mask=mask_grl)*dx   ! m^3/yr: flux
+
+            ! ajr, why only *dx above? 
+
+        else
+
+            A_ice_grl = 0.0_wp
+            flux_grl  = 0.0_wp
+
+        end if
+
+       ! ===== Frontal ice-shelves variables =====
+
+        if (npts_frnt .gt. 0) then
+
+            A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
+            calv_flt   = sum(dom%tpo%now%calv_flt*dom%tpo%now%H_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
+            flux_frnt  = calv_flt+sum(dom%tpo%now%fmb*dom%tpo%now%H_ice,mask=mask_frnt)*dx      ! m^3/yr: flux [m-1 yr-1]
+
+            ! ajr, why only *dx above? 
+
+        else
+
+            A_ice_frnt = 0.0_wp
+            calv_flt   = 0.0_wp
+            flux_frnt  = 0.0_wp
+
+        end if
+
+
+        ! 2. Begin writing step 
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+       
+        ! Determine current writing time step 
+        n = nc_size(filename,"time",ncid)
+        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
+        if (abs(time-time_prev).gt.1e-5) n = n+1
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
+                          dim1="time",start=[n],ncid=ncid)
+
+        ! ==== Fluxes ====
+        call nc_write(filename,"tendacabf",smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
+                      standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+
+        return
+
+    end subroutine write_1D_ebm
 
 
     subroutine calc_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
@@ -1377,11 +1560,13 @@ contains
 
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
         ! like normal, using the default function defined in Yelmo:
+
         call calc_cb_ref(ylmo%dyn%now%cb_ref,ylmo%bnd%z_bed,ylmo%bnd%z_bed_sd,ylmo%bnd%z_sl, &
                             ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min, &
                             ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min, &
                             ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1,ylmo%dyn%par%till_n_sd, &
                             ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method)
+
 
         ! === Finally, apply NEGIS scaling =============================
 

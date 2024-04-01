@@ -33,6 +33,8 @@
         real(prec), allocatable   :: t2m(:,:)            ! Surface temperature [K]
         real(prec), allocatable   :: pr(:,:), sf(:,:)    ! Precip, snowfall [mm/a or mm/d]
         real(prec), allocatable   :: S(:,:)              ! Insolation [W/m2]
+        real(prec), allocatable   :: Sref(:,:)           ! Reference Insolation [W/m2], typically solstice present day      
+        real(prec), allocatable   :: Ssols(:,:)           ! Slostice Insolation [W/m2]               
         real(prec), allocatable   :: sigma(:,:)          ! Effective temp. (ie, PDDs) [num. of days]
         real(prec), allocatable   :: PDDs(:,:)           ! Effective temp. (ie, PDDs) [num. of days]
         real(prec), allocatable   :: tsrf(:,:)           ! Effective temp. (ie, PDDs) [num. of days]
@@ -71,6 +73,7 @@ contains
         ! Local variables
         integer :: nx, ny, m  
         real(prec) :: tmp 
+        real(prec), allocatable :: tmp2(:,:)
 
         nx = size(x,1)
         ny = size(y,1)
@@ -101,6 +104,10 @@ contains
 
         ! Test calculation of insolation to load orbital params 
         tmp = calc_insol_day(180,65.d0,0.d0,fldr=smb%par%insol_fldr)
+
+        ! jalv getting present day summer insolation to be used as reference by snaplicm case ebm
+        ! Test calculation of insolation to load orbital params 
+        smb%now%Sref = calc_insol_day(180,dble(smb%par%lats),0.d0,fldr=smb%par%insol_fldr)
 
         return 
 
@@ -433,6 +440,11 @@ contains
             end if 
     
         end do 
+
+        now%Ssols   = calc_insol_day(180,dble(par%lats),insol_time,fldr=par%insol_fldr)
+
+        !print *, 'min and ma values of Ssols, just afer its calculation'   
+        !write(*,*) minval(now%Ssols), maxval(now%Ssols)
 
         ! Finalize annual average 
         call smbpal_average(smb%ann,now,step="end",nt=real(ndays)/dt)
@@ -781,6 +793,8 @@ contains
         allocate(now%pr(nx,ny))
         allocate(now%sf(nx,ny))
         allocate(now%S(nx,ny))
+        allocate(now%Sref(nx,ny))  
+        allocate(now%Ssols(nx,ny)) 
         allocate(now%sigma(nx,ny))
         allocate(now%PDDs(nx,ny))
         allocate(now%tsrf(nx,ny))
@@ -809,6 +823,8 @@ contains
         if (allocated(now%pr))       deallocate(now%pr)
         if (allocated(now%sf))       deallocate(now%sf)
         if (allocated(now%S))        deallocate(now%S)
+        if (allocated(now%Sref))        deallocate(now%Sref)
+        if (allocated(now%Ssols))        deallocate(now%Ssols)        
         if (allocated(now%sigma))    deallocate(now%sigma)
         if (allocated(now%PDDs))     deallocate(now%PDDs)
         if (allocated(now%tsrf))     deallocate(now%tsrf)
