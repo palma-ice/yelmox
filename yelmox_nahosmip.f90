@@ -1217,11 +1217,19 @@ contains
         ! jablasco: set anomaly to zero
         ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
         ! jablasco: volvamos al ppio! dto_ann=ismp%to%var(:,:,:,1)*0.0
+        ! antoniojm: set apart ref variables from nahosmip namelist
+
         call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                         ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
                         ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
-                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
+                        dto_ann=ismp%to%var(:,:,:,1), &
                         tf_ann=ismp%tf%var(:,:,:,1))
+
+        !call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+        !                ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
+        !                ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
+        !                dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
+        !                tf_ann=ismp%tf%var(:,:,:,1))
 
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin

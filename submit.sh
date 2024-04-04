@@ -14,7 +14,7 @@
 ##SBATCH -t 14-23:30:15
 
 # Run the job
-./yelmox_ismip6.x yelmo_ismip6_Antarctica_spinup.nml
+./yelmox_nahosmip.x yelmo_nahosmip_Antarctica.nml
 #./yelmox_ismip6.x yelmo_ismip6_Antarctica.nml
 
 

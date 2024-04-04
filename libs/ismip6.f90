@@ -1611,16 +1611,7 @@ end if
 
         select case(trim(ism%experiment))
 
-            case("CCSM4_RCP85",                 &
-                 "CESM2-WACCM_ssp585",          &
-                 "CESM2-WACCM_ssp585-repeat",   &
-                 "HadGEM2-ES_RCP85",            &
-                 "HadGEM2-ES_RCP85-repeat",     &
-                 "NorESM1-M_RCP26-repeat",      &
-                 "NorESM1-M_RCP85-repeat",      &
-                 "UKESM1-0-LL_ssp126",          &
-                 "UKESM1-0-LL_ssp585",          &
-                 "UKESM1-0-LL_ssp585-repeat")
+            case("HadGEM3_GC3-1MM")
                 ! Control and scenarios use the same files 
                 ! since ctrl specific forcing adapted in update step 
 
@@ -1651,7 +1642,7 @@ end if
                 
             case DEFAULT 
 
-                write(*,*) "nahosmip_ant_forcing_init:: Error: exeriment (== gcm_scenario) not recognized."
+                write(*,*) "nahosmip_ant_forcing_init:: Error: experiment (== gcm_scenario) not recognized."
                 write(*,*) "experiment = ", trim(ism%experiment) 
                 write(*,*) "gcm        = ", trim(ism%gcm) 
                 write(*,*) "scenario   = ", trim(ism%scenario) 
@@ -1825,10 +1816,10 @@ end if
 
         else if (time .ge. 2015 .and. time .le. 2300) then
             ! Get data from projection forcing datasets
-
-            call varslice_update(ism%ts_proj, [time],method=slice_method)
-            call varslice_update(ism%pr_proj, [time],method=slice_method)
-            call varslice_update(ism%smb_proj,[time],method=slice_method) 
+            ! antoniojm: Atmospheric fields set to 2015
+            call varslice_update(ism%ts_proj, [2015.0],method=slice_method)
+            call varslice_update(ism%pr_proj, [2015.0],method=slice_method)
+            call varslice_update(ism%smb_proj,[2015.0],method=slice_method) 
 
             ism%ts  = ism%ts_proj
             ism%pr  = ism%pr_proj
@@ -1885,7 +1876,7 @@ end if
             ! Projection period 1 
 
             call varslice_update(ism%to_proj,[time],method=slice_method)
-            call varslice_update(ism%so_proj,[time],method=slice_method)
+            call varslice_update(ism%so_proj,[2015.0],method=slice_method)
             call varslice_update(ism%tf_proj,[time],method=slice_method)
 
             ism%to = ism%to_proj
