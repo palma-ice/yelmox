@@ -83,6 +83,8 @@ module snapclim
         real(wp) :: climsens
         real(wp) :: ci
         real(wp) :: Cinit
+        real(wp) :: Cc
+        real(wp) :: tau_C
 
 
     end type
@@ -370,6 +372,7 @@ contains
 
         ! jalv initializing carbon dyoxide here from parameter Cinit
         snp%now%C =snp%par%Cinit
+        snp%now%Cref =snp%par%Cinit
 
 
         return 
@@ -493,11 +496,38 @@ contains
             case("ebm")
                 !snp%now%C = snp%par%Cinit
 
+                !write(*,*) 'temp_now=', sum(snp%now%tas)/size(snp%now%tas)
+                !write(*,*) 'temp0=', sum(snp%clim0%tas)/size(snp%clim0%tas)
+                !write(*,*) 'deltaT=', sum(snp%now%tas)/size(snp%now%tas) - sum(snp%clim0%tas)/size(snp%clim0%tas)
+
+                write(*,*) 'temp_now=', sum(snp%now%ta_ann)/size(snp%now%ta_ann)
+                write(*,*) 'temp0=', sum(snp%clim0%ta_ann)/size(snp%clim0%ta_ann)
+                write(*,*) 'deltaT=', sum(snp%now%ta_ann)/size(snp%now%ta_ann) - sum(snp%clim0%ta_ann)/size(snp%clim0%ta_ann)
+
+                write(*,*) 'Cinit(old)=', snp%par%Cinit                
+                write(*,*) 'Cref(old)=', snp%now%Cref                              
+                write(*,*) 'C(old)=', snp%now%C                              
+
                 ! Calcultate the carbon cycle to determine current co2 (C) values:
-                call calc_carbon(snp%now%C,snp%now%Cref,sum(snp%now%tas)/size(snp%now%tas),sum(snp%clim0%tas)/size(snp%clim0%tas))
+                !call calc_carbon(snp%now%C,snp%now%Cref,snp%par%Cinit,snp%par%Cc,snp%par%tau_C,sum(snp%now%tas)/size(snp%now%tas),sum(snp%clim0%tas)/size(snp%clim0%tas))
+                call calc_carbon(snp%now%C,snp%now%Cref,snp%par%Cinit,snp%par%Cc,snp%par%tau_C,sum(snp%now%ta_ann)/size(snp%now%ta_ann),sum(snp%clim0%ta_ann)/size(snp%clim0%ta_ann))
+
                 !call calc_carbon(snp%now%C,snp%now%Cref,snp%now%C,snp%now%C)
                 !call calc_carbon(snp%par%Cinit,snp%now%Cref,snp%now%tas,snp%clim0%tas)
 
+
+                !write(*,*) 'temp_now(new)=', sum(snp%now%tas)/size(snp%now%tas)
+                !write(*,*) 'temp0(new)=', sum(snp%clim0%tas)/size(snp%clim0%tas)
+                !write(*,*) 'deltaT(new)=', sum(snp%now%tas)/size(snp%now%tas) - sum(snp%clim0%tas)/size(snp%clim0%tas)
+
+                write(*,*) 'temp_now(new)=', sum(snp%now%ta_ann)/size(snp%now%ta_ann)
+                write(*,*) 'temp0(new)=', sum(snp%clim0%ta_ann)/size(snp%clim0%ta_ann)
+                write(*,*) 'deltaT(new)=', sum(snp%now%ta_ann)/size(snp%now%ta_ann) - sum(snp%clim0%ta_ann)/size(snp%clim0%ta_ann)
+
+
+                write(*,*) 'Cinit(new)=', snp%par%Cinit
+                write(*,*) 'Cref(new)=', snp%now%Cref               
+                write(*,*) 'C(new)=', snp%now%C  
 
                 ! Calculate the current anomaly from insolation and co2
                 ! We do it monthly for consistency even if no seasonal cycle in the anomalies
@@ -511,25 +541,29 @@ contains
                        !snp%now%deltaT(:,:,m) = snp%par%climsens*(snp%now%C-snp%par%Cref)/snp%par%Cref
                        !snp%now%deltaT(:,:,m) = 0.0
 
+                end do   
+
                 !print*, 'jalv: after first calculation of deltaT | C='
                 !write(*,*) snp%now%C
 
                 !print*, 'jalv: after first calculation of deltaT | climsens='
                 !write(*,*) snp%par%climsens
 
-                !print*, 'jalv: after first calculation of deltaT | Cref='
-                !write(*,*) snp%par%Cref                
+                !print*, 'jalv: after first calculation of deltaT | Crel='
+                !write(*,*) log(snp%now%C/snp%par%Cinit)/log(2.0)
 
                 !print*, 'jalv: after first calculation of deltaT | Ssols='
-                !write(*,*) minval(Ssols), maxval(Ssols) 
+                !write(*,*) minval(Ssols), maxval(Ssols)
 
                 !print*, 'jalv: after first calculation of deltaT | Sref='
-                !write(*,*) minval(Sref), maxval(Sref)  
+                !write(*,*) minval(Sref), maxval(Sref)
 
-                !print*, 'jalv: after first calculation of deltaT | deltaT='        
-                !write(*,*) minval(snp%now%deltaT), maxval(snp%now%deltaT) 
+                !print*, 'jalv: after first calculation of deltaT | Srel='
+                !write(*,*) minval((Ssols-Sref)/Sref), maxval((Ssols-Sref)/Sref)
 
-                end do   
+                !print*, 'jalv: after first calculation of deltaT | deltaT='
+                !write(*,*) minval(snp%now%deltaT), maxval(snp%now%deltaT)
+
 
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,snp%now%deltaT)
                 call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
@@ -893,29 +927,29 @@ contains
 
     end subroutine calc_temp_anom
 
-    elemental subroutine calc_carbon(C,Cref,temp_now,temp0)
+    elemental subroutine calc_carbon(C,Cref,Cinit,Cc,tau_C,temp_now,temp0)
         ! Calculate the reference co2 value from the difference between current surface temperature and the clim0 one  
 
         implicit none
 
-        real(wp), intent(INOUT) :: C               ! Current carbon dyoxide value
-        real(wp), intent(OUT) :: Cref            ! Current carbon dyoxide value
-        real(wp), intent(IN)  :: temp_now        ! Surface temperature (not sea level as in cal_temp_anom) 
-        real(wp), intent(IN)  :: temp0
+        real(wp), intent(INOUT) :: C             ! Current carbon dyoxide value
+        real(wp), intent(OUT)   :: Cref          ! Reference (climate dependent) carbon dyoxide value
+        real(wp), intent(IN)    :: Cinit         ! Inital (absolute reference) carbon dyoxide value
+                                                 ! the CO2 radiative forcing is calculated as a function of (C/Cinit) 
+        real(wp), intent(IN)    :: Cc            ![ppms/K] ! Constant to determine how many ppms we remove per a given deltaT
+        real(wp), intent(IN)    :: tau_C         ! [yrs] Characteristic time to relax to Cref
+                                                 
+        real(wp), intent(IN)    :: temp_now      ! Surface temperature (not the sea level one, as in cal_temp_anom) 
+        real(wp), intent(IN)    :: temp0         ! Initial (from clim0) surface temperature
+
 
         ! local variables
         real(wp) :: Cdot
-        real(wp), parameter :: Cc = 10.0         ![ppms/K] ! Constant to determine how many ppms we remove per a given deltaT
-        real(wp), parameter :: tau_C = 100.0     ! [yrs] Characteristic time to relax to Cref
 
-        !Cref = Cc * (sum(temp_now)/size(temp_now) - sum(temp0)/size(temp0))
-        Cref = Cc *(temp_now - temp0)
-
-        Cdot = 10*(C -Cref)/tau_C                ! jalv: multiplied by 10, beacuse the time step dt_clim seems to be hard coded
-                                                 ! to that value in yelmox
-
+        Cref = max(Cinit + Cc*(temp_now - temp0), 0.0)   ! Cref is Cinit corrected trough temperature anomalies
+        Cdot = 10*(Cref -C)/tau_C                        ! jalv: multiplied by 10, beacuse the time step dt_clim seems to be hard coded
+                                                         ! to that value in yelmox
         C = C + Cdot 
-
 
         return
 
@@ -1621,6 +1655,8 @@ contains
         call nml_read(filename,"snap","climsens",           par%climsens,       init=init_pars)
         call nml_read(filename,"snap","ci",                 par%ci,             init=init_pars)
         call nml_read(filename,"snap","Cinit",              par%Cinit,          init=init_pars)
+        call nml_read(filename,"snap","Cc",                 par%Cc,             init=init_pars)
+        call nml_read(filename,"snap","tau_C",              par%tau_C,          init=init_pars)
 
 
         call nml_read(filename,"snap_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)

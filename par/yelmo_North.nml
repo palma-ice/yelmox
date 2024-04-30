@@ -1,7 +1,7 @@
 &ctrl
     time_init       = -21e3               ! [yr] Starting time 
     time_end        = 0             ! [yr] Ending time
-    time_equil      = 10.0              ! [yr] Equilibration time 
+    time_equil      = 2.0              ! [yr] Equilibration time 
     time_const      = -19050.0          ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
     time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
@@ -283,7 +283,9 @@
     f_stdev            = 0.0 
     climsens           = 4.0               ! (for ebm case) climate sensitivity to co2 changes, aplied to dTa
     ci                 = 4.0               ! (for ebm case) temperature sensitivity to insolation cahnges   
-    Cinit              = 280.0             ! carbon dyoxide reference value
+    Cinit              = 280.0             ! carbon dyoxide initial and absolute reference value
+    Cc                 = 10.0              ![ppms/K] ! Constant to determine how many ppms we remove per a given deltaT
+    tau_C              = 100.0             ! [yrs] Characteristic time to relax to Cref
 /
 
 &snap_hybrid

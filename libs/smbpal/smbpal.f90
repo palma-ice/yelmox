@@ -109,6 +109,11 @@ contains
         ! Test calculation of insolation to load orbital params 
         smb%now%Sref = calc_insol_day(180,dble(smb%par%lats),0.d0,fldr=smb%par%insol_fldr)
 
+        ! jalv getting initial time summer insolation         
+        !smb%now%Ssols   = calc_insol_day(180,dble(smb%par%lats),insol_time,fldr=smb%par%insol_fldr)
+        ! Assuming that Ssols at initial time is equal to the reference insolation
+        smb%now%Ssols   = smb%now%Sref
+
         return 
 
     end subroutine smbpal_init

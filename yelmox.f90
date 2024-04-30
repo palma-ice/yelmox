@@ -484,6 +484,9 @@ program yelmox
     yelmo1%bnd%CO2 = snp1%now%C 
     yelmo1%bnd%Cref = snp1%now%Cref
 
+    !print*, 'In yelmox1, yelmo1%bnd%CO2=', yelmo1%bnd%CO2
+    !print*, 'In yelmox1, yelmo1%bnd%Cref=', yelmo1%bnd%Cref
+    
     !yelmo1%bnd%Sref = snp1%now%Sref
     !yelmo1%bnd%Ssols = snp1%now%Ssols
     
@@ -601,6 +604,16 @@ program yelmox
 
             ! Update snapclim to reflect new topography 
             call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins,Sref=smbpal1%now%Sref,Ssols=smbpal1%now%Ssols)
+
+            yelmo1%bnd%ta_ann = snp1%now%ta_ann
+            yelmo1%bnd%dTa_ann = snp1%now%ta_ann-snp1%clim0%ta_ann
+
+            yelmo1%bnd%CO2 = snp1%now%C
+            yelmo1%bnd%Cref = snp1%now%Cref
+
+            !print*, 'In yelmox2, yelmo1%bnd%CO2=', yelmo1%bnd%CO2
+            !print*, 'In yelmox2, yelmo1%bnd%Cref=', yelmo1%bnd%Cref
+
 
             ! Update smbpal
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
@@ -847,7 +860,18 @@ program yelmox
         
         if (mod(nint(time*100),nint(ctl%dt_clim*100))==0) then
             ! Update snapclim
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins,Sref=smbpal1%now%Sref,Ssols=smbpal1%now%Ssols) 
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins,Sref=smbpal1%now%Sref,Ssols=smbpal1%now%Ssols)
+
+            yelmo1%bnd%ta_ann = snp1%now%ta_ann
+            yelmo1%bnd%dTa_ann = snp1%now%ta_ann-snp1%clim0%ta_ann
+
+            yelmo1%bnd%CO2 = snp1%now%C
+            yelmo1%bnd%Cref = snp1%now%Cref
+
+            !print*, 'In yelmox3, yelmo1%bnd%CO2=', yelmo1%bnd%CO2
+            !print*, 'In yelmox3, yelmo1%bnd%Cref=', yelmo1%bnd%Cref
+
+
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
