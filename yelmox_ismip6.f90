@@ -384,8 +384,8 @@ program yelmox_ismip6
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
         yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
     
-    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+    yelmo1%bnd%z_bed = isos1%now%z_bed
+    yelmo1%bnd%z_sl  = isos1%now%z_ss
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -579,8 +579,8 @@ program yelmox_ismip6
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+            yelmo1%bnd%z_sl  = isos1%now%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -691,8 +691,8 @@ end if
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+            yelmo1%bnd%z_sl  = isos1%now%z_ss
             
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -828,8 +828,8 @@ end if
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
 
-            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+            yelmo1%bnd%z_sl  = isos1%now%z_ss
             
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -1040,8 +1040,8 @@ end if
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            yelmo1%bnd%z_bed = isos1%now%z_bed
+            yelmo1%bnd%z_sl  = isos1%now%z_ss
             
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -1240,9 +1240,9 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a ice equiv.",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv_flt",ylmo%tpo%now%calv_flt,units="m/a ice equiv.",long_name="Calving rate flt", &
+        call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,units="m/a ice equiv.",long_name="Calving mass balance rate flt", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
@@ -1838,7 +1838,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a ice equiv.",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
@@ -2426,9 +2426,9 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0 .and. ylmo%tpo%now%f_grnd_bmb .lt. 1.0) flux_grl = ylmo%tpo%now%dHidt
         call nc_write(filename,"strbasemag",ylmo%dyn%now%taub,units="Pa",long_name="Basal drag", &
                         standard_name="Basal drag", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"licalvf",ylmo%tpo%now%calv*ismip6_correction,units="kg m-2 s-1",long_name="Calving flux", &
+        call nc_write(filename,"licalvf",ylmo%tpo%now%cmb*ismip6_correction,units="kg m-2 s-1",long_name="Calving flux", &
                         standard_name="land_ice_specific_mass_flux_due_to_calving", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"lifmassbf",(ylmo%tpo%now%fmb+ylmo%tpo%now%calv)*ismip6_correction,units="kg m-2 s-1",long_name="Ice front melt and calving flux", &
+        call nc_write(filename,"lifmassbf",(ylmo%tpo%now%fmb+ylmo%tpo%now%cmb)*ismip6_correction,units="kg m-2 s-1",long_name="Ice front melt and calving flux", &
                         standard_name="land_ice_specific_mass_flux_due_to_calving_and_ice_front_melting", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ligroundf",flux_grl*ismip6_correction,units="kg m-2 s-1",long_name="Grounding line flux", &
                         standard_name="land_ice_specific_mass_flux_at_grounding_line", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -2581,7 +2581,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         if (npts_frnt .gt. 0) then
 
             A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
-            calv_flt   = sum(dom%tpo%now%calv_flt*dom%tpo%now%H_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
+            calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
             flux_frnt  = calv_flt+sum(dom%tpo%now%fmb*dom%tpo%now%H_ice,mask=mask_frnt)*dx      ! m^3/yr: flux [m-1 yr-1]
 
             ! ajr, why only *dx above? 

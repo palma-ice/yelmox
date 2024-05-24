@@ -13,7 +13,7 @@ program yelmox
 
     ! External libraries
     use sealevel 
-    use isostasy  
+    use fastisostasy  
      
     use snapclim
     use marine_shelf 
@@ -401,21 +401,25 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
-    if (trim(domain) .eq. "Antarctica") then 
-        ! Redefine tau (asthenosphere relaxation constant) as spatially
-        ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
-        call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
-        call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
-        call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
+    ! ajr: for now, spatially variable tau is disabled, since it is not clear how to 
+    ! pass the information from an isos1%output field back to the correlary extended 
+    ! isos1%domain field. 
+
+    ! if (trim(domain) .eq. "Antarctica") then 
+    !     ! Redefine tau (asthenosphere relaxation constant) as spatially
+    !     ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
+    !     call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
+    !     call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
+    !     call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
  
-        call isos_set_field(isos1%now%tau, &
-                [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
-                [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
-                                      regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
+    !     call isos_set_field(isos1%now%tau, &
+    !             [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
+    !             [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
+    !                                   regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
         
-    end if
+    ! end if
     
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
@@ -432,13 +436,18 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Initialize isostasy using present-day topography 
-    ! values to calibrate the reference rebound
-    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
-                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
-                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
-                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=time)
-                                       
+    ! Initialize isostasy reference state using present-day reference topography
+    call isos_init_state(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, &
+        yelmo1%bnd%z_sl*0.0_wp, 0.0_wp, time, set_ref=.TRUE.)
+    
+    ! Initialize isostasy using current topography to calibrate the reference rebound
+    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
+        yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
+    
+    yelmo1%bnd%z_bed = isos1%now%z_bed
+    yelmo1%bnd%z_sl  = isos1%now%z_ss
+
 
     call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -764,14 +773,15 @@ program yelmox
 
         call timer_step(tmrs,comp=0) 
         
-        ! == SEA LEVEL ==========================================================
+        ! == SEA LEVEL (BARYSTATIC) ======================================================
         call sealevel_update(sealev,year_bp=time_bp)
-        yelmo1%bnd%z_sl  = sealev%z_sl 
 
-        ! == ISOSTASY ==========================================================
-        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,time,yelmo1%bnd%dzbdt_corr) 
+        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
         yelmo1%bnd%z_bed = isos1%now%z_bed
-        
+        yelmo1%bnd%z_sl  = isos1%now%z_ss
+
         call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
         
         ! == ICE SHEET ===================================================
@@ -952,11 +962,11 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a ice equiv.",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv_grnd",ylmo%tpo%now%calv_grnd,units="m/a ice equiv.",long_name="Calving rate (floating)", &
+        call nc_write(filename,"cmb_grnd",ylmo%tpo%now%cmb_grnd,units="m/a ice equiv.",long_name="Calving mass balance rate (floating)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv_flt",ylmo%tpo%now%calv_flt,units="m/a ice equiv.",long_name="Calving rate (grounded)", &
+        call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,units="m/a ice equiv.",long_name="Calving mass balance rate (grounded)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
