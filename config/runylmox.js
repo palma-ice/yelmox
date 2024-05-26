@@ -31,7 +31,7 @@
     "dir-special" : {},
 
     "links" : 
-        ["input","ice_data","maps"],
+        ["input","ice_data","isostasy_data","maps"],
 
     "job_queues" :
         {   "priority" :
