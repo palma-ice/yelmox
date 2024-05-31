@@ -21,7 +21,7 @@
 
 &transient
     time_init       = 2015.0            ! [yr] Starting time (years CE)
-    time_end        = 2500.0            ! [yr] Ending time (years CE)
+    time_end        = 2200.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
@@ -66,7 +66,7 @@
 
 &tm_2D
     method          = "const"           ! "const", "file", "times"
-    dt              = 200.0
+    dt              = 10.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /

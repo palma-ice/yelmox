@@ -392,7 +392,7 @@ contains
             case(3)
                 ! Calculate the thermal forcing for nahosmip experiments. Same as case 2 for the moment
 
-                mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
+                mshlf%now%tf_shlf = 0 ! mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
             case DEFAULT 
 

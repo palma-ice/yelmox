@@ -24,7 +24,7 @@
     time_end        = 2200.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
-    time_const      = 2015.0            ! [yr] Year that equilibration represents
+    time_const      = 2051.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
 /
@@ -66,7 +66,7 @@
 
 &tm_2D
     method          = "const"           ! "const", "file", "times"
-    dt              = 200.0
+    dt              = 10.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /
@@ -476,7 +476,7 @@
 
 &marine_shelf
     bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 3             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf, 3: nahosmip
+    tf_method       = 2             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf, 3: nahosmip
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -568,7 +568,7 @@
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 0             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
     dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
-    dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
+    dt_diagnostics  = 1.           ! [yr] Min. timestep to recalculate diagnostics
     visc_method     = "laty"        ! Type of viscosity field for sub-lithospheric mantle
     rigidity_method = "laty"        ! Type of thickness filed for elastic lithosphere
 

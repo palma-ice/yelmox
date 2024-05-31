@@ -609,8 +609,8 @@ program yelmox_ismip6
         write(*,*) 
 
         ! Additionally make sure isostasy is updated every timestep 
-        isos1%par%dt_prognostics = 1.0_wp 
-        isos1%par%dt_diagnostics = 10.0_wp 
+        !isos1%par%dt_prognostics = 1.0_wp 
+        !isos1%par%dt_diagnostics = 5.0_wp 
         
         ! Get current time 
         time    = ctl%time_init
@@ -619,6 +619,23 @@ program yelmox_ismip6
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !antoniojm (write 1D for regions)
+        if (reg1%write) then
+         call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
+        end if
+
+        if (reg2%write) then
+         call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
+        end if
+
+        if (reg3%write) then
+         call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
+        end if
+
+
         
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
@@ -669,6 +686,8 @@ program yelmox_ismip6
 
             call timer_step(tmrs,comp=3,time_mod=[time-ctl%dtt,time]*1e-3,label="climate") 
 
+
+             
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2D,time)) then
@@ -679,6 +698,21 @@ program yelmox_ismip6
             if (timeout_check(tm_1D,time)) then
                  call yelmo_write_reg_step(yelmo1,file1D,time=time)
             end if 
+
+               !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !antoniojm (write 1D for regions)
+            if (reg1%write) then
+               call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
+            end if
+
+            if (reg2%write) then
+                call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
+            end if
+
+            if (reg3%write) then
+                call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
+            end if
+
 
             call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
         
@@ -1217,20 +1251,23 @@ contains
         ! jablasco: set anomaly to zero
         ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
         ! jablasco: volvamos al ppio! dto_ann=ismp%to%var(:,:,:,1)*0.0
-        ! antoniojm: set apart ref variables from nahosmip namelist
+        ! antoniojm: tf_ann should add reference (Jourdain) in projections, not in ctrl (nahosmip)
 
-        call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+        if (trim(ctl%ismip6_expname) .eq. "ctrlAE") then 
+
+            call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                         ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
                         ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
-                        dto_ann=ismp%to%var(:,:,:,1), &
+                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
                         tf_ann=ismp%tf%var(:,:,:,1))
+        else
 
-        !call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-        !                ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
-        !                ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
-        !                dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
-        !                tf_ann=ismp%tf%var(:,:,:,1))
-
+             call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
+                        ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
+                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
+                        tf_ann=ismp%tf%var(:,:,:,1)+ismp%tf_ref%var(:,:,:,1))
+        end if
         ! Update temperature forcing field with tf_corr and tf_corr_basin
         mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
@@ -1240,10 +1277,14 @@ contains
             mshlf1%now%dT_shlf = mshlf1%now%dT_shlf + dTo
             mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + dTo
         end if 
+        write(*,*) "antoniojm-bmb", sum(mshlf%now%bmb_shlf)/(381*381)
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
+
+        write(*,*) "antoniojm-bmb", sum(mshlf%now%bmb_shlf)/(381*381)
+
 
         return
 
