@@ -400,6 +400,7 @@ program yelmox
     ! Initialize global sea level model (bnd%z_sl)
     call sealevel_init(sealev,path_par)
 
+    write(*,*) "(nx, ny) = ", yelmo1%grd%nx, yelmo1%grd%ny
     ! Initialize bedrock model 
     call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
@@ -445,9 +446,8 @@ program yelmox
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
         yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
     
-    yelmo1%bnd%z_bed = isos1%now%z_bed
-    yelmo1%bnd%z_sl  = isos1%now%z_ss
-
+    yelmo1%bnd%z_bed = isos1%output%z_bed
+    yelmo1%bnd%z_sl  = isos1%output%z_ss
 
     call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -517,8 +517,9 @@ program yelmox
     if (yelmo1%par%use_restart) then 
         ! Perform additional startup steps when using a restart
 
-        ! Set boundary module variables equal to restarted value         
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
+        ! Set boundary module variables equal to restarted value
+        isos1%now%z_bed(isos1%domain%icrop1:isos1%domain%icrop2, &
+            isos1%domain%jcrop1:isos1%domain%jcrop2)  = yelmo1%bnd%z_bed
 
     else
         ! No restart file used
@@ -779,8 +780,8 @@ program yelmox
         ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
         call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                     dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = isos1%now%z_bed
-        yelmo1%bnd%z_sl  = isos1%now%z_ss
+        yelmo1%bnd%z_bed = isos1%output%z_bed
+        yelmo1%bnd%z_sl  = isos1%output%z_ss
 
         call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
         
