@@ -79,7 +79,7 @@
 
 
 &gcm_to_proj
-    filename    = "ice_data/NAHosMIP/{domain}/{grid_name}/{gcm}-{scenario}/{gcm}-{scenario}.nc"
+    filename    = "ice_data/NAHosMIP/{domain}/{grid_name}/{gcm}-{scenario}/{gcm}-{scenario}-detrend-2.nc"
     name        = "temperature"
     units_in    = "degrees C"
     units_out   = "K"
@@ -101,7 +101,7 @@
     time_par    = 1995, 2300, 1
 /
 &gcm_tf_proj
-    filename    = "ice_data/NAHosMIP/{domain}/{grid_name}/{gcm}-{scenario}/{gcm}-{scenario}.nc"
+    filename    = "ice_data/NAHosMIP/{domain}/{grid_name}/{gcm}-{scenario}/{gcm}-{scenario}-detrend-2.nc"
     name        = "thermal_forcing"
     units_in    = "K"
     units_out   = "K"
