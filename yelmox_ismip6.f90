@@ -35,6 +35,11 @@ program yelmox_ismip6
     real(wp) :: time_wt 
     logical  :: pd_ref
 
+    real(wp)            :: restart_every_df
+    integer             :: counter_restart
+    character(len=16)   :: counter_restart_str
+    character(len=512)  :: filename_restarts
+
     real(sp) :: convert_km3_Gt
 
     type(yelmo_class)           :: yelmo1 
@@ -178,6 +183,10 @@ program yelmox_ismip6
     ! Set initial model time 
     time    = ctl%time_init 
     time_bp = time - 1950.0_wp 
+
+    ! Init restart file tracking
+    restart_every_df = 0.5
+    counter_restart = 0
 
     !  =========================================================
     ! Print summary of run settings 
@@ -348,8 +357,8 @@ program yelmox_ismip6
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ismip6exp%experiment, &
-                                                                    shlf_collapse=ismip6exp%shlf_collapse)
+    call ismip6_forcing_init(ismp1, ismip6_path_par, domain, grid_name, &
+        experiment=ismip6exp%experiment, shlf_collapse=ismip6exp%shlf_collapse)
     
     ! ===== tf_corr initialization ======
 
@@ -435,7 +444,9 @@ program yelmox_ismip6
         ! Set boundary module variables equal to restarted value
         isos1%now%z_bed(isos1%domain%icrop1:isos1%domain%icrop2, &
             isos1%domain%jcrop1:isos1%domain%jcrop2)  = yelmo1%bnd%z_bed
-      
+
+        if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
+
     end if
 
 
@@ -758,7 +769,7 @@ program yelmox_ismip6
             if (mod(time_elapsed,10.0)==0) then
                 ! Print timestep timing info and write log table
                 call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
-            end if 
+            end if
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
@@ -1127,7 +1138,15 @@ end if
             if (mod(time_elapsed,10.0)==0) then
                 ! Print timestep timing info and write log table
                 call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
-            end if 
+            end if
+
+            if ((hyst1%f_now) .gt. ((counter_restart+1) * restart_every_df)) then
+                write (*,*) "writing restart file..."
+                counter_restart = counter_restart + 1
+                write (counter_restart_str, '(i1)') counter_restart
+                filename_restarts = trim(outfldr)//"yelmo_restart_"//trim(counter_restart_str)//".nc"
+                call yelmo_restart_write(yelmo1, filename_restarts, time=time_bp)
+            end if
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", time
