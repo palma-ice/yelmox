@@ -122,7 +122,8 @@ module marine_shelf
     public :: marshelf_update_shelf
     public :: marshelf_update
     public :: marshelf_init
-    public :: marshelf_end 
+    public :: marshelf_end
+    public :: maskkill_shelves
 
 contains 
     
@@ -1407,6 +1408,31 @@ contains
         return
 
     end subroutine calc_shelf_variable_depth
+
+    ! Kill ice shelves that go beyond mask_ref.
+    subroutine maskkill_shelves(H_ice, mask_ref)
+
+        implicit none
+        real(wp), intent(OUT)   :: H_ice(:, :)
+        real(wp), intent(IN)    :: mask_ref(:, :)
+
+        where(mask_ref .lt. 1.0) H_ice = 0.0 
+
+        ! ! Local variables
+        ! integer :: i, j, nx, ny
+
+        ! nx = size(H_ice, 1)
+        ! ny = size(H_ice, 2)
+        
+        ! do j = 1, ny
+        ! do i = 1, nx
+        !     if (mask_ref(i, j) < 1) then
+        !         H_ice(i, j) = 0.0
+        !     end if
+        ! end do
+        ! end do
+
+    end subroutine maskkill_shelves
 
     elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
