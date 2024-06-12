@@ -16,7 +16,7 @@
     dtt             = 5.0               ! [yr] Main loop timestep 
     time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
-    kill_shelves    = False             ! Kill shelves beyond PD?
+    kill_shelves    = True              ! Kill shelves beyond PD?
     equil_method    = "relax"           ! "none", "relax", "opt"
 /
 
@@ -101,7 +101,7 @@
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
+    cf_init         = 0.1              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
     cf_min          = 0.001             ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
@@ -110,16 +110,16 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
     
-    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
+    rel_tau1        = 10.0             ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 1000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 4e3               ! [yr] Time limit for time period 1
+    rel_time2       = 8e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = True              ! Should thermal forcing be optimized?
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
@@ -155,8 +155,8 @@
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1.0               ! Predictor-corrector tolerance 
+    pc_tol          = 10.0              ! [m/a] Tolerance threshold to redo timestep
+    pc_eps          = 3.0               ! Predictor-corrector tolerance 
     
 /
 
@@ -189,7 +189,7 @@
     gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
     gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
-    fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+    fmb_scale           = 3.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     k2                  = 3e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
@@ -243,17 +243,17 @@
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction
-    z0              = -250.0            ! [m] Bedrock rel. to sea level, lower limit
-    z1              =  250.0            ! [m] Bedrock rel. to sea level, upper limit
+    z0              = -200.0            ! [m] Bedrock rel. to sea level, lower limit
+    z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.001            ! [-- or deg] Minimum value of cf
     cf_ref          =  0.05             ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
-    method          = 2                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
     const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     p               = 1.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
-    H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
+    H_w_max         = 2.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
     delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
