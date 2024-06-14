@@ -197,14 +197,14 @@
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
-    gz_Hg1              = 0.0             ! Grounding zone, limit of penetration of bmb_shlf 
+    gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf 
     fmb_scale           = 10.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     k2                  = 3.2e9               ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
-    Hc_ref              = 90.0             ! [m] Calving limit in ice thickness (thinner ice calves)
-    Hc_deep             = 90.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
     zb_sigma            = 0.0               ! [m] Gaussian filtering of bedrock for calving transition to deep ocean
@@ -534,7 +534,7 @@
     kappa_grz       = 10.0          ! [m/yr K-1] Heat flux coefficient [kappa*dT]
     c_grz           = 1.0           ! [-] bmb_ref scalar [c_grz*bmb_ref]
     f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
-    grz_length      = 16.0          ! [km] Length scale of assumed grounding zone
+    grz_length      = 32.0          ! [km] Length scale of assumed grounding zone
 
     ! bmb_method == anom, bmb_ref parameters 
     use_obs         = True          ! Load obs for bmb_ref
@@ -550,7 +550,7 @@
 &tf_corr_ant
     ronne   = 0.0                   ! [K] tf_corr for ronne basin (basin=1)
     ross    = 0.0                   ! [K] tf_corr for ross basin (basin=12)
-    pine    = -2.0                   ! [K] tf_corr for pine island (basin=14)
+    pine    = -1.0                   ! [K] tf_corr for pine island (basin=14)
     abbott  = 0.0                   ! [K] tf_corr for Abbott glacier (basin=15)
 /
 
