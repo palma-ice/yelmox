@@ -22,7 +22,7 @@ program yelmox_ismip6
 
     implicit none
 
-    character(len=256) :: outfldr, file1D, file2D, file2D_small, file2D_wais
+    character(len=256) :: outfldr, file1D, file2D, file2D_small, file2D_wais, file3D
     character(len=256) :: file1D_ismip6, file2D_ismip6
     character(len=256) :: file_restart
     character(len=256) :: domain, grid_name
@@ -53,7 +53,7 @@ program yelmox_ismip6
     type(ismip6_forcing_class)  :: ismp1
     type(hyster_class)          :: hyst1
 
-    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm, tm_2Dwais
+    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm, tm_2Dwais, tm_3D
 
     ! Model timing
     type(timer_class)  :: tmr
@@ -164,6 +164,7 @@ program yelmox_ismip6
     call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ctl%time_init, ctl%time_end)
     call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium-heavy", ctl%time_init, ctl%time_end)
     call timeout_init(tm_2Dwais, path_par, "tm_2Dwais", "medium-small", ctl%time_init, ctl%time_end)
+    call timeout_init(tm_3D, path_par, "tm_3D", "veryheavy", ctl%time_init, ctl%time_end)
 
     ! Assume program is running from the output folder
     outfldr = "./"
@@ -173,8 +174,9 @@ program yelmox_ismip6
     file2D = trim(outfldr)//"yelmo2D.nc"
     file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
     file2D_wais = trim(outfldr)//"yelmo2Dwais.nc"
-    file_restart = trim(outfldr)//"yelmo_restart.nc"
+    file3D = trim(outfldr)//"yelmo3D.nc"
 
+    file_restart = trim(outfldr)//"yelmo_restart.nc"
     file1D_ismip6 = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6 = trim(outfldr)//"yelmo2D_ismip6.nc"
 
@@ -500,8 +502,11 @@ call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,do
         write (*, *) "Initialization complete."
 
         ! Initialize output files for checking progress
+        call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", &
+            mask=yelmo1%bnd%ice_allowed)
         call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
-        call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", mask=yelmo1%bnd%ice_allowed)
+        call yelmo_write_init3D(yelmo1, file3D, time_init=time, units="years")
+
 
         call timer_step(tmr, comp=1, label="initialization")
         call timer_step(tmrs, comp=-1)
@@ -627,12 +632,16 @@ call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,do
 
             ! == MODEL OUTPUT ===================================
 
+            if (timeout_check(tm_1D, time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+            end if
+            
             if (timeout_check(tm_2D, time)) then
                 call write_step_2D_combined(yelmo1, isos1, snp1, mshlf1, smbpal1, file2D, time)
             end if
 
-            if (timeout_check(tm_1D, time)) then
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+            if (timeout_check(tm_3D, time)) then
+                call write_step_3D(yelmo1, file3D, time)
             end if
 
             call timer_step(tmrs, comp=4, time_mod=[time - ctl%dtt, time]*1e-3, label="io")
@@ -672,9 +681,10 @@ call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,do
         time_bp = time - 1950.0_wp
 
         ! Initialize output files
-        call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
         call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", mask=yelmo1%bnd%ice_allowed)
-
+        call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
+        ! call yelmo_write_init3D(yelmo1, file3D, time_init=time, units="years")
+        
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
             call yelmo_write_init(yelmo1, file2D_ismip6, time_init=time, units="years")
@@ -743,12 +753,16 @@ call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,do
 
             ! == MODEL OUTPUT ===================================
 
+            if (timeout_check(tm_1D, time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+            end if
+            
             if (timeout_check(tm_2D, time)) then
                 call write_step_2D_combined(yelmo1, isos1, snp1, mshlf1, smbpal1, file2D, time)
             end if
 
-            if (timeout_check(tm_1D, time)) then
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+            if (timeout_check(tm_3D, time)) then
+                call write_step_3D(yelmo1, file3D, time)
             end if
 
             ! ISMIP6 output if desired:
@@ -926,12 +940,16 @@ call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,do
 
             ! == MODEL OUTPUT ===================================
 
+            if (timeout_check(tm_1D, time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+            end if
+            
             if (timeout_check(tm_2D, time)) then
                 call write_step_2D_combined(yelmo1, isos1, snp1, mshlf1, smbpal1, file2D, time)
             end if
 
-            if (timeout_check(tm_1D, time)) then
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+            if (timeout_check(tm_3D, time)) then
+                call write_step_3D(yelmo1, file3D, time)
             end if
 
             call timer_step(tmrs, comp=4, time_mod=[time - ctl%dtt, time]*1e-3, label="io")
@@ -1534,9 +1552,14 @@ call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_
         real(wp), intent(IN) :: time
 
         ! Local variables
-        integer  :: ncid, n
+        integer  :: ncid, n, nx, ny, nz
         real(wp) :: time_prev
 
+        nx = size(ylmo%dyn%now%ux, 1)
+        ny = size(ylmo%dyn%now%ux, 2)
+        nz = size(ylmo%dyn%now%ux, 3)
+        write (*, *) "nx, ny, nz = ", nx, ny, nz
+        
         ! Open the file for writing
         call nc_open(filename, ncid, writable=.TRUE.)
 
@@ -1548,13 +1571,13 @@ call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_
         ! Update the time step
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
 
-        call nc_write(filename, "ux", ylmo%dyn%now%ux, units="m/yr",
+        call nc_write(filename, "ux", ylmo%dyn%now%ux, units="m/yr", &
             long_name="Velocity in x", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
-        call nc_write(filename, "uy", ylmo%dyn%now%uy, units="m/yr",
+        call nc_write(filename, "uy", ylmo%dyn%now%uy, units="m/yr", &
             long_name="Velocity in y", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
-        call nc_write(filename, "uz", ylmo%dyn%now%uz, units="m/yr",
+        call nc_write(filename, "uz", ylmo%dyn%now%uz, units="m/yr", &
             long_name="Velocity in z", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
 
