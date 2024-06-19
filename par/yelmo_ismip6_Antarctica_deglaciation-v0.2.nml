@@ -90,6 +90,13 @@
     times           = 0
 /
 
+&tm_3D
+    method          = "const"   ! "const", "file", "times"
+    dt              = -1.0      ! [yr] Time step for small output. Negative => means no output.
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
 &hyster
     method          = "ramp-slope"      ! const, ramp-time, ramp-slope, exp, PI42, H312b, H312PID, H321PID, PID1
     with_kill       = True              ! Should kill signal be activated at limits of forcing?
