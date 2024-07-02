@@ -13,7 +13,7 @@ LISROOT = /Users/alrobi001/apps/lis/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib -llis
 
-ISOSTASYROOT = isostasy
+ISOSTASYROOT = FastIsostasy
 INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
 LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
 
