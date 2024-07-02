@@ -1,9 +1,10 @@
 Makefile
 libyelmox
 yelmo
-isostasy
+FastIsostasy
 rembo1
 ice_data
+isostasy_data
 tests/plots
 output
 tmp
