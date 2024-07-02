@@ -384,8 +384,8 @@ program yelmox_ismip6
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
         yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
     
-    yelmo1%bnd%z_bed = isos1%now%z_bed
-    yelmo1%bnd%z_sl  = isos1%now%z_ss
+    yelmo1%bnd%z_bed = isos1%output%z_bed
+    yelmo1%bnd%z_sl  = isos1%output%z_ss
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -416,7 +416,8 @@ program yelmox_ismip6
         ! Perform additional startup steps when using a restart
 
         ! Set boundary module variables equal to restarted value         
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
+        isos1%now%z_bed(isos1%domain%icrop1:isos1%domain%icrop2, &
+            isos1%domain%jcrop1:isos1%domain%jcrop2) = yelmo1%bnd%z_bed
       
     end if
 
@@ -579,8 +580,8 @@ program yelmox_ismip6
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-            yelmo1%bnd%z_sl  = isos1%now%z_ss
+            yelmo1%bnd%z_bed = isos1%output%z_bed
+            yelmo1%bnd%z_sl  = isos1%output%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -691,8 +692,8 @@ end if
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-            yelmo1%bnd%z_sl  = isos1%now%z_ss
+            yelmo1%bnd%z_bed = isos1%output%z_bed
+            yelmo1%bnd%z_sl  = isos1%output%z_ss
             
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -828,8 +829,8 @@ end if
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
 
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-            yelmo1%bnd%z_sl  = isos1%now%z_ss
+            yelmo1%bnd%z_bed = isos1%output%z_bed
+            yelmo1%bnd%z_sl  = isos1%output%z_ss
             
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -1040,8 +1041,8 @@ end if
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%now%z_bed
-            yelmo1%bnd%z_sl  = isos1%now%z_ss
+            yelmo1%bnd%z_bed = isos1%output%z_bed
+            yelmo1%bnd%z_sl  = isos1%output%z_ss
             
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
