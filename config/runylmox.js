@@ -5,7 +5,7 @@
         "email"         : "USER@pik-potsdam.de",
         "group"         : "anthroia", 
         "omp"           : 0,
-        "wall"          : 24, 
+        "wall"          : "24:00:00", 
         "qos"           : "priority",
         "partition"     : "haswell",
         "job_template"  : "config/pik_submit_slurm"
