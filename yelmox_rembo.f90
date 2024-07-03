@@ -11,7 +11,7 @@ program yelmox
 
     ! External libraries
     use sealevel 
-    use isostasy  
+    use fastisostasy  
     
     use rembo_sclimate 
     use snapclim
@@ -156,7 +156,7 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(time_init,8))
@@ -187,13 +187,13 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     
     ! Initialize isostasy reference state using present-day reference topography
-    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
-        dble(yelmo1%bnd%z_sl*0.0), dble(0.0), dble(time), set_ref=.TRUE.)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, &
+        yelmo1%bnd%z_sl*0.0_wp, 0.0_wp, time, set_ref=.TRUE.)
     
     ! Initialize isostasy using current topography to calibrate the reference rebound
     ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
-    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
-        dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
+        yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
     
     yelmo1%bnd%z_bed = real(isos1%now%z_bed)
     yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
@@ -412,8 +412,8 @@ end if
         call sealevel_update(sealev,year_bp=time)
 
         ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-        call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
-                                                    dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
         yelmo1%bnd%z_bed = real(isos1%now%z_bed)
         yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
 
@@ -784,7 +784,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a ice equiv.",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
