@@ -195,8 +195,8 @@ program yelmox
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
         yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
     
-    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+    yelmo1%bnd%z_bed = real(isos1%output%z_bed,wp)
+    yelmo1%bnd%z_sl  = real(isos1%output%z_ss,wp)
 
     if (use_hyster) then
         ! Update hysteresis variable 
@@ -307,8 +307,9 @@ program yelmox
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
 
-        ! Set boundary module variables equal to restarted value         
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
+        ! Set boundary module variables equal to restarted value
+        isos1%now%z_bed(isos1%domain%icrop1:isos1%domain%icrop2, &
+            isos1%domain%jcrop1:isos1%domain%jcrop2)  = yelmo1%bnd%z_bed
 
     else 
         ! Run yelmo for several years with constant boundary conditions and topo
@@ -414,8 +415,8 @@ end if
         ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
         call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                     dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-        yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+        yelmo1%bnd%z_bed = real(isos1%output%z_bed,wp)
+        yelmo1%bnd%z_sl  = real(isos1%output%z_ss,wp)
 
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
