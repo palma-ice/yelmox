@@ -1,5 +1,3 @@
-#FC  = mpiifort
-#FC  = ifort
 FC = ifx
 
 NETCDFC_ROOT = /albedo/soft/sw/spack-sw/netcdf-c/4.8.1-5ewdrxn

@@ -1,5 +1,4 @@
-FC = mpif90
-#FC = gfortran 
+FC = gfortran 
 
 NC_CROOT=/albedo/soft/sw/spack-sw/netcdf-c/4.8.1-i5n4n63
 NC_FROOT=/albedo/soft/sw/spack-sw/netcdf-fortran/4.5.4-yb7woqz

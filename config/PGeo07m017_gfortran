@@ -1,5 +1,4 @@
-FC = mpif90
-#FC = gfortran 
+FC = gfortran 
 
 NC_CROOT=/opt/homebrew/Cellar/netcdf/4.9.2_1
 NC_FROOT=/opt/homebrew/Cellar/netcdf-fortran/4.6.1
@@ -18,7 +17,6 @@ INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include
 LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
 
 YELMOROOT = yelmo
-#YELMOROOT = /Users/robinson/models/EURICE/yelmo_gmd
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 

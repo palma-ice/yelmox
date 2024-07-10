@@ -15,3 +15,4 @@ check_sim.x
 git_yelmo.txt
 maps/*.nc
 .vscode
+libs/lis

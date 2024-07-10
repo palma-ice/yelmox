@@ -44,7 +44,7 @@ include config/Makefile_yelmox.mk
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
 yelmo-static: 
-		$(MAKE) -C $(YELMOROOT) yelmo-static parallel=$(parallel)
+		$(MAKE) -C $(YELMOROOT) yelmo-static openmp=$(openmp)
 		cp $(YELMOROOT)/git_yelmo.txt ./
 
 # Compile the static library libisostasy,
