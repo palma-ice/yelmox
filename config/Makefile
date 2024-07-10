@@ -50,7 +50,7 @@ yelmo-static:
 # Compile the static library libisostasy,
 # using Makefile located in $(ISOSTASYROOT) directory 
 isostasy-static: 
-		$(MAKE) -C $(ISOSTASYROOT) isostasy-static parallel=$(parallel)
+		$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
 
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
