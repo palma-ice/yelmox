@@ -9,7 +9,7 @@ LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf
 INC_FFTW = 
 LIB_FFTW = -L/opt/homebrew/Cellar/fftw/3.3.10_1/lib -lfftw3 -lm
 
-LISROOT = /Users/alrobi001/apps/lis/lis
+LISROOT = libs/lis
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib -llis
 
@@ -28,10 +28,10 @@ LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
 FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = /Users/robinson/apps/lis/lis-omp
+    LISROOT = libs/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 

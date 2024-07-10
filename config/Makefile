@@ -8,8 +8,8 @@ bindir = libyelmox/bin
 libdir = libs
 
 # Command-line options at make call
-debug    ?= 0
-parallel ?= 0 
+debug  ?= 0
+openmp ?= 0 
 
 ## COMPILER CONFIGURATION ##
 # (should be loaded from config directory)

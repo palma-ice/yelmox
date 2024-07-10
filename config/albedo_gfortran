@@ -28,7 +28,7 @@ LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
 FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
     LISROOT = /Users/robinson/apps/lis/lis-omp
