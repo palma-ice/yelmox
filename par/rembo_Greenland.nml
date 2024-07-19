@@ -36,7 +36,7 @@
     year0               =  0.0
     yearf               =  1000000.0
     year_offset         =  0
-    dtime_emb           =  100
+    dtime_emb           =  10
     dtime_smb           =  1
     dto_clim            =  1
     dto_clim2d          =  10000 

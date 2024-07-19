@@ -119,6 +119,8 @@ clean:
 	rm -f $(bindir)/*.x
 	rm -f  *.x gmon.out $(objdir)/*.o $(objdir)/*.mod $(objdir)/*.a $(objdir)/*.so
 	rm -rf *.x.dSYM
+
+cleanall: clean
 	$(MAKE) -C $(ISOSTASYROOT) clean
 	$(MAKE) -C $(YELMOROOT) clean
-
+	$(MAKE) -C $(REMBOROOT) clean
