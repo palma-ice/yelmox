@@ -3,11 +3,11 @@
     {
         "jobname"       : "Yelmo",
         "email"         : "USER@awi.de",
-        "group"         : "envi", 
+        "group"         : "envi.envi", 
         "omp"           : 0,
         "wall"          : "48:00:00", 
         "qos"           : "48h",
-        "partition"     : "haswell",
+        "partition"     : "smp",
         "job_template"  : "config/albedo_submit_slurm"
     },
 
