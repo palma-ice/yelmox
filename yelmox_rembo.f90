@@ -224,13 +224,10 @@ if (.FALSE.) then
     rembo_ann%time_emb = time_init 
     rembo_ann%time_smb = time_init
 end if
-  
-    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8))
-    
-    call rembo_write_restart("rembo_restart_0.nc",real(time,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8))
 
+    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = rembo_ann%T_srf
@@ -463,6 +460,9 @@ end if
             
             end if 
 
+            write(*,*) "ajr: ", time, minval(yelmo1%bnd%smb),   maxval(yelmo1%bnd%smb)
+            write(*,*) "ajr: ", time, minval(yelmo1%bnd%T_srf), maxval(yelmo1%bnd%T_srf)
+        
             ! Update ice sheet to current time 
             call yelmo_update(yelmo1,time)
             
@@ -474,19 +474,14 @@ end if
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
-        ! ajr: diagnostics
-        call yelmo_restart_write(yelmo1,"yelmo_restart_1.nc",time=time) 
-        call rembo_write_restart("rembo_restart_1.nc",real(time,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8))
-
         ! call REMBO1
         call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8))
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
         
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = rembo_ann%T_srf
-         
+        
         ! Special treatment for Greenland
         if (lim_pd_ice) then 
         
@@ -494,11 +489,6 @@ if (calc_transient_climate) then
             where(mask_noice) yelmo1%bnd%smb = yelmo1%bnd%smb - 4.0 
 
         end if 
-
-        ! ajr: diagnostics
-        call yelmo_restart_write(yelmo1,"yelmo_restart_2.nc",time=time) 
-        call rembo_write_restart("rembo_restart_2.nc",real(time,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8))
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         
