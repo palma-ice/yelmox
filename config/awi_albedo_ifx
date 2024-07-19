@@ -2,15 +2,15 @@ FC = ifx
 
 NETCDFC_ROOT = /albedo/soft/sw/spack-sw/netcdf-c/4.8.1-5ewdrxn
 NETCDFFI_ROOT = /albedo/soft/sw/spack-sw/netcdf-fortran/4.5.4-rujc52i
-# NetCDF
 INC_NC  = -I${NETCDFFI_ROOT}/include
-# the -rpath options ensure that the same shared libraries are found at runtime
 LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
+# the -rpath options ensure that the same shared libraries are found at runtime
 
-INC_FFTW = 
-LIB_FFTW =  -L/albedo/soft/sw/spack-sw/fftw/3.3.10-pj3kzd2/lib -lfftw3 -lm
+FFTWROOT = libs/exlib/fftw-serial
+INC_FFTW = -I${FFTWROOT}/include
+LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 -lm
 
-LISROOT = libs/lis
+LISROOT = libs/exlib/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -31,7 +31,11 @@ FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
-    LISROOT = libs/lis-omp
+    FFTWROOT = libs/exlib/fftw-omp
+    INC_FFTW = -I${FFTWROOT}/include
+    LIB_FFTW = -L${FFTWROOT}/lib -lfftw3_omp -lfftw3 -lm
+
+    LISROOT = libs/exlib/lis-omp
     INC_LIS = -I${LISROOT}/include 
     LIB_LIS = -L${LISROOT}/lib/ -llis
 
