@@ -185,16 +185,16 @@ contains
 
     end function calc_T_pm
 
-    function calc_melt_rate_pico(T_box,pm_point,gamma_tstar) result(bmb)
+    function calc_melt_rate_pico(T_box,pm_point,gamma_tstar,tf_corr) result(bmb)
 
         implicit none
 
-        real(prec), intent(IN) :: T_box, pm_point
+        real(prec), intent(IN) :: T_box, pm_point, tf_corr
         real(prec), intent(IN) :: gamma_tstar
         real(prec) :: bmb        
 
         ! OJO: negativo?
-        bmb = -1.0*(gamma_tstar / (lambda*rho_ice_sw))*(T_box - pm_point)
+        bmb = -1.0*(gamma_tstar / (lambda*rho_ice_sw))*(T_box - pm_point + tf_corr)
 
         return
 

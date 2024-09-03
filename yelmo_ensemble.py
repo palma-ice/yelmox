@@ -475,8 +475,14 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     # Determine the base name of the parameter files (no folders)
     #o1_in  = "par/yelmo_ismip6_Antarctica_spinup.nml"
     #o1_out = "yelmo_ismip6_Antarctica_spinup.nml"
-    o1_in  = "par/yelmo_ismip6_Antarctica.nml"
-    o1_out = "yelmo_ismip6_Antarctica.nml"
+    #o1_in  = "par/yelmo_Antarctica.nml"
+    #o1_out = "yelmo_Antarctica.nml"
+    #o1_in  = "par/yelmo_Antarctica_sia.nml"
+    #o1_out = "yelmo_Antarctica_sia.nml"
+    o1_in  = "par/yelmo_Antarctica_restart.nml"
+    o1_out = "yelmo_Antarctica_restart.nml"
+    #o1_in  = "par/yelmo_Antarctica_ctrl.nml"
+    #o1_out = "yelmo_Antarctica_ctrl.nml"
 
     # Generate a name for the output folder, if desired
     if auto:
@@ -521,8 +527,8 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     const_path = "par/yelmo_const_Earth.nml"
     shutil.copy(const_path,outfldr)
     # Get path of ismip6 parameter file and copy it
-    ismip6_path = "par/ismip6.nml"
-    shutil.copy(ismip6_path,outfldr)
+    #ismip6_path = "par/ismip6.nml"
+    #shutil.copy(ismip6_path,outfldr)
 
     # Also copy exe file to rundir
     shutil.copy("libyelmox/bin/"+executable,outfldr)
@@ -550,6 +556,30 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
         print("Warning: path does not exist {}".format(srcname))
 
     srcname = "ice_data_javi"
+    dstname = os.path.join(outfldr,srcname)
+    if os.path.islink(dstname): os.unlink(dstname)
+    if os.path.islink(srcname):
+        linkto = os.readlink(srcname)
+        os.symlink(linkto, dstname)
+    elif os.path.isdir(srcname):
+        srcpath = os.path.abspath(srcname)
+        os.symlink(srcpath,dstname)
+    else:
+        print("Warning: path does not exist {}".format(srcname))
+
+    srcname = "maps"
+    dstname = os.path.join(outfldr,srcname)
+    if os.path.islink(dstname): os.unlink(dstname)
+    if os.path.islink(srcname):
+        linkto = os.readlink(srcname)
+        os.symlink(linkto, dstname)
+    elif os.path.isdir(srcname):
+        srcpath = os.path.abspath(srcname)
+        os.symlink(srcpath,dstname)
+    else:
+        print("Warning: path does not exist {}".format(srcname))
+
+    srcname = "isostasy_data"
     dstname = os.path.join(outfldr,srcname)
     if os.path.islink(dstname): os.unlink(dstname)
     if os.path.islink(srcname):
@@ -609,7 +639,7 @@ def submitjob(outfldr,executable):
 def main():
 
     # Default values of options #
-    executable = 'yelmox_ismip6.x'        # Exectutable program (default: Ant-40)
+    executable = 'yelmox.x'        # Exectutable program (default: Ant-40)
     submit     = False           # Submit the job to loadleveler (default: no)
     edit       = False           # Interactive editing of options
     outfldr    = 'output/test/'  # Default output folder is just the outbase

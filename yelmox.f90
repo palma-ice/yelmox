@@ -77,7 +77,8 @@ program yelmox
         logical  :: transient_clim
         logical  :: use_lgm_step
         logical  :: use_pd_step
-        logical  :: with_ice_sheet 
+        logical  :: with_ice_sheet
+        logical :: kill_shelves 
 
         character(len=56) :: equil_method
 
@@ -144,6 +145,7 @@ program yelmox
     call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
     call nml_read(path_par,"ctrl","use_pd_step",    ctl%use_pd_step)        ! Use pd_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
+    call nml_read(path_par,"ctrl","kill_shelves",ctl%kill_shelves)          ! Kill ice shelves outside PD domain
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
     ! Get output times
@@ -210,6 +212,7 @@ program yelmox
     write(*,*) "use_lgm_step:   ",  ctl%use_lgm_step
     write(*,*) "use_pd_step:    ",  ctl%use_pd_step
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
+    write(*,*) "kill_shelves: ",    ctl%kill_shelves
     write(*,*) "equil_method:   ",  trim(ctl%equil_method)
     write(*,*)
     write(*,*) "time_init:  ",      ctl%time_init 
@@ -253,7 +256,8 @@ program yelmox
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
     
     opt%cf_min = opt%cf_min_par 
-    opt%cf_max = yelmo1%dyn%par%till_cf_ref
+    opt%cf_max = opt%cf_max_par
+    !opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define specific regions of interest =====================
 
@@ -482,6 +486,7 @@ program yelmox
         call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
     end if
 
+    ! Initialize the ice-shelf basal melt
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -562,6 +567,7 @@ program yelmox
             if (ctl%with_ice_sheet) then
                 ! Run Yelmo for briefly to update surface topography
                 call yelmo_update_equil(yelmo1,time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+            if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice,yelmo1%dta%pd%mask)
 
                 ! Addtional cleanup - remove floating ice 
                 where( yelmo1%tpo%now%mask_bed .eq. 5) yelmo1%tpo%now%H_ice = 0.0 
@@ -594,6 +600,8 @@ program yelmox
                     ! Run yelmo for several years with constant boundary conditions to stabilize fields
                     call yelmo_update_equil(yelmo1,time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
                 end if 
+              
+                if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
 
             end if 
 
@@ -627,6 +635,8 @@ program yelmox
                     call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
                 end if 
 
+                if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
+
             end if
                 
         else 
@@ -637,6 +647,8 @@ program yelmox
                 ! to synchronize all model fields a bit
                 call yelmo_update_equil(yelmo1,time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
             end if 
+
+            if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice,yelmo1%dta%pd%mask)
 
         end if
         
@@ -736,13 +748,9 @@ program yelmox
                 if (opt%opt_tf .and. &
                         (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
                     ! Perform tf_corr optimization
-
                     call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
                                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
                                                 opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
-                    ! call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                    !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                    !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
                 
                 end if 
 
@@ -834,6 +842,15 @@ program yelmox
         end if 
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
+        ! jablasco: kill shelves before computing bmb
+        if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice,yelmo1%dta%pd%mask)
+        ! jablasco: if mask_obs=flt and mask_sim=grnd, apply ocean melt at
+        ! grounded point for pico
+        if ((trim(ctl%equil_method)      .eq. "opt")  .and. opt%opt_tf .and. yelmo1%tpo%par%grounded_melt .and. &
+            (trim(mshlf1%par%bmb_method) .eq. "pico") .and. ((time-ctl%time_init) .gt. opt%tf_time_init)) then
+            where(yelmo1%dta%pd%mask .eq. 3.0) yelmo1%tpo%now%f_grnd=0.0
+            where(yelmo1%dta%pd%mask .eq. 0.0) yelmo1%tpo%now%f_grnd=0.0
+        end if
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
                         yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
@@ -911,7 +928,7 @@ contains
         type(yelmo_class),      intent(IN) :: ylmo
         type(isos_class),       intent(IN) :: isos 
         type(snapclim_class),   intent(IN) :: snp 
-        type(marshelf_class),   intent(IN) :: mshlf 
+        type(marshelf_class),   intent(INOUT) :: mshlf 
         type(smbpal_class),     intent(IN) :: srf 
         !type(sediments_class),  intent(IN) :: sed 
         !type(geothermal_class), intent(IN) :: gthrm
@@ -1070,8 +1087,8 @@ contains
 
 !        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
 !                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1164,6 +1181,15 @@ contains
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"A_box",mshlf%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
                           dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Thermal forcing applied correction factor", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            ! jablasco: define tf_corr_shlf  (maybe needed for ctrl run)
+            mshlf%now%tf_corr_shlf = mshlf%now%tf_corr
+            where(ylmo%tpo%now%mask_bed .lt. 4.5) mshlf%now%tf_corr_shlf = 0.0_wp
+            call nc_write(filename,"tf_corr_shlf",mshlf%now%tf_corr_shlf,units="K",long_name="Thermal forcing applied correction factor (shelf)", &
+                          dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,units="K",long_name="Shelf thermal forcing basin-wide correction factor", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         else 
             call nc_write(filename,"tf_basin",mshlf%now%tf_basin,units="K",long_name="Mean basin thermal forcing", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)

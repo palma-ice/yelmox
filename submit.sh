@@ -14,10 +14,10 @@
 ##SBATCH -t 14-23:30:15
 
 # Run the job
-./yelmox_ismip6.x yelmo_ismip6_Antarctica_spinup.nml
-#./yelmox_ismip6.x yelmo_ismip6_Antarctica.nml
-
-
+#./yelmox.x yelmo_Antarctica.nml
+#./yelmox.x yelmo_Antarctica_sia.nml
+./yelmox.x yelmo_Antarctica_restart.nml
+#./yelmox.x yelmo_Antarctica_ctrl.nml
 
 # Run ensemble
-# python2.7 yelmo_ensemble.py -l -f -a output/deglaciation_32km/ \&ydyn="cb_z0=-400 cb_z1=500 beta_u0=100"
+# python2.7 yelmo_ensemble.py -l -f -a output/deglaciation_32km/ \&ytopo="kt_ref=0.0025,0.005,0.01,0.05,0.1"

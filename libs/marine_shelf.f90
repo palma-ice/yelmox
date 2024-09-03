@@ -95,7 +95,8 @@ module marine_shelf
         
         real(wp), allocatable :: tf_shlf(:,:)           ! Thermal forcing at the ice-shelf interface
         real(wp), allocatable :: tf_basin(:,:)          ! Basin-average thermal forcing at the ice-shelf interface
-        real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface by data (ismip6)
+        real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface by data (ismip6, opt)
+        real(wp), allocatable :: tf_corr_shlf(:,:)           ! Shelf thermal correction at the ice-shelf interface by data (ismip6, opt)
         real(wp), allocatable :: tf_corr_basin(:,:)     ! Thermal correction at the ice-shelf interface by basin
         
         real(wp), allocatable :: z_base(:,:)            ! Ice-shelf base elevation (relative to sea level)
@@ -122,11 +123,37 @@ module marine_shelf
     public :: marshelf_update_shelf
     public :: marshelf_update
     public :: marshelf_init
-    public :: marshelf_end 
+    public :: marshelf_end
+    public :: maskkill_shelves 
 
 contains 
-    
-    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
+   
+        ! Kill ice shelves that go beyond mask_ref.
+    subroutine maskkill_shelves(H_ice, mask_ref)
+
+        implicit none
+        real(wp), intent(OUT)   :: H_ice(:, :)
+        real(wp), intent(IN)    :: mask_ref(:, :)
+
+        where(mask_ref .lt. 1.0) H_ice = 0.0 
+
+        ! ! Local variables
+        ! integer :: i, j, nx, ny
+
+        ! nx = size(H_ice, 1)
+        ! ny = size(H_ice, 2)
+
+        ! do j = 1, ny
+        ! do i = 1, nx
+        !     if (mask_ref(i, j) < 1) then
+        !         H_ice(i, j) = 0.0
+        !     end if
+        ! end do
+        ! end do
+
+    end subroutine maskkill_shelves
+ 
+    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,basins,z_sl,dx, &
                                                 depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
@@ -136,7 +163,6 @@ contains
         type(marshelf_class), intent(INOUT) :: mshlf
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
-        real(wp), intent(IN) :: f_grnd(:,:)
         real(wp), intent(IN) :: basins(:,:) 
         real(wp), intent(IN) :: z_sl(:,:)
         real(wp), intent(IN) :: dx
@@ -413,13 +439,18 @@ contains
             case("pico") 
                 ! Calculate bmb_shlf using the PICO box model 
                 ! compute mean values at bedrock depth with ice-free points
-                
+ 
                 call calc_variable_basin_pico(mshlf%now%T_shlf_basin,mshlf%now%T_shlf, &
-                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
+                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn,270.0)
                 call calc_variable_basin_pico(mshlf%now%S_shlf_basin,mshlf%now%S_shlf, &
-                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
+                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn,35.0)
 
-                call pico_update(mshlf%pico,mshlf%now%T_shlf_basin,mshlf%now%S_shlf_basin, &
+                ! jablasco
+                ! apply condition that if OPT and if gr_mlt allowed
+                ! then f_grnd where mask_ice=1 and mask_obs_flt =1: f_grnd<1
+                
+
+                call pico_update(mshlf%pico,mshlf%now%T_shlf_basin,mshlf%now%S_shlf_basin, mshlf%now%tf_corr,&
                                     H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
 
                 mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
@@ -659,7 +690,7 @@ contains
                 call nml_read(filename,group_now,"abbott",tf_corr_now)
                 call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
                                                 basin_numbers=[15.0_wp])
-                
+ 
             case DEFAULT ! eg, "none", "None", "zero"
 
                 ! DO NOTHING
@@ -670,6 +701,8 @@ contains
         if (mshlf%par%tf_correction) then 
 
             call nc_read(mshlf%par%tf_path,mshlf%par%tf_name,mshlf%now%tf_corr)
+            ! jablasco: avoid tf_corr for grounded points if grounded
+            ! due to optimization routine
 
         end if  
 
@@ -1541,7 +1574,7 @@ contains
     end subroutine calc_bmb_anom
 
     ! pico basin in bedrock outside ice shelf
-    subroutine calc_variable_basin_pico(var_basin,var2D,f_grnd,basins,H_ice,mask_ocn)
+    subroutine calc_variable_basin_pico(var_basin,var2D,f_grnd,basins,H_ice,mask_ocn,ref_value)
         ! PICO needs the mean values but at bedrock depth and outside the basins
 
         implicit none
@@ -1552,6 +1585,7 @@ contains
         real(wp), intent(IN)  :: basins(:,:)
         real(wp), intent(IN)  :: H_ice(:,:)
         integer,  intent(IN)  :: mask_ocn(:,:)
+        real(wp), intent(IN)  :: ref_value
 
         ! Local variables
         integer :: i, j, m, nx, ny, npts
@@ -1576,8 +1610,8 @@ contains
             do i = 1, nx
 
                 ! Points without any ice.
-                if (basins(i,j) .eq. m .and. f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0) then
-
+                !if (basins(i,j) .eq. m .and. f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .eq. 0.0) then
+                if ((basins(i,j) .eq. m) .and. (H_ice(i,j) .lt. 10.0)) then
                     var_mean = var_mean + var2D(i,j)
                     npts     = npts + 1
 
@@ -1592,18 +1626,18 @@ contains
                 var_mean = var_mean / real(npts,wp)
 
             else
-                ! Set to zero for now and print a warning for safety.
+                ! Set to reference value for now and print a warning for safety.
                 ! This case is unlikely to happen.
 
-                var_mean = 0.0_wp
+                var_mean = ref_value
 
                 write(*,*) "Warning:: calc_variable_basin_pico:: no ice free points &
                 &available in this basin for calculating the basin-wide mean."
                 write(*,*) "basin = ", m
                 write(*,*) "n_flt = ", count(basins .eq. m .and. &
-                            (f_grnd .lt. 1.0 .and. H_ice .gt. 0.0) )
+                            (f_grnd .lt. 1.0 .and. H_ice .lt. 10.0) )
                 write(*,*) "n_ice = ", count(basins .eq. m .and. &
-                            (H_ice .gt. 0.0) )
+                            (H_ice .gt. 10.0) )
             end if
 
             ! Assign bedrock value to all points in the basin
@@ -1655,6 +1689,7 @@ contains
         allocate(now%tf_shlf(nx,ny))
         allocate(now%tf_basin(nx,ny))
         allocate(now%tf_corr(nx,ny))
+        allocate(now%tf_corr_shlf(nx,ny))
         allocate(now%tf_corr_basin(nx,ny))
 
         allocate(now%z_base(nx,ny))
@@ -1678,6 +1713,7 @@ contains
         now%tf_shlf         = 0.0
         now%tf_basin        = 0.0
         now%tf_corr         = 0.0
+        now%tf_corr_shlf    = 0.0
         now%tf_corr_basin   = 0.0     
 
         now%z_base          = 0.0 
@@ -1712,6 +1748,7 @@ contains
         if (allocated(now%tf_shlf))         deallocate(now%tf_shlf)
         if (allocated(now%tf_basin))        deallocate(now%tf_basin)
         if (allocated(now%tf_corr))         deallocate(now%tf_corr)
+        if (allocated(now%tf_corr_shlf))    deallocate(now%tf_corr_shlf)
         if (allocated(now%tf_corr_basin))   deallocate(now%tf_corr_basin)       
  
         if (allocated(now%z_base))          deallocate(now%z_base)

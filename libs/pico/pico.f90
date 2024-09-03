@@ -68,13 +68,13 @@ module pico
 
 contains
     
-    subroutine pico_update(pico,to,so,H_ice,z_bed,f_grnd,z_sl,basins,mask_ocn,dx)
+    subroutine pico_update(pico,to,so,tf_corr,H_ice,z_bed,f_grnd,z_sl,basins,mask_ocn,dx)
         
         implicit none
         
         type(pico_class), intent(INOUT) :: pico
-        real(wp), intent(IN) :: to(:,:)
-        real(wp), intent(IN) :: so(:,:)
+        real(wp), intent(IN) :: to(:,:), so(:,:)
+        real(wp), intent(IN) :: tf_corr(:,:)
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
@@ -154,7 +154,7 @@ contains
 
                 ! Compute melting
                 pm_point = calc_theta_pm(pico%now%S_box(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico,H_ice(i,j))
-                bmb_floating = calc_melt_rate_pico(pico%now%T_box(i,j),pm_point,pico%par%gamma_tstar)
+                bmb_floating = calc_melt_rate_pico(pico%now%T_box(i,j),pm_point,pico%par%gamma_tstar,tf_corr(i,j))
                
                 ! Apply melting to purely floating points or ocean
                 if(f_grnd(i,j) .eq. 0.0) pico%now%bmb_shlf(i,j) = bmb_floating
