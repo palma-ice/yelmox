@@ -1,0 +1,29 @@
+FC = gfortran 
+
+NFROOT  = /opt/ohpc/pub/libs/gnu8/impi/netcdf-fortran/4.4.5
+NCROOT  = /opt/ohpc/pub/libs/gnu8/impi/netcdf/4.6.3
+INC_NC  = -I${NFROOT}/include
+LIB_NC  = -L${NFROOT}/lib -lnetcdff -L${NCROOT}/lib -lnetcdf
+
+FFTWROOT = /home/jablasco/apps/fftw
+INC_FFTW = 
+LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 -lm
+
+LISROOT = /home/jablasco/apps/LIS
+INC_LIS = -I${LISROOT}/include
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+YELMOROOT = /home/jablasco/yelmo-ucm/yelmo_main
+INC_YELMO = -I${YELMOROOT}/libyelmo/include
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+ISOSTASYROOT = /home/jablasco/yelmo-ucm/isostasy_main
+INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include
+LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
+
+FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none
+LFLAGS  = $(LIB_YELMO) $(LIB_NC) $(LIB_LIS) $(LIB_ISOSTASY) $(LIB_FFTW) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2
+DFLAGS_DEBUG   = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wp,-DDEBUG
+DFLAGS_PROFILE = -O2 -p -ggdb
