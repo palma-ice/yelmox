@@ -85,6 +85,13 @@ yelmox_ismip6 : yelmo-static isostasy-static $(yelmox_libs)
 		@echo "    yelmox_ismip6.x is ready."
 		@echo " "
 
+yelmox_rtip : yelmo-static isostasy-static $(yelmox_libs)
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_rtip.x yelmox_rtip.f90 \
+			$(yelmox_libs) $(LFLAGS)
+		@echo " "
+		@echo "    yelmox_rtip.x is ready."
+		@echo " "
+
 yelmox_nahosmip : yelmo-static isostasy-static $(yelmox_libs)
 		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_nahosmip.x yelmox_nahosmip.f90 \
 			$(yelmox_libs) $(LFLAGS)
