@@ -16,7 +16,8 @@
             "iso"    : "libyelmox/bin/yelmox_iso.x",
             "hyst"   : "libyelmox/bin/yelmox_hyst.x",
             "rembo"  : "libyelmox/bin/yelmox_rembo.x",
-            "ismip6" : "libyelmox/bin/yelmox_ismip6.x"
+            "ismip6" : "libyelmox/bin/yelmox_ismip6.x",
+            "rtip"   : "libyelmox/bin/yelmox_rtip.x",
         },
 
     "grp_aliases" : {},
