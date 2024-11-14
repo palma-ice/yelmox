@@ -11,7 +11,7 @@ program yelmox
 
     ! External libraries
     use sealevel 
-    use isostasy  
+    use fastisostasy  
     
     use rembo_sclimate 
     use snapclim
@@ -156,7 +156,7 @@ program yelmox
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(time_init,8))
@@ -187,16 +187,16 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     
     ! Initialize isostasy reference state using present-day reference topography
-    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
-        dble(yelmo1%bnd%z_sl*0.0), dble(0.0), dble(time), set_ref=.TRUE.)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, &
+        yelmo1%bnd%z_sl*0.0_wp, 0.0_wp, time, set_ref=.TRUE.)
     
     ! Initialize isostasy using current topography to calibrate the reference rebound
     ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
-    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
-        dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
+        yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
     
-    yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-    yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+    yelmo1%bnd%z_bed = real(isos1%output%z_bed,wp)
+    yelmo1%bnd%z_sl  = real(isos1%output%z_ss,wp)
 
     if (use_hyster) then
         ! Update hysteresis variable 
@@ -214,14 +214,17 @@ program yelmox
         dT_ocn    = 0.0 
     end if 
 
+if (.FALSE.) then
     ! Update REMBO, with correct topography, let it equilibrate for several years 
-    ! do n = 1, 100
-    !     time = time_init + real(n,8)    
-    !     call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-    !                                     real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
-    ! end do 
-    ! rembo_ann%time_emb = time_init 
-    ! rembo_ann%time_smb = time_init  
+    do n = 1, 100
+        time = time_init + real(n-1,8)    
+        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    end do 
+    rembo_ann%time_emb = time_init 
+    rembo_ann%time_smb = time_init
+end if
+
     call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
                                         real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     
@@ -307,8 +310,9 @@ program yelmox
     if (yelmo1%par%use_restart) then 
         ! If using restart file, set boundary module variables equal to restarted value 
 
-        ! Set boundary module variables equal to restarted value         
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
+        ! Set boundary module variables equal to restarted value
+        isos1%now%z_bed(isos1%domain%icrop1:isos1%domain%icrop2, &
+            isos1%domain%jcrop1:isos1%domain%jcrop2)  = yelmo1%bnd%z_bed
 
     else 
         ! Run yelmo for several years with constant boundary conditions and topo
@@ -412,10 +416,10 @@ end if
         call sealevel_update(sealev,year_bp=time)
 
         ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-        call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
-                                                    dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
-        yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-        yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        yelmo1%bnd%z_bed = real(isos1%output%z_bed,wp)
+        yelmo1%bnd%z_sl  = real(isos1%output%z_ss,wp)
 
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
@@ -456,12 +460,16 @@ end if
             
             end if 
 
+            write(*,*) "ajr: ", time, minval(yelmo1%bnd%smb),   maxval(yelmo1%bnd%smb)
+            write(*,*) "ajr: ", time, minval(yelmo1%bnd%T_srf), maxval(yelmo1%bnd%T_srf)
+        
             ! Update ice sheet to current time 
             call yelmo_update(yelmo1,time)
             
         end if 
         
         call timer_step(tmrs,comp=2,time_mod=[time-dtt_now,time]*1e-3,label="yelmo") 
+        
         
 if (calc_transient_climate) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
@@ -473,7 +481,7 @@ if (calc_transient_climate) then
         ! Update surface mass balance and surface temperature from REMBO
         yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
         yelmo1%bnd%T_srf = rembo_ann%T_srf
-         
+        
         ! Special treatment for Greenland
         if (lim_pd_ice) then 
         
@@ -784,7 +792,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a ice equiv.",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &

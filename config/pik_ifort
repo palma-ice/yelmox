@@ -1,5 +1,4 @@
-FC  = mpiifort
-#FC  = ifort
+FC  = ifort
 
 INC_NC  = -I${NETCDF_FORTRANROOT}/include
 LIB_NC  = -L${NETCDF_FORTRANROOT}/lib -lnetcdff -L${NETCDF_CROOT}/lib -lnetcdf
@@ -25,7 +24,7 @@ LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
 FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
 
-ifeq ($(parallel), 1)
+ifeq ($(openmp), 1)
     # Overwrite default choices with openmp relevant choices 
 
     LISROOT = /home/robinson/apps/lis/lis-omp

@@ -8,8 +8,8 @@ bindir = libyelmox/bin
 libdir = libs
 
 # Command-line options at make call
-debug    ?= 0
-parallel ?= 0 
+debug  ?= 0
+openmp ?= 0 
 
 ## COMPILER CONFIGURATION ##
 # (should be loaded from config directory)
@@ -44,13 +44,13 @@ include config/Makefile_yelmox.mk
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
 yelmo-static: 
-		$(MAKE) -C $(YELMOROOT) yelmo-static parallel=$(parallel)
+		$(MAKE) -C $(YELMOROOT) yelmo-static openmp=$(openmp)
 		cp $(YELMOROOT)/git_yelmo.txt ./
 
 # Compile the static library libisostasy,
 # using Makefile located in $(ISOSTASYROOT) directory 
 isostasy-static: 
-		$(MAKE) -C $(ISOSTASYROOT) isostasy-static parallel=$(parallel)
+		$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
 
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
@@ -119,6 +119,8 @@ clean:
 	rm -f $(bindir)/*.x
 	rm -f  *.x gmon.out $(objdir)/*.o $(objdir)/*.mod $(objdir)/*.a $(objdir)/*.so
 	rm -rf *.x.dSYM
+
+cleanall: clean
 	$(MAKE) -C $(ISOSTASYROOT) clean
 	$(MAKE) -C $(YELMOROOT) clean
-
+	$(MAKE) -C $(REMBOROOT) clean

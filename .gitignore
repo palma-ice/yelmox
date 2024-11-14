@@ -1,5 +1,8 @@
 Makefile
 libyelmox
+libs/exlib
+libs/lis*
+coordinates
 yelmo
 FastIsostasy
 rembo1
@@ -10,7 +13,7 @@ output
 tmp
 tests/.DS_Store
 .DS_Store
-runylmox.js
+.runme_config
 check_sim.x
 git_yelmo.txt
 maps/*.nc

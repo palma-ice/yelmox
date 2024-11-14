@@ -1,5 +1,4 @@
-FC = mpif90
-#FC = gfortran 
+FC = gfortran 
 
 INC_NC = -I/usr/include
 LIB_NC = -L/usr/lib/x86_64-linux-gnu -lnetcdff -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -lnetcdf -lnetcdf -ldl -lm 
@@ -15,7 +14,7 @@ YELMOROOT = yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
-ISOSTASYROOT = isostasy
+ISOSTASYROOT = FastIsostasy
 INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
 LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
 
