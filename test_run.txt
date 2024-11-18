@@ -1,0 +1,2 @@
+# Run a test simulation of Antarctica for 1000 yrs
+jobrun ./runme -rs -q priority -w 1 -e yelmox -n par/yelmo_Antarctica.nml -o output/ant-test-100yr -p ctrl.time_end=1e2
