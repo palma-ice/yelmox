@@ -211,6 +211,7 @@
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
     Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
@@ -602,9 +603,9 @@
                                     ! of 2 multiplied by the resolution)
 
     ! Rheology
-    mantle = "rheology_file"        ! Choose mantle viscosity field, options:
+    mantle = "uniform"        ! Choose mantle viscosity field, options:
                                     ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
-    lithosphere = "rheology_file"   ! Choose lithospheric thickness field:
+    lithosphere = "uniform"   ! Choose lithospheric thickness field:
                                     ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
     viscosity_scaling_method = 0    ! -1: min, 0: nominal, 1: max, else: scale by provided number
     layering    = "parallel"        ! "parallel", "equalized" or "folded"
@@ -635,7 +636,7 @@
     ! Files
     restart = "None"
     mask_file = "isostasy_data/tools/masks/ANT-32KM_activemask.nc"
-    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Pan2022.nc"
+    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Latychev.nc"
     ocean_surface_file = "None"     ! "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
 /
 
