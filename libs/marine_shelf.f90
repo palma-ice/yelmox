@@ -1,5 +1,3 @@
-
-
 module marine_shelf
     ! Module to simulate the marine-shelf interface:
     ! Calculates the basal mass balance of an ice shelf (bmb_shlf)
@@ -123,6 +121,7 @@ module marine_shelf
     public :: marshelf_update
     public :: marshelf_init
     public :: marshelf_end 
+    public :: maskkill_shelves
 
 contains 
     
@@ -1408,6 +1407,16 @@ contains
 
     end subroutine calc_shelf_variable_depth
 
+        ! Kill ice shelves that go beyond mask_ref.
+    subroutine maskkill_shelves(H_ice, mask_ref)
+
+        implicit none
+        real(wp), intent(OUT)   :: H_ice(:, :)
+        real(wp), intent(IN)    :: mask_ref(:, :)
+        where(mask_ref .lt. 1.0) H_ice = 0.0
+
+    end subroutine maskkill_shelves
+
     elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
         ! Favier et al (2019), Eq. 3
@@ -1775,5 +1784,3 @@ contains
     end function interp_linear
     
 end module marine_shelf
-
-
