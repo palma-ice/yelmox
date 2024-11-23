@@ -33,7 +33,8 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file_restart, domain
+    character(len=256) :: outfldr, file1D, file2D, domain
+    character(len=256) :: file_yelmo_restart, file_isos_restart
     character(len=256) :: file2D_small
     character(len=512) :: path_par
     character(len=512) :: path_lgm  
@@ -196,13 +197,13 @@ program yelmox
     outfldr = "./"
 
     ! Define input and output locations 
-    file1D       = trim(outfldr)//"yelmo1D.nc"
-    file2D       = trim(outfldr)//"yelmo2D.nc"
-    file_restart = trim(outfldr)//"yelmo_restart.nc"          
-
-    file2D_small = trim(outfldr)//"yelmo2Dsm.nc"
+    file1D              = trim(outfldr)//"yelmo1D.nc"
+    file2D              = trim(outfldr)//"yelmo2D.nc"
+    file_yelmo_restart  = trim(outfldr)//"yelmo_restart.nc"          
+    file_isos_restart   = trim(outfldr)//"isos_restart.nc"
+    file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
     
-    tmr_file     = trim(outfldr)//"timer_table.txt"
+    tmr_file            = trim(outfldr)//"timer_table.txt"
 
     ! Print summary of run settings 
     write(*,*)
@@ -872,7 +873,8 @@ program yelmox
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt_restart*100))==0) then 
-            call yelmo_restart_write(yelmo1,file_restart,time=time) 
+            call yelmo_restart_write(yelmo1,file_yelmo_restart,time=time)
+            !call isos_restart_write(isos1,file_isos_restart,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
@@ -892,8 +894,9 @@ program yelmox
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,time]*1e-3,label="timeloop") 
     
     ! Write the restart file for the end of the simulation
-    call yelmo_restart_write(yelmo1,file_restart,time=time) 
-
+    call yelmo_restart_write(yelmo1,file_yelmo_restart,time=time) 
+    call isos_restart_write(isos1,file_isos_restart,time)
+    
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 
