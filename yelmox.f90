@@ -437,14 +437,12 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Initialize isostasy reference state using present-day reference topography
-    call isos_init_state(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, &
-        yelmo1%bnd%z_sl*0.0_wp, 0.0_wp, time, set_ref=.TRUE.)
-    
-    ! Initialize isostasy using current topography to calibrate the reference rebound
-    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
-        yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
+    ! Initialize the isostasy reference state using reference topography fields
+    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+
+    ! Initialize isostasy using current topography
+    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
     
     yelmo1%bnd%z_bed = isos1%output%z_bed
     yelmo1%bnd%z_sl  = isos1%output%z_ss
