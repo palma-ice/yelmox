@@ -11,7 +11,7 @@ program yelmox_ismip6
     ! External libraries
     use geothermal
     use ismip6
-    use isostasy  
+    use fastisostasy  
     use marine_shelf 
     use sealevel 
     use sediments 
@@ -22,7 +22,7 @@ program yelmox_ismip6
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small
     character(len=256) :: file1D_ismip6, file2D_ismip6
-    character(len=256) :: file_restart
+    character(len=256) :: file_restart, file_isos_restart
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
@@ -138,7 +138,7 @@ program yelmox_ismip6
     file2D              = trim(outfldr)//"yelmo2D.nc" 
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"    
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
-
+    file_isos_restart   = trim(outfldr)//"isos_restart.nc" 
 
 ! ajr: ismip6
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
@@ -274,7 +274,7 @@ program yelmox_ismip6
     call sealevel_init(sealev,path_par)
 
     ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,real(yelmo1%grd%dx,dp),real(yelmo1%grd%dy,dp))
+    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
     ! ajr: for now, spatially variable tau is disabled, since it is not clear how to 
     ! pass the information from an isos1%output field back to the correlary extended 
@@ -341,14 +341,12 @@ program yelmox_ismip6
     call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
     
-    ! Initialize isostasy reference state using present-day reference topography
-    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed_ref), dble(yelmo1%bnd%H_ice_ref), &
-        dble(yelmo1%bnd%z_sl*0.0), dble(0.0), dble(time), set_ref=.TRUE.)
-    
-    ! Initialize isostasy using current topography to calibrate the reference rebound
-    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
-    call isos_init_state(isos1, dble(yelmo1%bnd%z_bed), dble(yelmo1%tpo%now%H_ice), &
-        dble(yelmo1%bnd%z_sl), dble(0.0), dble(time), set_ref=.FALSE.)
+    ! Initialize the isostasy reference state using reference topography fields
+    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+
+    ! Initialize isostasy using current topography
+    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
     
     yelmo1%bnd%z_bed = real(isos1%now%z_bed)
     yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
@@ -542,10 +540,10 @@ program yelmox_ismip6
             call sealevel_update(sealev,year_bp=time_bp)
 
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
-                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
-            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
+                                                        dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            yelmo1%bnd%z_bed = isos1%output%z_bed
+            yelmo1%bnd%z_sl  = isos1%output%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -599,6 +597,7 @@ program yelmox_ismip6
 
         ! Write the restart file for the end of the simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time_bp) 
+        call isos_restart_write(isos1,file_isos_restart,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -644,11 +643,11 @@ program yelmox_ismip6
             call sealevel_update(sealev,year_bp=0.0_wp)
 
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, dble(yelmo1%tpo%now%H_ice), dble(sealev%z_sl), dble(time), &
-                                                        dwdt_corr=dble(yelmo1%bnd%dzbdt_corr))
-            yelmo1%bnd%z_bed = real(isos1%now%z_bed)
-            yelmo1%bnd%z_sl  = real(isos1%now%z_ss)
-            
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
+                                                        dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            yelmo1%bnd%z_bed = isos1%output%z_bed
+            yelmo1%bnd%z_sl  = isos1%output%z_ss
+
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================
@@ -699,6 +698,7 @@ program yelmox_ismip6
 
         ! Write the restart file for the end of the transient simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        call isos_restart_write(isos1,file_isos_restart,time)
 
     end select
 
@@ -808,16 +808,16 @@ contains
         call nc_write(filename,"dHidt",ylmo%tpo%now%dHidt,units="m/yr",long_name="Ice thickness rate of change", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"mb_applied",ylmo%tpo%now%mb_applied,units="m",long_name="Applied net mass balance", &
+        call nc_write(filename,"mb_net",ylmo%tpo%now%mb_net,units="m",long_name="Applied net mass balance", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv",ylmo%tpo%now%calv,units="m/a ice equiv.",long_name="Calving rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving rate mb", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"calv_flt",ylmo%tpo%now%calv_flt,units="m/a ice equiv.",long_name="Calving rate flt", &
+        call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,units="m/a ice equiv.",long_name="Calving rate mb flt", &
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &

@@ -33,7 +33,8 @@ program yelmox
     
     type(hyster_class)     :: hyst1 
 
-    character(len=256) :: outfldr, file1D, file2D, file1D_hyst, file_restart, domain 
+    character(len=256) :: outfldr, file1D, file2D, file1D_hyst, domain
+    character(len=256) :: file_restart, file_isos_restart 
     character(len=256) :: file_rembo
     character(len=512) :: path_par  
     real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart   
@@ -107,14 +108,15 @@ program yelmox
     end if 
     
     ! Define input and output locations 
-    file1D       = trim(outfldr)//"yelmo1D.nc"
-    file2D       = trim(outfldr)//"yelmo2D.nc"
-    file_restart = trim(outfldr)//"yelmo_restart.nc"          
-    file1D_hyst  = trim(outfldr)//"yelmo1D_hyst.nc" 
+    file1D              = trim(outfldr)//"yelmo1D.nc"
+    file2D              = trim(outfldr)//"yelmo2D.nc"
+    file_restart        = trim(outfldr)//"yelmo_restart.nc"
+    file_isos_restart   = trim(outfldr)//"isos_restart.nc"           
+    file1D_hyst         = trim(outfldr)//"yelmo1D_hyst.nc" 
 
-    file_rembo   = trim(outfldr)//"yelmo-rembo.nc"
+    file_rembo          = trim(outfldr)//"yelmo-rembo.nc"
 
-    tmr_file     = trim(outfldr)//"timer_table.txt"
+    tmr_file            = trim(outfldr)//"timer_table.txt"
 
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
@@ -186,14 +188,12 @@ program yelmox
     call sealevel_update(sealev,year_bp=time_init)
     yelmo1%bnd%z_sl  = sealev%z_sl 
     
-    ! Initialize isostasy reference state using present-day reference topography
-    call isos_init_state(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, &
-        yelmo1%bnd%z_sl*0.0_wp, 0.0_wp, time, set_ref=.TRUE.)
-    
-    ! Initialize isostasy using current topography to calibrate the reference rebound
-    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
-        yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
+    ! Initialize the isostasy reference state using reference topography fields
+    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+
+    ! Initialize isostasy using current topography
+    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
     
     yelmo1%bnd%z_bed = real(isos1%output%z_bed,wp)
     yelmo1%bnd%z_sl  = real(isos1%output%z_ss,wp)
@@ -531,6 +531,7 @@ end if
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
+            call isos_restart_write(isos1,file_isos_restart,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-dtt_now,time]*1e-3,label="io") 
@@ -554,11 +555,13 @@ end if
     
     ! Write the restart file for the end of the simulation
     if (write_restart) then 
-        call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        call yelmo_restart_write(yelmo1,file_restart,time=time)
+        call isos_restart_write(isos1,file_isos_restart,time)
     end if
 
 !     ! Let's see if we can read a restart file 
 !     call yelmo_restart_read(yelmo1,file_restart,time=time)
+!     call isos_restart_write(isos1,file_isos_restart,time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)

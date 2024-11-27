@@ -24,7 +24,7 @@ program yelmox_ismip6
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small
     character(len=256) :: file1D_ismip6, file2D_ismip6
-    character(len=256) :: file_restart
+    character(len=256) :: file_restart, file_isos_restart
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
@@ -164,6 +164,7 @@ program yelmox_ismip6
     file2D              = trim(outfldr)//"yelmo2D.nc" 
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"    
     file_restart        = trim(outfldr)//"yelmo_restart.nc" 
+    file_isos_restart   = trim(outfldr)//"isos_restart.nc" 
 
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc" 
@@ -375,14 +376,12 @@ program yelmox_ismip6
     call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
 
-    ! Initialize isostasy reference state using present-day reference topography
-    call isos_init_state(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, &
-        yelmo1%bnd%z_sl*0.0_wp, 0.0_wp, time, set_ref=.TRUE.)
-    
-    ! Initialize isostasy using current topography to calibrate the reference rebound
-    ! Here we pass BSL = 0 but you can choose to set this value to something more meaningful!
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, &
-        yelmo1%bnd%z_sl, 0.0_wp, time, set_ref=.FALSE.)
+    ! Initialize the isostasy reference state using reference topography fields
+    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+
+    ! Initialize isostasy using current topography
+    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
     
     yelmo1%bnd%z_bed = isos1%now%z_bed
     yelmo1%bnd%z_sl  = isos1%now%z_ss
@@ -634,6 +633,7 @@ program yelmox_ismip6
 
         ! Write the restart file for the end of the simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time_bp) 
+        call isos_restart_write(isos1,file_isos_restart,time=time_bp) 
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -758,6 +758,7 @@ end if
 
         ! Write the restart file for the end of the transient simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        call isos_restart_write(isos1,file_isos_restart,time=time) 
 
     case("abumip")
         ! Here it is assumed that the model has gone through spinup 
@@ -933,6 +934,7 @@ end if
 
         ! Write the restart file for the end of the transient simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        call isos_restart_write(isos1,file_isos_restart,time=time) 
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup 
@@ -1124,6 +1126,7 @@ end if
 
         ! Write the restart file for the end of the transient simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time) 
+        call isos_restart_write(isos1,file_isos_restart,time=time) 
 
     end select
 
