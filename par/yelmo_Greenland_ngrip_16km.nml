@@ -533,33 +533,49 @@
 
 &isos
     ! Options
-    interactive_sealevel = .true.  ! Sea level interacts with solid Earth deformation?
     correct_distortion = .false.    ! Account for distortion of projection?
+    interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
     dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    visc_method     = "laty"        ! Type of viscosity field for sub-lithospheric mantle
-    rigidity_method = "laty"        ! Type of thickness filed for elastic lithosphere
+    pad         = 512.e3            ! [m] Padding around the domain (preferably chosen as a power
+                                    ! of 2 multiplied by the resolution)
 
-    ! 1D reference model
-    nl          = 2                 ! [1] Number of viscous layers for sub-lithospheric mantle
-    boundaries  = 88.0, 600.0       ! [km] Depth of layer boundaries. The first value is overwritten
-                                    ! if a lithospheric thickness filed is provided.
-    viscosities = 1.e21, 2.e21      ! [Pa s] Layer viscosities. The values are overwritten if a 3D
+    ! Rheology
+    mantle = "uniform"              ! Choose mantle viscosity field, options:
+                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+    lithosphere = "uniform"         ! Choose lithospheric thickness field:
+                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+    viscosity_scaling_method = 0    ! -1: min, 0: nominal, 1: max, else: scale by provided number
+    layering    = "parallel"        ! "parallel", "equalized" or "folded"
+    nl          = 5                 ! [1] Number of viscous layers for sub-lithospheric mantle
+    dl          = 10.e3             ! [m] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 88.e3, 120.e3, 200.e3, 400.e3, 600.e3     ! [m] Depth of layer boundaries.
+                                    ! Only used if layering="equalized". First value 
+                                    ! overwritten if visc_method="rheology_file".
+    viscosities = 1.e21, 1.e21, 1.e21, 1.e21, 2.e21         ! [Pa s] Layer viscosities. Only used if
+                                    ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
                                     ! viscosity field is provided.
-    tau         = 2000.0            ! [yr] Relaxation time
+    tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
 
     ! Physical constants
-    E               = 66.0      ! [GPa] Young modulus
-    nu              = 0.28      ! [-] Poisson ratio
-    rho_ice         = 910.      ! [kg/m^3]
-    rho_seawater    = 1028.0    ! [kg/m^3]
-    rho_water       = 1000.0    ! [kg/m^3]
-    rho_uppermantle = 3400.0    ! [kg/m^3]
-    rho_litho       = 3200.0    ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
-    g               = 9.81      ! [m/s^2]
-    r_earth         = 6.378e6   ! [m]  Earth radius, Coulon et al. (2021)
-    m_earth         = 5.972e24  ! [kg] Earth mass,   Coulon et al. (2021)
-    A_ocean_pd      = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
+    E               = 66.0          ! [GPa] Young modulus
+    nu              = 0.28          ! [-] Poisson ratio
+    rho_ice         = 910.          ! [kg/m^3]
+    rho_seawater    = 1028.0        ! [kg/m^3]
+    rho_water       = 1000.0        ! [kg/m^3]
+    rho_uppermantle = 3400.0        ! [kg/m^3]
+    rho_litho       = 3200.0        ! [kg/m^3]  Optionally set to 0 ==> decouple the elastic
+                                    ! displacement from the viscous one
+    g               = 9.81          ! [m/s^2]
+    r_earth         = 6.378e6       ! [m]  Earth radius, Coulon et al. (2021)
+    m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
+    A_ocean_pd      = 3.625e14      ! [m^2] Ocean surface as in Goelzer et al. (2020)
+
+    ! Files
+    restart = "None"
+    mask_file = "isostasy_data/tools/masks/ANT-32KM_activemask.nc"
+    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Pan2022.nc"
+    ocean_surface_file = "None"     ! "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
 /
 

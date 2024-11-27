@@ -513,15 +513,8 @@ program yelmox
     end if 
     ! ========================================
 
-    if (yelmo1%par%use_restart) then 
-        ! Perform additional startup steps when using a restart
-
-        ! Set boundary module variables equal to restarted value
-        isos1%now%z_bed(isos1%domain%icrop1:isos1%domain%icrop2, &
-            isos1%domain%jcrop1:isos1%domain%jcrop2)  = yelmo1%bnd%z_bed
-
-    else
-        ! No restart file used
+    if (.not. yelmo1%par%use_restart) then 
+        ! No restart file used, perform various initialization steps
 
         if (running_laurentide) then 
             ! Start with some ice thickness for testing
@@ -792,10 +785,10 @@ program yelmox
             call negis_update_cb_ref(yelmo1,ngs,time)
 
         end if
-
+        
         ! Update Yelmo
         if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
+        
         call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
         
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
