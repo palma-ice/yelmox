@@ -1,6 +1,6 @@
 {
-    "hpc"           : "pik_hpc2024",
-    "account"       : "megarun", 
+    "hpc"           : "awi_albedo",
+    "account"       : "envi.p_forclima", 
     "jobname"       : "yelmox",
     "omp"           : 0,
 

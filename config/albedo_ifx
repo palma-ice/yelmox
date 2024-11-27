@@ -18,7 +18,7 @@ INC_FFTW = -I${FFTWROOT}/include
 LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 -lm
 
 # Yelmo
-YELMOROOT = /albedo/home/jablas001/yelmo-ucm/yelmo
+YELMOROOT = /albedo/home/jablas001/yelmo-ucm/yelmo_main
 INC_YELMO = -I${YELMOROOT}/libyelmo/include
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
