@@ -145,7 +145,7 @@ program yelmox_rtip
     call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
     call nml_read(path_par,trim(ctl%run_step),"time_const", ctl%time_const)
 
-    call nml_read(path_par,trim(ctl%run_step),"kill_shelves",ctl%kill_shelves)      ! Kill shelves beyond pd?
+    call nml_read(path_par,trim(ctl%run_step),"kill_shelves",  ctl%kill_shelves)    ! Kill shelves beyond pd?
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet?
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
 
@@ -457,6 +457,12 @@ program yelmox_rtip
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
+
+    ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
+    if (ctl%kill_shelves) then
+        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%ice_allowed = .FALSE.
+    end if
+
 ! ================= RUN STEPS ===============================================
 
 
@@ -517,10 +523,10 @@ program yelmox_rtip
 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
-        call yelmo_initnc_cropped(yelmo1, file2D_wais, time, "years", &
-                                  i1wais, i2wais, j1wais, j2wais)
+        call yelmo_write_init_cropped(yelmo1, file2D_wais, time, "years", &
+                                             i1wais, i2wais, j1wais, j2wais)
 
-        call yelmo_write_init3D(yelmo1, file3D, time_init=time, units="years")
+        call yelmo_write_init_3D(yelmo1, file3D, time_init=time, units="years")
 
         call timer_step(tmr,comp=1,label="initialization")
         call timer_step(tmrs,comp=-1)
@@ -629,8 +635,7 @@ program yelmox_rtip
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-            if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
-
+            
             call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
 
             ! == CLIMATE ===========================================================
@@ -753,7 +758,6 @@ program yelmox_rtip
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-            if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
 
             if (ismip6exp%shlf_collapse) then
                         ! Clean up icebergs for mask_shlf_collapse experiments
@@ -902,7 +906,6 @@ program yelmox_rtip
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-            if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
 
             call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
 
@@ -1066,10 +1069,10 @@ end if
             mask=yelmo1%bnd%ice_allowed)
 
         call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
-        call yelmo_initnc_cropped(yelmo1, file2D_wais, time, "years", &
-                                  i1wais, i2wais, j1wais, j2wais)
+        call yelmo_write_init_cropped(yelmo1, file2D_wais, time, "years", &
+                                            i1wais, i2wais, j1wais, j2wais)
         call yelmo_write_init(yelmo1, file2D_small, time_init=time, units="years")
-        call yelmo_write_init3D(yelmo1, file3D, time_init=time, units="years")
+        call yelmo_write_init_3D(yelmo1, file3D, time_init=time, units="years")
 
         if (reg1%write) then
             call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
@@ -1142,7 +1145,6 @@ end if
 
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-            if (ctl%kill_shelves) call maskkill_shelves(yelmo1%tpo%now%H_ice, yelmo1%dta%pd%mask)
 
             call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
 
