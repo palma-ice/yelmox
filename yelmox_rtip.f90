@@ -526,7 +526,7 @@ program yelmox_rtip
         call yelmo_write_init_cropped(yelmo1, file2D_wais, time, "years", &
                                              i1wais, i2wais, j1wais, j2wais)
 
-        call yelmo_write_init_3D(yelmo1, file3D, time_init=time, units="years")
+        call yelmo_write_init(yelmo1, file3D, time_init=time, units="years")
 
         call timer_step(tmr,comp=1,label="initialization")
         call timer_step(tmrs,comp=-1)
@@ -1072,7 +1072,7 @@ end if
         call yelmo_write_init_cropped(yelmo1, file2D_wais, time, "years", &
                                             i1wais, i2wais, j1wais, j2wais)
         call yelmo_write_init(yelmo1, file2D_small, time_init=time, units="years")
-        call yelmo_write_init_3D(yelmo1, file3D, time_init=time, units="years")
+        call yelmo_write_init(yelmo1, file3D, time_init=time, units="years")
 
         if (reg1%write) then
             call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
@@ -1650,16 +1650,17 @@ contains
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
 
         call nc_write(filename, "ux", ylmo%dyn%now%ux, units="m/yr", &
-            long_name="Velocity in x", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
+            long_name="Velocity in x", dim1="xc", dim2="yc", dim3="zeta", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
         call nc_write(filename, "uy", ylmo%dyn%now%uy, units="m/yr", &
-            long_name="Velocity in y", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
+            long_name="Velocity in y", dim1="xc", dim2="yc", dim3="zeta", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
         call nc_write(filename, "uz", ylmo%dyn%now%uz, units="m/yr", &
-            long_name="Velocity in z", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
+            long_name="Velocity in z", dim1="xc", dim2="yc", dim3="zeta", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
 
         ! For some reason this gives crappy output (missings or 0) --> use 2D output for now
+        ! ajr: dim3="zeta" may solve it, as visc is defined on the aa-nodes vertically!
         ! call nc_write(filename, "visc", ylmo%mat%now%visc, units="Pa a", &
         !     long_name="Ice viscosity", dim1="xc", dim2="yc", dim3="zc", dim4="time", &
         !     start=[1, 1, 1, n], ncid=ncid)
