@@ -353,7 +353,7 @@ program yelmox_rtip
         yelmo1%grd%dx, yelmo1%grd%dy)
 
     ! ajr: for now, spatially variable tau is disabled, since it is not clear how to
-    ! pass the information from an isos1%output field back to the correlary extended
+    ! pass the information from an isos1%out field back to the correlary extended
     ! isos1%domain field.
 
     ! if (trim(domain) .eq. "Antarctica") then
@@ -363,7 +363,7 @@ program yelmox_rtip
     !     call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)
     !     call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)
 
-    !     call isos_set_field(isos1%output%tau, &
+    !     call isos_set_field(isos1%out%tau, &
     !             [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
     !             [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
     !                                   regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
@@ -429,8 +429,8 @@ program yelmox_rtip
         ! z_bed_ref, H_ice_ref, bsl, bsl_ref, z_ss_perturb, z_ss_perturb_ref, &
         ! w_ref, we_ref)
 
-    yelmo1%bnd%z_bed = isos1%output%z_bed
-    yelmo1%bnd%z_sl  = isos1%output%z_ss
+    yelmo1%bnd%z_bed = isos1%out%z_bed
+    yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -628,8 +628,8 @@ program yelmox_rtip
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, time, &
                 dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%output%z_bed
-            yelmo1%bnd%z_sl  = isos1%output%z_ss
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -751,8 +751,8 @@ program yelmox_rtip
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%output%z_bed
-            yelmo1%bnd%z_sl  = isos1%output%z_ss
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -899,8 +899,8 @@ program yelmox_rtip
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
 
-            yelmo1%bnd%z_bed = isos1%output%z_bed
-            yelmo1%bnd%z_sl  = isos1%output%z_ss
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -1138,8 +1138,8 @@ end if
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%output%z_bed
-            yelmo1%bnd%z_sl  = isos1%output%z_ss
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -1282,15 +1282,12 @@ contains
 
         ! Local variables
         integer  :: ncid, n
-        real(wp) :: time_prev
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -1303,7 +1300,7 @@ contains
 
         ! Write constant fields
         if (n .eq. 1) then
-            call nc_write(filename,"isos_tau",isos%output%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
+            call nc_write(filename,"isos_tau",isos%out%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         end if
 
@@ -1471,7 +1468,7 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! External data
-        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Comparison with present-day
@@ -1631,7 +1628,6 @@ contains
 
         ! Local variables
         integer  :: ncid, n, nx, ny, nz
-        real(wp) :: time_prev
 
         ! nx = size(ylmo%dyn%now%ux, 1)
         ! ny = size(ylmo%dyn%now%ux, 2)
@@ -1641,10 +1637,8 @@ contains
         ! Open the file for writing
         call nc_open(filename, ncid, writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename, "time", ncid)
-        call nc_read(filename, "time", time_prev, start=[n], count=[1], ncid=ncid)
-        if (abs(time - time_prev) .gt. 1e-5) n = n + 1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
@@ -1684,15 +1678,12 @@ contains
 
         ! Local variables
         integer    :: ncid, n
-        real(wp) :: time_prev
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -2008,16 +1999,13 @@ subroutine yx_hyst_write_step_2Dwais(ylmo, mshlf, filename, time, i1, i2, j1, j2
 
     ! Local variables
     integer    :: ncid, n
-    real(prec) :: time_prev
     character(len=56), allocatable :: names(:)
 
     ! Open the file for writing
     call nc_open(filename, ncid, writable=.TRUE.)
 
-    ! Determine current writing time step
-    n = nc_size(filename, "time", ncid)
-    call nc_read(filename, "time", time_prev, start=[n], count=[1], ncid=ncid)
-    if (abs(time-time_prev) .gt. 1e-5) n = n+1
+    ! Determine current writing time step 
+    n = nc_time_index(filename,"time",time,ncid)
 
     ! Update the time step
     call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -2076,15 +2064,12 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! Local variables
         integer  :: ncid, n
-        real(wp) :: time_prev
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -2194,7 +2179,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! External data
-        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
@@ -2300,15 +2285,12 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! Local variables
         integer  :: ncid, n
-        real(wp) :: time_prev
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -2409,7 +2391,6 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! Local variables
         integer  :: ncid, n, k
-        real(wp) :: time_prev
         type(yregions_class) :: reg
 
         ! Assume region to write is the global region of yelmo
@@ -2418,10 +2399,8 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -2548,7 +2527,6 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         ! Local variables
         integer  :: ncid, n
-        real(wp) :: time_prev
         real(wp) :: rho_ice
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
@@ -2592,10 +2570,8 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -2722,7 +2698,6 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         type(yregions_class) :: reg
 
         integer  :: ncid, n
-        real(wp) :: time_prev
         real(wp) :: rho_ice
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
@@ -2846,10 +2821,8 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
-        ! Determine current writing time step
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)

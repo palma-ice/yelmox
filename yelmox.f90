@@ -406,7 +406,7 @@ program yelmox
     call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
     ! ajr: for now, spatially variable tau is disabled, since it is not clear how to 
-    ! pass the information from an isos1%output field back to the correlary extended 
+    ! pass the information from an isos1%out field back to the correlary extended 
     ! isos1%domain field. 
 
     ! if (trim(domain) .eq. "Antarctica") then 
@@ -445,8 +445,8 @@ program yelmox
     ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
     
-    yelmo1%bnd%z_bed = isos1%output%z_bed
-    yelmo1%bnd%z_sl  = isos1%output%z_ss
+    yelmo1%bnd%z_bed = isos1%out%z_bed
+    yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     call sealevel_update(sealev,year_bp=time_bp)
     yelmo1%bnd%z_sl  = sealev%z_sl 
@@ -772,8 +772,8 @@ program yelmox
         ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
         call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                     dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = isos1%output%z_bed
-        yelmo1%bnd%z_sl  = isos1%output%z_ss
+        yelmo1%bnd%z_bed = isos1%out%z_bed
+        yelmo1%bnd%z_sl  = isos1%out%z_ss
 
         call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
         
@@ -922,9 +922,7 @@ contains
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -1121,7 +1119,7 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! External data
-        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &

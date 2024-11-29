@@ -277,7 +277,7 @@ program yelmox_ismip6
     call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
 
     ! ajr: for now, spatially variable tau is disabled, since it is not clear how to 
-    ! pass the information from an isos1%output field back to the correlary extended 
+    ! pass the information from an isos1%out field back to the correlary extended 
     ! isos1%domain field. 
 
     ! if (trim(domain) .eq. "Antarctica") then 
@@ -542,8 +542,8 @@ program yelmox_ismip6
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%output%z_bed
-            yelmo1%bnd%z_sl  = isos1%output%z_ss
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -645,8 +645,8 @@ program yelmox_ismip6
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
             call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
                                                         dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%output%z_bed
-            yelmo1%bnd%z_sl  = isos1%output%z_ss
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy") 
 
@@ -728,15 +728,12 @@ contains
 
         ! Local variables
         integer  :: ncid, n
-        real(wp) :: time_prev
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid)
-        if (abs(time-time_prev).gt.1e-5) n = n+1
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
@@ -749,7 +746,7 @@ contains
         
         ! Write constant fields
         if (n .eq. 1) then 
-            call nc_write(filename,"isos_tau",isos%output%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
+            call nc_write(filename,"isos_tau",isos%out%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         end if 
 
@@ -919,7 +916,7 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
                         
         ! External data
-        call nc_write(filename,"dzbdt",isos%output%dwdt,units="m/a",long_name="Bedrock uplift rate", &
+        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Comparison with present-day 
@@ -1085,15 +1082,12 @@ contains
 
         ! Local variables
         integer    :: ncid, n
-        real(wp) :: time_prev 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
 
         ! Determine current writing time step 
-        n = nc_size(filename,"time",ncid)
-        call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-        if (abs(time-time_prev).gt.1e-5) n = n+1 
+        n = nc_time_index(filename,"time",time,ncid)
 
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
