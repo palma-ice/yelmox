@@ -588,13 +588,13 @@
     lithosphere = "uniform"         ! Choose lithospheric thickness field:
                                     ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
     viscosity_scaling_method = 0    ! -1: min, 0: nominal, 1: max, else: scale by provided number
-    layering    = "parallel"        ! "parallel", "equalized" or "folded"
-    nl          = 5                 ! [1] Number of viscous layers for sub-lithospheric mantle
+    layering    = "equalized"       ! "parallel", "equalized" or "folded"
+    nl          = 2                 ! [1] Number of viscous layers for sub-lithospheric mantle
     dl          = 10.e3             ! [m] Thickness of viscous layers. Only used if layering="parallel".
-    zl          = 88.e3, 120.e3, 200.e3, 400.e3, 600.e3     ! [m] Depth of layer boundaries.
+    zl          = 88.e3, 600.e3     ! [m] Depth of layer boundaries.
                                     ! Only used if layering="equalized". First value 
                                     ! overwritten if visc_method="rheology_file".
-    viscosities = 1.e21, 1.e21, 1.e21, 1.e21, 2.e21         ! [Pa s] Layer viscosities. Only used if
+    viscosities = 1.e21, 2.e21      ! [Pa s] Layer viscosities. Only used if
                                     ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
                                     ! viscosity field is provided.
     tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
@@ -615,8 +615,8 @@
 
     ! Files
     restart = "None"
-    mask_file = "isostasy_data/tools/masks/ANT-32KM_activemask.nc"
-    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Pan2022.nc"
+    mask_file = "None"
+    rheology_file = "None"
     ocean_surface_file = "None"     ! "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
 /
 
