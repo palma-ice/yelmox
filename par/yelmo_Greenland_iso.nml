@@ -155,7 +155,7 @@
 /
 
 &ydyn
-    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", l1l2", "l1l2-noslip"
+    solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip", "l1l2", "l1l2-noslip"
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 3               ! 0: constant beta; 1: linear (beta=cb/u0); 2: psuedo-plastic-power; 3: Regularized Coulomb
@@ -505,7 +505,6 @@
     ghf_const = 50.0           ! [mW/m^2]
 
 /
-
 &isos
     ! Options
     correct_distortion = .false.    ! Account for distortion of projection?
@@ -513,19 +512,19 @@
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
     dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    pad         = 512.e3            ! [m] Padding around the domain (preferably chosen as a power
+    pad         = 512.              ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
 
     ! Rheology
     mantle = "uniform"              ! Choose mantle viscosity field, options:
-                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+                                    ! "uniform", "rheology_file"
     lithosphere = "uniform"         ! Choose lithospheric thickness field:
-                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+                                    ! "uniform", "rheology_file"
     viscosity_scaling_method = 0    ! -1: min, 0: nominal, 1: max, else: scale by provided number
     layering    = "equalized"       ! "parallel", "equalized" or "folded"
     nl          = 2                 ! [1] Number of viscous layers for sub-lithospheric mantle
-    dl          = 10.e3             ! [m] Thickness of viscous layers. Only used if layering="parallel".
-    zl          = 88.e3, 600.e3     ! [m] Depth of layer boundaries.
+    dl          = 10.             ! [km] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 88., 600.         ! [km] Depth of layer boundaries.
                                     ! Only used if layering="equalized". First value 
                                     ! overwritten if visc_method="rheology_file".
     viscosities = 1.e21, 2.e21      ! [Pa s] Layer viscosities. Only used if
@@ -553,5 +552,3 @@
     rheology_file = "None"
     ocean_surface_file = "None"     ! "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
 /
-
-

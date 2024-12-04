@@ -598,19 +598,19 @@
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
     dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    pad         = 512.e3            ! [m] Padding around the domain (preferably chosen as a power
+    pad         = 512.              ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
 
     ! Rheology
     mantle = "rheology_file"        ! Choose mantle viscosity field, options:
-                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+                                    ! "uniform", "rheology_file"
     lithosphere = "rheology_file"   ! Choose lithospheric thickness field:
-                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+                                    ! "uniform", "rheology_file"
     viscosity_scaling_method = 0    ! -1: min, 0: nominal, 1: max, else: scale by provided number
     layering    = "parallel"        ! "parallel", "equalized" or "folded"
     nl          = 5                 ! [1] Number of viscous layers for sub-lithospheric mantle
-    dl          = 10.e3             ! [m] Thickness of viscous layers. Only used if layering="parallel".
-    zl          = 88.e3, 120.e3, 200.e3, 400.e3, 600.e3     ! [m] Depth of layer boundaries.
+    dl          = 40.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 88., 120., 200., 400., 600.     ! [km] Depth of layer boundaries.
                                     ! Only used if layering="equalized". First value 
                                     ! overwritten if visc_method="rheology_file".
     viscosities = 1.e21, 1.e21, 1.e21, 1.e21, 2.e21         ! [Pa s] Layer viscosities. Only used if
@@ -635,12 +635,6 @@
     ! Files
     restart = "None"
     mask_file = "isostasy_data/tools/masks/ANT-32KM_activemask.nc"
-    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Pan2022.nc"
+    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Lloyd2024.nc"
     ocean_surface_file = "None"     ! "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
-/
-
-&isos_ant
-    tau             = 100.0
-    tau_eais        = 5000.0
-    sigma           = 200e3
 /
