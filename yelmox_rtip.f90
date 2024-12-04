@@ -626,8 +626,8 @@ program yelmox_rtip
             call sealevel_update(sealev,year_bp=time_bp)
 
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, &
-                dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
 
@@ -749,8 +749,8 @@ program yelmox_rtip
             call sealevel_update(sealev,year_bp=0.0_wp)
 
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
-                                                        dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
 
@@ -896,8 +896,8 @@ program yelmox_rtip
             call sealevel_update(sealev,year_bp=0.0_wp)
 
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
-                                                        dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
 
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
@@ -1136,8 +1136,8 @@ end if
             call sealevel_update(sealev,year_bp=0.0_wp)
 
             ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, sealev%z_sl, time, &
-                                                        dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
 
