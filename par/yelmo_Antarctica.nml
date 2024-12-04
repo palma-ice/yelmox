@@ -292,8 +292,8 @@
 
 ! ===== EXTERNAL LIBRARIES =====
 
-&sealevel
-    method              = 0                             ! 0: use z_sl_const, 1: read time series from sl_path
+&barysealevel
+    method              = 0                             ! 0: use z_sl_const, 1: read time series from sl_path, 2: use internal isos
     z_sl_const          = 0.0                           ! [m] Sea-level relative to present day
     sl_path             = "input/sl_deglaciation.dat"   ! Input time series filename
     sl_name             = "none"                        ! Variable name in netcdf file, if relevant

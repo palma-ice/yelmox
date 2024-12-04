@@ -263,7 +263,7 @@
 
 ! ===== EXTERNAL LIBRARIES =====
 
-&sealevel
+&barysealevel
     sl_path            = "input/sl_deglaciation.dat"
 /
 
