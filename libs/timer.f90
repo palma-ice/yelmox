@@ -58,7 +58,11 @@ contains
         integer,           intent(IN)    :: comp
         character(len=*),  intent(IN), optional :: label
         
-        call timer_step_dble(timer,comp,real([0.0,0.0],8),label)
+        ! Local variables
+        real(8) :: time_mod(2)
+
+        time_mod = [0.0,0.0]
+        call timer_step_dble(timer,comp,time_mod,label)
 
         return
 
