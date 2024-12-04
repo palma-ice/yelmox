@@ -48,21 +48,21 @@ contains
         logical           :: use_nc 
         integer           :: n 
 
-        call nml_read(filename,"sealevel","method",sl%method,init=.TRUE.)
+        call nml_read(filename,"barysealevel","method",sl%method,init=.TRUE.)
         
         select case(sl%method)
 
             case(0)
                 ! Load constant sea level value from parameter file 
 
-                call nml_read(filename,"sealevel","z_sl_const",sl%z_sl_const,init=.TRUE.)
+                call nml_read(filename,"barysealevel","z_sl_const",sl%z_sl_const,init=.TRUE.)
                 
 
             case(1) 
                 ! Load transient sea-level time series 
 
                 ! Determine filename from which to load sea level time series 
-                call nml_read(filename,"sealevel","sl_path",sl%series%filename,init=.TRUE.)
+                call nml_read(filename,"barysealevel","sl_path",sl%series%filename,init=.TRUE.)
         
                 use_nc = .FALSE. 
                 n = len_trim(sl%series%filename)
@@ -71,7 +71,7 @@ contains
                 if (use_nc) then 
 
                     ! Get the variable name of interest
-                    call nml_read(filename,"sealevel","sl_name",varname,init=.TRUE.)
+                    call nml_read(filename,"barysealevel","sl_name",varname,init=.TRUE.)
                     
                     ! Read the time series from netcdf file 
                     call read_series_nc(sl%series,sl%series%filename,varname)
@@ -84,7 +84,11 @@ contains
                 end if 
         
                 ! Also set z_sl_const to zero for safety 
-                sl%z_sl_const = 0.0_wp 
+                sl%z_sl_const = 0.0_wp
+
+            case(2)
+
+                write(*,*) "sealevel_init:: You are using BSL from FastIsostasy."
 
             case DEFAULT 
 
@@ -118,8 +122,12 @@ contains
             case(1) 
                 sl%time  = year_bp 
                 sl%z_sl  = series_interp(sl%series,year_bp)
-                sl%sigma = 0.0 
-            
+                sl%sigma = 0.0
+
+            case(2)
+                sl%time  = year_bp
+                sl%sigma = 0.0
+                
             case DEFAULT 
 
                 write(error_unit,*) ""
