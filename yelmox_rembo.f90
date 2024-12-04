@@ -416,10 +416,15 @@ end if
         call sealevel_update(sealev,year_bp=time)
 
         ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+        write(io_unit_err,*) time, "z_bed: ", minval(yelmo1%bnd%z_bed), maxval(yelmo1%bnd%z_bed)
+
         call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
                                                     dwdt_corr=yelmo1%bnd%dzbdt_corr)
+
         yelmo1%bnd%z_bed = real(isos1%out%z_bed,wp)
         yelmo1%bnd%z_sl  = real(isos1%out%z_ss,wp)
+
+        write(io_unit_err,*) time, "z_bed: ", minval(yelmo1%bnd%z_bed), maxval(yelmo1%bnd%z_bed)
 
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
@@ -876,11 +881,9 @@ contains
         ! External data
         call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
- 
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        
         ! Comparison with present-day 
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
