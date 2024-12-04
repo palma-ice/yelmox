@@ -412,14 +412,22 @@ end if
 
         call timer_step(tmrs,comp=0) 
 
-        ! == SEA LEVEL (BARYSTATIC) ======================================================
-        call sealevel_update(sealev,year_bp=time)
+        ! == SEA LEVEL and ISOSTASY ============================================
+        ! write(io_unit_err,*) time, "z_bed: ", minval(yelmo1%bnd%z_bed), maxval(yelmo1%bnd%z_bed)
 
-        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-        write(io_unit_err,*) time, "z_bed: ", minval(yelmo1%bnd%z_bed), maxval(yelmo1%bnd%z_bed)
-
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        if (sealev%method .eq. 0) then
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl_const, &
+                dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        else if (sealev%method .eq. 1) then
+            call sealevel_update(sealev,year_bp=time)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
+                dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        else if (sealev%method .eq. 2) then
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        else
+            write(*,*) "sealevel:: Error: method defined."
+            stop
+        end if
 
         yelmo1%bnd%z_bed = real(isos1%out%z_bed,wp)
         yelmo1%bnd%z_sl  = real(isos1%out%z_ss,wp)
@@ -824,6 +832,30 @@ contains
                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+
+        call nc_write(filename, "w_viscous", isos%out%w, units="m", &
+            long_name="Viscous vertical displacement", dim1="xc", dim2="yc", dim3="time", &
+            start=[1,1,n], ncid=ncid)
+
+        call nc_write(filename, "w_elastic", isos%out%we, units="m", &
+            long_name="Elastic vertical displacement", dim1="xc", dim2="yc", dim3="time", &
+            start=[1,1,n], ncid=ncid)
+
+        call nc_write(filename, "canom", isos%out%canom_full, units="Pa", &
+            long_name="Full stress anomaly", dim1="xc", dim2="yc", dim3="time", &
+            start=[1,1,n], ncid=ncid)
+
+        call nc_write(filename, "maskocean", isos%out%maskocean, units="", &
+            long_name="Ocean mask", dim1="xc", dim2="yc", dim3="time", &
+            start=[1,1,n], ncid=ncid)
+
+        call nc_write(filename, "maskgrounded", isos%out%maskgrounded, units="", &
+            long_name="Grounded mask", dim1="xc", dim2="yc", dim3="time", &
+            start=[1,1,n], ncid=ncid)
+
+        call nc_write(filename, "maskcontinent", isos%out%maskcontinent, units="", &
+            long_name="Continent mask", dim1="xc", dim2="yc", dim3="time", &
+            start=[1,1,n], ncid=ncid)
         
         ! call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
         !               dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -872,6 +904,15 @@ contains
 
         call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+
+        call nc_write(filename, "eta_eff", isos%out%eta_eff, units="Pa s", &
+            long_name="Effective viscosity", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
+
+        call nc_write(filename, "D_lith", isos%out%D_lith, units="m", &
+            long_name="Lithosphere thickness", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
+
+        call nc_write(filename, "He_lith", isos%out%He_lith, units="m", &
+            long_name="Lithosphere rigidity", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
         
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Net basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
