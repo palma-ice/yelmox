@@ -434,9 +434,15 @@ program yelmox
     
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    yelmo1%bnd%H_sed = sed1%now%H 
+    
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
+    
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
+
+    call sealevel_update(sealev,year_bp=time_bp)
 
     ! Initialize the isostasy reference state using reference topography fields
     call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
@@ -444,14 +450,11 @@ program yelmox
     ! Initialize isostasy using current topography
     ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
-    
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-    call sealevel_update(sealev,year_bp=time_bp)
-    yelmo1%bnd%z_sl  = sealev%z_sl 
-    yelmo1%bnd%H_sed = sed1%now%H 
-
+    call isos_restart_write(isos1,"./isos_restart_init.nc",time)
+    
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
@@ -491,8 +494,6 @@ program yelmox
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
-    
     call yelmo_print_bound(yelmo1%bnd) 
     
     ! Initialize state variables (dyn,therm,mat)
@@ -766,6 +767,7 @@ program yelmox
 
         call timer_step(tmrs,comp=0) 
         
+
         ! == SEA LEVEL (BARYSTATIC) ======================================================
         call sealevel_update(sealev,year_bp=time_bp)
 
