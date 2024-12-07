@@ -445,8 +445,8 @@ program yelmox
     call sealevel_update(sealev,year_bp=time_bp)
 
     ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-
+    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref,bsl=0.0_wp)
+    
     ! Initialize isostasy using current topography
     ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
