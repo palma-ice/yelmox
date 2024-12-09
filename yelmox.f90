@@ -789,7 +789,9 @@ program yelmox
         end if
         
         ! Update Yelmo
-        if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+        if (ctl%with_ice_sheet .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then
+            call yelmo_update(yelmo1,time)
+        end if
         
         call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
         

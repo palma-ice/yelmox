@@ -121,7 +121,6 @@ program yelmox
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
 
-
     time = time_init 
 
     ! Start timing
@@ -189,14 +188,14 @@ program yelmox
     yelmo1%bnd%z_sl  = sealev%z_sl 
     
     ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, bsl=0.0_wp)
 
     ! Initialize isostasy using current topography
     ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
     
-    yelmo1%bnd%z_bed = real(isos1%out%z_bed,wp)
-    yelmo1%bnd%z_sl  = real(isos1%out%z_ss,wp)
+    yelmo1%bnd%z_bed = isos1%out%z_bed
+    yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     if (use_hyster) then
         ! Update hysteresis variable 
@@ -352,6 +351,9 @@ end if
     dtt_now      = dtt
     n = 0
 
+    ! Write model state out to initial set of restart files
+    call yelmox_restart_write(isos1,yelmo1,rembo_ann,time)
+
     do while (.not. timesteps_complete)
 
         ! Modify dtt and rembo timestepping for transient experiments 
@@ -412,32 +414,19 @@ end if
 
         call timer_step(tmrs,comp=0) 
 
-        ! == SEA LEVEL and ISOSTASY ============================================
-        ! write(io_unit_err,*) time, "z_bed: ", minval(yelmo1%bnd%z_bed), maxval(yelmo1%bnd%z_bed)
+        ! == SEA LEVEL (BARYSTATIC) ======================================================
+        call sealevel_update(sealev,year_bp=time)
 
-        if (sealev%method .eq. 0) then
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl_const, &
-                dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        else if (sealev%method .eq. 1) then
-            call sealevel_update(sealev,year_bp=time)
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        else if (sealev%method .eq. 2) then
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        else
-            write(*,*) "sealevel:: Error: method defined."
-            stop
-        end if
-
-        yelmo1%bnd%z_bed = real(isos1%out%z_bed,wp)
-        yelmo1%bnd%z_sl  = real(isos1%out%z_ss,wp)
-
-        write(io_unit_err,*) time, "z_bed: ", minval(yelmo1%bnd%z_bed), maxval(yelmo1%bnd%z_bed)
+        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
+                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        yelmo1%bnd%z_bed = isos1%out%z_bed
+        yelmo1%bnd%z_sl  = isos1%out%z_ss
 
         call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
         
         ! == Yelmo ice sheet ===================================================
-        if (with_ice_sheet) then
+        if (with_ice_sheet .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then
 
             if (optimize) then 
 
@@ -1139,6 +1128,44 @@ contains
         return
 
     end subroutine write_yelmo_init_combined
+
+    subroutine yelmox_restart_write(isos,ylmo,rembo_ann,time,fldr)
+
+        implicit none
+
+        type(isos_class),   intent(IN) :: isos
+        type(yelmo_class),  intent(IN) :: ylmo
+        type(rembo_class),  intent(IN) :: rembo_ann
+        real(wp),           intent(IN) :: time 
+        character(len=*),   intent(IN), optional :: fldr
+        
+        ! Local variables
+        real(wp) :: time_kyr
+        character(len=32)   :: time_str
+        character(len=1024) :: outfldr
+
+        character(len=56), parameter :: file_isos  = "isos_restart.nc"
+        character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
+        character(len=56), parameter :: file_rembo = "rembo_restart.nc"
+        
+        if (present(fldr)) then
+            outfldr = trim(fldr)
+        else
+            time_kyr = time*1e-3
+            write(time_str,"(f20.3)") time_kyr
+            outfldr = "./"//"restart-"//trim(adjustl(time_str))//"-kyr/"
+        end if
+
+        write(*,*) "yelmox_restart_write:: outfldr = ", trim(outfldr)
+
+        call isos_restart_write(isos,file_isos,time)
+        call yelmo_restart_write(ylmo,file_yelmo,time) 
+        call rembo_restart_write(file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
+                    real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
+        
+        return
+
+    end subroutine yelmox_restart_write
 
 end program yelmox
 
