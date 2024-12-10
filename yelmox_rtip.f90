@@ -695,9 +695,8 @@ program yelmox_rtip
         write(*,*) "spinup complete."
         write(*,*)
 
-        ! Write the restart file for the end of the simulation
-        call yelmo_restart_write(yelmo1,file_restart,time=time_bp)
-        call isos_restart_write(isos1,file_isos_restart,time_bp)
+        ! Write the restart snapshot for the end of the simulation
+        call yelmox_restart_write(isos1,yelmo1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup
@@ -830,9 +829,8 @@ program yelmox_rtip
         write(*,*) "Transient complete."
         write(*,*)
 
-        ! Write the restart file for the end of the transient simulation
-        call yelmo_restart_write(yelmo1,file_restart,time=time)
-        call isos_restart_write(isos1,file_isos_restart,time)
+        ! Write the restart snapshot for the end of the transient simulation
+        call yelmox_restart_write(isos1,yelmo1,time)
 
     case("abumip")
         ! Here it is assumed that the model has gone through spinup
@@ -1028,9 +1026,8 @@ end if
         write(*,*) "Transient complete."
         write(*,*)
 
-        ! Write the restart file for the end of the transient simulation
-        call yelmo_restart_write(yelmo1,file_restart,time=time)
-        call isos_restart_write(isos1,file_isos_restart,time)
+        ! Write the restart snashot for the end of the transient simulation
+        call yelmox_restart_write(isos1,yelmo1,time)
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup
@@ -1233,8 +1230,7 @@ end if
                 else if (counter_restart .lt. 100) then
                     write (counter_restart_str, '(i2)') counter_restart
                 end if
-                filename_restarts = trim(outfldr)//"yelmo_restart_"//trim(counter_restart_str)//".nc"
-                call yelmo_restart_write(yelmo1, filename_restarts, time=time_bp)
+                call yelmox_restart_write(isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
             end if
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
@@ -1250,9 +1246,8 @@ end if
         write(*,*) "Transient complete."
         write(*,*)
 
-        ! Write the restart file for the end of the transient simulation
-        call yelmo_restart_write(yelmo1,file_restart,time=time)
-        call isos_restart_write(isos1,file_isos_restart,time)
+        ! Write the restart snapshot for the end of the transient simulation
+        call yelmox_restart_write(isos1,yelmo1,time)
 
     end select
 
@@ -2864,5 +2859,42 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         return
 
     end subroutine write_1D_ismip6
+
+    subroutine yelmox_restart_write(isos,ylmo,time,fldr)
+
+        implicit none
+
+        type(isos_class),   intent(IN) :: isos
+        type(yelmo_class),  intent(IN) :: ylmo
+        real(wp),           intent(IN) :: time 
+        character(len=*),   intent(IN), optional :: fldr
+
+        ! Local variables
+        real(wp) :: time_kyr
+        character(len=32)   :: time_str
+        character(len=1024) :: outfldr
+
+        character(len=56), parameter :: file_isos  = "isos_restart.nc"
+        character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
+        
+        if (present(fldr)) then
+            outfldr = trim(fldr)
+        else
+            time_kyr = time*1e-3
+            write(time_str,"(f20.3)") time_kyr
+            outfldr = "./"//"restart-"//trim(adjustl(time_str))//"-kyr"
+        end if
+
+        write(*,*) "yelmox_restart_write:: outfldr = ", trim(outfldr)
+
+        ! Make directory (use -p to ignore if directory already exists)
+        call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
+        
+        call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
+        call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+
+        return
+
+    end subroutine yelmox_restart_write
 
 end program yelmox_rtip

@@ -869,9 +869,8 @@ program yelmox
 
         end if 
 
-        if (mod(nint(time*100),nint(ctl%dt_restart*100))==0) then 
-            call yelmo_restart_write(yelmo1,file_yelmo_restart,time=time)
-            !call isos_restart_write(isos1,file_isos_restart,time)
+        if (mod(nint(time*100),nint(ctl%dt_restart*100))==0) then
+            call yelmox_restart_write(isos1,yelmo1,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
@@ -890,10 +889,9 @@ program yelmox
     ! Stop timing
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,time]*1e-3,label="timeloop") 
     
-    ! Write the restart file for the end of the simulation
-    call yelmo_restart_write(yelmo1,file_yelmo_restart,time=time) 
-    call isos_restart_write(isos1,file_isos_restart,time)
-    
+    ! Write the restart snapshot for the end of the simulation
+    call yelmox_restart_write(isos1,yelmo1,time)
+
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
 
@@ -1365,6 +1363,43 @@ contains
 
     end subroutine negis_update_cb_ref
 
+
+    subroutine yelmox_restart_write(isos,ylmo,time,fldr)
+
+        implicit none
+
+        type(isos_class),   intent(IN) :: isos
+        type(yelmo_class),  intent(IN) :: ylmo
+        real(wp),           intent(IN) :: time 
+        character(len=*),   intent(IN), optional :: fldr
+        
+        ! Local variables
+        real(wp) :: time_kyr
+        character(len=32)   :: time_str
+        character(len=1024) :: outfldr
+
+        character(len=56), parameter :: file_isos  = "isos_restart.nc"
+        character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
+        
+        if (present(fldr)) then
+            outfldr = trim(fldr)
+        else
+            time_kyr = time*1e-3
+            write(time_str,"(f20.3)") time_kyr
+            outfldr = "./"//"restart-"//trim(adjustl(time_str))//"-kyr"
+        end if
+
+        write(*,*) "yelmox_restart_write:: outfldr = ", trim(outfldr)
+
+        ! Make directory (use -p to ignore if directory already exists)
+        call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
+        
+        call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
+        call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+
+        return
+
+    end subroutine yelmox_restart_write
 
 end program yelmox
 
