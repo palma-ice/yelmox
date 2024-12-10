@@ -224,8 +224,10 @@ if (.FALSE.) then
     rembo_ann%time_smb = time_init
 end if
 
-    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    if (.not. yelmo1%par%use_restart) then
+        call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                            real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    end if
     
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -470,7 +472,7 @@ end if
         call timer_step(tmrs,comp=2,time_mod=[time-dtt_now,time]*1e-3,label="yelmo") 
         
         
-if (calc_transient_climate) then 
+if (calc_transient_climate .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! call REMBO1
