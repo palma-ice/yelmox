@@ -41,9 +41,6 @@ $(objdir)/nml.o: $(libdir)/nml.f90
 $(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/sealevel.o: $(libdir)/sealevel.f90 $(objdir)/nml.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
 $(objdir)/sediments.o: $(libdir)/sediments.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -125,7 +122,6 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
                         $(objdir)/pico.o \
 					    $(objdir)/nml.o \
 			 		    $(objdir)/ncio.o \
-			 		    $(objdir)/sealevel.o \
 			 		    $(objdir)/sediments.o \
 			 		    $(objdir)/smbpal_precision.o \
 						$(objdir)/interp_time.o \
