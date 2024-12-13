@@ -23,7 +23,7 @@ program yelmox_ismip6
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small
     character(len=256) :: file1D_ismip6, file2D_ismip6
-    character(len=256) :: file_restart, file_isos_restart
+    character(len=256) :: file_restart, file_isos, file_bsl
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
@@ -1134,12 +1134,6 @@ contains
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
         
-        ! Write constant fields
-        if (n .eq. 1) then 
-            call nc_write(filename,"isos_tau",isos%out%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
-                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-        end if 
-
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
