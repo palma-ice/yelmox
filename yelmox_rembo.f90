@@ -224,8 +224,10 @@ if (.FALSE.) then
     rembo_ann%time_smb = time_init
 end if
 
-    call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    if (.not. yelmo1%par%use_restart) then
+        call rembo_update(real(time_init,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                            real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    end if
     
     ! Update surface mass balance and surface temperature from REMBO
     yelmo1%bnd%smb   = rembo_ann%smb    *yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
@@ -470,7 +472,7 @@ end if
         call timer_step(tmrs,comp=2,time_mod=[time-dtt_now,time]*1e-3,label="yelmo") 
         
         
-if (calc_transient_climate) then 
+if (calc_transient_climate .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! call REMBO1
@@ -552,10 +554,9 @@ end if
     ! Stop timing
     call timer_step(tmr,comp=2,time_mod=[time_init,time]*1e-3,label="timeloop") 
     
-    ! Write the restart file for the end of the simulation
+    ! Write the restart files for the end of the simulation
     if (write_restart) then 
-        call yelmo_restart_write(yelmo1,file_restart,time=time)
-        call isos_restart_write(isos1,file_isos_restart,time)
+        call yelmox_restart_write(isos1,yelmo1,rembo_ann,time)
     end if
 
 !     ! Let's see if we can read a restart file 
@@ -1153,14 +1154,17 @@ contains
         else
             time_kyr = time*1e-3
             write(time_str,"(f20.3)") time_kyr
-            outfldr = "./"//"restart-"//trim(adjustl(time_str))//"-kyr/"
+            outfldr = "./"//"restart-"//trim(adjustl(time_str))//"-kyr"
         end if
 
         write(*,*) "yelmox_restart_write:: outfldr = ", trim(outfldr)
 
-        call isos_restart_write(isos,file_isos,time)
-        call yelmo_restart_write(ylmo,file_yelmo,time) 
-        call rembo_restart_write(file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
+        ! Make directory (use -p to ignore if directory already exists)
+        call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
+        
+        call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
+        call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+        call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
                     real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
         
         return
