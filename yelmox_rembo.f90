@@ -13,8 +13,8 @@ program yelmox
     use fastisostasy    ! also reexports barysealevel
     use rembo_sclimate 
     use snapclim
-    use marine_shelf 
-    use sediments 
+    use marine_shelf
+    use sediments
     use geothermal
     
     use hyster
@@ -31,8 +31,7 @@ program yelmox
     type(hyster_class)     :: hyst1
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small, file_restart, domain
-    character(len=256) :: file1D_hyst, file_isos, file_isos_restart
-    character(len=256) :: file_bsl, file_bsl_restart, file_rembo
+    character(len=256) :: file1D_hyst, file_isos, file_bsl, file_rembo
     character(len=512) :: path_par
     real(wp) :: time_init, time_end, time_equil, time, time_bp, dtt, dt_restart
     real(wp) :: dtt_now, deltat_tot
@@ -112,10 +111,7 @@ program yelmox
     file1D_hyst         = trim(outfldr)//"yelmo1D_hyst.nc" 
 
     file_isos           = trim(outfldr)//"fastisostasy.nc"
-    file_isos_restart   = trim(outfldr)//"fastisostasy_restart.nc"
-
     file_bsl            = trim(outfldr)//"bsl.nc"
-    file_bsl_restart    = trim(outfldr)//"bsl_restart.nc"
 
     file_rembo          = trim(outfldr)//"yelmo-rembo.nc"
 
@@ -528,7 +524,6 @@ end if
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
-            call isos_restart_write(isos1,file_isos_restart,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-dtt_now,time]*1e-3,label="io") 
@@ -891,15 +886,6 @@ contains
         call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
 
-        call nc_write(filename, "eta_eff", isos%out%eta_eff, units="Pa s", &
-            long_name="Effective viscosity", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
-
-        call nc_write(filename, "D_lith", isos%out%D_lith, units="m", &
-            long_name="Lithosphere thickness", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
-
-        call nc_write(filename, "He_lith", isos%out%He_lith, units="m", &
-            long_name="Lithosphere rigidity", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
-        
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Net basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Net margin-front mass balance", &
@@ -1160,8 +1146,8 @@ contains
         
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
-        call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
-                    real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
+        ! call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
+        !             real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
         
         return
 
