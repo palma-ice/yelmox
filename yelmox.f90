@@ -12,32 +12,28 @@ program yelmox
     use basal_dragging, only : calc_lambda_bed_lin, calc_lambda_bed_exp
 
     ! External libraries
-    use sealevel 
-    use fastisostasy  
-     
+    use fastisostasy    ! also reexports barysealevel
     use snapclim
-    use marine_shelf 
-    use smbpal   
-    use sediments 
+    use marine_shelf
+    use smbpal
+    use sediments
     use geothermal
     
     implicit none 
 
-    type(yelmo_class)      :: yelmo1 
-    
-    type(sealevel_class)   :: sealev 
-    type(snapclim_class)   :: snp1 
-    type(marshelf_class)   :: mshlf1 
-    type(smbpal_class)     :: smbpal1  
-    type(sediments_class)  :: sed1 
+    type(yelmo_class)      :: yelmo1
+    type(bsl_class)   :: bsl
+    type(snapclim_class)   :: snp1
+    type(marshelf_class)   :: mshlf1
+    type(smbpal_class)     :: smbpal1
+    type(sediments_class)  :: sed1
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, domain
-    character(len=256) :: file_yelmo_restart, file_isos_restart
-    character(len=256) :: file2D_small
+    character(len=256) :: outfldr, file1D, file2D, file2D_small, file_restart, domain
+    character(len=256) :: file_isos_restart, file_isos, file_bsl, file_bsl_restart
     character(len=512) :: path_par
-    character(len=512) :: path_lgm  
+    character(len=512) :: path_lgm
     real(wp) :: time, time_bp, time_elapsed
     real(wp) :: dT_now 
     integer  :: n
@@ -195,13 +191,18 @@ program yelmox
     
     ! Assume program is running from the output folder
     outfldr = "./"
-
-    ! Define input and output locations 
+    
+    ! Define input and output locations
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
-    file_yelmo_restart  = trim(outfldr)//"yelmo_restart.nc"          
-    file_isos_restart   = trim(outfldr)//"isos_restart.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
+    file_restart        = trim(outfldr)//"yelmo_restart.nc"
+
+    file_isos           = trim(outfldr)//"fastisostasy.nc"
+    file_isos_restart   = trim(outfldr)//"fastisostasy_restart.nc"
+
+    file_bsl            = trim(outfldr)//"bsl.nc"
+    file_bsl_restart    = trim(outfldr)//"bsl_restart.nc"
     
     tmr_file            = trim(outfldr)//"timer_table.txt"
 
@@ -398,31 +399,13 @@ program yelmox
 
     ! === Initialize external models (forcing for ice sheet) ======
 
-    ! Initialize global sea level model (bnd%z_sl)
-    call sealevel_init(sealev,path_par)
+    ! Initialize barysealevel model
+    call bsl_init(bsl, path_par, time_bp)
 
-    write(*,*) "(nx, ny) = ", yelmo1%grd%nx, yelmo1%grd%ny
-    ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
+    ! Initialize fastisosaty
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
+        yelmo1%grd%dx, yelmo1%grd%dy)
 
-    ! ajr: for now, spatially variable tau is disabled, since it is not clear how to 
-    ! pass the information from an isos1%out field back to the correlary extended 
-    ! isos1%domain field. 
-
-    ! if (trim(domain) .eq. "Antarctica") then 
-    !     ! Redefine tau (asthenosphere relaxation constant) as spatially
-    !     ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
-    !     call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)   
-    !     call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)  
-    !     call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)  
- 
-    !     call isos_set_field(isos1%now%tau, &
-    !             [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
-    !             [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
-    !                                   regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
-        
-    ! end if
-    
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
@@ -442,19 +425,18 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
-    call sealevel_update(sealev,year_bp=time_bp)
+    ! Barystatic sea level
+    call bsl_update(bsl, year_bp=time_bp)
+    call bsl_write_init(bsl, file_bsl, time)
 
     ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref,bsl=0.0_wp)
-    
-    ! Initialize isostasy using current topography
-    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
+    call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
+    call isos_write_init_extended(isos1, file_isos, time)
+
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-    call isos_restart_write(isos1,"./isos_restart_init.nc",time)
-    
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
@@ -767,13 +749,9 @@ program yelmox
 
         call timer_step(tmrs,comp=0) 
         
-
-        ! == SEA LEVEL (BARYSTATIC) ======================================================
-        call sealevel_update(sealev,year_bp=time_bp)
-
-        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        ! == ISOSTASY and SEA LEVEL ======================================================
+        call bsl_update(bsl, time_bp)
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
         yelmo1%bnd%z_bed = isos1%out%z_bed
         yelmo1%bnd%z_sl  = isos1%out%z_ss
 
@@ -845,7 +823,7 @@ program yelmox
         ! == MODEL OUTPUT =======================================================
 
         if (timeout_check(tm_2D,time)) then
-            call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,time=time)
+            call write_step_2D_combined(yelmo1,snp1,mshlf1,smbpal1,file2D,time=time)
         end if
 
         if (timeout_check(tm_2Dsm,time)) then 
@@ -900,12 +878,11 @@ program yelmox
     
 contains
     
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
+    subroutine write_step_2D_combined(ylmo,snp,mshlf,srf,filename,time)
 
         implicit none 
         
         type(yelmo_class),      intent(IN) :: ylmo
-        type(isos_class),       intent(IN) :: isos 
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
         type(smbpal_class),     intent(IN) :: srf 
@@ -1118,10 +1095,6 @@ contains
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Net basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Net margin-front mass balance", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! External data
-        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
