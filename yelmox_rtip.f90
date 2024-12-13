@@ -11,7 +11,7 @@ program yelmox_rtip
     ! External libraries
     use geothermal
     use ismip6
-    use fastisostasy
+    use fastisostasy    ! also reexports barysealevel
     use marine_shelf
     use sediments
     use smbpal
@@ -23,8 +23,7 @@ program yelmox_rtip
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small, file2D_wais, file3D
     character(len=256) :: file1D_ismip6, file2D_ismip6
-    character(len=256) :: file_restart
-    character(len=256) :: file_isos, file_isos_restart, file_bsl, file_bsl_restart
+    character(len=256) :: file_restart, file_isos, file_bsl
     character(len=256) :: domain, grid_name
     character(len=512) :: path_par
     character(len=512) :: path_tf_corr
@@ -96,10 +95,6 @@ program yelmox_rtip
         character(len=56)  :: ismip6_expname
         logical            :: ismip6_write_formatted
         real(wp)           :: ismip6_dt_formatted
-
-        real(wp) :: isos_tau_1
-        real(wp) :: isos_tau_2
-        real(wp) :: isos_sigma
 
     end type
 
@@ -195,9 +190,7 @@ program yelmox_rtip
     file3D              = trim(outfldr)//"yelmo3D.nc"
     file_restart        = trim(outfldr)//"yelmo_restart.nc"
     file_isos           = trim(outfldr)//"fastisostasy.nc"
-    file_isos_restart   = trim(outfldr)//"fastisostasy_restart.nc"
     file_bsl            = trim(outfldr)//"bsl.nc"
-    file_bsl_restart    = trim(outfldr)//"bsl_restart.nc"
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc"
 
@@ -364,8 +357,8 @@ program yelmox_rtip
 
     ! Initialize variables inside of ismip6 object
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ismip6exp%experiment, &
-                                                                    shlf_collapse=ismip6exp%shlf_collapse)
+    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name, &
+        experiment=ismip6exp%experiment, shlf_collapse=ismip6exp%shlf_collapse)
 
     ! ===== tf_corr initialization ======
 
@@ -403,9 +396,6 @@ program yelmox_rtip
 
     ! Initialize the isostasy reference state using reference topography fields
     call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-
-    ! Initialize isostasy using current topography
-    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
     call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
     call isos_write_init_extended(isos1, file_isos, time)
 
@@ -437,14 +427,12 @@ program yelmox_rtip
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
 
-
     ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
     if (ctl%kill_shelves) then
         where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%ice_allowed = .FALSE.
     end if
 
 ! ================= RUN STEPS ===============================================
-
 
     select case(trim(ctl%run_step))
 
@@ -606,10 +594,10 @@ program yelmox_rtip
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
+            call bsl_update(bsl, time_bp)
             call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
-            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -642,7 +630,6 @@ program yelmox_rtip
 
             if (timeout_check(tm_2D, time)) then
                 call write_step_2D_combined(yelmo1, isos1, snp1, mshlf1, smbpal1, file2D, time)
-                call isos_write_step_extended(isos1, file_isos, time)
             end if
 
             if (timeout_check(tm_2Dsm, time)) then
@@ -678,7 +665,7 @@ program yelmox_rtip
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup
@@ -727,10 +714,10 @@ program yelmox_rtip
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
+            call bsl_update(bsl, time_bp)
             call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
-            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -809,7 +796,7 @@ program yelmox_rtip
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     case("abumip")
         ! Here it is assumed that the model has gone through spinup
@@ -870,10 +857,10 @@ program yelmox_rtip
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
+            call bsl_update(bsl, time_bp)
             call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
-            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -1002,7 +989,7 @@ end if
         write(*,*)
 
         ! Write the restart snashot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup
@@ -1105,10 +1092,10 @@ end if
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
+            call bsl_update(bsl, time_bp)
             call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
-            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -1202,7 +1189,7 @@ end if
                 else if (counter_restart .lt. 100) then
                     write (counter_restart_str, '(i2)') counter_restart
                 end if
-                call yelmox_restart_write(isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
+                call yelmox_restart_write(bsl,isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
             end if
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
@@ -1219,7 +1206,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     end select
 
@@ -2855,9 +2842,9 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Make directory (use -p to ignore if directory already exists)
         call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
         
-        call bsl_restart_write(bsl, trim(outfldr)//"/"//file_bsl,time)
-        call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
-        call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+        call bsl_restart_write(bsl, trim(outfldr)//"/"//file_bsl, time)
+        call isos_restart_write(isos, trim(outfldr)//"/"//file_isos, time)
+        call yelmo_restart_write(ylmo, trim(outfldr)//"/"//file_yelmo, time) 
         
         return
 
