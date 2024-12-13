@@ -491,8 +491,8 @@ program yelmox_rtip
 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
-        call yelmo_write_init_cropped(yelmo1, file2D_wais, time, "years", &
-                                             i1wais, i2wais, j1wais, j2wais)
+        call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
+                                    irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
 
         call yelmo_write_init(yelmo1, file3D, time_init=time, units="years")
 
@@ -1028,8 +1028,8 @@ end if
             mask=yelmo1%bnd%ice_allowed)
 
         call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
-        call yelmo_write_init_cropped(yelmo1, file2D_wais, time, "years", &
-                                            i1wais, i2wais, j1wais, j2wais)
+        call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
+                                    irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
         call yelmo_write_init(yelmo1, file2D_small, time_init=time, units="years")
         call yelmo_write_init(yelmo1, file3D, time_init=time, units="years")
 
