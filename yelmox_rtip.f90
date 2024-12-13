@@ -678,7 +678,7 @@ program yelmox_rtip
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup
@@ -809,7 +809,7 @@ program yelmox_rtip
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     case("abumip")
         ! Here it is assumed that the model has gone through spinup
@@ -1002,7 +1002,7 @@ end if
         write(*,*)
 
         ! Write the restart snashot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup
@@ -1202,7 +1202,7 @@ end if
                 else if (counter_restart .lt. 100) then
                     write (counter_restart_str, '(i2)') counter_restart
                 end if
-                call yelmox_restart_write(isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
+                call yelmox_restart_write(bsl,isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
             end if
 
             if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
@@ -1219,7 +1219,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     end select
 
