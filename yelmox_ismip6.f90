@@ -23,7 +23,7 @@ program yelmox_ismip6
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small
     character(len=256) :: file1D_ismip6, file2D_ismip6
-    character(len=256) :: file_restart, file_isos, file_bsl
+    character(len=256) :: file_isos, file_bsl
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
@@ -162,9 +162,10 @@ program yelmox_ismip6
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
-    file_restart        = trim(outfldr)//"yelmo_restart.nc"
+    
     file_isos           = trim(outfldr)//"fastisostasy.nc"
     file_bsl            = trim(outfldr)//"bsl.nc"
+    
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc"
 
@@ -608,7 +609,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -729,7 +730,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     case("abumip")
         ! Here it is assumed that the model has gone through spinup 
@@ -900,7 +901,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup 
@@ -1088,7 +1089,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     end select
 
@@ -2590,10 +2591,11 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine write_1D_ismip6
 
-    subroutine yelmox_restart_write(isos,ylmo,time,fldr)
+    subroutine yelmox_restart_write(bsl,isos,ylmo,time,fldr)
 
         implicit none
 
+        type(bsl_class),    intent(IN) :: bsl
         type(isos_class),   intent(IN) :: isos
         type(yelmo_class),  intent(IN) :: ylmo
         real(wp),           intent(IN) :: time 
@@ -2604,6 +2606,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         character(len=32)   :: time_str
         character(len=1024) :: outfldr
 
+        character(len=56), parameter :: file_bsl   = "bsl_restart.nc"
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
         
@@ -2620,6 +2623,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Make directory (use -p to ignore if directory already exists)
         call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
         
+        call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
 

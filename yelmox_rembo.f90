@@ -30,7 +30,7 @@ program yelmox
     type(isos_class)       :: isos1
     type(hyster_class)     :: hyst1
 
-    character(len=256) :: outfldr, file1D, file2D, file2D_small, file_restart, domain
+    character(len=256) :: outfldr, file1D, file2D, file2D_small, domain
     character(len=256) :: file1D_hyst, file_isos, file_bsl, file_rembo
     character(len=512) :: path_par
     real(wp) :: time_init, time_end, time_equil, time, time_bp, dtt, dt_restart
@@ -107,7 +107,6 @@ program yelmox
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
-    file_restart        = trim(outfldr)//"yelmo_restart.nc"
     file1D_hyst         = trim(outfldr)//"yelmo1D_hyst.nc" 
 
     file_isos           = trim(outfldr)//"fastisostasy.nc"
@@ -523,7 +522,7 @@ end if
         end if 
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
-            call yelmo_restart_write(yelmo1,file_restart,time=time) 
+            call yelmox_restart_write(isos1,yelmo1,rembo_ann,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-dtt_now,time]*1e-3,label="io") 

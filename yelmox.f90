@@ -22,7 +22,7 @@ program yelmox
     implicit none 
 
     type(yelmo_class)      :: yelmo1
-    type(bsl_class)   :: bsl
+    type(bsl_class)        :: bsl
     type(snapclim_class)   :: snp1
     type(marshelf_class)   :: mshlf1
     type(smbpal_class)     :: smbpal1
@@ -30,8 +30,8 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file2D_small, file_restart, domain
-    character(len=256) :: file_isos_restart, file_isos, file_bsl, file_bsl_restart
+    character(len=256) :: outfldr, file1D, file2D, file2D_small, domain
+    character(len=256) :: file_isos, file_bsl
     character(len=512) :: path_par
     character(len=512) :: path_lgm
     real(wp) :: time, time_bp, time_elapsed
@@ -196,14 +196,10 @@ program yelmox
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
-    file_restart        = trim(outfldr)//"yelmo_restart.nc"
 
     file_isos           = trim(outfldr)//"fastisostasy.nc"
-    file_isos_restart   = trim(outfldr)//"fastisostasy_restart.nc"
-
     file_bsl            = trim(outfldr)//"bsl.nc"
-    file_bsl_restart    = trim(outfldr)//"bsl_restart.nc"
-    
+
     tmr_file            = trim(outfldr)//"timer_table.txt"
 
     ! Print summary of run settings 
@@ -848,7 +844,7 @@ program yelmox
         end if 
 
         if (mod(nint(time*100),nint(ctl%dt_restart*100))==0) then
-            call yelmox_restart_write(isos1,yelmo1,time)
+            call yelmox_restart_write(bsl,isos1,yelmo1,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
@@ -868,7 +864,7 @@ program yelmox
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,time]*1e-3,label="timeloop") 
     
     ! Write the restart snapshot for the end of the simulation
-    call yelmox_restart_write(isos1,yelmo1,time)
+    call yelmox_restart_write(bsl,isos1,yelmo1,time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=time)
@@ -1337,10 +1333,11 @@ contains
     end subroutine negis_update_cb_ref
 
 
-    subroutine yelmox_restart_write(isos,ylmo,time,fldr)
+    subroutine yelmox_restart_write(bsl,isos,ylmo,time,fldr)
 
         implicit none
 
+        type(bsl_class),    intent(IN) :: bsl
         type(isos_class),   intent(IN) :: isos
         type(yelmo_class),  intent(IN) :: ylmo
         real(wp),           intent(IN) :: time 
@@ -1351,6 +1348,7 @@ contains
         character(len=32)   :: time_str
         character(len=1024) :: outfldr
 
+        character(len=56), parameter :: file_bsl   = "bsl_restart.nc"
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
         
@@ -1367,6 +1365,7 @@ contains
         ! Make directory (use -p to ignore if directory already exists)
         call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
         
+        call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
 
