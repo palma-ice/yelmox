@@ -13,7 +13,6 @@ program yelmox_rtip
     use ismip6
     use fastisostasy
     use marine_shelf
-    use sealevel
     use sediments
     use smbpal
     use snapclim
@@ -25,7 +24,7 @@ program yelmox_rtip
     character(len=256) :: outfldr, file1D, file2D, file2D_small, file2D_wais, file3D
     character(len=256) :: file1D_ismip6, file2D_ismip6
     character(len=256) :: file_restart
-    character(len=256) :: file_isos_restart
+    character(len=256) :: file_isos, file_isos_restart, file_bsl, file_bsl_restart
     character(len=256) :: domain, grid_name
     character(len=512) :: path_par
     character(len=512) :: path_tf_corr
@@ -43,7 +42,7 @@ program yelmox_rtip
     real(sp) :: convert_km3_Gt
 
     type(yelmo_class)           :: yelmo1
-    type(sealevel_class)        :: sealev
+    type(bsl_class)             :: bsl
     type(snapclim_class)        :: snp1
     type(marshelf_class)        :: mshlf1
     type(smbpal_class)          :: smbpal1
@@ -195,7 +194,10 @@ program yelmox_rtip
     file2D_wais         = trim(outfldr)//"yelmo2Dwais.nc"
     file3D              = trim(outfldr)//"yelmo3D.nc"
     file_restart        = trim(outfldr)//"yelmo_restart.nc"
-    file_isos_restart   = trim(outfldr)//"isos_restart.nc"
+    file_isos           = trim(outfldr)//"fastisostasy.nc"
+    file_isos_restart   = trim(outfldr)//"fastisostasy_restart.nc"
+    file_bsl            = trim(outfldr)//"bsl.nc"
+    file_bsl_restart    = trim(outfldr)//"bsl_restart.nc"
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc"
 
@@ -344,31 +346,12 @@ program yelmox_rtip
 
     ! === Initialize external models (forcing for ice sheet) ======
 
+    ! Initialize barysealevel model
+    call bsl_init(bsl, path_par, time_bp)
 
-    ! Initialize global sea level model (bnd%z_sl)
-    call sealevel_init(sealev,path_par)
-
-    ! Initialize bedrock model
+    ! Initialize fastisosaty
     call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
         yelmo1%grd%dx, yelmo1%grd%dy)
-
-    ! ajr: for now, spatially variable tau is disabled, since it is not clear how to
-    ! pass the information from an isos1%out field back to the correlary extended
-    ! isos1%domain field.
-
-    ! if (trim(domain) .eq. "Antarctica") then
-    !     ! Redefine tau (asthenosphere relaxation constant) as spatially
-    !     ! variable field using region mask loaded above (0=deepocean,1=wais,2=eais,3=apis)
-    !     call nml_read(path_par,"isos_ant","tau",      ctl%isos_tau_1)
-    !     call nml_read(path_par,"isos_ant","tau_eais", ctl%isos_tau_2)
-    !     call nml_read(path_par,"isos_ant","sigma",    ctl%isos_sigma)
-
-    !     call isos_set_field(isos1%out%tau, &
-    !             [ctl%isos_tau_1,ctl%isos_tau_1,ctl%isos_tau_2,ctl%isos_tau_1], &
-    !             [        0.0_wp,        1.0_wp,        2.0_wp,        3.0_wp], &
-    !                                   regions_mask,yelmo1%grd%dx,ctl%isos_sigma)
-
-    ! end if
 
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
@@ -415,19 +398,16 @@ program yelmox_rtip
     yelmo1%bnd%Q_geo = gthrm1%now%ghf
 
     ! Barystatic sea level
-    call sealevel_update(sealev,year_bp=time_bp)
-    yelmo1%bnd%z_sl  = sealev%z_sl
+    call bsl_update(bsl, year_bp=time_bp)
+    call bsl_write_init(bsl, file_bsl, time)
 
     ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+    call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
 
     ! Initialize isostasy using current topography
     ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
-    
-        ! (isos, z_bed, H_ice, time, w, we, &
-        ! z_bed_ref, H_ice_ref, bsl, bsl_ref, z_ss_perturb, z_ss_perturb_ref, &
-        ! w_ref, we_ref)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
+    call isos_write_init_extended(isos1, file_isos, time)
 
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
@@ -544,75 +524,78 @@ program yelmox_rtip
 
             select case(trim(ctl%equil_method))
 
-                case("opt")
+            case("opt")
 
-                    if (time_elapsed .le. opt%rel_time2) then
-                        ! Apply relaxation to the model
+                if (time_elapsed .le. opt%rel_time2) then
+                    ! Apply relaxation to the model
 
-                        ! Update model relaxation time scale and error scaling (in [m])
-                        call optimize_set_transient_param(opt%rel_tau,time_elapsed,time1=opt%rel_time1, &
-                                                time2=opt%rel_time2,p1=opt%rel_tau1,p2=opt%rel_tau2,m=opt%rel_m)
+                    ! Update model relaxation time scale and error scaling (in [m])
+                    call optimize_set_transient_param(opt%rel_tau,time_elapsed, &
+                        time1=opt%rel_time1, time2=opt%rel_time2, p1=opt%rel_tau1, &
+                        p2=opt%rel_tau2,m=opt%rel_m)
 
-                        ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
-                        yelmo1%tpo%par%topo_rel_tau = opt%rel_tau
-                        yelmo1%tpo%par%topo_rel     = 3
+                    ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
+                    yelmo1%tpo%par%topo_rel_tau = opt%rel_tau
+                    yelmo1%tpo%par%topo_rel     = 3
 
-                    else
-                        ! Turn-off relaxation now
+                else
+                    ! Turn-off relaxation now
 
-                        yelmo1%tpo%par%topo_rel = 0
+                    yelmo1%tpo%par%topo_rel = 0
 
-                    end if
+                end if
 
-                    ! === Optimization update step =========
+                ! === Optimization update step =========
 
-                    if (opt%opt_cf .and. &
-                        (time_elapsed .ge. opt%cf_time_init .and. time_elapsed .le. opt%cf_time_end) ) then
-                        ! Perform cf_ref optimization
+                if (opt%opt_cf .and. &
+                    (time_elapsed .ge. opt%cf_time_init .and. time_elapsed .le. opt%cf_time_end) ) then
+                    ! Perform cf_ref optimization
 
-                        ! Update cb_ref based on error metric(s)
-                        call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
-                                            yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                            yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                            opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                            dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
-                                            cb_tgt=yelmo1%dyn%now%cb_tgt)
+                    ! Update cb_ref based on error metric(s)
+                    call optimize_cb_ref(yelmo1%dyn%now%cb_ref, yelmo1%tpo%now%H_ice, &
+                        yelmo1%tpo%now%dHidt, yelmo1%bnd%z_bed, yelmo1%bnd%z_sl, &
+                        yelmo1%dyn%now%ux_s, yelmo1%dyn%now%uy_s, yelmo1%dta%pd%H_ice, &
+                        yelmo1%dta%pd%uxy_s, yelmo1%dta%pd%H_grnd, opt%cf_min, opt%cf_max, &
+                        yelmo1%tpo%par%dx, opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                        dt=ctl%dtt, fill_method=opt%fill_method, fill_dist=opt%sigma_err, &
+                        cb_tgt=yelmo1%dyn%now%cb_tgt)
 
-                    end if
+                end if
 
-                    if (opt%opt_tf .and. &
-                        (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
-                        ! Perform tf_corr optimization
+                if (opt%opt_tf .and. &
+                    (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
+                    ! Perform tf_corr optimization
 
-                        call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
-                                                opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
+                    call optimize_tf_corr(mshlf1%now%tf_corr, yelmo1%tpo%now%H_ice, &
+                        yelmo1%tpo%now%H_grnd, yelmo1%tpo%now%dHidt, yelmo1%dta%pd%H_ice, &
+                        yelmo1%dta%pd%H_grnd, opt%H_grnd_lim, opt%tau_m, opt%m_temp, &
+                        opt%tf_min, opt%tf_max, yelmo1%tpo%par%dx,sigma=opt%tf_sigma, dt=ctl%dtt)
 
-                    end if
+                end if
 
-                case("relax")
-                    ! ===== relaxation spinup ==================
+            case("relax")
+                ! ===== relaxation spinup ==================
 
-                    if (time_elapsed .lt. ctl%time_equil) then
-                        ! Turn on relaxation for now, to let thermodynamics equilibrate
-                        ! without changing the topography too much. Important when
-                        ! effective pressure = f(thermodynamics).
+                if (time_elapsed .lt. ctl%time_equil) then
+                    ! Turn on relaxation for now, to let thermodynamics equilibrate
+                    ! without changing the topography too much. Important when
+                    ! effective pressure = f(thermodynamics).
 
-                        yelmo1%tpo%par%topo_rel     = 3
-                        yelmo1%tpo%par%topo_rel_tau = 50.0
-                        write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
+                    yelmo1%tpo%par%topo_rel     = 3
+                    yelmo1%tpo%par%topo_rel_tau = 50.0
+                    write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-                    else if (time_elapsed .eq. ctl%time_equil) then
-                        ! Disable relaxation now...
+                else if (time_elapsed .eq. ctl%time_equil) then
+                    ! Disable relaxation now...
 
-                        yelmo1%tpo%par%topo_rel     = 0
-                        write(*,*) "timelog, relation off..."
+                    yelmo1%tpo%par%topo_rel     = 0
+                    write(*,*) "timelog, relation off..."
 
-                    end if
+                end if
 
-                case DEFAULT   ! == "none", etc
+            case DEFAULT   ! == "none", etc
 
-                    ! Pass - do nothing
+                ! Pass - do nothing
 
             end select
 
@@ -622,14 +605,11 @@ program yelmox_rtip
 
             call timer_step(tmrs,comp=0)
 
-            ! == SEA LEVEL (BARYSTATIC) ======================================================
-            call sealevel_update(sealev,year_bp=time_bp)
-
-            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            ! == ISOSTASY and SEA LEVEL ===========================================
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
+            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -657,10 +637,12 @@ program yelmox_rtip
 
             if (timeout_check(tm_1D, time)) then
                 call yelmo_write_reg_step(yelmo1, file1D, time=time)
+                call bsl_write_step(bsl, file_bsl, time)
             end if
 
             if (timeout_check(tm_2D, time)) then
                 call write_step_2D_combined(yelmo1, isos1, snp1, mshlf1, smbpal1, file2D, time)
+                call isos_write_step_extended(isos1, file_isos, time)
             end if
 
             if (timeout_check(tm_2Dsm, time)) then
@@ -698,6 +680,7 @@ program yelmox_rtip
         ! Write the restart file for the end of the simulation
         call yelmo_restart_write(yelmo1,file_restart,time=time_bp)
         call isos_restart_write(isos1,file_isos_restart,time_bp)
+        call bsl_restart_write(bsl, file_bsl_restart, time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup
@@ -745,14 +728,11 @@ program yelmox_rtip
 
             call timer_step(tmrs,comp=0)
 
-            ! == SEA LEVEL (BARYSTATIC) ======================================================
-            call sealevel_update(sealev,year_bp=0.0_wp)
-
-            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            ! == ISOSTASY and SEA LEVEL ===========================================
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
+            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -892,15 +872,11 @@ program yelmox_rtip
 
             call timer_step(tmrs,comp=0)
 
-            ! == SEA LEVEL (BARYSTATIC) ======================================================
-            call sealevel_update(sealev,year_bp=0.0_wp)
-
-            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
-
+            ! == ISOSTASY and SEA LEVEL ===========================================
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
+            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -977,7 +953,7 @@ end if
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_1D,time)) then
-                call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,file1D,time=time)
+                call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,bsl,file1D,time=time)
 
                 if (reg1%write) then
                     call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
@@ -1132,14 +1108,11 @@ end if
 
             call timer_step(tmrs,comp=0)
 
-            ! == SEA LEVEL (BARYSTATIC) ======================================================
-            call sealevel_update(sealev,year_bp=0.0_wp)
-
-            ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            ! == ISOSTASY and SEA LEVEL ===========================================
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
+            call bsl_update(bsl, time)
 
             call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
 
@@ -1201,7 +1174,7 @@ end if
             if (timeout_check(tm_1D, time)) then
                 write(*,*) "writing 1D at t=", time
 
-                call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,file1D,time=time)
+                call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,bsl,file1D,time=time)
 
                 if (reg1%write) then
                     call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
@@ -1297,12 +1270,6 @@ contains
 
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-
-        ! Write constant fields
-        if (n .eq. 1) then
-            call nc_write(filename,"isos_tau",isos%out%tau,units="yr",long_name="Asthenospheric relaxation timescale", &
-                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-        end if
 
         ! == yelmo_topography ==
         call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
@@ -1465,10 +1432,6 @@ contains
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Margin-front mass balance", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! External data
-        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Comparison with present-day
@@ -1650,7 +1613,7 @@ contains
             long_name="Velocity in y", dim1="xc", dim2="yc", dim3="zeta", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
         call nc_write(filename, "uz", ylmo%dyn%now%uz, units="m/yr", &
-            long_name="Velocity in z", dim1="xc", dim2="yc", dim3="zeta", dim4="time", &
+            long_name="Velocity in z", dim1="xc", dim2="yc", dim3="zeta_ac", dim4="time", &
             start=[1, 1, 1, n], ncid=ncid)
 
         ! For some reason this gives crappy output (missings or 0) --> use 2D output for now
@@ -2178,10 +2141,6 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        ! External data
-        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn,units="",long_name="Marine-shelf ocean mask", &
@@ -2379,13 +2338,14 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine yx_hyst_write_yelmo_init_1D_combined
 
-    subroutine yx_hyst_write_step_1D_combined(ylm,hyst,snp,filename,time)
+    subroutine yx_hyst_write_step_1D_combined(ylm,hyst,snp,bsl,filename,time)
 
         implicit none
 
         type(yelmo_class),    intent(IN) :: ylm
         type(hyster_class),   intent(IN) :: hyst
         type(snapclim_class), intent(IN) :: snp
+        type(bsl_class),      intent(IN) :: bsl
         character(len=*),     intent(IN) :: filename
         real(wp),             intent(IN) :: time
 
@@ -2405,6 +2365,10 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
+        call nc_write(filename, "bsl", bsl%bsl_now, units="m", long_name="Barystatic sea level", &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "A_ocean", bsl%A_ocean_now, units="m^2", long_name="Ocean area", &
+            dim1="time", start=[n], ncid=ncid)
 
         ! ===== Hyst / forcing variables =====
 
