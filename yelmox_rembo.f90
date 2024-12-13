@@ -4,40 +4,36 @@ program yelmox
 
     use nml
     use ncio
-    use timer 
-    use timeout 
-    use yelmo 
-    use ice_optimization 
+    use timer
+    use timeout
+    use yelmo
+    use ice_optimization
 
     ! External libraries
-    use sealevel 
-    use fastisostasy  
-    
+    use fastisostasy    ! also reexports barysealevel
     use rembo_sclimate 
     use snapclim
-    use marine_shelf 
-    use sediments 
+    use marine_shelf
+    use sediments
     use geothermal
     
-    use hyster 
+    use hyster
     
     implicit none 
 
-    type(yelmo_class)      :: yelmo1 
-    type(snapclim_class)   :: snp1 
-    type(sealevel_class)   :: sealev 
-    type(marshelf_class)   :: mshlf1 
-    type(sediments_class)  :: sed1 
+    type(yelmo_class)      :: yelmo1
+    type(snapclim_class)   :: snp1
+    type(bsl_class)        :: bsl
+    type(marshelf_class)   :: mshlf1
+    type(sediments_class)  :: sed1
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
-    
-    type(hyster_class)     :: hyst1 
+    type(hyster_class)     :: hyst1
 
-    character(len=256) :: outfldr, file1D, file2D, file1D_hyst, domain
-    character(len=256) :: file_restart, file_isos_restart 
-    character(len=256) :: file_rembo
-    character(len=512) :: path_par  
-    real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart   
+    character(len=256) :: outfldr, file1D, file2D, file2D_small, file_restart, domain
+    character(len=256) :: file1D_hyst, file_isos, file_bsl, file_rembo
+    character(len=512) :: path_par
+    real(wp) :: time_init, time_end, time_equil, time, time_bp, dtt, dt_restart
     real(wp) :: dtt_now, deltat_tot
     real(wp) :: time_elapsed
     logical  :: timesteps_complete
@@ -106,13 +102,16 @@ program yelmox
         call optimize_par_load(opt,path_par,"opt")
 
     end if 
-    
-    ! Define input and output locations 
+
+    ! Define input and output locations
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
+    file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
     file_restart        = trim(outfldr)//"yelmo_restart.nc"
-    file_isos_restart   = trim(outfldr)//"isos_restart.nc"           
     file1D_hyst         = trim(outfldr)//"yelmo1D_hyst.nc" 
+
+    file_isos           = trim(outfldr)//"fastisostasy.nc"
+    file_bsl            = trim(outfldr)//"bsl.nc"
 
     file_rembo          = trim(outfldr)//"yelmo-rembo.nc"
 
@@ -121,7 +120,8 @@ program yelmox
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
 
-    time = time_init 
+    time = time_init
+    time_bp = time - 1950.0_wp
 
     ! Start timing
     call timer_step(tmr,comp=-1) 
@@ -136,8 +136,6 @@ program yelmox
     ! Store domain name as a shortcut 
     domain = yelmo1%par%domain 
 
-
-
     ! Ensure optimization fields are allocated and preassigned
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
@@ -150,14 +148,12 @@ program yelmox
     mask_noice = .FALSE. 
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
+    ! Initialize barysealevel model
+    call bsl_init(bsl, path_par, time_bp)
 
-
-    
-    ! Initialize global sea level model (bnd%z_sl)
-    call sealevel_init(sealev,path_par)
-
-    ! Initialize bedrock model 
-    call isos_init(isos1,path_par,"isos",yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx,yelmo1%grd%dy)
+    ! Initialize fastisosaty
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
+        yelmo1%grd%dx, yelmo1%grd%dy)
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(time_init,8))
@@ -184,16 +180,15 @@ program yelmox
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
-    call sealevel_update(sealev,year_bp=time_init)
-    yelmo1%bnd%z_sl  = sealev%z_sl 
-    
-    ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1,yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref, bsl=0.0_wp)
+    ! Barystatic sea level
+    call bsl_update(bsl, year_bp=time_bp)
+    call bsl_write_init(bsl, file_bsl, time)
 
-    ! Initialize isostasy using current topography
-    ! Optionally pass bsl (scalar) and dz_ss (2D sea-surface perturbation) too
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl)
-    
+    ! Initialize the isostasy reference state using reference topography fields
+    call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
+    call isos_write_init_extended(isos1, file_isos, time)
+
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
@@ -416,12 +411,9 @@ end if
 
         call timer_step(tmrs,comp=0) 
 
-        ! == SEA LEVEL (BARYSTATIC) ======================================================
-        call sealevel_update(sealev,year_bp=time)
-
-        ! == ISOSTASY and SEA LEVEL (REGIONAL) ===========================================
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl=sealev%z_sl, &
-                                                    dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        ! == ISOSTASY and SEA LEVEL ===========================================
+        call bsl_update(bsl, time_bp)
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
         yelmo1%bnd%z_bed = isos1%out%z_bed
         yelmo1%bnd%z_sl  = isos1%out%z_ss
 
@@ -532,7 +524,6 @@ end if
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
             call yelmo_restart_write(yelmo1,file_restart,time=time) 
-            call isos_restart_write(isos1,file_isos_restart,time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[time-dtt_now,time]*1e-3,label="io") 
@@ -895,15 +886,6 @@ contains
         call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW/m^2",long_name="Geothermal heat flux", &
                       dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
 
-        call nc_write(filename, "eta_eff", isos%out%eta_eff, units="Pa s", &
-            long_name="Effective viscosity", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
-
-        call nc_write(filename, "D_lith", isos%out%D_lith, units="m", &
-            long_name="Lithosphere thickness", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
-
-        call nc_write(filename, "He_lith", isos%out%He_lith, units="m", &
-            long_name="Lithosphere rigidity", dim1="xc", dim2="yc", start=[1,1],ncid=ncid)
-        
         call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Net basal mass balance", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Net margin-front mass balance", &
@@ -1164,8 +1146,8 @@ contains
         
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
-        call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
-                    real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
+        ! call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
+        !             real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
         
         return
 
