@@ -21,7 +21,7 @@ program yelmox_ismip6
 
     character(len=256) :: outfldr, file1D, file2D, file2D_small
     character(len=256) :: file1D_ismip6, file2D_ismip6
-    character(len=256) :: file_restart, file_isos_restart, file_isos, file_bsl
+    character(len=256) :: file_isos, file_bsl
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
@@ -136,7 +136,6 @@ program yelmox_ismip6
     file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
-    file_restart        = trim(outfldr)//"yelmo_restart.nc"
 
     file_isos           = trim(outfldr)//"fastisostasy.nc"
     file_bsl            = trim(outfldr)//"bsl.nc"
@@ -565,7 +564,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -662,7 +661,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,time)
     end select
 
     ! Finalize program
@@ -1273,10 +1272,11 @@ contains
 
     end subroutine load_tf_corr_from_restart
 
-    subroutine yelmox_restart_write(isos,ylmo,time,fldr)
+    subroutine yelmox_restart_write(bsl,isos,ylmo,time,fldr)
 
         implicit none
 
+        type(bsl_class),    intent(IN) :: bsl
         type(isos_class),   intent(IN) :: isos
         type(yelmo_class),  intent(IN) :: ylmo
         real(wp),           intent(IN) :: time 
@@ -1287,6 +1287,7 @@ contains
         character(len=32)   :: time_str
         character(len=1024) :: outfldr
 
+        character(len=56), parameter :: file_bsl   = "bsl_restart.nc"
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
         
@@ -1303,6 +1304,7 @@ contains
         ! Make directory (use -p to ignore if directory already exists)
         call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
         
+        call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
 
