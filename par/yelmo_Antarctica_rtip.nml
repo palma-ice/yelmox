@@ -585,7 +585,7 @@
 
 &isos
     ! Options
-    heterogeneous_ssh = .true.     ! Sea level varies spatially?
+    heterogeneous_ssh = .true.      ! Sea level varies spatially?
     interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
