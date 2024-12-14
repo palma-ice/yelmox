@@ -13,7 +13,10 @@
             "rtip"   : "libyelmox/bin/yelmox_rtip.x"
         },
     
-    "grp_aliases" : {},
+    "grp_aliases" : 
+        {
+            "bsl" : "barysealevel"
+        },
 
     "par_paths" : 
         {
