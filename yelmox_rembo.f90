@@ -1145,8 +1145,8 @@ contains
         
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
-        ! call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
-        !             real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
+        call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
+                    real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
         
         return
 
