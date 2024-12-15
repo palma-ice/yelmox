@@ -1024,9 +1024,7 @@ end if
 
 
         ! Initialize hysteresis output files
-        call yx_hyst_write_yelmo_init_1D_combined(yelmo1, file1D, time, units="years", &
-            mask=yelmo1%bnd%ice_allowed)
-
+        call yelmo_write_init(yelmo1, file1D, time_init=time, units="years")
         call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
         call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
                                     irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
@@ -2205,29 +2203,6 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
 
     end subroutine yelmox_write_step_small
 
-    subroutine yx_hyst_write_yelmo_init_1D_combined(dom,filename,time_init,units,mask)
-
-        implicit none
-
-        type(yelmo_class), intent(IN) :: dom
-        character(len=*),  intent(IN) :: filename, units
-        real(wp),          intent(IN) :: time_init
-        logical,           intent(IN) :: mask(:,:)
-
-        ! Initialize netcdf file and dimensions
-        call nc_create(filename)
-        call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,    units="kilometers")
-        call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,    units="kilometers")
-        call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,    units="1")
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
-
-        ! Static information
-        call nc_write(filename,"mask", mask,  units="1",long_name="Region mask",dim1="xc",dim2="yc")
-
-        return
-
-    end subroutine yx_hyst_write_yelmo_init_1D_combined
-
     subroutine yelmox_write_step_1D(ylm,hyst,snp,bsl,filename,time)
 
         implicit none
@@ -2308,8 +2283,6 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"bmb",reg%bmb,units="m/a",long_name="Mean total basal mass balance", &
                       dim1="time",start=[n],ncid=ncid)
-
-
 
         ! ===== Grounded ice variables =====
 
