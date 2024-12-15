@@ -382,6 +382,7 @@ end if
         end if
         if (time .ge. time_end) timesteps_complete = .TRUE. 
         time_elapsed = time - time_init
+        time_bp      = time - 1950.0_wp
         n = n+1
         
         ! == HYSTER boundary forcing ====================================
@@ -685,7 +686,7 @@ contains
         call nc_write(filename,"pr_ann",rembo%pr*1e-3,units="m/a water equiv.",long_name="REMBO Precipitation (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        call nc_write(filename,"smb",rembo%smb*1e-3,units="m/yr water equiv.",long_name="REMBO Surface mass balance (ann)", &
+        call nc_write(filename,"smb_ann",rembo%smb*1e-3,units="m/yr water equiv.",long_name="REMBO Surface mass balance (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! == ocean forcing ==
