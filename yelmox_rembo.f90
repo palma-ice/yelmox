@@ -5,6 +5,7 @@ program yelmox
     use nml
     use ncio
     use timer
+    use timestepping
     use timeout
     use yelmo
     use ice_optimization
@@ -21,6 +22,8 @@ program yelmox
     
     implicit none 
 
+    type(tstep_class)      :: ts
+    
     type(yelmo_class)      :: yelmo1
     type(snapclim_class)   :: snp1
     type(bsl_class)        :: bsl

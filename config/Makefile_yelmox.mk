@@ -56,6 +56,9 @@ $(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
 $(objdir)/timer.o: $(libdir)/timer.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+$(objdir)/timestepping.o: $(libdir)/timestepping.f90 $(objdir)/nml.o $(objdir)/ncio.o
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 $(objdir)/varslice.o: $(libdir)/varslice.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -131,6 +134,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/snapclim.o \
 					    $(objdir)/timeout.o \
 						$(objdir)/timer.o \
+						$(objdir)/timestepping.o \
 			 		    $(objdir)/varslice.o \
 					    $(objdir)/xarray.o
 
