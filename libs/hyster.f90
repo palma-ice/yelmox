@@ -2,6 +2,7 @@
 module hyster 
 
     use nml 
+    use ncio 
 
     implicit none 
 
@@ -59,7 +60,6 @@ module hyster
     end type 
 
     private
-    !public :: wp
     public :: hyster_class
     public :: hyster_init 
     public :: hyster_calc_forcing
@@ -814,4 +814,7 @@ contains
     end subroutine gen_random_normal
 
 
+    ! === IO ===
+
+    
 end module hyster

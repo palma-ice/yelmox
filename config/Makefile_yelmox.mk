@@ -15,7 +15,7 @@ $(objdir)/basal_hydro_simple.o: $(libdir)/basal_hydro_simple.f90 $(objdir)/nml.o
 $(objdir)/geothermal.o: $(libdir)/geothermal.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/hyster.o: $(libdir)/hyster.f90 $(objdir)/nml.o
+$(objdir)/hyster.o: $(libdir)/hyster.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/latinhypercube.o: $(libdir)/latinhypercube.f90
