@@ -1013,14 +1013,7 @@ contains
 
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        
-        if (n .eq. 1) then
-            call nc_write(filename,"ice_allowed",ylmo%bnd%ice_allowed,units="",long_name="Ice allowed mask", &
-                        dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-            call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
-                        dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-        end if
-        
+                
         ! == yelmo_topography ==
         call yelmo_write_var(filename,"H_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_srf",ylmo,n,ncid)
