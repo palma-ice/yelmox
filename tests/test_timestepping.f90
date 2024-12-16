@@ -7,16 +7,16 @@ program test_timestepping
     
 
     type(tstep_class) :: ts
-    integer :: n, ntot
+    integer  :: n, ntot
     real(wp) :: time_init, time_end
     real(wp) :: dtt
     logical  :: timesteps_complete
 
-    time_init = 1800.0
-    time_end  = 3000.0
-    dtt       = 100.0
+    time_init = -100.0
+    time_end  =  1.0
+    dtt       =  1.0
 
-    call tstep_init(ts,time_init,time_pd=1950.0_wp,method="cal",units="years",trans_cal=.TRUE.,trans_bp=.FALSE.)
+    call tstep_init(ts,time_init,method="bp",units="kyr")
     call tstep_print(ts)
 
     ! Advance timesteps

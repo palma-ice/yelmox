@@ -19,15 +19,23 @@ module timestepping
     type tstep_class
         character(len=56) :: units      ! External time units
         character(len=56) :: method     ! method of timekeeping
-        logical  :: trans_cal
-        logical  :: trans_bp
+        logical  :: use_const_cal
+        logical  :: use_const_bp
         real(wp) :: time
         real(wp) :: time_elapsed
         real(wp) :: time_cal 
         real(wp) :: time_bp
-        real(wp) :: time_pd
         real(wp) :: time_init
+        real(wp) :: time_const_bp
+        real(wp) :: time_const_cal
         integer  :: n
+
+        ! Internal values
+        real(wp) :: time_pd
+        real(dp) :: comp_elapsed
+        real(dp) :: comp_cal
+        real(dp) :: comp_bp
+        
     end type
 
     private
@@ -38,17 +46,16 @@ module timestepping
 
 contains
 
-    subroutine tstep_init(ts,time_init,time_pd,method,units,trans_cal,trans_bp)
+    subroutine tstep_init(ts,time_init,method,units,const_cal,const_bp)
 
         implicit none
 
         type(tstep_class), intent(INOUT) :: ts
         real(wp),          intent(IN)    :: time_init
-        real(wp),          intent(IN)    :: time_pd 
         character(len=*),  intent(IN)    :: method
         character(len=*),  intent(IN)    :: units
-        logical,           intent(IN), optional :: trans_cal
-        logical,           intent(IN), optional :: trans_bp
+        real(wp),          intent(IN), optional :: const_cal
+        real(wp),          intent(IN), optional :: const_bp
 
         ! Local variables
         real(wp) :: time_years
@@ -57,25 +64,63 @@ contains
         ts%method = trim(method)
         ts%units  = trim(units)
 
-        ts%trans_cal = .TRUE.
-        ts%trans_bp  = .TRUE.
-        if (present(trans_cal)) ts%trans_cal = trans_cal
-        if (present(trans_bp))  ts%trans_bp  = trans_bp 
-
+        
+        if (present(const_cal)) then
+            ts%time_const_cal = convert_time_from_units(const_cal,ts%units)
+            ts%use_const_cal  = .TRUE.
+        else
+            ts%time_const_cal = -1e8
+            ts%use_const_cal  = .FALSE.
+        end if
+        
+        if (present(const_bp)) then
+            ts%time_const_bp = convert_time_from_units(const_bp,ts%units)
+            ts%use_const_bp  = .TRUE.
+        else
+            ts%time_const_bp = -1e8
+            ts%use_const_bp  = .FALSE.
+        end if
+        
         ! Set initial time
         ts%time_init    = convert_time_from_units(time_init,ts%units)
-        ts%time_pd      = convert_time_from_units(time_pd,ts%units)
-        
+
+        ! Set time PD (calendar year) - used for converting between cal and bp timescales
+        ts%time_pd = 1950.0 
+
         ! Set output time based on method
         select case(trim(ts%method))
             case("cal")
+                
                 ts%time_cal = ts%time_init
                 ts%time_bp  = ts%time_cal - ts%time_pd
                 ts%time     = convert_time_to_units(ts%time_cal,ts%units)
+
+                if (ts%use_const_bp) ts%time_bp = ts%time_const_bp
+
+                ! Consistency check
+                if (ts%use_const_cal) then
+                    write(error_unit,*) "tstep_init:: Error: a constant calendar time (const_cal) &
+                    &has been specified with method='cal'. These cannot be used together."
+                    write(error_unit,*) "const_cal = ", const_cal
+                    stop
+                end if
+
             case("bp")
+
                 ts%time_bp  = ts%time_init
                 ts%time_cal = ts%time_bp + ts%time_pd
                 ts%time     = convert_time_to_units(ts%time_bp,ts%units)
+
+                if (ts%use_const_cal) ts%time_cal = ts%time_const_cal
+                
+                ! Consistency check
+                if (ts%use_const_bp) then
+                    write(error_unit,*) "tstep_init:: Error: a constant before present time (const_bp) &
+                    &has been specified with method='bp'. These cannot be used together."
+                    write(error_unit,*) "const_bp = ", const_bp
+                    stop
+                end if
+                
             case DEFAULT
                 write(error_unit,*) "tstep_init:: Error: method not recognized."
                 write(error_unit,*) "ts%method = ", trim(ts%method)
@@ -85,6 +130,11 @@ contains
         ! Set elapsed time and interations too
         ts%time_elapsed = 0.0
         ts%n = 0
+
+        ! Set summation compensation values to zero for each time keeper
+        ts%comp_elapsed = 0.0
+        ts%comp_cal     = 0.0
+        ts%comp_bp      = 0.0
 
         return
 
@@ -104,13 +154,23 @@ contains
         dt_year = convert_time_from_units(dt,ts%units)
 
         ! Update each time keeper and round for errors
-        ts%time_elapsed = round_time(ts%time_elapsed + dt_year)
-        
-        if (ts%trans_cal) ts%time_cal = round_time(ts%time_cal + dt_year)
-        if (ts%trans_bp)  ts%time_bp  = round_time(ts%time_bp  + dt_year)
 
         ts%n = ts%n + 1 
 
+        call kahan_sum(ts%time_elapsed, ts%comp_elapsed, dt_year)
+
+        if (ts%use_const_cal) then
+            ts%time_cal = ts%time_const_cal
+        else
+            call kahan_sum(ts%time_cal, ts%comp_cal, dt_year)
+        end if
+
+        if (ts%use_const_bp) then
+            ts%time_bp = ts%time_const_bp
+        else
+            call kahan_sum(ts%time_bp, ts%comp_bp, dt_year)
+        end if
+        
         ! Set output time based on method
         select case(trim(ts%method))
             case("cal")
@@ -142,11 +202,34 @@ contains
         real(wp), intent(IN) :: time
         real(wp) :: rtime
 
-        rtime = nint(time*1e3)*1e-3_wp
+        rtime = nint(time*1e2)*1e-2_wp
 
         return
 
     end function round_time
+
+    subroutine kahan_sum(time, comp, dt)
+        ! Use Kahan Summation to avoid accumulation of summing
+        ! errors over time.
+        ! https://en.wikipedia.org/wiki/Kahan_summation_algorithm
+
+        implicit none
+
+        real(wp), intent(inout) :: time  ! Accumulated total
+        real(dp), intent(inout) :: comp  ! Compensation for rounding errors
+        real(wp), intent(in)    :: dt    ! Current increment
+        
+        ! Local variables
+        real(8) :: y, t
+
+        y = dble(dt) - comp    ! Compensate for lost low-order bits
+        t = time + y           ! Temporarily add the compensated value
+        comp = (t - time) - y  ! Compute new compensation
+        time = t               ! Update the accumulated total
+
+        return
+
+    end subroutine kahan_sum
 
     function convert_time_to_units(time,units) result (time_units)
 
