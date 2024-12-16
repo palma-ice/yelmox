@@ -15,7 +15,7 @@ $(objdir)/basal_hydro_simple.o: $(libdir)/basal_hydro_simple.f90 $(objdir)/nml.o
 $(objdir)/geothermal.o: $(libdir)/geothermal.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/hyster.o: $(libdir)/hyster.f90 $(objdir)/nml.o
+$(objdir)/hyster.o: $(libdir)/hyster.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/latinhypercube.o: $(libdir)/latinhypercube.f90
@@ -54,6 +54,9 @@ $(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/timer.o: $(libdir)/timer.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
+$(objdir)/timestepping.o: $(libdir)/timestepping.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/varslice.o: $(libdir)/varslice.f90 $(objdir)/nml.o $(objdir)/ncio.o
@@ -131,6 +134,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/snapclim.o \
 					    $(objdir)/timeout.o \
 						$(objdir)/timer.o \
+						$(objdir)/timestepping.o \
 			 		    $(objdir)/varslice.o \
 					    $(objdir)/xarray.o
 
