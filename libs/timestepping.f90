@@ -22,12 +22,12 @@ module timestepping
         real(wp) :: time_init
         real(wp) :: time_end
         logical  :: use_const_cal
-        logical  :: use_const_bp
+        logical  :: use_const_st
         real(wp) :: time
         real(wp) :: time_elapsed
         real(wp) :: time_cal 
-        real(wp) :: time_bp
-        real(wp) :: time_const_bp
+        real(wp) :: time_st
+        real(wp) :: time_const_st
         real(wp) :: time_const_cal
         integer  :: n
 
@@ -35,7 +35,7 @@ module timestepping
         real(wp) :: time_pd
         real(dp) :: comp_elapsed
         real(dp) :: comp_cal
-        real(dp) :: comp_bp
+        real(dp) :: comp_st
         logical  :: is_finished
     end type
 
@@ -47,10 +47,10 @@ module timestepping
 
 contains
 
-    subroutine tstep_init(ts,time_init,time_end,method,units,const_cal,const_bp)
-        ! method = "const": time_elapsed evolves, fixed time_cal and time_bp
-        ! method = "cal"  : time_cal evolves, time_bp is set relative to it
-        ! method = "bp"   : time_bp evolves, time_cal is set relative to it
+    subroutine tstep_init(ts,time_init,time_end,method,units,const_cal,const_st)
+        ! method = "const": time_elapsed evolves, fixed time_cal and time_st
+        ! method = "cal"  : time_cal evolves, time_st is set relative to it
+        ! method = "st"   : time_st evolves, time_cal is set relative to it
 
         implicit none
 
@@ -60,7 +60,7 @@ contains
         character(len=*),  intent(IN)    :: method
         character(len=*),  intent(IN)    :: units
         real(wp),          intent(IN), optional :: const_cal
-        real(wp),          intent(IN), optional :: const_bp
+        real(wp),          intent(IN), optional :: const_st
 
         ! Local variables
         real(wp) :: time_years
@@ -77,18 +77,18 @@ contains
             ts%use_const_cal  = .FALSE.
         end if
         
-        if (present(const_bp)) then
-            ts%time_const_bp = convert_time_from_units(const_bp,ts%units)
-            ts%use_const_bp  = .TRUE.
+        if (present(const_st)) then
+            ts%time_const_st = convert_time_from_units(const_st,ts%units)
+            ts%use_const_st  = .TRUE.
         else
-            ts%time_const_bp = -1e8
-            ts%use_const_bp  = .FALSE.
+            ts%time_const_st = -1e8
+            ts%use_const_st  = .FALSE.
         end if
         
         if (trim(ts%method) .eq. "const") then
             ! In this case, set both constant values to true independent of arguments provided
             ts%use_const_cal = .TRUE.
-            ts%use_const_bp  = .TRUE.
+            ts%use_const_st  = .TRUE.
         end if
 
         ! Set initial and end time
@@ -105,7 +105,7 @@ contains
             stop
         end if
 
-        ! Set time PD (calendar year) - used for converting between cal and bp timescales
+        ! Set time PD (calendar year) - used for converting between cal and st timescales
         ts%time_pd = 1950.0 
 
         ! Set interations to zero
@@ -117,10 +117,10 @@ contains
                 
                 ts%time_elapsed = 0.0
                 ts%time_cal = ts%time_init
-                ts%time_bp  = ts%time_cal - ts%time_pd
+                ts%time_st  = ts%time_cal - ts%time_pd
                 ts%time     = convert_time_to_units(ts%time_cal,ts%units)
 
-                if (ts%use_const_bp) ts%time_bp = ts%time_const_bp
+                if (ts%use_const_st) ts%time_st = ts%time_const_st
 
                 ! Consistency check
                 if (ts%use_const_cal) then
@@ -130,20 +130,20 @@ contains
                     stop
                 end if
 
-            case("bp")
+            case("st")
 
                 ts%time_elapsed = 0.0
-                ts%time_bp  = ts%time_init
-                ts%time_cal = ts%time_bp + ts%time_pd
-                ts%time     = convert_time_to_units(ts%time_bp,ts%units)
+                ts%time_st  = ts%time_init
+                ts%time_cal = ts%time_st + ts%time_pd
+                ts%time     = convert_time_to_units(ts%time_st,ts%units)
 
                 if (ts%use_const_cal) ts%time_cal = ts%time_const_cal
                 
                 ! Consistency check
-                if (ts%use_const_bp) then
-                    write(error_unit,*) "tstep_init:: Error: a constant before present time (const_bp) &
-                    &has been specified with method='bp'. These cannot be used together."
-                    write(error_unit,*) "const_bp = ", const_bp
+                if (ts%use_const_st) then
+                    write(error_unit,*) "tstep_init:: Error: a constant before present time (const_st) &
+                    &has been specified with method='st'. These cannot be used together."
+                    write(error_unit,*) "const_st = ", const_st
                     stop
                 end if
             
@@ -151,7 +151,7 @@ contains
 
                 ts%time_elapsed = ts%time_init      ! only case where time_elapsed can start at non-zero
                 ts%time_cal = ts%time_const_cal
-                ts%time_bp  = ts%time_const_bp
+                ts%time_st  = ts%time_const_st
                 ts%time     = convert_time_to_units(ts%time_elapsed,ts%units)
 
             case DEFAULT
@@ -163,7 +163,7 @@ contains
         ! Set summation compensation values to zero for each time keeper
         ts%comp_elapsed = 0.0
         ts%comp_cal     = 0.0
-        ts%comp_bp      = 0.0
+        ts%comp_st      = 0.0
 
         return
 
@@ -194,18 +194,18 @@ contains
             call kahan_sum(ts%time_cal, ts%comp_cal, dt_year)
         end if
 
-        if (ts%use_const_bp) then
-            ts%time_bp = ts%time_const_bp
+        if (ts%use_const_st) then
+            ts%time_st = ts%time_const_st
         else
-            call kahan_sum(ts%time_bp, ts%comp_bp, dt_year)
+            call kahan_sum(ts%time_st, ts%comp_st, dt_year)
         end if
         
         ! Set output time based on method
         select case(trim(ts%method))
             case("cal")
                 ts%time = convert_time_to_units(ts%time_cal,ts%units)
-            case("bp")
-                ts%time = convert_time_to_units(ts%time_bp,ts%units)
+            case("st")
+                ts%time = convert_time_to_units(ts%time_st,ts%units)
             case("const")
                 ts%time = convert_time_to_units(ts%time_elapsed,ts%units)
         end select
@@ -225,7 +225,7 @@ contains
 
         type(tstep_class), intent(IN) :: ts
 
-        write(*,*) "ts: ", ts%n, ts%time, ts%time_cal, ts%time_bp, ts%time_elapsed
+        write(*,*) "ts: ", ts%n, ts%time, ts%time_cal, ts%time_st, ts%time_elapsed
 
         return
 

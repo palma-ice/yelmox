@@ -16,7 +16,7 @@ program test_timestepping
     time_end  =  1.0
     dtt       =  1.0
 
-    call tstep_init(ts,time_init,time_end,method="bp",units="kyr")
+    call tstep_init(ts,time_init,time_end,method="st",units="kyr")
     call tstep_print(ts)
 
     ! Advance timesteps
