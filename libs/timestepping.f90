@@ -47,6 +47,9 @@ module timestepping
 contains
 
     subroutine tstep_init(ts,time_init,method,units,const_cal,const_bp)
+        ! method = "const": time_elapsed evolves, fixed time_cal and time_bp
+        ! method = "cal"  : time_cal evolves, time_bp is set relative to it
+        ! method = "bp"   : time_bp evolves, time_cal is set relative to it
 
         implicit none
 
@@ -64,7 +67,6 @@ contains
         ts%method = trim(method)
         ts%units  = trim(units)
 
-        
         if (present(const_cal)) then
             ts%time_const_cal = convert_time_from_units(const_cal,ts%units)
             ts%use_const_cal  = .TRUE.
@@ -81,16 +83,26 @@ contains
             ts%use_const_bp  = .FALSE.
         end if
         
+        if (trim(ts%method) .eq. "const") then
+            ! In this case, set both constant values to true independent of arguments provided
+            ts%use_const_cal = .TRUE.
+            ts%use_const_bp  = .TRUE.
+        end if
+
         ! Set initial time
         ts%time_init    = convert_time_from_units(time_init,ts%units)
 
         ! Set time PD (calendar year) - used for converting between cal and bp timescales
         ts%time_pd = 1950.0 
 
-        ! Set output time based on method
+        ! Set interations to zero
+        ts%n = 0
+
+        ! Set time keepers based on method
         select case(trim(ts%method))
             case("cal")
                 
+                ts%time_elapsed = 0.0
                 ts%time_cal = ts%time_init
                 ts%time_bp  = ts%time_cal - ts%time_pd
                 ts%time     = convert_time_to_units(ts%time_cal,ts%units)
@@ -107,6 +119,7 @@ contains
 
             case("bp")
 
+                ts%time_elapsed = 0.0
                 ts%time_bp  = ts%time_init
                 ts%time_cal = ts%time_bp + ts%time_pd
                 ts%time     = convert_time_to_units(ts%time_bp,ts%units)
@@ -120,16 +133,19 @@ contains
                     write(error_unit,*) "const_bp = ", const_bp
                     stop
                 end if
-                
+            
+            case("const")
+
+                ts%time_elapsed = ts%time_init      ! only case where time_elapsed can start at non-zero
+                ts%time_cal = ts%time_const_cal
+                ts%time_bp  = ts%time_const_bp
+                ts%time     = convert_time_to_units(ts%time_elapsed,ts%units)
+
             case DEFAULT
                 write(error_unit,*) "tstep_init:: Error: method not recognized."
                 write(error_unit,*) "ts%method = ", trim(ts%method)
                 stop
         end select
-
-        ! Set elapsed time and interations too
-        ts%time_elapsed = 0.0
-        ts%n = 0
 
         ! Set summation compensation values to zero for each time keeper
         ts%comp_elapsed = 0.0
@@ -177,6 +193,8 @@ contains
                 ts%time = convert_time_to_units(ts%time_cal,ts%units)
             case("bp")
                 ts%time = convert_time_to_units(ts%time_bp,ts%units)
+            case("const")
+                ts%time = convert_time_to_units(ts%time_elapsed,ts%units)
         end select
 
         return
