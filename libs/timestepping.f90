@@ -44,7 +44,8 @@ module timestepping
     public :: tstep_init
     public :: tstep_update
     public :: tstep_print
-
+    public :: tstep_print_header
+    
 contains
 
     subroutine tstep_init(ts,time_init,time_end,method,units,const_cal,const_st)
@@ -179,36 +180,41 @@ contains
         ! Local variables
         real(wp) :: dt_year
 
-        ! Get timestep in years
-        dt_year = convert_time_from_units(dt,ts%units)
+        if (ts%n .gt. 0) then
 
-        ! Update each time keeper and round for errors
+            ! Get timestep in years
+            dt_year = convert_time_from_units(dt,ts%units)
 
+            ! Update each time keeper and round for errors
+
+            call kahan_sum(ts%time_elapsed, ts%comp_elapsed, dt_year)
+
+            if (ts%use_const_cal) then
+                ts%time_cal = ts%time_const_cal
+            else
+                call kahan_sum(ts%time_cal, ts%comp_cal, dt_year)
+            end if
+
+            if (ts%use_const_st) then
+                ts%time_st = ts%time_const_st
+            else
+                call kahan_sum(ts%time_st, ts%comp_st, dt_year)
+            end if
+            
+            ! Set output time based on method
+            select case(trim(ts%method))
+                case("cal")
+                    ts%time = convert_time_to_units(ts%time_cal,ts%units)
+                case("st")
+                    ts%time = convert_time_to_units(ts%time_st,ts%units)
+                case("const")
+                    ts%time = convert_time_to_units(ts%time_elapsed,ts%units)
+            end select
+
+        end if 
+
+        ! Advance number of iterations
         ts%n = ts%n + 1 
-
-        call kahan_sum(ts%time_elapsed, ts%comp_elapsed, dt_year)
-
-        if (ts%use_const_cal) then
-            ts%time_cal = ts%time_const_cal
-        else
-            call kahan_sum(ts%time_cal, ts%comp_cal, dt_year)
-        end if
-
-        if (ts%use_const_st) then
-            ts%time_st = ts%time_const_st
-        else
-            call kahan_sum(ts%time_st, ts%comp_st, dt_year)
-        end if
-        
-        ! Set output time based on method
-        select case(trim(ts%method))
-            case("cal")
-                ts%time = convert_time_to_units(ts%time_cal,ts%units)
-            case("st")
-                ts%time = convert_time_to_units(ts%time_st,ts%units)
-            case("const")
-                ts%time = convert_time_to_units(ts%time_elapsed,ts%units)
-        end select
 
         ! Finally check if time stepping is finished
         if (convert_time_from_units(ts%time,ts%units) .ge. ts%time_end) then
@@ -225,11 +231,23 @@ contains
 
         type(tstep_class), intent(IN) :: ts
 
-        write(*,*) "ts: ", ts%n, ts%time, ts%time_cal, ts%time_st, ts%time_elapsed
+        write(*,"(a5,i6,4f17.5)") "ts: ", ts%n, ts%time, ts%time_cal, ts%time_st, ts%time_elapsed
 
         return
 
     end subroutine tstep_print
+
+    subroutine tstep_print_header(ts)
+
+        implicit none
+
+        type(tstep_class), intent(IN) :: ts
+
+        write(*,"(a5,a6,4a17)") "ts: ", "iter", "time", "time_cal", "time_st", "time_elapsed"
+
+        return
+
+    end subroutine tstep_print_header
 
     function round_time(time) result (rtime)
 

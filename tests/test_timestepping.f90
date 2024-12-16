@@ -17,14 +17,16 @@ program test_timestepping
     dtt       =  1.0
 
     call tstep_init(ts,time_init,time_end,method="st",units="kyr")
-    call tstep_print(ts)
-
+    call tstep_print_header(ts)
+    
     ! Advance timesteps
     do while (.not. ts%is_finished)
 
         ! Update timestep
         call tstep_update(ts,dtt)
         call tstep_print(ts)
+
+        ! Perform model updates here...
 
     end do
 
