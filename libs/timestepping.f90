@@ -34,6 +34,7 @@ module timestepping
     public :: tstep_class
     public :: tstep_init
     public :: tstep_update
+    public :: tstep_print
 
 contains
 
@@ -76,7 +77,7 @@ contains
                 ts%time_cal = ts%time_bp + ts%time_pd
                 ts%time     = convert_time_to_units(ts%time_bp,ts%units)
             case DEFAULT
-                write(error_unit,*) "tstep_update:: Error: method not recognized."
+                write(error_unit,*) "tstep_init:: Error: method not recognized."
                 write(error_unit,*) "ts%method = ", trim(ts%method)
                 stop
         end select
@@ -103,10 +104,10 @@ contains
         dt_year = convert_time_from_units(dt,ts%units)
 
         ! Update each time keeper and round for errors
-        ts%time_elapsed = round_time(ts%time_elapsed + dt)
+        ts%time_elapsed = round_time(ts%time_elapsed + dt_year)
         
-        if (ts%trans_cal) ts%time_cal = round_time(ts%time_cal + dt)
-        if (ts%trans_bp)  ts%time_bp  = round_time(ts%time_bp  + dt)
+        if (ts%trans_cal) ts%time_cal = round_time(ts%time_cal + dt_year)
+        if (ts%trans_bp)  ts%time_bp  = round_time(ts%time_bp  + dt_year)
 
         ts%n = ts%n + 1 
 
@@ -121,6 +122,18 @@ contains
         return
 
     end subroutine tstep_update
+
+    subroutine tstep_print(ts)
+
+        implicit none
+
+        type(tstep_class), intent(IN) :: ts
+
+        write(*,*) "ts: ", ts%n, ts%time, ts%time_cal, ts%time_bp, ts%time_elapsed
+
+        return
+
+    end subroutine tstep_print
 
     function round_time(time) result (rtime)
 
@@ -145,9 +158,13 @@ contains
 
         select case(trim(units))
             case("years","yrs","year","yr")
-                ! Pass, internal units match external units
+                ! Internal units match external units
+                time_units = time
             case("kiloyears","kyr","ka")
                 time_units = time*1e-3
+            case DEFAULT
+                write(error_unit,*) "convert_time_to_units:: Error: units not recognized."
+                write(error_unit,*) "units = ", trim(units)
         end select
 
         return
@@ -164,9 +181,13 @@ contains
 
         select case(trim(units))
             case("years","yrs","year","yr")
-                ! Pass, internal units match external units
+                ! Internal units match external units
+                time_yr = time
             case("kiloyears","kyr","ka")
                 time_yr = time*1e3
+            case DEFAULT
+                write(error_unit,*) "convert_time_from_units:: Error: units not recognized."
+                write(error_unit,*) "units = ", trim(units)
         end select
 
         return
