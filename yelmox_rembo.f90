@@ -36,13 +36,11 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file2D_small, domain
     character(len=256) :: file1D_hyst, file_isos, file_bsl, file_rembo
     character(len=512) :: path_par
-    real(wp) :: time_init, time_end, time_equil, time, time_bp, dtt, dt_restart
+    real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart
     real(wp) :: dtt_now, deltat_tot
-    real(wp) :: time_elapsed
-    logical  :: timesteps_complete
-    integer  :: n
     logical  :: calc_transient_climate
-    
+    integer  :: n
+
     type(timeout_class) :: tm_1D, tm_2D 
     logical :: file_rembo_write_ocn_forcing
 
@@ -122,12 +120,13 @@ program yelmox
     ! How often to write a restart file 
     dt_restart   = 20e3                 ! [yr] 
 
-    time = time_init
-    time_bp = time - 1950.0_wp
-
     ! Start timing
     call timer_step(tmr,comp=-1) 
     
+    ! === Initialize timestepping ===
+    
+    call tstep_init(ts,time_init,time_end,method="st",units="year")
+
     ! === Initialize ice sheet model =====
 
     ! Initialize data objects and load initial topography
@@ -151,7 +150,7 @@ program yelmox
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
     ! Initialize barysealevel model
-    call bsl_init(bsl, path_par, time_bp)
+    call bsl_init(bsl, path_par, ts%time_st)
 
     ! Initialize fastisosaty
     call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
@@ -183,7 +182,7 @@ program yelmox
     ! ybound: z_bed, z_sl, H_sed, H_w, smb, T_srf, bmb_shlf , Q_geo
 
     ! Barystatic sea level
-    call bsl_update(bsl, year_bp=time_bp)
+    call bsl_update(bsl, year_bp=ts%time_st)
     call bsl_write_init(bsl, file_bsl, time)
 
     ! Initialize the isostasy reference state using reference topography fields
@@ -344,16 +343,16 @@ end if
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)
     
-    ! Advance timesteps
-    timesteps_complete = .FALSE.
-    time_elapsed = 0.0
-    dtt_now      = dtt
-    n = 0
-
     ! Write model state out to initial set of restart files
     call yelmox_restart_write(isos1,yelmo1,rembo_ann,time)
 
-    do while (.not. timesteps_complete)
+    ! == Advance timesteps ===
+
+    dtt_now = dtt
+    
+    call tstep_print_header(ts)
+
+    do while (.not. ts%is_finished)
 
         ! Modify dtt and rembo timestepping for transient experiments 
         if (use_hyster) then
@@ -363,7 +362,7 @@ end if
 
                     deltat_tot = hyst1%par%dt_init + hyst1%par%dt_ramp + hyst1%par%dt_conv + 100.0
 
-                    if (time_elapsed .lt. deltat_tot) then
+                    if (ts%time_elapsed .lt. deltat_tot) then
                         dtt_now = min(5.0,dtt)
                         rembo_ann%par%dtime_emb = dtt_now
                     else
@@ -376,17 +375,10 @@ end if
             end select
         end if 
         
-        if (n .gt. 0) then
-            ! Get current time
-            !time = min(time_init + n*dtt_now,time_end)
-            time = min(time + dtt_now,time_end)
-            ! Round for improved accuracy
-            time = nint(time*1e2)*1e-2_wp
-        end if
-        if (time .ge. time_end) timesteps_complete = .TRUE. 
-        time_elapsed = time - time_init
-        time_bp      = time - 1950.0_wp
-        n = n+1
+        ! == Update timestep ===
+
+        call tstep_update(ts,dtt_now)
+        call tstep_print(ts)
         
         ! == HYSTER boundary forcing ====================================
 if (calc_transient_climate) then
@@ -415,22 +407,22 @@ end if
         call timer_step(tmrs,comp=0) 
 
         ! == ISOSTASY and SEA LEVEL ===========================================
-        call bsl_update(bsl, time_bp)
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        call bsl_update(bsl, ts%time_st)
+        call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
         yelmo1%bnd%z_bed = isos1%out%z_bed
         yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-        call timer_step(tmrs,comp=1,time_mod=[time-dtt_now,time]*1e-3,label="isostasy") 
+        call timer_step(tmrs,comp=1,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="isostasy") 
         
         ! == Yelmo ice sheet ===================================================
-        if (with_ice_sheet .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then
+        if (with_ice_sheet .and. (.not. (ts%n .eq. 0 .and. yelmo1%par%use_restart)) ) then
 
             if (optimize) then 
 
                 ! === Optimization update step =========
 
                 if (opt%opt_cf .and. &
-                        (time_elapsed .ge. opt%cf_time_init .and. time_elapsed .le. opt%cf_time_end) ) then  
+                        (ts%time_elapsed .ge. opt%cf_time_init .and. ts%time_elapsed .le. opt%cf_time_end) ) then  
                     ! Perform cf_ref optimization
                 
                     ! Update cb_ref based on error metric(s) 
@@ -444,7 +436,7 @@ end if
                 end if
 
                 if (opt%opt_tf .and. &
-                        (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
+                        (ts%time_elapsed .ge. opt%tf_time_init .and. ts%time_elapsed .le. opt%tf_time_end) ) then
                     ! Perform tf_corr optimization
 
                     call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
@@ -460,18 +452,18 @@ end if
             end if 
             
             ! Update ice sheet to current time 
-            call yelmo_update(yelmo1,time)
+            call yelmo_update(yelmo1,ts%time)
             
         end if 
         
-        call timer_step(tmrs,comp=2,time_mod=[time-dtt_now,time]*1e-3,label="yelmo") 
+        call timer_step(tmrs,comp=2,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="yelmo") 
         
         
-if (calc_transient_climate .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then 
+if (calc_transient_climate .and. (.not. (ts%n .eq. 0 .and. yelmo1%par%use_restart)) ) then 
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         ! call REMBO1
-        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+        call rembo_update(real(ts%time_st,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
                                         real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
         
         ! Update surface mass balance and surface temperature from REMBO
@@ -489,7 +481,7 @@ if (calc_transient_climate .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart))
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         
         ! Update snapclim
-        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+        call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_st,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
 
         if (use_hyster .and. trim(snp1%par%ocn_type) .eq. "const") then 
             ! Apply oceanic anomaly from hyster method 
@@ -510,35 +502,35 @@ end if
         yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
-        call timer_step(tmrs,comp=3,time_mod=[time-dtt_now,time]*1e-3,label="climate") 
+        call timer_step(tmrs,comp=3,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="climate") 
 
         ! == MODEL OUTPUT =======================================================
 
-        if (timeout_check(tm_1D,time)) then  
-            ! call yelmo_write_reg_step(yelmo1,file1D,time=time) 
-            !call yelmox_write_step_1D(yelmo1,hyst1,file1D_hyst,time=time)
-            call yelmox_write_step_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,time, &
+        if (timeout_check(tm_1D,ts%time)) then  
+            ! call yelmo_write_reg_step(yelmo1,file1D,time=ts%time) 
+            !call yelmox_write_step_1D(yelmo1,hyst1,file1D_hyst,time=ts%time)
+            call yelmox_write_step_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,ts%time, &
                                             dT_summer,dT_ann,dT_ocn,file_rembo_write_ocn_forcing)
         end if 
 
         if (timeout_check(tm_2D,time)) then
-            call yelmox_write_step(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
+            call yelmox_write_step(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=ts%time)
         end if 
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
-            call yelmox_restart_write(isos1,yelmo1,rembo_ann,time)
+            call yelmox_restart_write(isos1,yelmo1,rembo_ann,ts%time)
         end if 
 
-        call timer_step(tmrs,comp=4,time_mod=[time-dtt_now,time]*1e-3,label="io") 
+        call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
         
-        if (mod(time_elapsed,10.0)==0) then
+        if (mod(ts%time_elapsed,10.0)==0) then
             ! Print timestep timing info and write log table
-            call timer_write_table(tmrs,[time,dtt_now]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
+            call timer_write_table(tmrs,[ts%time,dtt_now]*1e-3,"m",tmr_file,init=ts%time_elapsed .eq. 0.0)
         end if 
 
         if (use_hyster .and. hyst1%kill) then 
             write(*,"(a,f12.3,a,f12.3)") "hyster:: kill switch activated. [time, f_now] = ", &
-                                                        time, ", ", hyst1%f_now 
+                                                        ts%time, ", ", hyst1%f_now 
             write(*,*) "hyster:: exiting time loop..."
             exit  
         end if 
@@ -546,18 +538,18 @@ end if
     end do 
 
     ! Stop timing
-    call timer_step(tmr,comp=2,time_mod=[time_init,time]*1e-3,label="timeloop") 
+    call timer_step(tmr,comp=2,time_mod=[ts%time_init,ts%time]*1e-3,label="timeloop") 
     
     ! Write the restart files for the end of the simulation
     if (write_restart) then 
-        call yelmox_restart_write(isos1,yelmo1,rembo_ann,time)
+        call yelmox_restart_write(isos1,yelmo1,rembo_ann,ts%time)
     end if
 
     ! Finalize program
-    call yelmo_end(yelmo1,time=time)
+    call yelmo_end(yelmo1,time=ts%time)
 
     ! Print timing summary
-    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=time*1e-3)
+    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=ts%time*1e-3)
     
 contains
     
@@ -1034,6 +1026,7 @@ end if
         real(wp),          intent(IN) :: dT_max
 
         ! Local variables
+        integer :: n
         real(wp), allocatable :: dT_axis(:) 
 
         ! Initialize netcdf file and dimensions

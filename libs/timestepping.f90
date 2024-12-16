@@ -45,7 +45,7 @@ module timestepping
     public :: tstep_update
     public :: tstep_print
     public :: tstep_print_header
-    
+
 contains
 
     subroutine tstep_init(ts,time_init,time_end,method,units,const_cal,const_st)
@@ -167,7 +167,7 @@ contains
         ts%comp_st      = 0.0
 
         return
-
+    
     end subroutine tstep_init
 
     subroutine tstep_update(ts,dt)
@@ -184,7 +184,7 @@ contains
 
             ! Get timestep in years
             dt_year = convert_time_from_units(dt,ts%units)
-
+            
             ! Update each time keeper and round for errors
 
             call kahan_sum(ts%time_elapsed, ts%comp_elapsed, dt_year)
@@ -294,10 +294,10 @@ contains
         real(wp) :: time_units
 
         select case(trim(units))
-            case("years","yrs","year","yr")
+            case("years","yrs","year","yr","years since today")
                 ! Internal units match external units
                 time_units = time
-            case("kiloyears","kyr","ka")
+            case("kiloyears","kyr","ka","kiloyears since today")
                 time_units = time*1e-3
             case DEFAULT
                 write(error_unit,*) "convert_time_to_units:: Error: units not recognized."
@@ -317,10 +317,10 @@ contains
         real(wp) :: time_yr
 
         select case(trim(units))
-            case("years","yrs","year","yr")
+            case("years","yrs","year","yr","years since today")
                 ! Internal units match external units
                 time_yr = time
-            case("kiloyears","kyr","ka")
+            case("kiloyears","kyr","ka","kiloyears since today")
                 time_yr = time*1e3
             case DEFAULT
                 write(error_unit,*) "convert_time_from_units:: Error: units not recognized."
