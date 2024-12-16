@@ -16,20 +16,15 @@ program test_timestepping
     time_end  =  1.0
     dtt       =  1.0
 
-    call tstep_init(ts,time_init,method="bp",units="kyr")
+    call tstep_init(ts,time_init,time_end,method="bp",units="kyr")
     call tstep_print(ts)
 
     ! Advance timesteps
-    timesteps_complete = .FALSE.
-
-    do while (.not. timesteps_complete)
+    do while (.not. ts%is_finished)
 
         ! Update timestep
         call tstep_update(ts,dtt)
         call tstep_print(ts)
-
-        ! Check timesteps
-        if (ts%time .ge. time_end) timesteps_complete = .TRUE. 
 
     end do
 

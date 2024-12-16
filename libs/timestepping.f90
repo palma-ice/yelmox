@@ -19,13 +19,14 @@ module timestepping
     type tstep_class
         character(len=56) :: units      ! External time units
         character(len=56) :: method     ! method of timekeeping
+        real(wp) :: time_init
+        real(wp) :: time_end
         logical  :: use_const_cal
         logical  :: use_const_bp
         real(wp) :: time
         real(wp) :: time_elapsed
         real(wp) :: time_cal 
         real(wp) :: time_bp
-        real(wp) :: time_init
         real(wp) :: time_const_bp
         real(wp) :: time_const_cal
         integer  :: n
@@ -35,7 +36,7 @@ module timestepping
         real(dp) :: comp_elapsed
         real(dp) :: comp_cal
         real(dp) :: comp_bp
-        
+        logical  :: is_finished
     end type
 
     private
@@ -46,7 +47,7 @@ module timestepping
 
 contains
 
-    subroutine tstep_init(ts,time_init,method,units,const_cal,const_bp)
+    subroutine tstep_init(ts,time_init,time_end,method,units,const_cal,const_bp)
         ! method = "const": time_elapsed evolves, fixed time_cal and time_bp
         ! method = "cal"  : time_cal evolves, time_bp is set relative to it
         ! method = "bp"   : time_bp evolves, time_cal is set relative to it
@@ -55,6 +56,7 @@ contains
 
         type(tstep_class), intent(INOUT) :: ts
         real(wp),          intent(IN)    :: time_init
+        real(wp),          intent(IN)    :: time_end
         character(len=*),  intent(IN)    :: method
         character(len=*),  intent(IN)    :: units
         real(wp),          intent(IN), optional :: const_cal
@@ -89,8 +91,19 @@ contains
             ts%use_const_bp  = .TRUE.
         end if
 
-        ! Set initial time
-        ts%time_init    = convert_time_from_units(time_init,ts%units)
+        ! Set initial and end time
+        ts%time_init = convert_time_from_units(time_init,ts%units)
+        ts%time_end  = convert_time_from_units(time_end,ts%units)
+
+        ! Initialize is_finished to .false.
+        if (ts%time_end .gt. ts%time_init) then
+            ts%is_finished = .FALSE.
+        else
+            write(error_unit,*) "tstep_init:: Error: time_init must be earlier than time_end."
+            write(error_unit,*) "time_init = ", ts%time_init
+            write(error_unit,*) "time_end  = ", ts%time_end
+            stop
+        end if
 
         ! Set time PD (calendar year) - used for converting between cal and bp timescales
         ts%time_pd = 1950.0 
@@ -196,6 +209,11 @@ contains
             case("const")
                 ts%time = convert_time_to_units(ts%time_elapsed,ts%units)
         end select
+
+        ! Finally check if time stepping is finished
+        if (convert_time_from_units(ts%time,ts%units) .ge. ts%time_end) then
+            ts%is_finished = .TRUE.
+        end if
 
         return
 
