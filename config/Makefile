@@ -114,10 +114,10 @@ check_sim : $(objdir)/ncio.o
 		@echo " "
 
 test_timestepping : yelmo-static $(objdir)/nml.o $(objdir)/ncio.o $(objdir)/timestepping.o
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -o ./test_timestepping.x tests/test_timestepping.f90 \
+		$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -o ./libyelmox/bin/test_timestepping.x tests/test_timestepping.f90 \
 			$(objdir)/nml.o $(objdir)/ncio.o $(objdir)/timestepping.o $(LFLAGS)
 		@echo " "
-		@echo "    test_timestepping.x is ready."
+		@echo "    ./libyelmox/bin/test_timestepping.x is ready."
 		@echo " "
 
 
