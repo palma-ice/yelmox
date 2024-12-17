@@ -6,7 +6,8 @@
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
     write_restart   = True              ! Write restart files
-    transient       = True              ! Calculate transient climate? 
+    tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_const     = -21e3             ! Assumed time for "const" method
     use_hyster      = True              ! Use hysteresis module? 
     dT              = 0.0               ! [K]  Contant summer warming anomaly              
     lim_pd_ice      = True              ! Apply extra melting outside of PD ice extent

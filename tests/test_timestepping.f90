@@ -7,18 +7,30 @@ program test_timestepping
     
 
     type(tstep_class) :: ts
-    integer  :: n, ntot
-    real(wp) :: time_init, time_end
+    real(wp) :: time_init
+    real(wp) :: time_end
     real(wp) :: dtt
-    logical  :: timesteps_complete
 
-    time_init = -100.0
-    time_end  =  1.0
-    dtt       =  1.0
+    select case("cal")
+        case("rel","sp","bp")
+            time_init = -21.0   ! kyr st
+            time_end  =  1.0    ! kyr st
+            dtt       =  1.0    ! kyr
+            call tstep_init(ts,time_init,time_end,method="sp",time_ref=1950e-3_wp,units="kyr")
+        case("cal")
+            time_init = 1880.0  ! yr CE
+            time_end  = 2100.0  ! yr CE
+            dtt       = 10.0    ! yr
+            call tstep_init(ts,time_init,time_end,method="cal",time_ref=1950.0_wp,units="yr")
+        case("const")
+            time_init = 0.0     ! kyr
+            time_end  = 100.0   ! kyr
+            dtt       = 10.0
+            call tstep_init(ts,time_init,time_end,method="const",units="yr",const_rel=-21e3_wp,const_cal=1880._wp)
+    end select
 
-    call tstep_init(ts,time_init,time_end,method="st",units="kyr")
     call tstep_print_header(ts)
-    
+
     ! Advance timesteps
     do while (.not. ts%is_finished)
 
