@@ -155,10 +155,11 @@ contains
             
             case("const")
 
-                ts%time_elapsed = ts%time_init      ! only case where time_elapsed can start at non-zero
+                ts%time_elapsed = 0.0
                 ts%time_cal     = ts%time_const_cal
                 ts%time_rel     = ts%time_const_rel
-                ts%time         = ts%time_elapsed
+                ts%time         = ts%time_init          ! Only case where time potentially doesn't match any
+                                                        ! other time keepers, i.e., if time_init is not 0.0.
 
             case DEFAULT
                 write(error_unit,*) "tstep_init:: Error: method not recognized."
@@ -207,7 +208,7 @@ contains
                 case("rel","sp","bp")
                     ts%time = ts%time_rel
                 case("const")
-                    ts%time = ts%time_elapsed
+                    ts%time = ts%time_init + ts%time_elapsed
             end select
 
         end if 
