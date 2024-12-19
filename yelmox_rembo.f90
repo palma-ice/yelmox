@@ -216,15 +216,15 @@ if (.FALSE.) then
     ! Update REMBO, with correct topography, let it equilibrate for several years 
     do n = 1, 100
         time = ts%time + real(n-1,8)    
-        call rembo_update(real(time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                            real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+        call rembo_update(real(time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                                    real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     end do 
     rembo_ann%time_emb = ts%time 
     rembo_ann%time_smb = ts%time
 end if
 
     if (.not. yelmo1%par%use_restart) then
-        call rembo_update(real(ts%time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+        call rembo_update(real(ts%time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
                                              real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     end if
     
@@ -462,7 +462,7 @@ end if
         if ( .not. (ts%n .eq. 1 .and. yelmo1%par%use_restart) ) then
 
             ! call REMBO1
-            call rembo_update(real(ts%time,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+            call rembo_update(real(ts%time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
                                             real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
             
             ! Update surface mass balance and surface temperature from REMBO
