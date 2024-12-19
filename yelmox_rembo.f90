@@ -212,20 +212,24 @@ program yelmox
         dT_ocn    = 0.0 
     end if 
 
-if (.FALSE.) then
-    ! Update REMBO, with correct topography, let it equilibrate for several years 
-    do n = 1, 100
-        time = ts%time + real(n-1,8)    
-        call rembo_update(real(time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                                    real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
-    end do 
-    rembo_ann%time_emb = ts%time 
-    rembo_ann%time_smb = ts%time
-end if
-
-    if (.not. yelmo1%par%use_restart) then
+    if (yelmo1%par%use_restart) then
+        ! Call rembo_update once to get all fields over the year
+        ! (restart file only contains information for last day of the year)
         call rembo_update(real(ts%time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
                                              real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+    else
+        ! Update REMBO, with correct topography, let it equilibrate for several years
+        ! Reset time back to current time
+if (.FALSE.) then
+        do n = 1, 100
+            time = ts%time + real(n-1,8)    
+            call rembo_update(real(time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
+                                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
+        end do 
+        rembo_ann%time_emb = ts%time 
+        rembo_ann%time_smb = ts%time
+end if
+
     end if
     
     ! Update surface mass balance and surface temperature from REMBO
@@ -324,21 +328,16 @@ end if
 
     ! Heavy 2D file  
     call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
-    call yelmox_write_step(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=time)
-    
+
     ! 2D small file 
     ! call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years")
-    ! call yelmox_write_step_small(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D_small,time=ts%time)
     
     ! 1D file 
     ! call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
-    ! call yelmo_write_reg_step(yelmo1,file1D,time=ts%time)
 
     ! Small 1D-2D yelmo-rembo file
     call yelmox_write_init(yelmo1,file_rembo,time_init=ts%time,units="years", &
                     mask=yelmo1%bnd%ice_allowed,dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
-    call yelmox_write_step_small(yelmo1,hyst1,rembo_ann,isos1,mshlf1,file_rembo,ts%time, &
-                                                        dT_summer,dT_ann,dT_ocn,file_rembo_write_ocn_forcing)
 
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)
@@ -695,11 +694,9 @@ contains
 
         end if 
 
-if (.FALSE.) then
-    ! ajr: possibily interesting for studies on future melting
-
         ! == ice-sheet wide metrics == 
-
+        ! Note: aar possibily interesting for studies on future melting
+        
         ! Get integrated metrics (smb_tot [Gt/yr] and aar [unitless])
         ntot = count(ylmo%tpo%now%H_ice .gt. 0.0)
 
@@ -715,7 +712,6 @@ if (.FALSE.) then
         else
             aar = 0.0
         end if  
-end if
 
         call nc_write(filename,"dT_jja",hyst%f_now,units="K",long_name="Temp. anomaly, regional JJA mean", &
                       dim1="time",start=[n],ncid=ncid)
