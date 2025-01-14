@@ -512,7 +512,7 @@ end if
                                             dT_summer,dT_ann,dT_ocn,file_rembo_write_ocn_forcing)
         end if 
 
-        if (timeout_check(tm_2D,time)) then
+        if (timeout_check(tm_2D,ts%time)) then
             call yelmox_write_step(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=ts%time)
         end if 
 
