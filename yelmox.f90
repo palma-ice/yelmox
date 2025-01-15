@@ -358,6 +358,9 @@ program yelmox
             ! Should NEGIS parameter modifications be used
             ngs%use_negis_par = .TRUE. 
 
+if (.FALSE.) then
+    ! ajr, 2025-01-15, missing these parameters in param files - ask Ilaria!!
+
             ! Load NEGIS parameters from file, if used
             if (ngs%use_negis_par) then
                 
@@ -365,9 +368,10 @@ program yelmox
                 call nml_read(path_par,"negis","cf_1",       ngs%cf_1)
                 call nml_read(path_par,"negis","cf_centre",  ngs%cf_centre)
                 call nml_read(path_par,"negis","cf_north",   ngs%cf_north)
-                call nml_read(path_par,"negis","cf_north",   ngs%cf_north)
+                call nml_read(path_par,"negis","cf_south",   ngs%cf_south)
                 
             end if 
+end if
 
             ! Make sure to set ice_allowed to prevent ice from growing in 
             ! Iceland and Svaalbard (on grid borders)
@@ -1101,9 +1105,6 @@ contains
         call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
-
-        call nc_write(filename,"err_pd_smb_ref",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_strn_alt_units",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
