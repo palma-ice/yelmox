@@ -1611,7 +1611,7 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call yelmo_write_var(filename,"pd_err_H_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_z_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_uxy_s",ylmo,n,ncid)
-        call yelmo_write_var(filename,"pd_err_smb",ylmo,n,ncid)
+        call yelmo_write_var(filename,"pd_err_smb_ref",ylmo,n,ncid)
 
         ! == yelmo extra fields ==
 
@@ -1635,9 +1635,6 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
-
-        call nc_write(filename,"err_pd_smb_ref",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_strn_alt_units",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
