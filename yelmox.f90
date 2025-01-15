@@ -1080,7 +1080,7 @@ contains
         call yelmo_write_var(filename,"pd_err_H_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_z_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_uxy_s",ylmo,n,ncid)
-        call yelmo_write_var(filename,"pd_err_smb",ylmo,n,ncid)
+        call yelmo_write_var(filename,"pd_err_smb_ref",ylmo,n,ncid)
         
 
         ! == yelmo extra fields ==
