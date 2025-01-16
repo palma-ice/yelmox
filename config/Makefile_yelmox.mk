@@ -47,8 +47,8 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90 $(objdir)/nml.o $(objdir)/ncio.o
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90 $(objdir)/nml.o $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-$(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+# $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
+# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -101,6 +101,22 @@ $(objdir)/pico_physics.o: $(libdir)/pico/pico_physics.f90
 $(objdir)/pico.o: $(libdir)/pico/pico.f90 $(objdir)/pico_geometry.o $(objdir)/pico_physics.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
+# oceanic models for bipolar mode
+$(objdir)/obm_defs.o: $(libdir)/obm/obm_defs.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/ice2ocean.o: $(libdir)/obm/ice2ocean.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/ocean2ice.o: $(libdir)/obm/ocean2ice.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/atm2ocean.o: $(libdir)/obm/atm2ocean.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/stommel.o: $(libdir)/obm/stommel.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/nautilus.o: $(libdir)/obm/nautilus.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/obm.o: $(libdir)/obm/obm.f90
+	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+
 # General yelmox helper modules for different applications 
 $(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -c -o $@ $^
@@ -136,6 +152,13 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 						$(objdir)/timer.o \
 						$(objdir)/timestepping.o \
 			 		    $(objdir)/varslice.o \
-					    $(objdir)/xarray.o
+					    $(objdir)/xarray.o\
+						$(objdir)/obm_defs.o\
+						$(objdir)/ice2ocean.o\
+						$(objdir)/ocean2ice.o\
+						$(objdir)/atm2ocean.o\
+						$(objdir)/stommel.o\
+						$(objdir)/nautilus.o\
+						$(objdir)/obm.o
 
 yelmox_help = 			$(objdir)/yelmox_hysteresis_help.o

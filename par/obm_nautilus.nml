@@ -1,0 +1,49 @@
+&nautilus
+    ! Constants
+    specific_heat_capacity = 4000       ! [Jkg-1ºC-1] Specific heat capacity of seawater   
+    density_of_seawater = 1025          ! [kgm-3] Density of seawater   
+    therm_exp_coeff = 1.7e-4            ! [ºC-1] Thermal expansion coefficient   
+    haline_exp_coeff = 8e-4             ! [psu-1] Haline expansion coefficient 
+    reference_salinity = 35             ! [psu] Reference salinity 
+
+    ! Fixed parameters
+    vol_s = 1.1e17                      ! [m3] Volume of southern box 
+    vol_n = 0.4e17                      ! [m3] Volume of northern box
+    vol_t = 0.68e17                     ! [m3] Volume of tropical box
+    vol_td = 0.05e17                    ! [m3] Volume of tropical deep box
+    depth_s = 3000.0                    ! [m] Depth of southern box
+    depth_n = 3000.0                    ! [m] Depth of northern box
+    depth_t = 1000.0                    ! [m] Depth of tropical box
+    depth_td = 2000.0                   ! [m] Depth of tropical deep box
+
+    ! Tunable parameters
+    thermal_coupling_constant = 7.3e8   ! [Ja-1m-2ºC-1] Thermal coupling constant 
+    emp_flow_k = 25.4e17                ! [m3a-1] Empirical flow constant 
+
+    ! Initial conditions
+    tn_init = 4.7                       ! [ºC] Northern box temperature
+    tt_init = 11.4                      ! [ºC] Tropical box temperature
+    ttd_init = 5.0                      ! [ºC] Tropical deep box temperature
+    ts_init = 6.5                       ! [ºC] Southern box temperature
+
+    sn_init = 36.0                      ! [psu] Northern box salinity
+    st_init = 35.08                     ! [psu] Tropical box salinity
+    std_init = 35.5                     ! [psu] Tropical deep box salinity
+    ss_init = 34.98                     ! [psu] Southern box salinity
+
+    fn_init = 0.0                       ! [Sv] External fwf in the north
+    ft_init = 0.0                       ! [Sv] External fwf in the tropics
+    fs_init = 0.0                       ! [Sv] External fwf in the south
+
+    phit_init = 4.41504e11              ! [m3a-1] Freshwater transport from southern to tropical box
+    phin_init = 2.04984e12              ! [m3a-1] Freshwater transport from tropical to northern box
+
+    thetas_init = 6.6                   ! [ºC] Relaxation temperature of the southern box
+    thetan_init = 2.7                   ! [ºC] Relaxation temperature of the northern box
+    thetat_init = 11.7                  ! [ºC] Relaxation temperature of the tropical box
+
+    lambdan_init = 0.05934959349593496  ! Gamma / (c * rho * z)
+    lambdas_init = 0.05934959349593496
+    lambdat_init = 0.17804878048780487
+    lambdatd_init = 0.0
+/

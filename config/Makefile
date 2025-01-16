@@ -106,6 +106,13 @@ yelmox_rembo: yelmo-static rembo-static isostasy-static $(yelmox_libs)
 	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
 	@echo " "
 
+yelmox_bipolar : yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_bipolar.x yelmox_bipolar.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_bipolar.x is ready."
+	@echo " "
+
 check_sim : $(objdir)/ncio.o
 		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
 			$(objdir)/ncio.o $(LFLAGS)

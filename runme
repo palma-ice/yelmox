@@ -7,6 +7,7 @@ jobrun ./runme -r -- -o output/run -p ctl.nyears=5000
 '''
 import subprocess as subp 
 import sys, os, argparse, shutil, glob, json
+import f90nml
 
 # Check whether runner library is installed or not:
 try:
@@ -265,6 +266,16 @@ def main():
 
     if info["par_path_as_argument"] is True:
         par_paths.append(par_path)   # add included parameter file provided at command line too
+
+    if exe_fname == "yelmox_bipolar.x":
+        nml = f90nml.read(par_path)
+        domain_par_files = [nml["ctrl"]["path_par_north"],
+                            nml["ctrl"]["path_par_south"]]
+        for p in domain_par_files:
+            par_paths.append("par/"+p)
+        
+        ocn_model_file = nml["ctrl"]["path_par_ocn"].split()
+        par_paths.append("par/"+ocn_model_file[0])
 
     # Eliminate empty entries
     par_paths = [entry for entry in par_paths if entry and entry != "None"]

@@ -10,7 +10,8 @@
             "hyst"   : "libyelmox/bin/yelmox_hyst.x",
             "rembo"  : "libyelmox/bin/yelmox_rembo.x",
             "ismip6" : "libyelmox/bin/yelmox_ismip6.x",
-            "rtip"   : "libyelmox/bin/yelmox_rtip.x"
+            "rtip"   : "libyelmox/bin/yelmox_rtip.x",
+            "bipolar" : "libyelmox/bin/yelmox_bipolar.x"
         },
     
     "grp_aliases" : 

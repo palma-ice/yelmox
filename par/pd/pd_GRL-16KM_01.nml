@@ -1,11 +1,11 @@
 &ctrl
     time_init       = 0.0               ! [yr] Starting time 
-    time_end        = 20e3              ! [yr] Ending time
+    time_end        = 30e3              ! [yr] Ending time
     time_equil      = 2e3               ! [yr] Equilibration time 
-    time_const      = 1950.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
+    time_const      = 2015.0            ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
     time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
     time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
-    dtt             = 10.0              ! [yr] Main loop timestep 
+    dtt             = 5.0              ! [yr] Main loop timestep 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = False             ! Calculate transient climate? 
     use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
@@ -67,6 +67,14 @@
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
 
     cf_ref_wais     = 0.0
+/
+
+&negis
+    cf_0            = 1.0 
+    cf_1            = 1.0 
+    cf_centre       = 1.0 
+    cf_north        = 1.0
+    cf_south        = 1.0
 /
 
 &yelmo
@@ -285,7 +293,7 @@
     pd_vel_load       = True 
     pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
-    pd_age_load       = False 
+    pd_age_load       = True 
     pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
@@ -301,8 +309,8 @@
 /
 
 &snap
-    atm_type           = "snap_1ind_new"
-    ocn_type           = "fraction"
+    atm_type           = "anom"
+    ocn_type           = "anom"
     fname_at           = "input/alpha_orbital_r2020.dat"
     fname_ao           = "input/alpha_orbital_r2020.dat"
     fname_ap           = "input/alpha_orbital_r2020.dat"
@@ -312,9 +320,9 @@
     fname_bp           = "input/ones.dat"
     fname_bs           = "input/ones.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
-    dSo_const          = 3.0
+    dTa_const          = 0.0  
+    dTo_const          = 0.0
+    dSo_const          = 0.0
     f_to               = 0.25 
     f_p                = 0.06
     f_stdev            = 0.0 
