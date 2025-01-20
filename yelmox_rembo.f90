@@ -218,18 +218,12 @@ program yelmox
         call rembo_update(real(ts%time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
                                              real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
     else
-        ! Update REMBO, with correct topography, let it equilibrate for several years
-        ! Reset time back to current time
-if (.FALSE.) then
-        do n = 1, 100
-            time = ts%time + real(n-1,8)    
-            call rembo_update(real(time,8),real(ts%time_rel,8),real(dT_summer,8),real(yelmo1%tpo%now%z_srf,8), &
-                                                        real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8))
-        end do 
-        rembo_ann%time_emb = ts%time 
-        rembo_ann%time_smb = ts%time
-end if
+        ! Equilibrate REMBO with correct topography, no temp anomaly, let it equilibrate for several years
+        ! This will also calculate the precip correction factor
 
+        call rembo_equilibrate(real(ts%time,8),real(yelmo1%tpo%now%z_srf,8), &
+                                real(yelmo1%tpo%now%H_ice,8),real(yelmo1%bnd%z_sl,8),time_tot=10d0)
+        
     end if
     
     ! Update surface mass balance and surface temperature from REMBO
