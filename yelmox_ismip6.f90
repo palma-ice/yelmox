@@ -391,15 +391,6 @@ program yelmox_ismip6
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
     
-    if (yelmo1%par%use_restart) then 
-        ! Perform additional startup steps when using a restart
-
-        ! Set boundary module variables equal to restarted value         
-        isos1%now%z_bed  = yelmo1%bnd%z_bed
-      
-    end if
-
-
 ! ================= RUN STEPS ===============================================
 
 
