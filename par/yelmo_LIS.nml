@@ -4,12 +4,8 @@
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 100e3             ! [yr] Ending time
     time_equil      = 10.0              ! [yr] Equilibration time 
-    time_lgm_step   = 15e3              ! [yr] Time to switch time_const => time_lgm
-    time_pd_step    = 30e3              ! [yr] Time to switch time_const => time_pd
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
-    use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
-    use_pd_step     = False             ! Activate PD step-return in forcing at time=time_pd_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
 

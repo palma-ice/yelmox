@@ -10,7 +10,6 @@ program yelmox
     use yelmo 
     use yelmo_tools, only : smooth_gauss_2D
     use ice_optimization
-    use basal_dragging, only : calc_lambda_bed_lin, calc_lambda_bed_exp
 
     ! External libraries
     use fastisostasy    ! also reexports barysealevel
@@ -39,7 +38,6 @@ program yelmox
     character(len=512) :: path_lgm
     real(wp) :: dT_now
     real(wp) :: dtt_now
-    integer  :: n
     
     type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm
 
@@ -63,29 +61,18 @@ program yelmox
     real(wp), allocatable :: regions_mask(:,:) 
 
     type ctrl_params
-        character(len=56) :: run_step
+        character(len=56) :: tstep_method
+        real(wp) :: tstep_const
         real(wp) :: time_init
         real(wp) :: time_end
         real(wp) :: time_equil      ! Only for spinup
-        real(wp) :: time_lgm_step 
-        real(wp) :: time_pd_step
         real(wp) :: dtt
         real(wp) :: dt_restart
         real(wp) :: dt_clim
 
-        character(len=56)  :: tstep_method
-        real(wp) :: tstep_const
-
-        logical  :: use_lgm_step
-        logical  :: use_pd_step
         logical  :: with_ice_sheet 
-
         character(len=56) :: equil_method
 
-        real(wp) :: isos_tau_1 
-        real(wp) :: isos_tau_2 
-        real(wp) :: isos_sigma 
-        
     end type 
 
     type negis_params
@@ -100,21 +87,8 @@ program yelmox
         
     end type
 
-    type stats_class
-        logical  :: defined
-        real(wp) :: pd_rmse_H
-        real(wp) :: pd_rmse_H_flt
-        real(wp) :: V
-        real(wp) :: A
-        real(wp) :: A_grnd
-        real(wp) :: A_flt
-    end type
-
-
     type(ctrl_params)    :: ctl
     type(ice_opt_params) :: opt  
-    type(stats_class)    :: stats_pd_1, stats_lgm, stats_pd_2
-
     type(negis_params)   :: ngs 
 
     ! Internal parameters
@@ -126,24 +100,17 @@ program yelmox
     logical  :: greenland_init_marine_H
     logical  :: scale_glacial_smb
 
-    real(wp), parameter :: time_lgm = -19050.0_wp  ! [yr CE] == 21 kyr ago 
-    real(wp), parameter :: time_pd  =   1950.0_wp  ! [yr CE] ==  0 kyr ago 
-    
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
     ! Timing and other parameters 
+    call nml_read(path_par,"ctrl","tstep_method",   ctl%tstep_method)       ! Calendar choice ("const" or "rel")
+    call nml_read(path_par,"ctrl","tstep_const",    ctl%tstep_const)        ! Assumed time bp for const method
     call nml_read(path_par,"ctrl","time_init",      ctl%time_init)          ! [yr] Starting time
     call nml_read(path_par,"ctrl","time_end",       ctl%time_end)           ! [yr] Ending time
     call nml_read(path_par,"ctrl","time_equil",     ctl%time_equil)         ! [yr] Years to equilibrate first
-    call nml_read(path_par,"ctrl","time_lgm_step",  ctl%time_lgm_step) 
-    call nml_read(path_par,"ctrl","time_pd_step",   ctl%time_pd_step) 
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
-    call nml_read(path_par,"ctrl","tstep_method",   ctl%tstep_method)       ! Calendar choice ("const" or "rel")
-    call nml_read(path_par,"ctrl","tstep_const",    ctl%tstep_const)        ! Assumed time bp for const method
-    call nml_read(path_par,"ctrl","use_lgm_step",   ctl%use_lgm_step)       ! Use lgm_step?
-    call nml_read(path_par,"ctrl","use_pd_step",    ctl%use_pd_step)        ! Use pd_step?
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
@@ -164,25 +131,6 @@ program yelmox
                                             time_ref=1950.0_wp,const_rel=ctl%tstep_const)
 
     ! Consistency checks ===
-
-    ! transient_clim overrides use_lgm_step 
-    if (trim(ts%method) .ne. "const") ctl%use_lgm_step = .FALSE. 
-
-    ! lgm step should only come after time_equil is finished...
-    if (ctl%time_lgm_step .lt. ctl%time_equil) then 
-        write(5,*) ""
-        write(5,*) "yelmox:: time_lgm_step must be greater than time_equil."
-        write(5,*) "Try again."
-        stop "Program stopped."
-    end if 
-
-    ! pd step should only come after lgm step 
-    if (ctl%time_pd_step .lt. ctl%time_lgm_step) then 
-        write(5,*) ""
-        write(5,*) "yelmox:: time_pd_step must be greater than time_lgm_step."
-        write(5,*) "Try again."
-        stop "Program stopped."
-    end if 
 
     if (trim(ctl%equil_method) .eq. "opt") then 
         ! Load optimization parameters 
@@ -210,8 +158,6 @@ program yelmox
     ! Print summary of run settings 
     write(*,*)
     write(*,*) "timestepping:   ",  trim(ts%method)
-    write(*,*) "use_lgm_step:   ",  ctl%use_lgm_step
-    write(*,*) "use_pd_step:    ",  ctl%use_pd_step
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
     write(*,*) "equil_method:   ",  trim(ctl%equil_method)
     write(*,*)
@@ -222,16 +168,7 @@ program yelmox
     write(*,*) 
     
     if (trim(ts%method) .eq. "const") then 
-        write(*,*) "time_equil: ",    ctl%time_equil 
-
-        if (ctl%use_lgm_step) then 
-            write(*,*) "time_lgm_step: ", ctl%time_lgm_step 
-        end if 
-
-        if (ctl%use_pd_step) then 
-            write(*,*) "time_pd_step: ", ctl%time_pd_step 
-        end if 
-
+        write(*,*) "time_equil: ",    ctl%time_equil
     end if 
 
     write(*,*) "time    = ", ts%time 
@@ -302,9 +239,6 @@ program yelmox
         case("Laurentide")
 
             running_laurentide = .TRUE. 
-
-            ctl%use_lgm_step        = .FALSE.
-            ctl%use_pd_step         = .FALSE.
 
             laurentide_init_const_H = .FALSE.
 
@@ -404,8 +338,7 @@ end if
     call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
-        yelmo1%grd%dx, yelmo1%grd%dy)
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
 
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
@@ -446,16 +379,6 @@ end if
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
-
-! Testing related to present-day surface mass balance
-!     snp1%now%tas = snp1%now%tas + 0.0 
-!     snp1%now%pr  = snp1%now%pr*exp(0.05*(0.0))
-
-!     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-!                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel, &
-!                                file_out=trim(outfldr)//"smbpal.nc",write_now=.TRUE.,write_init=.TRUE.) 
-
-!     stop 
 
     call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel) 
@@ -636,35 +559,15 @@ end if
         call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=ts%time,units="years",mask=reg3%mask)
     end if
 
-    ! Set stats
-    stats_pd_1%defined = .FALSE. 
-    stats_lgm%defined  = .FALSE. 
-    stats_pd_2%defined = .FALSE. 
-    
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)
     
     ! ==== Begin main time loop =====
 
-    ! == Advance timesteps ===
-
     dtt_now = ctl%dtt
-
     call tstep_print_header(ts)
 
     do while (.not. ts%is_finished)
-
-        if (ts%use_const_rel) then
-
-            if (ctl%use_lgm_step .and. ts%time .ge. ctl%time_lgm_step) then 
-                ts%time_const_rel = time_lgm 
-            end if 
-
-            if (ctl%use_pd_step .and. ts%time .ge. ctl%time_pd_step) then 
-                ts%time_const_rel = time_pd 
-            end if 
-
-        end if
 
         ! == Update timestep ===
 
@@ -769,7 +672,7 @@ end if
         end if
         
         ! Update Yelmo
-        if (ctl%with_ice_sheet .and. (.not. (n .eq. 0 .and. yelmo1%par%use_restart)) ) then
+        if (ctl%with_ice_sheet .and. (.not. (ts%n .eq. 0 .and. yelmo1%par%use_restart)) ) then
             call yelmo_update(yelmo1,ts%time)
         end if
         
