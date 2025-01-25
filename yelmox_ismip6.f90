@@ -21,7 +21,8 @@ program yelmox_ismip6
 
     implicit none 
 
-    character(len=256) :: outfldr, file1D, file2D, file2D_small
+    character(len=256) :: outfldr, file2D, file2D_small
+    character(len=256) :: file1D_hyst
     character(len=256) :: file1D_ismip6, file2D_ismip6
     character(len=256) :: file_isos, file_bsl
     character(len=256) :: domain, grid_name 
@@ -53,17 +54,6 @@ program yelmox_ismip6
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file 
     
-    type reg_def_class 
-        character(len=56)  :: name 
-        character(len=512) :: fnm
-        logical, allocatable :: mask(:,:) 
-        logical :: write 
-    end type
-
-    type(reg_def_class) :: reg1
-    type(reg_def_class) :: reg2
-    type(reg_def_class) :: reg3
-
     character(len=512)    :: regions_mask_fnm
     real(wp), allocatable :: regions_mask(:,:) 
 
@@ -159,13 +149,14 @@ program yelmox_ismip6
     outfldr = "./"
 
     ! Define input and output locations
-    file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
     
     file_isos           = trim(outfldr)//"fastisostasy.nc"
     file_bsl            = trim(outfldr)//"bsl.nc"
     
+    file1D_hyst         = trim(outfldr)//"yelmo1D_hyst.nc"
+
     file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
     file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc"
 
@@ -249,54 +240,20 @@ program yelmox_ismip6
             ! Load mask from file 
             call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
 
-            ! ajr (2023-03-13): files are now consistent, this fix should not be needed!
-            ! ! ajr: fix mask inconsistency at 16km resolution
-            ! ! Note: the files themselves should be fixed and made consistent!
-            ! if (trim(yelmo1%par%grid_name) .eq. "ANT-16KM") then 
-            !     where(abs(regions_mask - 4.0) .lt. 1e-3) regions_mask = 1.0 
-            !     where(abs(regions_mask - 5.0) .lt. 1e-3) regions_mask = 2.0 
-            ! end if 
-
             ! APIS region (region=3.0 in regions map)
-            reg1%write = .TRUE. 
-            reg1%name  = "APIS" 
-            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
-
-            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg1%mask = .FALSE. 
-            where(abs(regions_mask - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
+            call yelmo_region_init(yelmo1%regs(1),"APIS",write_to_file=.TRUE.,outfldr=outfldr)
+            yelmo1%regs(1)%mask = .FALSE. 
+            where(abs(regions_mask - 3.0) .lt. 1e-3) yelmo1%regs(1)%mask = .TRUE.
 
             ! WAIS region (region=1.0 in regions map)
-            reg2%write = .TRUE. 
-            reg2%name  = "WAIS" 
-            reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
-
-            allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg2%mask = .FALSE. 
-            where(abs(regions_mask - 1.0) .lt. 1e-3) reg2%mask = .TRUE.
+            call yelmo_region_init(yelmo1%regs(2),"WAIS",write_to_file=.TRUE.,outfldr=outfldr)
+            yelmo1%regs(2)%mask = .FALSE. 
+            where(abs(regions_mask - 1.0) .lt. 1e-3) yelmo1%regs(2)%mask = .TRUE.
 
             ! EAIS region (region=2.0 in regions map)
-            reg3%write = .TRUE. 
-            reg3%name  = "EAIS" 
-            reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
-
-            allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg3%mask = .FALSE. 
-            where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
-
-            ! Adjust optimization cf_max field specifically for the WAIS and Amery
-            !where(abs(yelmo1%bnd%basins - 14.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
-            !where(abs(yelmo1%bnd%basins -  6.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
-            ! Note ajr (2023-03-13): this is no longer needed as long as ytill.cf_ref is set to 0.1 instead of 1.0.
-            ! Also, it was not nice having cf_ref_wais inside of the opt object in ice_optimization.f90. This
-            ! will be removed. If it is needed in the future, cf_ref_wais should be included in a parameter
-            ! section loaded in this program directly. 
-
-        case DEFAULT 
-
-            reg1%write = .FALSE. 
-            reg2%write = .FALSE. 
-            reg3%write = .FALSE. 
+            call yelmo_region_init(yelmo1%regs(3),"EAIS",write_to_file=.TRUE.,outfldr=outfldr)
+            yelmo1%regs(3)%mask = .FALSE. 
+            where(abs(regions_mask - 2.0) .lt. 1e-3) yelmo1%regs(3)%mask = .TRUE.
 
     end select
 
@@ -447,8 +404,8 @@ program yelmox_ismip6
 
         ! Initialize output files for checking progress 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-        
+        call yelmo_regions_write(yelmo1,time,init=.TRUE.,units="years")
+
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
         
@@ -578,8 +535,7 @@ program yelmox_ismip6
             end if
 
             if (timeout_check(tm_1D,time)) then
-                call yelmo_write_reg_step(yelmo1,file1D,time=time)
-                 
+                call yelmo_regions_write(yelmo1,time)
             end if 
 
             call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
@@ -620,8 +576,8 @@ program yelmox_ismip6
 
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
-        
+        call yelmo_regions_write(yelmo1,time,init=.TRUE.,units="years")
+
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
             call yelmo_write_init(yelmo1,file2D_ismip6,time_init=time,units="years")
@@ -692,7 +648,7 @@ end if
            
              
             if (timeout_check(tm_1D,time)) then
-                 call yelmo_write_reg_step(yelmo1,file1D,time=time)
+                 call yelmo_regions_write(yelmo1,time)
             end if 
 
             ! ISMIP6 output if desired:
@@ -741,8 +697,8 @@ end if
 
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
-        
+        call yelmo_regions_write(yelmo1,time,init=.TRUE.,units="years")
+
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
         
@@ -870,8 +826,7 @@ end if
             end if
 
             if (timeout_check(tm_1D,time)) then
-                call yelmo_write_reg_step(yelmo1,file1D,time=time)
-                 
+                call yelmo_regions_write(yelmo1,time)                 
             end if 
 
             call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 
@@ -930,23 +885,13 @@ end if
         yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
         ! Initialize hysteresis output files
-        call yx_hyst_write_yelmo_init_1D_combined(yelmo1,file1D,time,units="years",mask=yelmo1%bnd%ice_allowed, &
+        call yx_hyst_write_yelmo_init_1D_combined(yelmo1,file1D_hyst,time,units="years",mask=yelmo1%bnd%ice_allowed, &
                                                 dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
 
         call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
         call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
 
-        if (reg1%write) then 
-            call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
-        end if 
-
-        if (reg2%write) then
-            call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
-        end if
-
-        if (reg3%write) then
-            call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
-        end if
+        call yelmo_regions_write(yelmo1,time,init=.TRUE.,units="years")
 
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
@@ -1043,20 +988,9 @@ end if
             end if
 
             if (timeout_check(tm_1D,time)) then
-                call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,file1D,time=time)
+                call yx_hyst_write_step_1D_combined(yelmo1,hyst1,snp1,file1D_hyst,time=time)
                 
-                if (reg1%write) then 
-                    call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
-                end if 
-
-                if (reg2%write) then
-                    call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
-                end if
-
-                if (reg3%write) then
-                    call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
-                end if
-
+                call yelmo_regions_write(yelmo1,time)
             end if 
 
             call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io") 

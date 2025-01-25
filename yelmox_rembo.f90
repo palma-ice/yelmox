@@ -327,7 +327,7 @@ program yelmox
     ! call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years")
     
     ! 1D file 
-    ! call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
+    !call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
     ! Small 1D-2D yelmo-rembo file
     call yelmox_write_init(yelmo1,file_rembo,time_init=ts%time,units="years", &

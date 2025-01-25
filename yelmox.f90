@@ -32,7 +32,7 @@ program yelmox
     type(geothermal_class) :: gthrm1
     type(isos_class)       :: isos1
     
-    character(len=256) :: outfldr, file1D, file2D, file2D_small, domain
+    character(len=256) :: outfldr, file2D, file2D_small, domain
     character(len=256) :: file_isos, file_bsl
     character(len=512) :: path_par
     character(len=512) :: path_lgm
@@ -46,17 +46,6 @@ program yelmox
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file 
 
-    type reg_def_class 
-        character(len=56)  :: name 
-        character(len=512) :: fnm
-        logical, allocatable :: mask(:,:) 
-        logical :: write 
-    end type
-    
-    type(reg_def_class) :: reg1 
-    type(reg_def_class) :: reg2 
-    type(reg_def_class) :: reg3 
-    
     character(len=512)    :: regions_mask_fnm
     real(wp), allocatable :: regions_mask(:,:) 
 
@@ -146,7 +135,6 @@ program yelmox
     outfldr = "./"
     
     ! Define input and output locations
-    file1D              = trim(outfldr)//"yelmo1D.nc"
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
 
@@ -210,31 +198,19 @@ program yelmox
             call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
 
             ! APIS region (region=3.0 in regions map)
-            reg1%write = .TRUE. 
-            reg1%name  = "APIS" 
-            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
-
-            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg1%mask = .FALSE. 
-            where(abs(regions_mask - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
+            call yelmo_region_init(yelmo1%regs(1),"APIS",write_to_file=.TRUE.,outfldr=outfldr)
+            yelmo1%regs(1)%mask = .FALSE. 
+            where(abs(regions_mask - 3.0) .lt. 1e-3) yelmo1%regs(1)%mask = .TRUE.
 
             ! WAIS region (region=4.0 in regions map)
-            reg2%write = .TRUE. 
-            reg2%name  = "WAIS" 
-            reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
-
-            allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg2%mask = .FALSE. 
-            where(abs(regions_mask - 4.0) .lt. 1e-3) reg2%mask = .TRUE.
+            call yelmo_region_init(yelmo1%regs(2),"WAIS",write_to_file=.TRUE.,outfldr=outfldr)
+            yelmo1%regs(2)%mask = .FALSE. 
+            where(abs(regions_mask - 4.0) .lt. 1e-3) yelmo1%regs(2)%mask = .TRUE.
 
             ! EAIS region (region=5.0 in regions map)
-            reg3%write = .TRUE. 
-            reg3%name  = "EAIS" 
-            reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
-
-            allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg3%mask = .FALSE. 
-            where(abs(regions_mask - 5.0) .lt. 1e-3) reg3%mask = .TRUE.
+            call yelmo_region_init(yelmo1%regs(3),"EAIS",write_to_file=.TRUE.,outfldr=outfldr)
+            yelmo1%regs(3)%mask = .FALSE. 
+            where(abs(regions_mask - 5.0) .lt. 1e-3) yelmo1%regs(3)%mask = .TRUE.
 
         case("Laurentide")
 
@@ -269,16 +245,9 @@ program yelmox
             yelmo1%bnd%ice_allowed(:,yelmo1%grd%ny) = .FALSE. 
             
             ! Hudson region (region=1.12 in regions map)
-            reg1%write = .TRUE. 
-            reg1%name  = "Hudson" 
-            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
-
-            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg1%mask = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) reg1%mask = .TRUE.
-
-            reg2%write = .FALSE. 
-            reg3%write = .FALSE. 
+            call yelmo_region_init(yelmo1%regs(1),"Hudson",write_to_file=.TRUE.)
+            yelmo1%regs(1)%mask = .FALSE. 
+            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) yelmo1%regs(1)%mask = .TRUE.
 
         case("Greenland")
 
@@ -322,13 +291,6 @@ end if
                 yelmo1%dyn%now%cb_ref = yelmo1%dyn%par%till_cf_ref 
 
             end if 
-
-            
-        case DEFAULT 
-
-            reg1%write = .FALSE. 
-            reg2%write = .FALSE. 
-            reg3%write = .FALSE. 
 
     end select
 
@@ -544,20 +506,9 @@ end if
     ! ===== Initialize output files ===== 
     
     call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years") 
-    call yelmo_write_reg_init(yelmo1,file1D,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
     call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years") 
     
-    if (reg1%write) then 
-        call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=ts%time,units="years",mask=reg1%mask)
-    end if 
-
-    if (reg2%write) then
-        call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=ts%time,units="years",mask=reg2%mask)
-    end if
-
-    if (reg3%write) then
-        call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=ts%time,units="years",mask=reg3%mask)
-    end if
+    call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)
@@ -732,20 +683,7 @@ end if
         end if
 
         if (timeout_check(tm_1D,ts%time)) then 
-            call yelmo_write_reg_step(yelmo1,file1D,time=ts%time)
-
-            if (reg1%write) then 
-                call yelmo_write_reg_step(yelmo1,reg1%fnm,time=ts%time,mask=reg1%mask)
-            end if 
-
-            if (reg2%write) then
-                call yelmo_write_reg_step(yelmo1,reg2%fnm,time=ts%time,mask=reg2%mask)
-            end if
-
-            if (reg3%write) then
-                call yelmo_write_reg_step(yelmo1,reg3%fnm,time=ts%time,mask=reg3%mask)
-            end if
-
+            call yelmo_regions_write(yelmo1,ts%time)
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
