@@ -687,7 +687,7 @@ end if
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-            call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
+            call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
@@ -707,7 +707,7 @@ end if
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,ts%time]*1e-3,label="timeloop") 
     
     ! Write the restart snapshot for the end of the simulation
-    call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
+    call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=ts%time)
@@ -1037,15 +1037,16 @@ contains
 
     end subroutine yelmox_write_step
 
-    subroutine yelmox_restart_write(bsl,isos,ylmo,time,fldr)
+    subroutine yelmox_restart_write(bsl,isos,ylmo,mshlf,time,fldr)
 
         implicit none
 
-        type(bsl_class),    intent(IN) :: bsl
-        type(isos_class),   intent(IN) :: isos
-        type(yelmo_class),  intent(IN) :: ylmo
-        real(wp),           intent(IN) :: time 
-        character(len=*),   intent(IN), optional :: fldr
+        type(bsl_class),      intent(IN) :: bsl
+        type(isos_class),     intent(IN) :: isos
+        type(yelmo_class),    intent(IN) :: ylmo
+        type(marshelf_class), intent(IN) :: mshlf
+        real(wp),             intent(IN) :: time 
+        character(len=*),     intent(IN), optional :: fldr
         
         ! Local variables
         real(wp) :: time_kyr
@@ -1055,7 +1056,8 @@ contains
         character(len=56), parameter :: file_bsl   = "bsl_restart.nc"
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
-        
+        character(len=56), parameter :: file_mshlf = "marine_shelf.nc"
+
         if (present(fldr)) then
             outfldr = trim(fldr)
         else
@@ -1072,6 +1074,7 @@ contains
         call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+        call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
 
         return
 

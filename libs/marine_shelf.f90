@@ -50,6 +50,7 @@ module marine_shelf
         integer             :: tf_method 
         character(len=56)   :: interp_method 
         character(len=56)   :: interp_depth 
+        character(len=512)  :: restart
         logical             :: find_ocean 
         logical             :: use_obs
         character(len=512)  :: obs_path
@@ -81,6 +82,13 @@ module marine_shelf
 
     end type 
 
+    type marshelf_grid_class
+        real(wp), allocatable :: xc(:)
+        real(wp), allocatable :: yc(:)
+        integer :: nx 
+        integer :: ny
+    end type
+
     type marshelf_state_class 
         real(wp), allocatable :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
         real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
@@ -108,6 +116,7 @@ module marine_shelf
 
     type marshelf_class
         type(marshelf_param_class) :: par 
+        type(marshelf_grid_class)  :: grd
         type(marshelf_state_class) :: now
         type(pico_class)           :: pico  
     end type
@@ -123,6 +132,8 @@ module marine_shelf
     public :: marshelf_update
     public :: marshelf_init
     public :: marshelf_end 
+    public :: marshelf_restart_write
+    public :: marshelf_restart_read
 
 contains 
     
@@ -539,7 +550,7 @@ contains
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins,xc,yc,dx)
 
         implicit none 
 
@@ -548,20 +559,50 @@ contains
         character(len=*), intent(IN)      :: group
         integer, intent(IN)               :: nx, ny 
         character(len=*), intent(IN)      :: domain, grid_name
-        real(wp), intent(IN)            :: regions(:,:)
-        real(wp), intent(IN)            :: basins(:,:)
-        
+        real(wp), intent(IN)              :: regions(:,:)
+        real(wp), intent(IN)              :: basins(:,:)
+        real(wp), intent(IN), optional    :: xc(:)
+        real(wp), intent(IN), optional    :: yc(:)
+        real(wp), intent(IN), optional    :: dx 
+
         ! Local variables
         integer  :: j 
         integer  :: num
         character(len=56) :: group_now
         real(wp) :: basin_number_now
         real(wp) :: tf_corr_now 
+        real(wp) :: grd_dx 
 
         ! Load parameters
         call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
 
-        ! Allocate the object 
+        ! Set grid
+        mshlf%grd%nx = nx
+        mshlf%grd%ny = ny
+        if (allocated(mshlf%grd%xc)) deallocate(mshlf%grd%xc)
+        if (allocated(mshlf%grd%yc)) deallocate(mshlf%grd%yc)
+        allocate(mshlf%grd%xc(nx))
+        allocate(mshlf%grd%yc(ny))
+        
+        if (present(dx)) then
+            grd_dx = dx
+        else
+            grd_dx = 1.0
+        end if
+        
+        if (present(xc)) then
+            mshlf%grd%xc = xc
+        else
+            call axis_init(mshlf%grd%xc,x0=0.0_wp,dx=grd_dx)
+        end if
+
+        if (present(yc)) then
+            mshlf%grd%yc = yc
+        else
+            call axis_init(mshlf%grd%yc,x0=0.0_wp,dx=grd_dx)
+        end if
+        
+        ! Allocate the object
         call marshelf_allocate(mshlf%now,nx,ny)
         
         ! Decide whether to load observations or use psuedo-observations
@@ -745,7 +786,24 @@ contains
         ! Initialize variables 
         mshlf%now%bmb_shlf      = 0.0
         mshlf%now%tf_shlf       = 0.0
-        mshlf%now%tf_basin      = 0.0 
+        mshlf%now%tf_basin      = 0.0
+
+
+        ! ============================================================
+        ! Finally, load all fields from a restart file?
+
+        if (trim(mshlf%par%restart) .ne. "none" .and. &
+            trim(mshlf%par%restart) .ne. ""     .and. &
+            trim(mshlf%par%restart) .ne. "None") then 
+            ! Load fields from restart file. This is mainly important for reloading
+            ! an already defined (optimized) tf_corr field from a previous run.
+
+            call marshelf_restart_read(mshlf,mshlf%par%restart)
+            
+        end if
+
+        ! ============================================================
+
 
         return 
 
@@ -1724,6 +1782,193 @@ contains
 
     end subroutine marshelf_deallocate
 
+    subroutine marshelf_restart_write(mshlf,filename,time,init,irange,jrange)
+
+        implicit none
+
+        type(marshelf_class), intent(IN) :: mshlf
+        character(len=*),     intent(IN) :: filename
+        real(wp),             intent(IN) :: time 
+        logical,              intent(IN), optional :: init 
+        integer,              intent(IN), optional :: irange(2)
+        integer,              intent(IN), optional :: jrange(2)
+        
+        ! Local variables
+        integer  :: ncid, n, q, nt, nx, ny
+        integer :: i1, i2, j1, j2 
+        logical  :: initialize_file  
+        
+        initialize_file = .TRUE. 
+        if (present(init)) initialize_file = init
+
+        nx = size(mshlf%now%bmb_shlf,1)
+        ny = size(mshlf%now%bmb_shlf,2)
+
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+        
+        ! == Initialize netcdf file ==============================================
+
+        if (initialize_file) then
+            ! Initialize netcdf file and dimensions
+            ! Create the empty netcdf file
+            call nc_create(filename)
+
+            ! ! Write some general attributes that can be useful (e.g., for interpolation etc)
+            ! call nc_write_attr(filename, "domain",    trim(domain))
+            ! call nc_write_attr(filename, "grid_name", trim(grid_name))
+
+            ! Add grid axis variables to netcdf file
+            call nc_write_dim(filename,"xc",x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
+            call nc_write_dim(filename,"yc",x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
+            call nc_write_dim(filename,"month", x=1,dx=1,nx=12,       units="month")            
+            call nc_write_dim(filename,"time",  x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
+
+        end if 
+        
+        ! == Begin writing data ==============================================
+        
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+        
+        if (initialize_file) then 
+            ! Current time index to write will be the first and only one 
+            n = 1
+
+        else 
+            ! Determine current writing time step 
+            n = nc_time_index(filename,"time",time,ncid)
+
+            ! Update the time step
+            call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        end if 
+
+        ! Write variables
+        
+        call nc_write(filename,"bmb_shlf",mshlf%now%bmb_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"bmb_ref",mshlf%now%bmb_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"bmb_corr",mshlf%now%bmb_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+          
+        return
+
+    end subroutine marshelf_restart_write
+
+    subroutine marshelf_restart_read(mshlf,filename)
+
+        implicit none
+
+        type(marshelf_class), intent(IN) :: mshlf
+        character(len=*),     intent(IN) :: filename
+
+        ! Local variables
+        integer :: ncid, n, nx, ny
+
+        nx = mshlf%grd%nx
+        ny = mshlf%grd%ny
+
+        ! Assume that first time dimension value is to be read in
+        n = 1 
+
+        ! Open the file for reading
+
+        call nc_open(filename,ncid,writable=.FALSE.)
+
+        call nc_read(filename,"bmb_shlf",mshlf%now%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"bmb_ref",mshlf%now%bmb_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"bmb_corr",mshlf%now%bmb_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"T_shlf",mshlf%now%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"dT_shlf",mshlf%now%dT_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"S_shlf",mshlf%now%S_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"S_shlf_basin",mshlf%now%S_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"tf_shlf",mshlf%now%tf_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"tf_basin",mshlf%now%tf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"tf_corr",mshlf%now%tf_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"z_base",mshlf%now%z_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"slope_base",mshlf%now%slope_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        call nc_read(filename,"mask_ocn",mshlf%now%mask_ocn,ncid=ncid,start=[1,1,n],count=[nx,ny,1])
+        
+        ! Close the netcdf file
+        call nc_close(ncid)
+        
+        return
+
+    end subroutine marshelf_restart_read
+
+    subroutine get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+        ! Get indices for a region based on bounds. 
+        ! If no bounds provided, use whole domain.
+
+        implicit none
+
+        integer, intent(OUT) :: i1
+        integer, intent(OUT) :: i2
+        integer, intent(OUT) :: j1
+        integer, intent(OUT) :: j2
+        integer, intent(IN)  :: nx
+        integer, intent(IN)  :: ny
+        integer, intent(IN), optional :: irange(2)
+        integer, intent(IN), optional :: jrange(2)
+
+        
+        if (present(irange)) then
+            i1 = irange(1)
+            i2 = irange(2)
+        else
+            i1 = 1
+            i2 = nx
+        end if
+
+        if (present(jrange)) then
+            j1 = jrange(1)
+            j2 = jrange(2)
+        else
+            j1 = 1
+            j2 = ny
+        end if
+
+        return
+
+    end subroutine get_region_indices
+
     subroutine parse_path(path,domain,grid_name)
 
         implicit none 
@@ -1774,6 +2019,35 @@ contains
 
     end function interp_linear
     
+    subroutine axis_init(x,x0,dx)
+
+        implicit none 
+
+        real(wp) :: x(:)
+        real(wp), optional :: x0, dx
+        real(wp) :: dx_tmp 
+        integer :: i, nx  
+
+        nx = size(x) 
+
+        do i = 1, nx 
+            x(i) = real(i-1,wp)
+        end do 
+
+        dx_tmp = 1.d0 
+        if (present(dx)) dx_tmp = dx 
+        
+        x = x*dx_tmp  
+
+        if (present(x0)) then 
+            x = x + x0 
+        else
+            x = x + (-(nx-1.0)/2.0*dx_tmp)
+        end if 
+
+        return 
+    end subroutine axis_init
+
 end module marine_shelf
 
 

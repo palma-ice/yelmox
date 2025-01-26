@@ -403,6 +403,7 @@
     tf_method       = 2             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
+    restart         = "none"        ! Load fields from a restart file?
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     
     corr_method     = "none"        ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
