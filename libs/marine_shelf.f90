@@ -8,6 +8,8 @@ module marine_shelf
 
     use nml 
     use ncio 
+    ! use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+    !                                         gen_map_filename, nc_read_interp
 
     use pico 
 
@@ -78,7 +80,11 @@ module marine_shelf
         real(wp)            :: c_grz, kappa_grz, f_grz_shlf, grz_length
         
         character(len=512) :: domain   
+        character(len=512) :: grid_name
         real(wp) :: rho_ice, rho_sw
+
+        ! Internal parameter
+        logical :: use_restart
 
     end type 
 
@@ -558,7 +564,8 @@ contains
         character(len=*), intent(IN)      :: filename
         character(len=*), intent(IN)      :: group
         integer, intent(IN)               :: nx, ny 
-        character(len=*), intent(IN)      :: domain, grid_name
+        character(len=*), intent(IN)      :: domain
+        character(len=*), intent(IN)      :: grid_name
         real(wp), intent(IN)              :: regions(:,:)
         real(wp), intent(IN)              :: basins(:,:)
         real(wp), intent(IN), optional    :: xc(:)
@@ -800,6 +807,10 @@ contains
 
             call marshelf_restart_read(mshlf,mshlf%par%restart)
             
+            mshlf%par%use_restart = .TRUE.
+        
+        else
+            mshlf%par%use_restart = .FALSE.
         end if
 
         ! ============================================================
@@ -889,6 +900,7 @@ contains
         call nml_read(filename,group,"tf_method",      par%tf_method,      init=init_pars)
         call nml_read(filename,group,"interp_depth",   par%interp_depth,   init=init_pars)
         call nml_read(filename,group,"interp_method",  par%interp_method,  init=init_pars)
+        call nml_read(filename,group,"restart",        par%restart,        init=init_pars)
         call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)
         call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
         call nml_read(filename,group,"basin_number",   par%basin_number,   init=init_pars)
@@ -931,7 +943,9 @@ contains
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
         call parse_path(par%tf_path,domain,grid_name)
-        par%domain = trim(domain)
+        
+        par%domain    = trim(domain)
+        par%grid_name = trim(grid_name)
 
         ! Consistency checks 
         if (par%f_grz_shlf .eq. 0.0) then 
@@ -1797,12 +1811,21 @@ contains
         integer  :: ncid, n, q, nt, nx, ny
         integer :: i1, i2, j1, j2 
         logical  :: initialize_file  
-        
+        character(len=16) :: xnm 
+        character(len=16) :: ynm 
+        character(len=16) :: grid_mapping_name
+
+        xnm = "xc"
+        ynm = "yc" 
+        grid_mapping_name = "crs" 
+
         initialize_file = .TRUE. 
         if (present(init)) initialize_file = init
 
         nx = size(mshlf%now%bmb_shlf,1)
         ny = size(mshlf%now%bmb_shlf,2)
+        
+        grid_mapping_name = "crs" 
 
         ! Get indices for current domain of interest
         call get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
@@ -1814,13 +1837,13 @@ contains
             ! Create the empty netcdf file
             call nc_create(filename)
 
-            ! ! Write some general attributes that can be useful (e.g., for interpolation etc)
-            ! call nc_write_attr(filename, "domain",    trim(domain))
-            ! call nc_write_attr(filename, "grid_name", trim(grid_name))
+            ! Write some general attributes that can be useful (e.g., for interpolation etc)
+            call nc_write_attr(filename, "domain",    trim(mshlf%par%domain))
+            call nc_write_attr(filename, "grid_name", trim(mshlf%par%grid_name))
 
             ! Add grid axis variables to netcdf file
-            call nc_write_dim(filename,"xc",x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
-            call nc_write_dim(filename,"yc",x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
+            call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
+            call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
             call nc_write_dim(filename,"month", x=1,dx=1,nx=12,       units="month")            
             call nc_write_dim(filename,"time",  x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
 
@@ -1847,39 +1870,39 @@ contains
         ! Write variables
         
         call nc_write(filename,"bmb_shlf",mshlf%now%bmb_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"bmb_ref",mshlf%now%bmb_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"bmb_corr",mshlf%now%bmb_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
-                                                                    dim1="xc",dim2="yc",dim3="time",ncid=ncid)
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
 
         ! Close the netcdf file
         call nc_close(ncid)
@@ -1897,6 +1920,41 @@ contains
 
         ! Local variables
         integer :: ncid, n, nx, ny
+        character(len=56) :: restart_domain 
+        character(len=56) :: restart_grid_name 
+        !type(map_scrip_class) :: mps
+        logical :: restart_interpolated
+
+! === Interpolation things ===
+
+        ! Load restart file grid attributes 
+        if (nc_exists_attr(filename,"domain")) then 
+            call nc_read_attr(filename,"domain",    restart_domain)
+        else 
+            restart_domain = trim(mshlf%par%domain)
+        end if 
+
+        if (nc_exists_attr(filename,"grid_name")) then 
+            call nc_read_attr(filename,"grid_name", restart_grid_name)
+        else 
+            restart_grid_name = trim(mshlf%par%grid_name)
+        end if 
+
+        if (trim(restart_grid_name) .ne. trim(mshlf%par%grid_name)) then 
+            restart_interpolated = .TRUE. 
+        else 
+            restart_interpolated = .FALSE. 
+        end if 
+
+        ! if (restart_interpolated) then
+        !     ! Load the scrip map from file (should already have been generated via cdo externally)
+        !     call map_scrip_init(mps,restart_grid_name,mshlf%par%grid_name, &
+        !                             method="con",fldr="maps",load=.TRUE.)
+        ! end if 
+
+
+! ==========
+
 
         nx = mshlf%grd%nx
         ny = mshlf%grd%ny
