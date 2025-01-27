@@ -4,11 +4,15 @@ INC_NC  = -I${NETCDFFI_ROOT}/include
 LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
 # the -rpath options ensure that the same shared libraries are found at runtime
 
-FFTWROOT = libs/fesm-utils/fftw-serial
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+FFTWROOT = fesm-utils/fftw-serial
 INC_FFTW = -I${FFTWROOT}/include
 LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 
 
-LISROOT = libs/fesm-utils/lis-serial
+LISROOT = fesm-utils/lis-serial
 INC_LIS = -I${LISROOT}/include 
 LIB_LIS = -L${LISROOT}/lib/ -llis
 
@@ -41,7 +45,7 @@ ifeq ($(openmp), 1)
 
 endif 
 
-LFLAGS  = $(LIB_YELMO) $(LIB_NC) $(LIB_LIS) $(LIB_ISOSTASY) $(LIB_FFTW) -Wl,-zmuldefs
+LFLAGS  = $(LIB_NC) $(LIB_FESMUTILS) $(LIB_LIS) $(LIB_FFTW) $(LIB_ISOSTASY) $(LIB_YELMO) -Wl,-zmuldefs
 
 DFLAGS_NODEBUG = -O2 -fp-model precise
 DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise

@@ -41,84 +41,86 @@ include config/Makefile_yelmox.mk
 ##
 ###############################################
 
-# Compile the static library libyelmo,
-# using Makefile located in $(YELMOROOT) directory 
-yelmo-static: 
-		$(MAKE) -C $(YELMOROOT) yelmo-static openmp=$(openmp)
-		cp $(YELMOROOT)/git_yelmo.txt ./
+# Compile static library in its own directory
+fesmutils-static: 
+	$(MAKE) -C $(FESMUTILSROOT) fesmutils-static openmp=$(openmp)
 
-# Compile the static library libisostasy,
-# using Makefile located in $(ISOSTASYROOT) directory 
+# Compile static library in its own directory
+yelmo-static: 
+	$(MAKE) -C $(YELMOROOT) yelmo-static openmp=$(openmp)
+	cp $(YELMOROOT)/git_yelmo.txt ./
+
+# Compile static library in its own directory
 isostasy-static: 
-		$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
+	$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
 
 # Compile the static library libyelmo,
 # using Makefile located in $(YELMOROOT) directory 
 rembo-static: 
-		$(MAKE) -C $(REMBOROOT) rembo-static 
+	$(MAKE) -C $(REMBOROOT) rembo-static 
 
 yelmox : yelmo-static isostasy-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox.x yelmox.f90 \
-			$(yelmox_libs) $(LFLAGS)
-		@echo " "
-		@echo "    yelmox.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox.x is ready."
+	@echo " "
 
 yelmox_hyst : yelmo-static isostasy-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
-			$(yelmox_libs) $(LFLAGS)
-		@echo " "
-		@echo "    yelmox_hyst.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_hyst.x is ready."
+	@echo " "
 
 yelmox_iso : yelmo-static isostasy-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
-			$(yelmox_libs) $(LFLAGS)
-		@echo " "
-		@echo "    yelmox_iso.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_iso.x is ready."
+	@echo " "
 
 yelmox_ismip6 : yelmo-static isostasy-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
-			$(yelmox_libs) $(LFLAGS)
-		@echo " "
-		@echo "    yelmox_ismip6.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_ismip6.x is ready."
+	@echo " "
 
 yelmox_rtip : yelmo-static isostasy-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_rtip.x yelmox_rtip.f90 \
-			$(yelmox_libs) $(LFLAGS)
-		@echo " "
-		@echo "    yelmox_rtip.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip.x yelmox_rtip.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_rtip.x is ready."
+	@echo " "
 
 yelmox_nahosmip : yelmo-static isostasy-static $(yelmox_libs)
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_nahosmip.x yelmox_nahosmip.f90 \
-			$(yelmox_libs) $(LFLAGS)
-		@echo " "
-		@echo "    yelmox_nahosmip.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_nahosmip.x yelmox_nahosmip.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_nahosmip.x is ready."
+	@echo " "
 
 yelmox_rembo: yelmo-static rembo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_LIS) $(INC_YELMO) $(INC_REMBO) $(INC_ISOSTASY) -o libyelmox/bin/yelmox_rembo.x \
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -o libyelmox/bin/yelmox_rembo.x \
 			yelmox_rembo.f90 $(LIB_REMBO) $(yelmox_libs) $(LFLAGS)
 	@echo " "
 	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
 	@echo " "
 
 check_sim : $(objdir)/ncio.o
-		$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
-			$(objdir)/ncio.o $(LFLAGS)
-		@echo " "
-		@echo "    check_sim.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
+		$(objdir)/ncio.o $(LFLAGS)
+	@echo " "
+	@echo "    check_sim.x is ready."
+	@echo " "
 
 test_timestepping : yelmo-static $(objdir)/nml.o $(objdir)/ncio.o $(objdir)/timestepping.o
-		$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -o ./libyelmox/bin/test_timestepping.x tests/test_timestepping.f90 \
-			$(objdir)/nml.o $(objdir)/ncio.o $(objdir)/timestepping.o $(LFLAGS)
-		@echo " "
-		@echo "    ./libyelmox/bin/test_timestepping.x is ready."
-		@echo " "
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -o ./libyelmox/bin/test_timestepping.x tests/test_timestepping.f90 \
+		$(objdir)/nml.o $(objdir)/ncio.o $(objdir)/timestepping.o $(LFLAGS)
+	@echo " "
+	@echo "    ./libyelmox/bin/test_timestepping.x is ready."
+	@echo " "
 
 
 .PHONY : usage
