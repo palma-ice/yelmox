@@ -57,7 +57,7 @@ program yelmox_rtip
     type(timer_class)  :: tmr
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file
-    
+
     character(len=512)    :: regions_mask_fnm
     real(wp), allocatable :: regions_mask(:,:)
 
@@ -1278,7 +1278,7 @@ contains
 
     subroutine load_tf_corr_from_restart(tf_corr,file_restart,domain,grid_name)
 
-        use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+        use mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
                                             gen_map_filename, nc_read_interp
 
         implicit none
