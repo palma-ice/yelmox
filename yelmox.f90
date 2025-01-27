@@ -10,7 +10,7 @@ program yelmox
     use yelmo 
     use yelmo_tools, only : smooth_gauss_2D
     use ice_optimization
-
+    
     ! External libraries
     use fastisostasy    ! also reexports barysealevel
     use snapclim

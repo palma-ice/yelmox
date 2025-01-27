@@ -286,13 +286,7 @@ program yelmox_ismip6
     ! Make sure that tf is prescribed externally
     mshlf1%par%tf_method = 0  
     
-    if (yelmo1%par%use_restart) then
-        ! Load tf_corr field from file 
-
-        call load_tf_corr_from_restart(mshlf1%now%tf_corr,yelmo1%par%restart, &
-                                                yelmo1%par%domain,yelmo1%par%grid_name)
-    
-    else 
+    if (.not. mshlf1%par%use_restart) then
         ! Initialize tf_corr to be equal to tf_corr_basin, and
         ! set tf_corr_basin to zero (all corrections will be contained in one field)
 
@@ -556,7 +550,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -677,7 +671,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time)
 
     case("abumip")
         ! Here it is assumed that the model has gone through spinup 
@@ -847,7 +841,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time)
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup 
@@ -1014,7 +1008,7 @@ end if
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time)
 
     end select
 
@@ -2516,16 +2510,17 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine write_1D_ismip6
 
-    subroutine yelmox_restart_write(bsl,isos,ylmo,time,fldr)
+    subroutine yelmox_restart_write(bsl,isos,ylmo,mshlf,time,fldr)
 
         implicit none
 
-        type(bsl_class),    intent(IN) :: bsl
-        type(isos_class),   intent(IN) :: isos
-        type(yelmo_class),  intent(IN) :: ylmo
-        real(wp),           intent(IN) :: time 
-        character(len=*),   intent(IN), optional :: fldr
-
+        type(bsl_class),      intent(IN) :: bsl
+        type(isos_class),     intent(IN) :: isos
+        type(yelmo_class),    intent(IN) :: ylmo
+        type(marshelf_class), intent(IN) :: mshlf
+        real(wp),             intent(IN) :: time 
+        character(len=*),     intent(IN), optional :: fldr
+        
         ! Local variables
         real(wp) :: time_kyr
         character(len=32)   :: time_str
@@ -2534,7 +2529,8 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         character(len=56), parameter :: file_bsl   = "bsl_restart.nc"
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
-        
+        character(len=56), parameter :: file_mshlf = "marine_shelf.nc"
+
         if (present(fldr)) then
             outfldr = trim(fldr)
         else
@@ -2551,6 +2547,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+        call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
 
         return
 

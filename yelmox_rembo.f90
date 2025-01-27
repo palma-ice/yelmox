@@ -337,7 +337,7 @@ program yelmox
     call timer_step(tmrs,comp=-1)
     
     ! Write model state out to initial set of restart files
-    call yelmox_restart_write(isos1,yelmo1,rembo_ann,ts%time)
+    call yelmox_restart_write(isos1,yelmo1,mshlf1,rembo_ann,ts%time)
 
     ! == Advance timesteps ===
 
@@ -510,7 +510,7 @@ program yelmox
         end if 
 
         if (write_restart .and. mod(time,dt_restart)==0) then 
-            call yelmox_restart_write(isos1,yelmo1,rembo_ann,ts%time)
+            call yelmox_restart_write(isos1,yelmo1,mshlf1,rembo_ann,ts%time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
@@ -534,7 +534,7 @@ program yelmox
     
     ! Write the restart files for the end of the simulation
     if (write_restart) then 
-        call yelmox_restart_write(isos1,yelmo1,rembo_ann,ts%time)
+        call yelmox_restart_write(isos1,yelmo1,mshlf1,rembo_ann,ts%time)
     end if
 
     ! Finalize program
@@ -1045,12 +1045,13 @@ contains
 
     end subroutine yelmox_write_init
 
-    subroutine yelmox_restart_write(isos,ylmo,rembo_ann,time,fldr)
+    subroutine yelmox_restart_write(isos,ylmo,mshlf,rembo_ann,time,fldr)
 
         implicit none
 
         type(isos_class),   intent(IN) :: isos
         type(yelmo_class),  intent(IN) :: ylmo
+        type(marshelf_class), intent(IN) :: mshlf
         type(rembo_class),  intent(IN) :: rembo_ann
         real(wp),           intent(IN) :: time 
         character(len=*),   intent(IN), optional :: fldr
@@ -1062,6 +1063,7 @@ contains
 
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
+        character(len=56), parameter :: file_mshlf = "marine_shelf.nc"
         character(len=56), parameter :: file_rembo = "rembo_restart.nc"
         
         if (present(fldr)) then
@@ -1079,6 +1081,8 @@ contains
         
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+        call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
+        
         call rembo_restart_write(trim(outfldr)//"/"//file_rembo,real(time,dp),real(ylmo%tpo%now%z_srf,dp), &
                     real(ylmo%tpo%now%H_ice,dp),real(ylmo%bnd%z_sl,dp))
         
