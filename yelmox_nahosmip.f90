@@ -517,7 +517,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time_bp)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -614,7 +614,7 @@ program yelmox_ismip6
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time)
     end select
 
     ! Finalize program
