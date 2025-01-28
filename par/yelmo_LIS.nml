@@ -75,7 +75,7 @@
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
+    calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
@@ -403,8 +403,8 @@
     tf_method       = 2             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
-    restart         = "none"        ! Load fields from a restart file?
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
+    restart         = "none"        ! Load fields from a restart file?
     
     corr_method     = "none"        ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
     basin_number    = 1             ! 1 2 3
