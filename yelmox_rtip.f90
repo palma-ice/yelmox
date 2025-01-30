@@ -7,7 +7,8 @@ program yelmox_rtip
     use timeout
     use yelmo
     use ice_optimization
-
+    use ice_sub_regions
+    
     ! External libraries
     use geothermal
     use ismip6
@@ -58,8 +59,7 @@ program yelmox_rtip
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file
 
-    character(len=512)    :: regions_mask_fnm
-    real(wp), allocatable :: regions_mask(:,:)
+    logical, allocatable :: tmp_mask(:,:)
 
     type ctrl_params
         character(len=56) :: run_step
@@ -256,32 +256,26 @@ program yelmox_rtip
 
     ! Define specific regions of interest =====================
 
+    allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+    
     select case(trim(domain))
 
         case("Antarctica")
 
-            ! Define base regions for whole domain first
-            regions_mask_fnm = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
-                                "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
-            allocate(regions_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            ! Initialize regions
+            call yelmo_regions_init(yelmo1,n=3)
 
-            ! Load mask from file
-            call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
+            ! APIS
+            call get_ice_sub_region(tmp_mask,"APIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(1),"APIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! APIS region (region=3.0 in regions map)
-            call yelmo_region_init(yelmo1%regs(1),"APIS",write_to_file=.TRUE.,outfldr=outfldr)
-            yelmo1%regs(1)%mask = .FALSE. 
-            where(abs(regions_mask - 3.0) .lt. 1e-3) yelmo1%regs(1)%mask = .TRUE.
+            ! WAIS
+            call get_ice_sub_region(tmp_mask,"WAIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(2),"WAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! WAIS region (region=1.0 in regions map)
-            call yelmo_region_init(yelmo1%regs(2),"WAIS",write_to_file=.TRUE.,outfldr=outfldr)
-            yelmo1%regs(2)%mask = .FALSE. 
-            where(abs(regions_mask - 1.0) .lt. 1e-3) yelmo1%regs(2)%mask = .TRUE.
-
-            ! EAIS region (region=2.0 in regions map)
-            call yelmo_region_init(yelmo1%regs(3),"EAIS",write_to_file=.TRUE.,outfldr=outfldr)
-            yelmo1%regs(3)%mask = .FALSE. 
-            where(abs(regions_mask - 2.0) .lt. 1e-3) yelmo1%regs(3)%mask = .TRUE.
+            ! EAIS
+            call get_ice_sub_region(tmp_mask,"EAIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
             ! Set WAIS indices too
             i1wais = 25
