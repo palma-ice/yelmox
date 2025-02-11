@@ -4,6 +4,7 @@ module smb_itm
     ! the melt_budget() subroutine, which takes arrays from the main
     ! program as input and outputs arrays of the calculated variables.
 
+    use nml
     use smbpal_precision 
 
     implicit none
@@ -31,80 +32,106 @@ module smb_itm
 
 contains
 
-    subroutine itm_par_load(par,filename)
+    subroutine itm_par_load(par,filename,domain,grid_name,init,group)
 
         type(itm_par_class)     :: par
         character(len=*), intent(IN) :: filename 
+        character(len=*), intent(IN) :: domain, grid_name 
+        logical, optional :: init 
+        logical :: init_pars 
+        character(len=*),      intent(IN)   :: group
 
-        ! Local variables 
-        integer :: file_unit 
+        ! ! Local variables 
+        ! integer :: file_unit 
 
-        ! Local parameter definitions (identical to object)
-        real(prec) :: trans_a, trans_b, trans_c 
-        real(prec) :: itm_c, itm_t, itm_b, itm_lat0 
-        real(prec) :: H_snow_max
-        real(prec) :: Pmaxfrac
-        real(prec) :: H_snow_crit_desert
-        real(prec) :: H_snow_crit_forest
-        real(prec) :: melt_crit 
-        real(prec) :: alb_ocean, alb_land, alb_forest, alb_ice 
-        real(prec) :: alb_snow_dry, alb_snow_wet 
+        ! ! Local parameter definitions (identical to object)
+        ! real(prec) :: trans_a, trans_b, trans_c 
+        ! real(prec) :: itm_c, itm_t, itm_b, itm_lat0 
+        ! real(prec) :: H_snow_max
+        ! real(prec) :: Pmaxfrac
+        ! real(prec) :: H_snow_crit_desert
+        ! real(prec) :: H_snow_crit_forest
+        ! real(prec) :: melt_crit 
+        ! real(prec) :: alb_ocean, alb_land, alb_forest, alb_ice 
+        ! real(prec) :: alb_snow_dry, alb_snow_wet 
 
-        namelist /itm/ trans_a, trans_b, trans_c, itm_c, itm_t, itm_b, itm_lat0, &
-        H_snow_max, Pmaxfrac, &
-        H_snow_crit_desert, H_snow_crit_forest, melt_crit, alb_ocean, alb_land, &
-        alb_forest, alb_ice, alb_snow_dry, alb_snow_wet 
+        init_pars = .FALSE.
+        if (present(init)) init_pars = .TRUE.
+
+        call nml_read(filename,group,"trans_a",par%trans_a,init=init_pars)
+        call nml_read(filename,group,"trans_b",par%trans_b,init=init_pars)
+        call nml_read(filename,group,"trans_c",par%trans_c,init=init_pars)
+        call nml_read(filename,group,"itm_c",par%itm_c,init=init_pars)
+        call nml_read(filename,group,"itm_t",par%itm_t,init=init_pars)
+        call nml_read(filename,group,"itm_b",par%itm_b,init=init_pars)
+        call nml_read(filename,group,"itm_lat0",par%itm_lat0,init=init_pars)
+        call nml_read(filename,group,"H_snow_max",par%H_snow_max,init=init_pars)
+        call nml_read(filename,group,"Pmaxfrac",par%Pmaxfrac,init=init_pars)
+        call nml_read(filename,group,"H_snow_crit_desert",par%H_snow_crit_desert,init=init_pars)
+        call nml_read(filename,group,"H_snow_crit_forest",par%H_snow_crit_forest,init=init_pars)
+        call nml_read(filename,group,"melt_crit",par%melt_crit,init=init_pars)
+        call nml_read(filename,group,"alb_ocean",par%alb_ocean,init=init_pars)
+        call nml_read(filename,group,"alb_land",par%alb_land,init=init_pars)
+        call nml_read(filename,group,"alb_forest",par%alb_forest,init=init_pars)
+        call nml_read(filename,group,"alb_ice",par%alb_ice,init=init_pars)
+        call nml_read(filename,group,"alb_snow_dry",par%alb_snow_dry,init=init_pars)
+        call nml_read(filename,group,"alb_snow_wet",par%alb_snow_wet,init=init_pars)
+
+        ! namelist /itm/ trans_a, trans_b, trans_c, itm_c, itm_t, itm_b, itm_lat0, &
+        ! H_snow_max, Pmaxfrac, &
+        ! H_snow_crit_desert, H_snow_crit_forest, melt_crit, alb_ocean, alb_land, &
+        ! alb_forest, alb_ice, alb_snow_dry, alb_snow_wet 
 
                 
-        ! Store initial values in local parameter values 
-        trans_a            = par%trans_a
-        trans_b            = par%trans_b
-        trans_c            = par%trans_c
-        itm_c              = par%itm_c
-        itm_t              = par%itm_t 
-        itm_b              = par%itm_b 
-        itm_lat0           = par%itm_lat0 
-        H_snow_max         = par%H_snow_max
-        Pmaxfrac           = par%Pmaxfrac
-        H_snow_crit_desert = par%H_snow_crit_desert
-        H_snow_crit_forest = par%H_snow_crit_forest
-        melt_crit          = par%melt_crit
-        alb_ocean          = par%alb_ocean
-        alb_land           = par%alb_land
-        alb_forest         = par%alb_forest
-        alb_ice            = par%alb_ice
-        alb_snow_dry       = par%alb_snow_dry
-        alb_snow_wet       = par%alb_snow_wet
+        ! ! Store initial values in local parameter values 
+        ! trans_a            = par%trans_a
+        ! trans_b            = par%trans_b
+        ! trans_c            = par%trans_c
+        ! itm_c              = par%itm_c
+        ! itm_t              = par%itm_t 
+        ! itm_b              = par%itm_b 
+        ! itm_lat0           = par%itm_lat0 
+        ! H_snow_max         = par%H_snow_max
+        ! Pmaxfrac           = par%Pmaxfrac
+        ! H_snow_crit_desert = par%H_snow_crit_desert
+        ! H_snow_crit_forest = par%H_snow_crit_forest
+        ! melt_crit          = par%melt_crit
+        ! alb_ocean          = par%alb_ocean
+        ! alb_land           = par%alb_land
+        ! alb_forest         = par%alb_forest
+        ! alb_ice            = par%alb_ice
+        ! alb_snow_dry       = par%alb_snow_dry
+        ! alb_snow_wet       = par%alb_snow_wet
 
-        ! Read parameters from input namelist file
-        inquire(file=trim(filename),NUMBER=file_unit)
-        if (file_unit .gt. 0) then 
-            read(file_unit,nml=itm)
-        else
-            open(7,file=trim(filename))
-            read(7,nml=itm)
-            close(7)
-        end if 
+        ! ! Read parameters from input namelist file
+        ! inquire(file=trim(filename),NUMBER=file_unit)
+        ! if (file_unit .gt. 0) then 
+        !     read(file_unit,nml=itm)
+        ! else
+        !     open(7,file=trim(filename))
+        !     read(7,nml=itm)
+        !     close(7)
+        ! end if 
 
-        ! Store local parameter values in output object
-        par%trans_a            = trans_a
-        par%trans_b            = trans_b
-        par%trans_c            = trans_c
-        par%itm_c              = itm_c
-        par%itm_t              = itm_t 
-        par%itm_b              = itm_b 
-        par%itm_lat0           = itm_lat0 
-        par%H_snow_max         = H_snow_max
-        par%Pmaxfrac           = Pmaxfrac
-        par%H_snow_crit_desert = H_snow_crit_desert
-        par%H_snow_crit_forest = H_snow_crit_forest
-        par%melt_crit          = melt_crit
-        par%alb_ocean          = alb_ocean
-        par%alb_land           = alb_land
-        par%alb_forest         = alb_forest
-        par%alb_ice            = alb_ice
-        par%alb_snow_dry       = alb_snow_dry
-        par%alb_snow_wet       = alb_snow_wet
+        ! ! Store local parameter values in output object
+        ! par%trans_a            = trans_a
+        ! par%trans_b            = trans_b
+        ! par%trans_c            = trans_c
+        ! par%itm_c              = itm_c
+        ! par%itm_t              = itm_t 
+        ! par%itm_b              = itm_b 
+        ! par%itm_lat0           = itm_lat0 
+        ! par%H_snow_max         = H_snow_max
+        ! par%Pmaxfrac           = Pmaxfrac
+        ! par%H_snow_crit_desert = H_snow_crit_desert
+        ! par%H_snow_crit_forest = H_snow_crit_forest
+        ! par%melt_crit          = melt_crit
+        ! par%alb_ocean          = alb_ocean
+        ! par%alb_land           = alb_land
+        ! par%alb_forest         = alb_forest
+        ! par%alb_ice            = alb_ice
+        ! par%alb_snow_dry       = alb_snow_dry
+        ! par%alb_snow_wet       = alb_snow_wet
 
         return
 

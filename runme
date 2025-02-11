@@ -269,10 +269,10 @@ def main():
 
     if exe_fname == "yelmox_bipolar.x":
         nml = f90nml.read(par_path)
-        domain_par_files = [nml["ctrl"]["path_par_north"],
-                            nml["ctrl"]["path_par_south"]]
-        for p in domain_par_files:
-            par_paths.append("par/"+p)
+        # domain_par_files = [nml["ctrl"]["path_par_north"],
+        #                     nml["ctrl"]["path_par_south"]]
+        # for p in domain_par_files:
+        #     par_paths.append("par/"+p)
         
         ocn_model_file = nml["ctrl"]["path_par_ocn"].split()
         par_paths.append("par/"+ocn_model_file[0])

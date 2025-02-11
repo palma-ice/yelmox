@@ -112,7 +112,7 @@ program yelmox
         character(len=256) :: file_isos
         character(len=512) :: path_lgm
 
-        character(len=512) :: path_par  ! domain specific nml
+        !character(len=512) :: path_par  ! domain specific nml
         character(len=512) :: path_hydro_mask
         real(wp), allocatable :: hydro_mask(:,:)
 
@@ -267,13 +267,13 @@ program yelmox
     call bsl_write_init(bsl, file_bsl, time)
 
     if (ctl%active_north) then
-        call initialize_icesheet(bipolar_path_par, "north", time, ctl, yelmox_north)  ! yelmox.f90 lines 243-394
+        call initialize_icesheet(bipolar_path_par, "north", time, ctl, yelmox_north, "yelmo_north")  ! yelmox.f90 lines 243-394
         
         ! BIPOLAR: allocate and load hydrographic mask
         allocate(yelmox_north%hydro_mask(yelmox_north%yelmo1%grd%nx,yelmox_north%yelmo1%grd%ny))
         call nc_read(yelmox_north%path_hydro_mask,"mask",yelmox_north%hydro_mask)
         
-        call initialize_external_models(yelmox_north%path_par, yelmox_north)   ! yelmox.f90 lines 396-419
+        call initialize_external_models(bipolar_path_par, yelmox_north,"isos_north","snap_north","smbpal_north","itm_north","marine_shelf_north","sediments_north","geothermal_north")   ! yelmox.f90 lines 396-419
         call initialize_boundary_conditions(ctl, yelmox_north, bsl, time, time_bp)   ! yelmox.f90 lines 421-614
 
         call initialize_output_files(yelmox_north, time)
@@ -282,13 +282,13 @@ program yelmox
     end if
 
     if (ctl%active_south) then
-        call initialize_icesheet(bipolar_path_par, "south", time, ctl, yelmox_south)  ! yelmox.f90 lines 243-394
+        call initialize_icesheet(bipolar_path_par, "south", time, ctl, yelmox_south, "yelmo_south")  ! yelmox.f90 lines 243-394
         
         ! BIPOLAR: allocate and load hydrographic mask
         allocate(yelmox_south%hydro_mask(yelmox_south%yelmo1%grd%nx,yelmox_south%yelmo1%grd%ny))
         call nc_read(yelmox_south%path_hydro_mask,"mask",yelmox_south%hydro_mask)
         
-        call initialize_external_models(yelmox_south%path_par, yelmox_south)   ! yelmox.f90 lines 396-419
+        call initialize_external_models(bipolar_path_par, yelmox_south,"isos_south","snap_south","smbpal_south","itm_south","marine_shelf_south","sediments_south","geothermal_south")   ! yelmox.f90 lines 396-419
         call initialize_boundary_conditions(ctl, yelmox_south, bsl, time, time_bp)   ! yelmox.f90 lines 421-614
 
         call initialize_output_files(yelmox_south, time)
@@ -920,48 +920,48 @@ contains
     end subroutine yelmox_write_step
 
     ! Bipolar specific subroutines
-    subroutine rewrite_common_parameters(filename, dom)
+    ! subroutine rewrite_common_parameters(filename, dom)
         
-        implicit none
+    !     implicit none
 
-        character(len=512), intent(IN)    :: filename
-        type(yelmo_class), intent(INOUT) :: dom
+    !     character(len=512), intent(IN)    :: filename
+    !     type(yelmo_class), intent(INOUT) :: dom
 
-        ! == topography ==
+    !     ! == topography ==
 
-        call ytopo_par_load(dom%tpo%par,filename,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    !     call ytopo_par_load(dom%tpo%par,filename,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        !call ytopo_alloc(dom%tpo%now,dom%tpo%par%nx,dom%tpo%par%ny)
+    !     !call ytopo_alloc(dom%tpo%now,dom%tpo%par%nx,dom%tpo%par%ny)
         
-        write(*,*) "rewrite_common_parameters:: topography rewritten."
+    !     write(*,*) "rewrite_common_parameters:: topography rewritten."
         
-        ! == dynamics == 
+    !     ! == dynamics == 
 
-        call ydyn_par_load(dom%dyn%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    !     call ydyn_par_load(dom%dyn%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        !call ydyn_alloc(dom%dyn%now,dom%dyn%par%nx,dom%dyn%par%ny,dom%dyn%par%nz_aa,dom%dyn%par%nz_ac)
+    !     !call ydyn_alloc(dom%dyn%now,dom%dyn%par%nx,dom%dyn%par%ny,dom%dyn%par%nz_aa,dom%dyn%par%nz_ac)
         
-        write(*,*) "rewrite_common_parameters:: dynamics rewritten."
+    !     write(*,*) "rewrite_common_parameters:: dynamics rewritten."
         
-        ! == material == 
+    !     ! == material == 
 
-        call ymat_par_load(dom%mat%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    !     call ymat_par_load(dom%mat%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        !call ymat_alloc(dom%mat%now,dom%mat%par%nx,dom%mat%par%ny,dom%mat%par%nz_aa,dom%mat%par%nz_ac,dom%mat%par%n_iso)
+    !     !call ymat_alloc(dom%mat%now,dom%mat%par%nx,dom%mat%par%ny,dom%mat%par%nz_aa,dom%mat%par%nz_ac,dom%mat%par%n_iso)
         
-        write(*,*) "rewrite_common_parameters:: material rewritten."
+    !     write(*,*) "rewrite_common_parameters:: material rewritten."
         
-        ! == thermodynamics == 
+    !     ! == thermodynamics == 
         
-        call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    !     call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
 
-        !call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr_aa)
+    !     !call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr_aa)
         
-        write(*,*) "rewrite_common_parameters:: thermodynamics rewritten."
+    !     write(*,*) "rewrite_common_parameters:: thermodynamics rewritten."
 
-        return
+    !     return
 
-    end subroutine rewrite_common_parameters
+    ! end subroutine rewrite_common_parameters
 
     subroutine yelmox_bipolar_restart_write(bsl,isos,ylmo,time,fldr,hemisphere)
 
@@ -1049,11 +1049,11 @@ contains
         call nml_read(path_par, "ctrl", "obm_name",        ctl%obm_name)
 
         if (ctl%active_north) then
-            call nml_read(path_par,"ctrl","path_par_north", yelmox1%path_par)
+            !call nml_read(path_par,"ctrl","path_par_north", yelmox1%path_par)
             call nml_read(path_par,"ctrl","hydro_mask_north", yelmox1%path_hydro_mask)
         end if
         if (ctl%active_south) then
-            call nml_read(path_par,"ctrl","path_par_south", yelmox2%path_par)
+            !call nml_read(path_par,"ctrl","path_par_south", yelmox2%path_par)
             call nml_read(path_par,"ctrl","hydro_mask_south", yelmox2%path_hydro_mask)
         end if
 
@@ -1095,11 +1095,11 @@ contains
             ! Initially set to zero
             if (ctl%active_north) then
                 yelmox1%opt%tf_basins = 0 
-                call optimize_par_load(yelmox1%opt,yelmox1%path_par,"opt")
+                call optimize_par_load(yelmox1%opt,path_par,"opt")
             end if
             if (ctl%active_south) then
                 yelmox2%opt%tf_basins = 0 
-                call optimize_par_load(yelmox2%opt,yelmox2%path_par,"opt")
+                call optimize_par_load(yelmox2%opt,path_par,"opt")
             end if
 
         end if 
@@ -1127,7 +1127,7 @@ contains
 
     end subroutine define_input_and_output_locations
 
-    subroutine initialize_icesheet(path_par, hemisphere, time, ctl, yelmox)
+    subroutine initialize_icesheet(path_par, hemisphere, time, ctl, yelmox, group)
 
         implicit none
 
@@ -1137,12 +1137,13 @@ contains
         real(wp),            intent(IN)    :: time
         type(ctrl_params),   intent(INOUT) :: ctl          ! run control parameters
         type(yelmox_class),  intent(INOUT) :: yelmox
+        character(len=*),    intent(IN)    :: group
 
         ! === Initialize ice sheet model =====
 
         ! Initialize data objects and load initial topography
-        call yelmo_init(yelmox%yelmo1,filename=yelmox%path_par,grid_def="file",time=time)
-        call rewrite_common_parameters(filename=path_par, dom=yelmox%yelmo1)  ! Rewrite those parameters that are common between domains (remove in future version, spm)
+        call yelmo_init(yelmox%yelmo1,filename=path_par,grid_def="file",time=time, group=group)
+        !call rewrite_common_parameters(filename=path_par, dom=yelmox%yelmo1)  ! Rewrite those parameters that are common between domains (remove in future version, spm)
         
         ! Store domain name as a shortcut 
         yelmox%domain = yelmox%yelmo1%par%domain  
@@ -1301,34 +1302,36 @@ contains
 
     end subroutine initialize_icesheet
 
-    subroutine initialize_external_models(path_par, yelmox)
+    subroutine initialize_external_models(path_par, yelmox, isos_group, snapclim_group,smbpal_group,itm_group, marshelf_group, sediments_group, geothermal_group)
 
         implicit none
 
         ! Arguments
         character(len=512),  intent(IN)    :: path_par     ! parameter namelist of the specific domain
         type(yelmox_class),  intent(INOUT) :: yelmox
+        character(len=*),    intent(IN)    :: isos_group, snapclim_group ,smbpal_group, itm_group
+        character(len=*),    intent(IN)    :: marshelf_group, sediments_group, geothermal_group
 
         ! === Initialize external models (forcing for ice sheet) ======
 
         ! Initialize fastisosaty
-        call isos_init(yelmox%isos1, path_par, "isos", yelmox%yelmo1%grd%nx, yelmox%yelmo1%grd%ny, &
+        call isos_init(yelmox%isos1, path_par, isos_group, yelmox%yelmo1%grd%nx, yelmox%yelmo1%grd%ny, &
             yelmox%yelmo1%grd%dx, yelmox%yelmo1%grd%dy)
 
         ! Initialize "climate" model (climate and ocean forcing)
-        call snapclim_init(yelmox%snp1,path_par,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%yelmo1%bnd%basins)
+        call snapclim_init(yelmox%snp1,path_par,snapclim_group,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%yelmo1%bnd%basins)
         
         ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
-        call smbpal_init(yelmox%smbpal1,path_par,x=yelmox%yelmo1%grd%xc,y=yelmox%yelmo1%grd%yc,lats=yelmox%yelmo1%grd%lat)
+        call smbpal_init(yelmox%smbpal1,path_par,smbpal_group,itm_group,x=yelmox%yelmo1%grd%xc,y=yelmox%yelmo1%grd%yc,lats=yelmox%yelmo1%grd%lat,domain=yelmox%domain,grid_name=yelmox%yelmo1%par%grid_name)
         
         ! Initialize marine melt model (bnd%bmb_shlf)
-        call marshelf_init(yelmox%mshlf1,path_par,"marine_shelf",yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%bnd%regions,yelmox%yelmo1%bnd%basins)
+        call marshelf_init(yelmox%mshlf1,path_par,marshelf_group,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%bnd%regions,yelmox%yelmo1%bnd%basins)
         
         ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
-        call sediments_init(yelmox%sed1,path_par,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name)
+        call sediments_init(yelmox%sed1,path_par,sediments_group,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name)
         yelmox%yelmo1%bnd%H_sed = yelmox%sed1%now%H 
         
-        call geothermal_init(yelmox%gthrm1,path_par,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name)
+        call geothermal_init(yelmox%gthrm1,path_par,geothermal_group,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name)
         yelmox%yelmo1%bnd%Q_geo    = yelmox%gthrm1%now%ghf 
 
         return

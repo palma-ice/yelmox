@@ -41,7 +41,7 @@ module geothermal
 
 contains 
 
-    subroutine geothermal_init(gthrm,filename,nx,ny,domain,grid_name)
+    subroutine geothermal_init(gthrm,filename,group,nx,ny,domain,grid_name)
         ! Eventually interface should use 'sed' object directly
         ! instead of input/output arrays 
 
@@ -49,12 +49,13 @@ contains
 
         type(geothermal_class), intent(OUT) :: gthrm  
         character(len=*),      intent(IN)   :: filename 
+        character(len=*),      intent(IN)   :: group
         integer,               intent(IN)   :: nx, ny 
         character(len=*),      intent(IN)   :: domain, grid_name
 
 
         ! Load geothermal parameters
-        call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.)
+        call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.,group=group)
 
         ! Allocate the geothermal object 
         call geothermal_allocate(gthrm%now,nx,ny)
@@ -131,21 +132,22 @@ contains
     end subroutine geothermal_end
 
 
-    subroutine geothermal_par_load(par,filename,domain,grid_name,init)
+    subroutine geothermal_par_load(par,filename,domain,grid_name,init, group)
 
         type(geothermal_param_class), intent(OUT) :: par
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain, grid_name 
         logical, optional :: init 
         logical :: init_pars 
+        character(len=*),      intent(IN)   :: group
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"geothermal","use_obs",    par%use_obs,     init=init_pars)
-        call nml_read(filename,"geothermal","obs_path",   par%obs_path,    init=init_pars)
-        call nml_read(filename,"geothermal","obs_name",   par%obs_name,    init=init_pars)
-        call nml_read(filename,"geothermal","ghf_const",  par%ghf_const,   init=init_pars)
+        call nml_read(filename,group,"use_obs",    par%use_obs,     init=init_pars)
+        call nml_read(filename,group,"obs_path",   par%obs_path,    init=init_pars)
+        call nml_read(filename,group,"obs_name",   par%obs_name,    init=init_pars)
+        call nml_read(filename,group,"ghf_const",  par%ghf_const,   init=init_pars)
 
         ! Replace gridding template values from path
         call parse_path(par%obs_path,domain,grid_name)

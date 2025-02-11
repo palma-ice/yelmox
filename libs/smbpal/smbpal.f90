@@ -1,5 +1,6 @@
  module smbpal
 
+    use nml
     use smbpal_precision
     use insolation
     use interp_time 
@@ -60,13 +61,15 @@
 
 contains 
 
-    subroutine smbpal_init(smb,filename,x,y,lats)
+    subroutine smbpal_init(smb,filename,group,itm_group,x,y,lats,domain,grid_name)
 
         implicit none 
 
         type(smbpal_class) :: smb
         character(len=*), intent(IN)  :: filename  ! Parameter file 
+        character(len=*),      intent(IN)   :: group, itm_group
         real(prec) :: x(:), y(:), lats(:,:)
+        character(len=*),      intent(IN)    :: domain, grid_name
 
         ! Local variables
         integer :: nx, ny, m  
@@ -76,7 +79,7 @@ contains
         ny = size(y,1)
 
         ! Load smbpal parameters
-        call smbpal_par_load(smb%par,filename)
+        call smbpal_par_load(smb%par,filename,domain,grid_name,init=.TRUE.,group=group,itm_group=itm_group)
 
         ! Additionally define dimension info 
         if (allocated(smb%par%x)) deallocate(smb%par%x)
@@ -525,67 +528,89 @@ contains
 
 ! "Fix TSURF calculations!!!" 
 
-    subroutine smbpal_par_load(par,filename)
+    subroutine smbpal_par_load(par,filename,domain,grid_name,init,group,itm_group)
 
         type(smbpal_param_class)     :: par
         character(len=*), intent(IN) :: filename 
+        character(len=*), intent(IN) :: domain, grid_name 
+        logical, optional :: init 
+        logical :: init_pars 
+        character(len=*),      intent(IN)   :: group,itm_group
 
-        ! Local variables 
-        integer :: file_unit 
+        ! ! Local variables 
+        ! integer :: file_unit 
 
-        ! Local parameter definitions (identical to object)
-        character(len=512) :: insol_fldr 
-        logical    :: const_insol
-        real(prec) :: const_kabp
-        character(len=16)  :: abl_method
-        real(prec)         :: sigma_snow, sigma_melt, sigma_land
-        real(prec)         :: sf_a, sf_b, firn_fac 
-        real(prec)         :: mm_snow, mm_ice 
+        ! ! Local parameter definitions (identical to object)
+        ! character(len=512) :: insol_fldr 
+        ! logical    :: const_insol
+        ! real(prec) :: const_kabp
+        ! character(len=16)  :: abl_method
+        ! real(prec)         :: sigma_snow, sigma_melt, sigma_land
+        ! real(prec)         :: sf_a, sf_b, firn_fac 
+        ! real(prec)         :: mm_snow, mm_ice 
 
-        namelist /smbpal/ insol_fldr, const_insol, const_kabp, &
-            abl_method, sigma_snow, sigma_melt, sigma_land, &
-            sf_a, sf_b, firn_fac, mm_snow, mm_ice 
-                
-        ! Store initial values in local parameter values 
-        insol_fldr  = par%insol_fldr
-        const_insol = par%const_insol
-        const_kabp  = par%const_kabp
-        abl_method  = par%abl_method
-        sigma_snow  = par%sigma_snow 
-        sigma_melt  = par%sigma_melt 
-        sigma_land  = par%sigma_land 
-        sf_a        = par%sf_a 
-        sf_b        = par%sf_b 
-        firn_fac    = par%firn_fac 
-        mm_snow     = par%mm_snow 
-        mm_ice      = par%mm_ice 
+        init_pars = .FALSE.
+        if (present(init)) init_pars = .TRUE.
 
-        ! Read parameters from input namelist file
-        inquire(file=trim(filename),NUMBER=file_unit)
-        if (file_unit .gt. 0) then 
-            read(file_unit,nml=smbpal)
-        else
-            open(7,file=trim(filename))
-            read(7,nml=smbpal)
-            close(7)
-        end if 
-
-        ! Store local parameter values in output object
-        par%insol_fldr  = insol_fldr 
-        par%const_insol = const_insol
-        par%const_kabp  = const_kabp
-        par%abl_method  = abl_method
-        par%sigma_snow  = sigma_snow 
-        par%sigma_melt  = sigma_melt 
-        par%sigma_land  = sigma_land 
-        par%sf_a        = sf_a 
-        par%sf_b        = sf_b 
-        par%firn_fac    = firn_fac 
-        par%mm_snow     = mm_snow 
-        par%mm_ice      = mm_ice 
+        call nml_read(filename,group,"insol_fldr",par%insol_fldr,init=init_pars)
+        call nml_read(filename,group,"const_insol",par%const_insol,init=init_pars)
+        call nml_read(filename,group,"const_kabp",par%const_kabp,init=init_pars)
+        call nml_read(filename,group,"abl_method",par%abl_method,init=init_pars)
+        call nml_read(filename,group,"sigma_snow",par%sigma_snow,init=init_pars)
+        call nml_read(filename,group,"sigma_melt",par%sigma_melt,init=init_pars)
+        call nml_read(filename,group,"sf_a",par%sf_a,init=init_pars)
+        call nml_read(filename,group,"sf_b",par%sf_b,init=init_pars)
+        call nml_read(filename,group,"firn_fac",par%firn_fac,init=init_pars)
+        call nml_read(filename,group,"mm_snow",par%mm_snow,init=init_pars)
+        call nml_read(filename,group,"mm_ice",par%mm_ice,init=init_pars)
 
         ! Also load itm parameters
-        call itm_par_load(par%itm,filename)
+        call itm_par_load(par%itm,filename,domain,grid_name,init=init,group=itm_group)
+
+        ! namelist /smbpal/ insol_fldr, const_insol, const_kabp, &
+        !     abl_method, sigma_snow, sigma_melt, sigma_land, &
+        !     sf_a, sf_b, firn_fac, mm_snow, mm_ice 
+                
+        ! ! Store initial values in local parameter values 
+        ! insol_fldr  = par%insol_fldr
+        ! const_insol = par%const_insol
+        ! const_kabp  = par%const_kabp
+        ! abl_method  = par%abl_method
+        ! sigma_snow  = par%sigma_snow 
+        ! sigma_melt  = par%sigma_melt 
+        ! sigma_land  = par%sigma_land 
+        ! sf_a        = par%sf_a 
+        ! sf_b        = par%sf_b 
+        ! firn_fac    = par%firn_fac 
+        ! mm_snow     = par%mm_snow 
+        ! mm_ice      = par%mm_ice 
+
+        ! ! Read parameters from input namelist file
+        ! inquire(file=trim(filename),NUMBER=file_unit)
+        ! if (file_unit .gt. 0) then 
+        !     read(file_unit,nml=smbpal)
+        ! else
+        !     open(7,file=trim(filename))
+        !     read(7,nml=smbpal)
+        !     close(7)
+        ! end if 
+
+        ! ! Store local parameter values in output object
+        ! par%insol_fldr  = insol_fldr 
+        ! par%const_insol = const_insol
+        ! par%const_kabp  = const_kabp
+        ! par%abl_method  = abl_method
+        ! par%sigma_snow  = sigma_snow 
+        ! par%sigma_melt  = sigma_melt 
+        ! par%sigma_land  = sigma_land 
+        ! par%sf_a        = sf_a 
+        ! par%sf_b        = sf_b 
+        ! par%firn_fac    = firn_fac 
+        ! par%mm_snow     = mm_snow 
+        ! par%mm_ice      = mm_ice 
+
+        ! ! Also load itm parameters
+        ! call itm_par_load(par%itm,filename)
 
         return
 
