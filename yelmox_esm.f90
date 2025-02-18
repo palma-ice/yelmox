@@ -55,9 +55,10 @@ program yelmox_esm
         character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
-        real(wp) :: time_equil      ! Only for spinup
-        real(wp) :: time_const      ! Only for spinup 
+        real(wp) :: time_rlx      ! Only for spinup?
+        real(wp) :: time_equil(2) ! Only for spinup? 
         real(wp) :: dtt
+        logical  :: clim_var
 
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
@@ -73,7 +74,13 @@ program yelmox_esm
 
     end type 
 
+    type esm_atm_params
+        real(wp) :: lapse(2)
+        real(wp) :: f_p
+    end type
+
     type(ctrl_params)     :: ctl
+    type(esm_atm_params)  :: esm_atm
     type(ice_opt_params)  :: opt 
     type(esm_experiment_class) :: esmexp 
 
@@ -82,13 +89,13 @@ program yelmox_esm
 
     ! Control parameters 
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
-    
+
     ! esm parameters 
-    call nml_read(path_par,"esm","par_file",         ctl%esm_par_file)
+    call nml_read(path_par,"esm","par_file",   ctl%esm_par_file)
     call nml_read(path_par,"esm","expname",          ctl%esm_expname)
     call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)
     call nml_read(path_par,"esm","dt_formatted",     ctl%esm_dt_formatted)
-
+    ! What does this?
     if (index(ctl%esm_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
         call esm_experiment_def(esmexp,ctl%esm_expname,ctl%esm_par_file,"UCM","YELMO")
@@ -98,8 +105,9 @@ program yelmox_esm
     call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
     call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
     call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
-    call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
-    call nml_read(path_par,trim(ctl%run_step),"time_const", ctl%time_const) 
+    call nml_read(path_par,trim(ctl%run_step),"time_rlx",   ctl%time_rlx)       ! [yr] Years to relax first
+    call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr,yr] Equilibration period
+    call nml_real(path_par,trim(ctl%run_step),"clim_var",   ctl%clim_var)       ! Climate variability
 
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
@@ -110,6 +118,10 @@ program yelmox_esm
         call optimize_par_load(opt,path_par,"opt")
 
     end if 
+
+    ! Load ESM atm parameters (so far, lapse rate + clausius clap)
+    call nml_read(path_par,"esm_atm","lapse", esm_atm%lapse)
+    call nml_real(path_par,"esm_atm","f_p",   esm_atm%f_p)
 
     ! Get output times
     call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
@@ -153,12 +165,12 @@ program yelmox_esm
 
         case("spinup")
 
-            write(*,*) "time_equil: ",    ctl%time_equil 
-            write(*,*) "time_const: ",    ctl%time_const 
+            write(*,*) "time_rlx: ",    ctl%time_rlx 
+            write(*,*) "time_equil: ",  ctl%time_equil 
 
-            time_bp = ctl%time_const - 1950.0_wp
+            time_bp = ctl%time_equil - 1950.0_wp
 
-        case("transient")
+        case("esm")
 
             write(*,*) "esm_write_formatted: ", ctl%esm_write_formatted
             write(*,*) "esm_file_suffix:     ", trim(esmexp%file_suffix)
@@ -287,7 +299,7 @@ program yelmox_esm
     
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(snp1,smbpal1,mshlf1,esm1,yelmo1, &
-                time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+                time=ctl%time_equil,time_bp=ctl%time_equil-1950.0_wp)
     
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -346,9 +358,9 @@ program yelmox_esm
         if (trim(ctl%equil_method) .eq. "opt") then 
             ! Additional initialization option when running 'opt' spinup...
 
-            if (ctl%with_ice_sheet .and. ctl%time_equil .gt. 0.0) then 
+            if (ctl%with_ice_sheet .and. ctl%time_rlx .gt. 0.0) then 
                 ! Calculate thermodynamics with fixed ice sheet 
-                call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.TRUE.)
+                call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_rlx,dt=ctl%dtt,topo_fixed=.TRUE.)
             end if 
 
         end if 
@@ -423,7 +435,7 @@ program yelmox_esm
                 case("relax")
                     ! ===== relaxation spinup ==================
 
-                    if (time_elapsed .lt. ctl%time_equil) then 
+                    if (time_elapsed .lt. ctl%time_rlx) then 
                         ! Turn on relaxation for now, to let thermodynamics equilibrate
                         ! without changing the topography too much. Important when 
                         ! effective pressure = f(thermodynamics).
@@ -432,7 +444,7 @@ program yelmox_esm
                         yelmo1%tpo%par%topo_rel_tau = 50.0 
                         write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-                    else if (time_elapsed .eq. ctl%time_equil) then 
+                    else if (time_elapsed .eq. ctl%time_rlx) then 
                         ! Disable relaxation now... 
 
                         yelmo1%tpo%par%topo_rel     = 0
@@ -470,7 +482,7 @@ program yelmox_esm
             ! Update forcing to present-day reference, but 
             ! adjusting to ice topography
             call calc_climate_esm(snp1,smbpal1,mshlf1,esm1,yelmo1, &
-                        time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+                        time=ctl%time_equil,time_bp=ctl%time_equil-1950.0_wp)
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -617,7 +629,7 @@ program yelmox_esm
         if (n .eq. 0) then 
             ! Calculate smb for present day 
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ctl%time_const) 
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ctl%time_equil) 
                 
             ! Apply esm anomalies
             ! (apply to climate just for consistency)
@@ -712,9 +724,6 @@ contains
         type(snapclim_class),   intent(IN) :: snp
         type(marshelf_class),   intent(IN) :: mshlf
         type(smbpal_class),     intent(IN) :: srf
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
 
         character(len=*),       intent(IN) :: filename
         real(wp),               intent(IN) :: time
@@ -879,8 +888,6 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
-        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/a ice equiv.",long_name="Net surface mass balance", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
