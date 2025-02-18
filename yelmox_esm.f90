@@ -15,7 +15,6 @@ program yelmox_esm
     use marine_shelf
     use sediments
     use smbpal
-    use snapclim
     
     implicit none 
 
