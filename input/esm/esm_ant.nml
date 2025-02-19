@@ -9,12 +9,7 @@
     time_par    = 1950, 1960, 1
 /
 
-! ====== ISMIP6-2300 experiment definitions ======
-
-&ctrlAE0
-    experiment      = "ctrl0"
-    shlf_collapse   = False
-/
+! ====== ESM experiment definitions ======
 
 &ctrlAE
     experiment      = "ctrl"
@@ -26,325 +21,193 @@
     shlf_collapse   = False
 /
 
-&expAE02
-    experiment      = "CCSM4_RCP85"
-    shlf_collapse   = False
-/
+! =========== ATMOSPHERE ===========
 
-&expAE03
-    experiment      = "HadGEM2-ES_RCP85"
-    shlf_collapse   = False
-/
-
-&expAE04
-    experiment      = "CESM2-WACCM_ssp585"
-    shlf_collapse   = False
-/
-
-&expAE05
-    experiment      = "UKESM1-0-LL_ssp585"
-    shlf_collapse   = False
-/
-
-&expAE06
-    experiment      = "UKESM1-0-LL_ssp585-repeat"
-    shlf_collapse   = False
-/
-
-&expAE07
-    experiment      = "NorESM1-M_RCP85-repeat"
-    shlf_collapse   = False
-/
-
-&expAE08
-    experiment      = "HadGEM2-ES_RCP85-repeat"
-    shlf_collapse   = False
-/
-
-&expAE09
-    experiment      = "CESM2-WACCM_ssp585-repeat"
-    shlf_collapse   = False
-/
-
-&expAE10
-    experiment      = "UKESM1-0-LL_ssp126"
-    shlf_collapse   = False
-/
-
-&expAE11
-    experiment      = "CCSM4_RCP85"
-    shlf_collapse   = True
-/
-
-&expAE12
-    experiment      = "HadGEM2-ES_RCP85"
-    shlf_collapse   = True
-/
-
-&expAE13
-    experiment      = "CESM2-WACCM_ssp585"
-    shlf_collapse   = True
-/
-
-&expAE14
-    experiment      = "UKESM1-0-LL_ssp585"
-    shlf_collapse   = True
-/
-
-! ====== ATMOSPHERE ================
-
+! ======== Reference period ========
 &gcm_ts_ref
-    filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
+    filename    = "ice_data/Antarctica/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
     name        = "t2m"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1979, 2019, 1
+    with_time   = True
+    monthly     = True 
+    time_par    = 1979, 2022, 1
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
+    filename    = "ice_data/Antarctica/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
     name        = "precip"
-    units_in    = "kg m-2 yr-1"
+    units_in    = "kg m-2"
     units_out   = "mm yr-1"
     unit_scale  = 1.0         
     unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1979, 2019, 1
+    with_time   = True
+    monthly     = True 
+    time_par    = 1979, 2022, 1
 /
 
-&gcm_sf_ref
-    filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
-    name        = "snowfall"
-    units_in    = "kg m-2 yr-1"
-    units_out   = "mm yr-1"
+&gcm_zsrf_ref
+    filename    = "ice_data/Antarctica/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
     unit_scale  = 1.0         
     unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1979, 2019, 1
+    with_time   = False
+    monthly     = False 
+    time_par    = 2020, 2020, 0
 /
 
-&gcm_smb_ref
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
-    name        = "smb_clim"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
-    unit_offset = 0.0 
-    with_time   = FALSE 
-    time_par    = 1995, 2014, 1
-/
-
+! ======= Historical period =======
 &gcm_ts_hist
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "ts_anomaly"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
+    monthly     = False
     time_par    = 1950, 1994, 1
 /
 
 &gcm_pr_hist
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "pr_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
     unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
     unit_offset = 0.0 
-    with_time   = True 
+    with_time   = True
+    monthly     = False 
     time_par    = 1950, 1994, 1
 /
 
-&gcm_smb_hist
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
-    name        = "smb_anomaly"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
-/
-
+! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "ts_anomaly"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
+    monthly     = False
     time_par    = 1995, 2300, 1
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "pr_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
+    unit_scale  = 31556926.0        ! CMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
+    monthly     = False
     time_par    = 1995, 2300, 1
 /
 
-&gcm_smb_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
-    name        = "smb_anomaly"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
-/
+! ========      OCEAN      =========
 
-! ====== OCEAN ================
-
-&imbie_basins
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
-    name        = "basinNumber"
-    units_in    = "1"
-    units_out   = "1"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 1995, 1
-/
-
+! ======== Reference period ========
 &to_ref
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 273.15 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
+    with_time   = False
+    monthly     = False 
+    time_par    = 2020, 2020, 0
 /
 
 &so_ref
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
     unit_scale  = 1.0 
     unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
+    with_time   = False
+    monthly     = False 
+    time_par    = 2020, 2020, 0
 /
 
-&tf_ref
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
-    name        = "tf"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
-/
-
-&tf_cor
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
-    name        = "dT_nl"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
-/
-
+! ======== Historical period ========
 &gcm_to_hist
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "temperature"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0
     unit_offset = 273.15 
-    with_time   = True 
+    with_time   = True
+    monthly     = False 
     time_par    = 1850, 1994, 1
 /
 
 &gcm_so_hist
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "salinity"
     units_in    = "PSU"
     units_out   = "PSU"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
+    monthly     = False
     time_par    = 1850, 1994, 1
 /
 
-&gcm_tf_hist
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
-    name        = "thermal_forcing"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 1994, 1
-/
-
+! ======== Projection period ========
 &gcm_to_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "temperature"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0
     unit_offset = 273.15 
     with_time   = True 
+    monthly     = False
     time_par    = 1995, 2300, 1
 /
 
 &gcm_so_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "salinity"
     units_in    = "PSU"
     units_out   = "PSU"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1995, 2300, 1
-/
-&gcm_tf_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
-    name        = "thermal_forcing"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
+    monthly     = False
     time_par    = 1995, 2300, 1
 /
 
-================== Ice shelf collapse mask =================
+! === Other fields ===
 
-&gcm_mask_shlf_proj
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/ShelfCollapse_forcing/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
-    name        = "mask"
+&imbie_basins
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
+    name        = "basinNumber"
     units_in    = "1"
     units_out   = "1"
-    unit_scale  = 1.0
-    unit_offset = 0.0
-    with_time   = True
-    time_par    = 1995, 2300, 1
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False
+    monthly     = False 
+    time_par    = 2020, 2020, 0
 /
 
 ! =====================================================
 !
-! ISMIP6 output variable list
+! CMIP output variable list
 !
 ! =====================================================
 
-&ismip6_out_lithk
+&cmip_out_lithk
     name            = "lithk"
     long_name       = "Ice sheet thickness"
     var_type        = "ST"
@@ -355,7 +218,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_orog
+&cmip_out_orog
     name            = "orog"
     long_name       = "Ice sheet surface elevation"
     var_type        = "ST"
@@ -366,7 +229,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_base
+&cmip_out_base
     name            = "base"
     long_name       = "Ice sheet base elevation"
     var_type        = "ST"
@@ -377,7 +240,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_topg
+&cmip_out_topg
     name            = "topg"
     long_name       = "Bedrock elevation"
     var_type        = "ST"
@@ -388,7 +251,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_hfgeoubed
+&cmip_out_hfgeoubed
     name            = "hfgeoubed"
     long_name       = "Geothermal heat flux"
     var_type        = "CST"
@@ -399,7 +262,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_acabf
+&cmip_out_acabf
     name            = "acabf"
     long_name       = "Surface mass balance flux"
     var_type        = "FL"
@@ -410,7 +273,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_libmassbfgr
+&cmip_out_libmassbfgr
     name            = "libmassbfgr"
     long_name       = "Basal mass balance flux beneath grounded ice"
     var_type        = "FL"
@@ -421,7 +284,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_libmassbffl
+&cmip_out_libmassbffl
     name            = "libmassbffl"
     long_name       = "Basal mass balance flux beneath floating ice"
     var_type        = "FL"
@@ -432,7 +295,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_dlithkdt
+&cmip_out_dlithkdt
     name            = "dlithkdt"
     long_name       = "Ice thickness imbalance"
     var_type        = "FL"
@@ -443,7 +306,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_xvelsurf
+&cmip_out_xvelsurf
     name            = "xvelsurf"
     long_name       = "Surface velocity in x direction"
     var_type        = "ST"
@@ -454,7 +317,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_yvelsurf
+&cmip_out_yvelsurf
     name            = "yvelsurf"
     long_name       = "Surface velocity in y direction"
     var_type        = "ST"
@@ -465,7 +328,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_zvelsurf
+&cmip_out_zvelsurf
     name            = "zvelsurf"
     long_name       = "Surface velocity in z direction"
     var_type        = "ST"
@@ -477,7 +340,7 @@
 /
 
 
-&ismip6_out_xvelbase
+&cmip_out_xvelbase
     name            = "xvelbase"
     long_name       = "Basal velocity in x direction"
     var_type        = "ST"
@@ -488,7 +351,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_yvelbase
+&cmip_out_yvelbase
     name            = "yvelbase"
     long_name       = "Basal velocity in y direction"
     var_type        = "ST"
@@ -499,7 +362,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_zvelbase
+&cmip_out_zvelbase
     name            = "zvelbase"
     long_name       = "Basal velocity in z direction"
     var_type        = "ST"
@@ -510,7 +373,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_xvelmean
+&cmip_out_xvelmean
     name            = "xvelmean"
     long_name       = "Mean velocity in x direction"
     var_type        = "ST"
@@ -521,7 +384,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_yvelmean
+&cmip_out_yvelmean
     name            = "yvelmean"
     long_name       = "Mean velocity in y direction"
     var_type        = "ST"
@@ -532,7 +395,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_litemptop
+&cmip_out_litemptop
     name            = "litemptop"
     long_name       = "Ice surface temperature"
     var_type        = "ST"
@@ -543,7 +406,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_litempbotgr
+&cmip_out_litempbotgr
     name            = "litempbotgr"
     long_name       = "Basal temperature beneath grounded ice sheet"
     var_type        = "ST"
@@ -554,7 +417,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_litempbotfl
+&cmip_out_litempbotfl
     name            = "litempbotfl"
     long_name       = "Basal temperature beneath floating ice sheet"
     var_type        = "ST"
@@ -565,7 +428,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_strbasemag
+&cmip_out_strbasemag
     name            = "strbasemag"
     long_name       = "Magnitude of basal drag"
     var_type        = "ST"
@@ -576,7 +439,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_licalvf
+&cmip_out_licalvf
     name            = "licalvf"
     long_name       = "Land ice calving flux"
     var_type        = "FL"
@@ -587,7 +450,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_lifmassbf
+&cmip_out_lifmassbf
     name            = "lifmassbf"
     long_name       = "Ice front melt and calving flux"
     var_type        = "FL"
@@ -597,7 +460,7 @@
     unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
     unit_offset     = 0.0 
 /
-&ismip6_out_ligroundf
+&cmip_out_ligroundf
     name            = "ligroundf"
     long_name       = "Grounding line flux"
     var_type        = "FL"
@@ -608,7 +471,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_sftgif
+&cmip_out_sftgif
     name            = "sftgif"
     long_name       = "Land ice area fraction"
     var_type        = "ST"
@@ -619,7 +482,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_sftgrf
+&cmip_out_sftgrf
     name            = "sftgrf"
     long_name       = "Grounded ice sheet area fraction"
     var_type        = "ST"
@@ -630,7 +493,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_sftflf
+&cmip_out_sftflf
     name            = "sftflf"
     long_name       = "Floating ice sheet area fraction"
     var_type        = "ST"
@@ -641,7 +504,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_lim
+&cmip_out_lim
     name            = "lim"
     long_name       = "Total ice sheet mass"
     var_type        = "ST"
@@ -652,7 +515,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_limnsw
+&cmip_out_limnsw
     name            = "limnsw"
     long_name       = "Total ice sheet mass above flotation"
     var_type        = "ST"
@@ -663,7 +526,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_iareagr
+&cmip_out_iareagr
     name            = "iareagr"
     long_name       = "Grounded ice area"
     var_type        = "ST"
@@ -674,7 +537,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_iareafl
+&cmip_out_iareafl
     name            = "iareafl"
     long_name       = "Floating ice area"
     var_type        = "ST"
@@ -685,7 +548,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_tendacabf
+&cmip_out_tendacabf
     name            = "tendacabf"
     long_name       = "Total SMB flux"
     var_type        = "FL"
@@ -696,7 +559,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_tendlibmassbf
+&cmip_out_tendlibmassbf
     name            = "tendlibmassbf"
     long_name       = "Total BMB flux"
     var_type        = "FL"
@@ -707,7 +570,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_tendlibmassbffl
+&cmip_out_tendlibmassbffl
     name            = "tendlibmassbffl"
     long_name       = "Total BMB flux beneath floating ice"
     var_type        = "FL"
@@ -718,7 +581,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_tendlicalvf
+&cmip_out_tendlicalvf
     name            = "tendlicalvf"
     long_name       = "Total calving flux"
     var_type        = "FL"
@@ -729,7 +592,7 @@
     unit_offset     = 0.0 
 /
 
-&ismip6_out_tendlifmassbf
+&cmip_out_tendlifmassbf
     name            = "tendlifmassbf"
     long_name       = "Total calving and ice front melting flux"
     var_type        = "FL"
@@ -739,7 +602,8 @@
     unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
     unit_offset     = 0.0 
 /
-&ismip6_out_tendligroundf
+
+&cmip_out_tendligroundf
     name            = "tendligroundf"
     long_name       = "Total grounding line flux"
     var_type        = "FL"

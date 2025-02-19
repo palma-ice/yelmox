@@ -121,7 +121,7 @@ program yelmox
 
     ! Consistency checks ===
 
-    if (trim(ctl%equil_method) .eq. "opt") then 
+    if (trim(ctl%equil_method) .eq. "opt" then 
         ! Load optimization parameters 
 
         ! Initially set to zero 
@@ -632,8 +632,9 @@ end if
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
         if (mod(nint(ts%time*100),nint(ctl%dt_clim*100))==0) then
-            ! Update snapclim
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+                ! Update snapclim
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+            end if
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
