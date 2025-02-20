@@ -205,7 +205,7 @@ program yelmox_ismip6
     ! === Initialize timestepping ===
     
     call tstep_init(ts,ctl%time_init,ctl%time_end,method=ctl%tstep_method,units="year", &
-                                            time_ref=1950.0_wp,const_rel=ctl%tstep_const)
+                                            time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
 
     ! === Initialize ice sheet model =====
     
