@@ -9,33 +9,35 @@
     write_formatted = False             ! CMIP convention
     dt_formatted    = 1.0               ! CMIP output timestep
     
-    ! ESM parameters
-    time_init       = 1990.0            ! [yr] Starting time (years CE)
-    time_end        = 2300.0            ! [yr] Ending time (years CE)
-    dtt             = 1.0               ! [yr] Main loop timestep
-    time_rlx        = 0.0               ! [yr] Relax time (previous time_equil)
-    time_equil      = 2015.0            ! [yr] Year(s) that equilibration represents
-    clim_var        = True              ! include climate variability
-    with_ice_sheet  = True              ! Is the ice sheet active?
-    equil_method    = "none"            ! "none", "relax", "opt" 
+        ! Atmospheric variables
+    lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
+    f_p             = 0.05              ! Claus-Cl. term
 /
 
 &spinup
-    ! Model run
+    tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 30e3              ! [yr] Ending time (model years)
-    dtt             = 10.0              ! [yr] Main loop timestep
-    time_rlx        = 0.0               ! [yr] Equilibration time (previous time_equil)
-    time_equil      = 1990.0, 2020.0    ! [yr] Year interval that equilibration represents
+    time_equil      = 0.0               ! [yr] Equilibration time
+    time_opt        = 1990.0, 2020.0    ! [yr] Year interval that optimization represents 
+    dtt             = 5.0               ! [yr] Main loop timestep 
     clim_var        = True              ! include climate variability
     with_ice_sheet  = True              ! Is the ice sheet active?
-    equil_method    = "opt"             ! "none", "relax", "opt"
+    equil_method    = "relax"           ! "none", "relax", "opt"
 /
 
-&esm_atm
-    ! Atmospheric variables
-    lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
-    f_p             = 0.05              ! Claus-Cl. term
+&transient
+    tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
+    time_init       = 1990.0            ! [yr] Starting time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
+    time_opt        = 1990.0, 2020.0    ! [yr] Year interval that optimization represents 
+    time_equil      = 0.0               ! [yr] Equilibration time 
+    dtt             = 1.0               ! [yr] Main loop timestep 
+    clim_var        = False              ! include climate variability
+    with_ice_sheet  = True              ! Is the ice sheet active?
+    equil_method    = "none"            ! "none", "relax", "opt"
 /
 
 &tm_1D
