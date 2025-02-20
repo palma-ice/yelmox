@@ -317,7 +317,7 @@ contains
     
     end subroutine esm_forcing_init
     
-    subroutine esm_forcing_update(esm,z_srf_ylm,time,time_ref,use_ref_atm,use_ref_ocn)
+    subroutine esm_forcing_update(esm,z_srf_ylm,time,time_ref,time_hist,time_proj,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field
 
@@ -326,7 +326,7 @@ contains
         type(esm_forcing_class), intent(INOUT) :: esm
         real(wp), intent(IN) :: z_srf_ylm
         real(wp), intent(IN) :: time
-        real(wp), intent(IN)    :: time_ref(2)
+        real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2)
         logical,  intent(IN), optional :: use_ref_atm 
         logical,  intent(IN), optional :: use_ref_ocn 
 
@@ -367,7 +367,7 @@ contains
                     esm%dto = 0.0_wp
                     esm%dso = 0.0_wp 
                 ! Projection period
-                else if (time .gt. time_ref(2) .and. time .le. time_proj_end) then
+                else if (time .gt. time_ref(2) .and. time .le. time_proj(2)) then
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_proj, [time],method=slice_method)
                     call varslice_update(esm%pr_proj, [time],method=slice_method)
@@ -398,14 +398,14 @@ contains
  
         end select
         
-        ! set atmosphere to reference values
         if (use_ref_atm) then
+            ! set atmosphere to reference values
             esm%dts = 0.0_wp
             esm%dpr = 1.0_wp
         end if
         
-        ! set ocean to reference values
         if (use_ref_ocn) then
+            ! set ocean to reference values
             esm%dto = 0.0_wp
             esm%dso = 0.0_wp
         end if
@@ -414,7 +414,7 @@ contains
 
     end subroutine esm_forcing_update
 
-    subroutine esm_clim_update(esm,z_srf_ylm,time,domain)
+    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,domain)
         ! Routine to compute the esm reference climatology
         ! This is a monthly file
 
@@ -423,6 +423,7 @@ contains
         type(esm_forcing_class), intent(INOUT) :: esm
         real(wp),                intent(IN)    :: z_srf_ylm
         real(wp),                intent(IN)    :: time
+        real(wp),                intent(IN)    :: time_ref(2)
         character(len=*),        intent(IN)    :: domain
 
         ! Local variables 
@@ -441,7 +442,7 @@ contains
         if (esm%clim_var) then
             ! If climate variability is true, we select a random year from the climatology period
             call random_number(rand)
-            year_rand = NINT((esm%time_equil(2)-esm%time_equil(1))*rand)
+            year_rand = NINT((time_ref(2)-time_ref(1))*rand)
             ! === Atmospheric fields ===
             ! jablasco: problem taking one year
             do m = 1, 12 
@@ -454,11 +455,11 @@ contains
         else
             ! If no climate variability, mean over the whole reference period
             ! === Atmospheric fields ===
-            call varslice_update(esm%ts_ref, [esm%time_equil(1),esm%time_equil(2)],method="range_mean",rep=12)
-            call varslice_update(esm%pr_ref, [esm%time_equil(1),esm%time_equil(2)],method="range_mean",rep=12)
+            call varslice_update(esm%ts_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
+            call varslice_update(esm%pr_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
             ! ===   Oceanic fields   ===
-            call varslice_update(esm%to_ref, [esm%time_equil(1),esm%time_equil(2)],method="range_mean")
-            call varslice_update(esm%so_ref, [esm%time_equil(1),esm%time_equil(2)],method="range_mean")       
+            call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean")
+            call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean")       
         end if
 
         ! Convert atmospheric fields to model elevation

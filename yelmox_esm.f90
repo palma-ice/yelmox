@@ -55,9 +55,12 @@ program yelmox_esm
         character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
-        real(wp) :: time_equil   ! Only for spinup
-        real(wp) :: time_ref(2)  ! Only for spinup 
+        real(wp) :: time_equil   ! Only for spinup 
         real(wp) :: dtt
+
+        real(wp) :: time_hist(2) 
+        real(wp) :: time_proj(2)  
+        real(wp) :: time_ref(2)  
         logical  :: clim_var
 
         character(len=56)  :: tstep_method
@@ -106,14 +109,16 @@ program yelmox_esm
     end if
 
     ! Read run_step specific control parameters
-    call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
-    call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
-    call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
-    call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to relax first
-    call nml_read(path_par,trim(ctl%run_step),"time_ref",   ctl%time_ref)       ! [yr,yr] Opt period
-    call nml_real(path_par,trim(ctl%run_step),"clim_var",   ctl%clim_var)       ! Climate variability
-    call nml_read(path_par,trim(ctl%run_step),"tstep_method",ctl%tstep_method)  ! Calendar choice ("const" or "rel")
-    call nml_read(path_par,trim(ctl%run_step),"tstep_const", ctl%tstep_const)   ! Assumed time bp for const method
+    call nml_read(path_par,trim(ctl%run_step),"time_init",    ctl%time_init)    ! [yr] Starting time
+    call nml_read(path_par,trim(ctl%run_step),"time_end",     ctl%time_end)     ! [yr] Ending time
+    call nml_read(path_par,trim(ctl%run_step),"dtt",          ctl%dtt)          ! [yr] Main loop time step 
+    call nml_read(path_par,trim(ctl%run_step),"time_equil",   ctl%time_equil)   ! [yr] Years to relax first
+    call nml_read(path_par,trim(ctl%run_step),"time_ref",     ctl%time_ref)     ! [yr,yr] Reference period
+    call nml_read(path_par,trim(ctl%run_step),"time_hist",    ctl%time_hist)    ! [yr,yr] Historical period
+    call nml_read(path_par,trim(ctl%run_step),"time_proj",    ctl%time_proj)    ! [yr,yr] Projection period
+    call nml_real(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)     ! Climate variability
+    call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method) ! Calendar choice ("const" or "rel")
+    call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)  ! Assumed time bp for const method
         
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
@@ -167,12 +172,15 @@ program yelmox_esm
 
             write(*,*) "time_equil: ",   ctl%time_equil 
             write(*,*) "tstep_const: ",  ctl%tstep_const 
-            write(*,*) "time_ref: ",     ctl%time_ref(1),ctl%time_ref(2)
+            write(*,*) "time_opt: ",     ctl%time_ref(1),ctl%time_ref(2)
 
         case("transient")
 
             write(*,*) "esm_write_formatted: ", ctl%esm_write_formatted
             write(*,*) "esm_file_suffix:     ", trim(esmexp%file_suffix)
+            write(*,*) "time_hist: ",           ctl%time_hist(1),ctl%time_hist(2)
+            write(*,*) "time_ref: ",            ctl%time_ref(1),ctl%time_ref(2)
+            write(*,*) "time_proj: ",           ctl%time_proj(1),ctl%time_proj(2)
             
     end select
 
@@ -291,7 +299,8 @@ program yelmox_esm
     
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
-                          time=ts%time,time_bp=ts%time_rel,ctl%time_ref)
+                          time=ts%time,time_bp=ts%time_rel, &
+                          ctl%time_ref,ctl%time_hist,ctl%time_proj)
     
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -474,7 +483,8 @@ program yelmox_esm
             ! Update forcing to present-day reference, but 
             ! adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
-                                  time=ts%time,time_bp=ts%time_rel,ctl%time_ref) 
+                                  time=ts%time,time_bp=ts%time_rel, &
+                                  ctl%time_ref,ctl%time_hist,ctl%time_proj) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -567,7 +577,8 @@ program yelmox_esm
             ! == CLIMATE and OCEAN ==========================================
 
             ! Get ISMIP6 climate and ocean forcing
-            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel,ctl%time_ref)
+            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel, &
+                                  ctl%time_ref,ctl%time_hist,ctl%time_proj)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -1035,7 +1046,7 @@ contains
 
     ! === CLIMATE ====
 
-    subroutine calc_climate_esm(smbp,mshlf,esm,snp,ylmo,time,time_bp,time_ref,domain)
+    subroutine calc_climate_esm(smbp,mshlf,esm,snp,ylmo,time,time_bp,time_ref,time_hist,time_proj)
 
         implicit none 
 
@@ -1046,8 +1057,7 @@ contains
         type(yelmo_class),          intent(IN)    :: ylmo
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp
-        real(wp),                   intent(IN)    :: time_ref(2)
-        character(len=*),           intent(IN)    :: domain 
+        real(wp),                   intent(IN)    :: time_ref(2),time_hist(2),time_proj(2)
         
         ! === Atmospheric boundary conditions ===
 
