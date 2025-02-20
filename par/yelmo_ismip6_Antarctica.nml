@@ -43,6 +43,8 @@
 /
 
 &hysteresis
+    tstep_method    = "const"           ! "const" (time_elapsed), "rel" (time_rel=time_bp) or "cal"
+    tstep_const     = 0.0               ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time
     time_end        = 500.0             ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
