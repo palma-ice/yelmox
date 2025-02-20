@@ -607,9 +607,9 @@ program yelmox_ismip6
 
             if (ismip6exp%shlf_collapse) then
                 ! Clean up icebergs for mask_shlf_collapse experiments
-                call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
-                where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
-            end if 
+            call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
+            where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
+end if 
 
             call timer_step(tmrs,comp=2,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="yelmo") 
 
