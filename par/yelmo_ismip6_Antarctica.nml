@@ -10,8 +10,8 @@
 /
 
 &spinup
-    tstep_method    = "const"           ! "const" (time_elapsed), "rel" (time_rel=time_bp) or "cal"
-    tstep_const     = 0.0               ! Assumed time for "const" method
+    tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 20e3              ! [yr] Ending time (model years)
     time_equil      = 0.0               ! [yr] Equilibration time 
@@ -21,8 +21,8 @@
 /
 
 &transient
-    tstep_method    = "cal"             ! "const" (time_elapsed), "rel" (time_rel=time_bp) or "cal"
-    tstep_const     = 0.0               ! Assumed time for "const" method
+    tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 2015.0            ! [yr] Starting time (years CE)
     time_end        = 2500.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time 

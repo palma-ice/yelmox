@@ -10,38 +10,35 @@
 /
 
 &spinup
-    tstep_method    = "const"           ! "const" (time_elapsed), "rel" (time_rel=time_bp) or "cal"
-    tstep_const     = 0.0               ! Assumed time for "const" method
+    tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 20e3              ! [yr] Ending time (model years)
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 5.0               ! [yr] Main loop timestep
-    time_const      = 2015.0            ! [yr] Year that equilibration represents
     kill_shelves    = True              ! Remove shelves beyond PD
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"             ! "none", "relax", "opt"
 /
 
 &transient
-    tstep_method    = "cal"             ! "const" (time_elapsed), "rel" (time_rel=time_bp) or "cal"
-    tstep_const     = 0.0               ! Assumed time for "const" method
+    tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 2015.0            ! [yr] Starting time (years CE)
     time_end        = 2500.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 1.0               ! [yr] Main loop timestep
-    time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
 /
 
 &hysteresis
-    tstep_method    = "const"           ! "const" (time_elapsed), "rel" (time_rel=time_bp) or "cal"
-    tstep_const     = 0.0               ! Assumed time for "const" method
+    tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time
     time_end        = 500.0             ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 5.0               ! [yr] Main loop timestep
-    time_const      = 2015.0            ! [yr] Year that equilibration represents
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     kill_shelves    = True              ! Remove shelves beyond PD
