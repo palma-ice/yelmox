@@ -582,15 +582,15 @@ program yelmox_ismip6
             call tstep_update(ts,ctl%dtt)
             call tstep_print(ts)
             
-if (ismip6exp%shlf_collapse) then
-            ! Perform mask_shlf_collapse experiments
-            ! Set H to zero where mask==1, then compute Yelmo.
+            if (ismip6exp%shlf_collapse) then
+                ! Perform mask_shlf_collapse experiments
+                ! Set H to zero where mask==1, then compute Yelmo.
 
-            if(ts%time .ge. 2015) then
-                !where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
-                where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%bnd%ice_allowed = .FALSE.
+                if(ts%time .ge. 2015) then
+                    !where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
+                    where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%bnd%ice_allowed = .FALSE.
+                end if
             end if
-end if
 
             call timer_step(tmrs,comp=0) 
             
@@ -605,11 +605,11 @@ end if
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,ts%time)
 
-if (ismip6exp%shlf_collapse) then
-            ! Clean up icebergs for mask_shlf_collapse experiments
-            call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
-            where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
-end if 
+            if (ismip6exp%shlf_collapse) then
+                ! Clean up icebergs for mask_shlf_collapse experiments
+                call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
+                where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
+            end if 
 
             call timer_step(tmrs,comp=2,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="yelmo") 
 
