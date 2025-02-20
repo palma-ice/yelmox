@@ -56,7 +56,7 @@ program yelmox_esm
         real(wp) :: time_init
         real(wp) :: time_end
         real(wp) :: time_equil   ! Only for spinup
-        real(wp) :: time_opt(2)  ! Only for spinup 
+        real(wp) :: time_ref(2)  ! Only for spinup 
         real(wp) :: dtt
         logical  :: clim_var
 
@@ -110,7 +110,7 @@ program yelmox_esm
     call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
     call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
     call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to relax first
-    call nml_read(path_par,trim(ctl%run_step),"time_opt",   ctl%time_opt)       ! [yr,yr] Opt period
+    call nml_read(path_par,trim(ctl%run_step),"time_ref",   ctl%time_ref)       ! [yr,yr] Opt period
     call nml_real(path_par,trim(ctl%run_step),"clim_var",   ctl%clim_var)       ! Climate variability
     call nml_read(path_par,trim(ctl%run_step),"tstep_method",ctl%tstep_method)  ! Calendar choice ("const" or "rel")
     call nml_read(path_par,trim(ctl%run_step),"tstep_const", ctl%tstep_const)   ! Assumed time bp for const method
@@ -167,7 +167,7 @@ program yelmox_esm
 
             write(*,*) "time_equil: ",   ctl%time_equil 
             write(*,*) "tstep_const: ",  ctl%tstep_const 
-            write(*,*) "time_opt: ",  ctl%time_opt(1),ctl%time_opt(2)
+            write(*,*) "time_ref: ",     ctl%time_ref(1),ctl%time_ref(2)
 
         case("transient")
 
@@ -291,7 +291,7 @@ program yelmox_esm
     
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
-                          time=ts%time,time_bp=ts%time_rel)
+                          time=ts%time,time_bp=ts%time_rel,ctl%time_ref)
     
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -474,7 +474,7 @@ program yelmox_esm
             ! Update forcing to present-day reference, but 
             ! adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
-                                  time=ts%time,time_bp=ts%time_rel) 
+                                  time=ts%time,time_bp=ts%time_rel,ctl%time_ref) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -567,7 +567,7 @@ program yelmox_esm
             ! == CLIMATE and OCEAN ==========================================
 
             ! Get ISMIP6 climate and ocean forcing
-            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel)
+            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel,ctl%time_ref)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -1035,7 +1035,7 @@ contains
 
     ! === CLIMATE ====
 
-    subroutine calc_climate_esm(smbp,mshlf,esm,snp,ylmo,time,time_bp,domain,dTa,dTo)
+    subroutine calc_climate_esm(smbp,mshlf,esm,snp,ylmo,time,time_bp,time_ref,domain)
 
         implicit none 
 
@@ -1046,10 +1046,8 @@ contains
         type(yelmo_class),          intent(IN)    :: ylmo
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp
+        real(wp),                   intent(IN)    :: time_ref(2)
         character(len=*),           intent(IN)    :: domain 
-        ! Optional commands
-        real(wp), intent(IN), optional :: dTa
-        real(wp), intent(IN), optional :: dTo
         
         ! === Atmospheric boundary conditions ===
 
@@ -1059,7 +1057,7 @@ contains
                              domain=ylmo%par%domain)
 
         ! Step 2: Calculate anomaly fields
-        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time,use_ref_atm,use_ref_ocn)
+        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time,time_ref,use_ref_atm,use_ref_ocn)
 
         ! Calculate the smb fields 
         call smbpal_update_monthly(smbp,esm%ts_ref+dts_now,esm%pr_ref*dpr, &

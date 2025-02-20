@@ -317,7 +317,7 @@ contains
     
     end subroutine esm_forcing_init
     
-    subroutine esm_forcing_update(esm,z_srf_ylm,time,use_ref_atm,use_ref_ocn)
+    subroutine esm_forcing_update(esm,z_srf_ylm,time,time_ref,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field
 
@@ -326,6 +326,7 @@ contains
         type(esm_forcing_class), intent(INOUT) :: esm
         real(wp), intent(IN) :: z_srf_ylm
         real(wp), intent(IN) :: time
+        real(wp), intent(IN)    :: time_ref(2)
         logical,  intent(IN), optional :: use_ref_atm 
         logical,  intent(IN), optional :: use_ref_ocn 
 
@@ -348,7 +349,7 @@ contains
         
             case("transient")
                 ! Historical period
-                if (time .lt. time_hist_end) then
+                if (time .lt. time_ref(1)) then
                     ! === Atmospheric fields === 
                     call varslice_update(esm%ts_hist,[time],method=slice_method)
                     call varslice_update(esm%pr_hist,[time],method=slice_method)
@@ -359,7 +360,14 @@ contains
                     call varslice_update(esm%so_hist,[time],method=slice_method)
                     esm%dto = esm%to_hist-esm%to_esm_ref
                     esm%dso = esm%so_hist-esm%so_esm_ref
-                else if (time .gt. time_hist_end .and. time .le. time_proj_end) then
+                ! Reference period
+                else if (time .gt. time_ref(1) .and. time .lt. time_ref(2)) then
+                    esm%dts = 0.0_wp
+                    esm%dpr = 1.0_wp
+                    esm%dto = 0.0_wp
+                    esm%dso = 0.0_wp 
+                ! Projection period
+                else if (time .gt. time_ref(2) .and. time .le. time_proj_end) then
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_proj, [time],method=slice_method)
                     call varslice_update(esm%pr_proj, [time],method=slice_method)
