@@ -10,7 +10,8 @@ program yelmox
     use yelmo 
     use yelmo_tools, only : smooth_gauss_2D
     use ice_optimization
-    
+    use ice_sub_regions
+
     ! External libraries
     use fastisostasy    ! also reexports barysealevel
     use snapclim
@@ -39,15 +40,14 @@ program yelmox
     real(wp) :: dT_now
     real(wp) :: dtt_now
     
+    logical,  allocatable :: tmp_mask(:,:)
+
     type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm
 
     ! Model timing
     type(timer_class)  :: tmr
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file 
-
-    character(len=512)    :: regions_mask_fnm
-    real(wp), allocatable :: regions_mask(:,:) 
 
     type ctrl_params
         character(len=56) :: tstep_method
@@ -185,32 +185,26 @@ program yelmox
     running_laurentide = .FALSE. 
     running_greenland  = .FALSE. 
 
+    allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+    
     select case(trim(domain))
 
         case("Antarctica")
 
-            ! Define base regions for whole domain first 
-            regions_mask_fnm = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
-                                "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
-            allocate(regions_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            
-            ! Load mask from file 
-            call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
+            ! Initialize regions
+            call yelmo_regions_init(yelmo1,n=3)
 
-            ! APIS region (region=3.0 in regions map)
-            call yelmo_region_init(yelmo1%regs(1),"APIS",write_to_file=.TRUE.,outfldr=outfldr)
-            yelmo1%regs(1)%mask = .FALSE. 
-            where(abs(regions_mask - 3.0) .lt. 1e-3) yelmo1%regs(1)%mask = .TRUE.
+            ! APIS
+            call get_ice_sub_region(tmp_mask,"APIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(1),"APIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! WAIS region (region=4.0 in regions map)
-            call yelmo_region_init(yelmo1%regs(2),"WAIS",write_to_file=.TRUE.,outfldr=outfldr)
-            yelmo1%regs(2)%mask = .FALSE. 
-            where(abs(regions_mask - 4.0) .lt. 1e-3) yelmo1%regs(2)%mask = .TRUE.
+            ! WAIS
+            call get_ice_sub_region(tmp_mask,"WAIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(2),"WAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! EAIS region (region=5.0 in regions map)
-            call yelmo_region_init(yelmo1%regs(3),"EAIS",write_to_file=.TRUE.,outfldr=outfldr)
-            yelmo1%regs(3)%mask = .FALSE. 
-            where(abs(regions_mask - 5.0) .lt. 1e-3) yelmo1%regs(3)%mask = .TRUE.
+            ! EAIS
+            call get_ice_sub_region(tmp_mask,"EAIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
         case("Laurentide")
 
@@ -244,10 +238,12 @@ program yelmox
             yelmo1%bnd%ice_allowed(:,1)             = .FALSE. 
             yelmo1%bnd%ice_allowed(:,yelmo1%grd%ny) = .FALSE. 
             
-            ! Hudson region (region=1.12 in regions map)
-            call yelmo_region_init(yelmo1%regs(1),"Hudson",write_to_file=.TRUE.)
-            yelmo1%regs(1)%mask = .FALSE. 
-            where(abs(yelmo1%bnd%regions - 1.12) .lt. 1e-3) yelmo1%regs(1)%mask = .TRUE.
+            ! Initialize regions
+            call yelmo_regions_init(yelmo1,n=1)
+
+            ! Hudson region
+            call get_ice_sub_region(tmp_mask,"Hudson",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(1),"Hudson",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
         case("Greenland")
 
