@@ -42,26 +42,29 @@ module esm
         ! Atmospheric fields
         type(varslice_class)   :: ts
         type(varslice_class)   :: pr
-        !type(varslice_class)   :: dts
-        !type(varslice_class)   :: dpr
+        type(varslice_class)   :: dts
+        type(varslice_class)   :: dpr
 
         ! Oceanic fields 
         type(varslice_class)   :: to
         type(varslice_class)   :: so
-        !type(varslice_class)   :: dto
-        !type(varslice_class)   :: dso
-        type(varslice_class)   :: tf_cor
+        type(varslice_class)   :: dto
+        type(varslice_class)   :: dso
 
         ! General fields 
         type(varslice_class)   :: basins
         type(varslice_class)   :: zs_ref
+        type(varslice_class)   :: zs_esm_ref
         type(varslice_class)   :: zs_hist
         type(varslice_class)   :: zs_proj
 
         ! ESM fields
         ! Atmospheric fields
         type(varslice_class)   :: ts_ref 
-        type(varslice_class)   :: pr_ref 
+        type(varslice_class)   :: pr_ref
+
+        type(varslice_class)   :: ts_esm_ref 
+        type(varslice_class)   :: pr_esm_ref 
 
         type(varslice_class)   :: ts_hist 
         type(varslice_class)   :: pr_hist 
@@ -72,6 +75,9 @@ module esm
         ! Oceanic fields 
         type(varslice_class)   :: to_ref
         type(varslice_class)   :: so_ref
+
+        type(varslice_class)   :: to_esm_ref
+        type(varslice_class)   :: so_esm_ref
 
         type(varslice_class)   :: to_hist
         type(varslice_class)   :: so_hist
@@ -271,8 +277,7 @@ contains
         grp_so_proj  = trim(group_prefix)//"so_proj"         
  
         ! Initialize all variables from namelist entries 
-    
-        ! General fields 
+        ! General fields (needed? switch to reese basins?)
         call varslice_init_nml_esm(esm%basins,  filename,"imbie_basins",domain,grid_name,esm%gcm,esm%scenario)
             
         ! Reference period
@@ -312,13 +317,14 @@ contains
     
     end subroutine esm_forcing_init
     
-    subroutine esm_forcing_update(esm,time,use_ref_atm,use_ref_ocn)
+    subroutine esm_forcing_update(esm,z_srf_ylm,time,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field
 
         implicit none 
 
         type(esm_forcing_class), intent(INOUT) :: esm
+        real(wp), intent(IN) :: z_srf_ylm
         real(wp), intent(IN) :: time
         logical,  intent(IN), optional :: use_ref_atm 
         logical,  intent(IN), optional :: use_ref_ocn 
@@ -334,50 +340,48 @@ contains
         select case(trim(esm%ctrl_run_type))
         
             case("ctrl","opt")
-                ! If ctrl or opt, run only climatology?
-                ! check
+                ! If ctrl or opt, run only reference field.
                 esm%dts = 0.0_wp
                 esm%dpr = 1.0_wp
                 esm%dto = 0.0_wp
                 esm%dso = 0.0_wp 
         
             case("transient")
-                ! To do: what reference do i use for the historical/projection period?
                 ! Historical period
                 if (time .lt. time_hist_end) then
                     ! === Atmospheric fields === 
                     call varslice_update(esm%ts_hist,[time],method=slice_method)
                     call varslice_update(esm%pr_hist,[time],method=slice_method)
-                    esm%ts = esm%ts_hist
-                    esm%pr = esm%pr_hist
+                    esm%dts = esm%ts_hist-esm%ts_esm_ref
+                    esm%dpr = esm%pr_hist/(esm%pr_esm_ref+1e-12)
                     ! ===   Oceanic fields   ===
                     call varslice_update(esm%to_hist,[time],method=slice_method)
                     call varslice_update(esm%so_hist,[time],method=slice_method)
-                    esm%to = esm%to_hist
-                    esm%so = esm%so_hist
+                    esm%dto = esm%to_hist-esm%to_esm_ref
+                    esm%dso = esm%so_hist-esm%so_esm_ref
                 else if (time .gt. time_hist_end .and. time .le. time_proj_end) then
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_proj, [time],method=slice_method)
                     call varslice_update(esm%pr_proj, [time],method=slice_method)
-                    esm%ts = esm%ts_proj
-                    esm%pr = esm%pr_proj
+                    esm%dts  = esm%ts_proj-esm%ts_esm_ref
+                    esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
                     ! ===   Oceanic fields   ===
                     call varslice_update(esm%to_proj,[time],method=slice_method)
                     call varslice_update(esm%so_proj,[time],method=slice_method)
-                    esm%to = esm%to_proj
-                    esm%so = esm%so_proj
+                    esm%dto = esm%to_proj-esm%to_esm_ref
+                    esm%dso = esm%so_proj-esm%so_esm_ref
                 ! If longer than projection period, take the mean of the last 30 years
                 else
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
                     call varslice_update(esm%pr_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
-                    esm%ts  = esm%ts_proj
-                    esm%pr  = esm%pr_proj
+                    esm%dts  = esm%ts_proj-esm%ts_esm_ref
+                    esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
                     ! ===   Oceanic fields   ===
                     call varslice_update(esm%to_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
                     call varslice_update(esm%so_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
-                    esm%to  = esm%to_proj
-                    esm%so  = esm%so_proj        
+                    esm%dto  = esm%to_proj
+                    esm%dso  = esm%so_proj        
                 end if
 
             case DEFAULT
@@ -386,6 +390,18 @@ contains
  
         end select
         
+        ! set atmosphere to reference values
+        if (use_ref_atm) then
+            esm%dts = 0.0_wp
+            esm%dpr = 1.0_wp
+        end if
+        
+        ! set ocean to reference values
+        if (use_ref_ocn) then
+            esm%dto = 0.0_wp
+            esm%dso = 0.0_wp
+        end if
+
         return 
 
     end subroutine esm_forcing_update

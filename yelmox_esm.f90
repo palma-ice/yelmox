@@ -1051,37 +1051,22 @@ contains
         real(wp), intent(IN), optional :: dTa
         real(wp), intent(IN), optional :: dTo
         
-        ! Local variables
-        real(wp), allocatable :: dts(:,:),dpr(:,:) 
-        real(wp), allocatable :: dto(:,:),dso(:,:)
-        logical :: south
-
-        south = .FALSE. 
-        if (trim(domain).eq."Antarctica") south = .TRUE.
-
-        allocate(dts(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(dpr(ylmo%grd%nx,ylmo%grd%ny))
-        
         ! === Atmospheric boundary conditions ===
 
         ! Step 1: set the reference climatologies (monthly data)
-        call esm_clim_update(esm,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp,  &
+        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time=0.0_wp,  &
                              dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
                              domain=ylmo%par%domain)
 
         ! Step 2: Calculate anomaly fields
-        ! call esm_forcing_update(...)
-        dts  = 0.0_wp 
-        dpr  = 1.0_wp 
-        dto  = 0.0_wp
-        dso  = 0.0_wp
+        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time,use_ref_atm,use_ref_ocn)
 
         ! Calculate the smb fields 
         call smbpal_update_monthly(smbp,esm%ts_ref+dts_now,esm%pr_ref*dpr, &
                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
         
         ! === Oceanic boundary conditions ===
-        ! Update fields at base level
+        ! Update oceanic fields at draft level
         call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                         ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-esm%to%z, &
                         esm%to%var(:,:,:,1)+dto,esm%so%var(:,:,:,1)+dso, &
