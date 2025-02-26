@@ -1055,18 +1055,6 @@ contains
         ! Step 2: Calculate anomaly fields
         call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time,time_ref,use_ref_atm,use_ref_ocn)
 
-        ! Convert atmospheric fields to model elevation
-        do m = 1,12 
-            if(south) then ! Southern Hemisphere
-                lapse = (esm%par%lapse(1)+(esm%par%lapse(2)-esm%par%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
-            else ! Northern Hemisphere
-                lapse = (esm%par%lapse(1)+(esm%par%lapse(1)-esm%par%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
-            end if    
-            esm%now%t2m(:,:,m) = esm%ts_ref(:,:,m) + lapse*(esm%zs_ref-z_srf_ylm)
-            ! jablasco: do i have to divide with 365? check!
-            esm%now%pr(:,:,m) = esm%pr_ref(:,:,m)/365.0 * exp(esm%par%beta_p*lapse*(esm%zs_ref-z_srf_ylm))! [mm/yr] => [mm/d]
-        end do
-
         ! Calculate the smb fields 
         call smbpal_update_monthly(smbp,esm%ts_ref+dts_now,esm%pr_ref*dpr, &
                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
