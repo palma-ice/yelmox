@@ -101,7 +101,7 @@ program yelmox_esm
     ! What does this?
     if (index(ctl%esm_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
-        call esm_experiment_def(esmexp,ctl%esm_expname,ctl%esm_par_file,"UCM","YELMO")
+        call esm_experiment_def(esmexp,ctl%esm_expname,ctl%esm_par_file,"UCM","YELMO",yelmo1%par%domain)
     end if
 
     ! Read run_step specific control parameters
@@ -191,7 +191,7 @@ program yelmox_esm
     ! === Initialize ice sheet model =====
     
     ! Initialize data objects and load initial topography
-    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ts%time)
 
     ! Store domain and grid_name as shortcuts 
     domain    = yelmo1%par%domain 
@@ -231,7 +231,7 @@ program yelmox_esm
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Initialize barysealevel model
-    call bsl_init(bsl, path_par, time_bp)
+    call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
     call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
@@ -258,21 +258,22 @@ program yelmox_esm
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
 
     ! Barystatic sea level
-    call bsl_update(bsl, year_bp=time_bp)
-    call bsl_write_init(bsl, file_bsl, time)
+    call bsl_update(bsl, year_bp=ts%time_rel)
+    call bsl_write_init(bsl, file_bsl, ts%time)
 
     ! Initialize the isostasy reference state using reference topography fields
     call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
-    call isos_write_init_extended(isos1, file_isos, time)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
+    call isos_write_init_extended(isos1, file_isos, ts%time)
 
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
-        call smbpal_update_monthly_equil(smbpal1,esm1%now%tas,esm1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp,time_equil=100.0)
+        ! jablasco: add anomaly here for init?
+        call smbpal_update_monthly_equil(smbpal1,esm1%t2m,esm1%pr, &
+             yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
     
     ! Update forcing to present-day reference using esm forcing
