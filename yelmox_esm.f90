@@ -12,7 +12,7 @@ program yelmox_esm
     
     ! External libraries
     use geothermal
-    use ismip6
+    use esm
     use fastisostasy    ! also reexports barysealevel
     use marine_shelf
     use sediments
@@ -254,20 +254,6 @@ program yelmox_esm
     
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
-    
-    ! ===== tf_corr initialization ======
-
-    ! Make sure that tf is prescribed externally
-    mshlf1%par%tf_method = 0  
-    
-    if (.not. mshlf1%par%use_restart) then
-        ! Initialize tf_corr to be equal to tf_corr_basin, and
-        ! set tf_corr_basin to zero (all corrections will be contained in one field)
-
-        mshlf1%now%tf_corr       = mshlf1%now%tf_corr_basin
-        mshlf1%now%tf_corr_basin = 0.0_wp
-
-    end if 
     
     ! === Update external modules and pass variables to yelmo boundaries =======
 
@@ -643,7 +629,7 @@ contains
 
         type(yelmo_class),      intent(IN) :: ylmo
         type(isos_class),       intent(IN) :: isos
-        type(snapclim_class),   intent(IN) :: esm
+        type(esm_class),        intent(IN) :: esm
         type(marshelf_class),   intent(IN) :: mshlf
         type(smbpal_class),     intent(IN) :: srf
 
