@@ -279,7 +279,7 @@ program yelmox_esm
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
                           time=ts%time,time_bp=ts%time_rel, &
-                          ctl%time_ref,ctl%time_hist,ctl%time_proj)
+                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj)
     
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -291,7 +291,7 @@ program yelmox_esm
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=ts%time,thrm_method="robin-cold")
     
 ! ================= RUN STEPS ===============================================
 
@@ -332,15 +332,15 @@ program yelmox_esm
         if (ctl%with_ice_sheet .and. .not. yelmo1%par%use_restart) then 
             ! Run yelmo alone for one or a few years with constant boundary conditions
             ! to sort out inconsistencies from initialization.
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,dt=1.0_wp,topo_fixed=.FALSE.)
+            call yelmo_update_equil(yelmo1,ts%time,time_tot=1.0_wp,dt=1.0_wp,topo_fixed=.FALSE.)
         end if 
 
         if (trim(ctl%equil_method) .eq. "opt") then 
             ! Additional initialization option when running 'opt' spinup...
 
-            if (ctl%with_ice_sheet .and. ctl%time_rlx .gt. 0.0) then 
+            if (ctl%with_ice_sheet .and. ctl%time_equil .gt. 0.0) then 
                 ! Calculate thermodynamics with fixed ice sheet 
-                call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_rlx,dt=ctl%dtt,topo_fixed=.TRUE.)
+                call yelmo_update_equil(yelmo1,ts%time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.TRUE.)
             end if 
 
         end if 
@@ -348,8 +348,8 @@ program yelmox_esm
         write(*,*) "Initialization complete."
 
         ! Initialize output files for checking progress 
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")  
-        call yelmo_regions_write(yelmo1,time,init=.TRUE.,units="years")
+        call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")  
+        call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
@@ -463,7 +463,7 @@ program yelmox_esm
             ! adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
                                   time=ts%time,time_bp=ts%time_rel, &
-                                  ctl%time_ref,ctl%time_hist,ctl%time_proj) 
+                                  time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -501,7 +501,7 @@ program yelmox_esm
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time_rel)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup 
@@ -516,13 +516,13 @@ program yelmox_esm
         isos1%par%dt_diagnostics = 10.0_wp 
 
         ! Initialize output files 
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call yelmo_regions_write(yelmo1,time,init=.TRUE.,units="years")
+        call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
+        call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
         if (ctl%esm_write_formatted) then
             ! Initialize output files for esm
-            call yelmo_write_init(yelmo1,file2D_esm,time_init=time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed) 
+            call yelmo_write_init(yelmo1,file2D_esm,time_init=ts%time,units="years")
+            call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed) 
         end if 
 
         call timer_step(tmr,comp=1,label="initialization") 
@@ -580,9 +580,9 @@ program yelmox_esm
 
             ! esm output if desired:
             if (ctl%esm_write_formatted) then
-                if (mod(nint(time_elapsed*100),nint(ctl%esm_dt_formatted*100))==0) then
-                    call write_step_2D_esm(yelmo1,file2D_esm,time)
-                    call write_1D_esm(yelmo1,file1D_esm,time)
+                if (mod(nint(ts%time_elapsed*100),nint(ctl%esm_dt_formatted*100))==0) then
+                    call write_step_2D_esm(yelmo1,file2D_esm,ts%time)
+                    call write_1D_esm(yelmo1,file1D_esm,ts%time)
                 end if
             end if
 
@@ -604,15 +604,15 @@ program yelmox_esm
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
 
     end select
 
     ! Finalize program
-    call yelmo_end(yelmo1,time=time)
+    call yelmo_end(yelmo1,time=ts%time)
 
     ! Print timing summary
-    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=time*1e-3)
+    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=ts%time*1e-3)
     
 contains
     
@@ -1041,7 +1041,7 @@ contains
         ! === Atmospheric boundary conditions ===
 
         ! Step 1: set the reference climatologies (monthly data)
-        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time=0.0_wp,  &
+        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
                              dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
                              domain=ylmo%par%domain)
 
