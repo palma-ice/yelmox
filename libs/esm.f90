@@ -418,13 +418,8 @@ contains
 
         ! Local variables 
         integer  :: m, year 
-        real(wp) :: rand, tmp, year_rand, lapse 
+        real(wp) :: rand, tmp, year_rand 
         character(len=56) :: slice_method 
-        logical :: south
-        real(wp), parameter :: pi        = 3.14159265359
-
-        south = .FALSE. 
-        if (trim(domain).eq."Antarctica") south = .TRUE.
 
         ! Get slices for current time
         slice_method = "extrap" 
@@ -450,18 +445,6 @@ contains
             call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)       
         end if
 
-        ! Convert atmospheric fields to model elevation
-        do m = 1,12 
-            if(south) then ! Southern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
-            else ! Northern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
-            end if    
-            esm%ts_ref(:,:,m) = esm%ts_ref(:,:,m) + lapse*(esm%zs_ref-z_srf_ylm)
-            ! jablasco: do i have to divide with 365? check!
-            esm%pr_ref(:,:,m) = esm%pr_ref(:,:,m)/365.0 * exp(esm%par%beta_p*lapse*(esm%zs_ref-z_srf_ylm))! [mm/yr] => [mm/d]
-        end do
-
         return
 
     end subroutine esm_clim_update
@@ -481,7 +464,7 @@ contains
         character(len=*),       intent(IN)    :: grid_name
         character(len=*),       intent(IN)    :: gcm
         character(len=*),       intent(IN)    :: scenario
-        real(wp), optional,     intent(IN)    :: time_par(3)
+        real(wp), optional,     intent(IN)    :: time_par(4)
 
         ! First load parameters from nml file 
         call varslice_par_load_esm(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose=.TRUE.)
@@ -528,7 +511,6 @@ contains
         call nml_read(filename,group,"unit_scale",     par%unit_scale,   init=init_pars)   
         call nml_read(filename,group,"unit_offset",    par%unit_offset,  init=init_pars)   
         call nml_read(filename,group,"with_time",      par%with_time,    init=init_pars)
-        call nml_read(filename,group,"monthly",        par%use_monthly,  init=init_pars)   
         call nml_read(filename,group,"time_par",       par%time_par,     init=init_pars)   
         
         ! Parse filename as needed
@@ -549,7 +531,6 @@ contains
             write(*,*) "unit_offset = ", par%unit_offset
             write(*,*) "with_time   = ", par%with_time
             if (par%with_time) then
-                write(*,*) "monthly     = ", par%use_monthly
                 write(*,*) "time_par    = ", par%time_par
             end if
         end if 
@@ -743,7 +724,7 @@ contains
                                     "Unit"
             
             do n = 1, n_variables 
-                v = esm%vars(n)
+                v = esmi%vars(n)
                 write(*,"(a40,a8,a65,a15)") &
                                     trim(v%long_name),      &
                                     trim(v%var_type),       &
