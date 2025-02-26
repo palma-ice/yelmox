@@ -30,6 +30,8 @@ module esm
         character(len=256)     :: domain 
         character(len=256)     :: grid_name 
         character(len=256)     :: ctrl_run_type
+        logical                :: clim_var
+        real(wp)               :: lapse(2)
 
         ! === Climatologies ===
         ! Atmosphere
@@ -68,14 +70,16 @@ module esm
         type(varslice_class)   :: zs_hist
         type(varslice_class)   :: zs_proj
 
-        ! Output fields
-        real(wp), allocatable :: t2m_sum(:,:) ! Summer surface temperature [K]
-        real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
-        real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]
-        real(wp), allocatable :: dts(:,:,:)   ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dpr(:,:,:)   ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dto(:,:,:)   ! Ocean temperature anomaly [K]
-        real(wp), allocatable :: dso(:,:,:)   ! Ocean salinity anomaly [PSU]
+        ! Diagnostic fields
+        ! Observed model forcing
+        type(varslice_class) :: t2m_sum ! Summer surface temperature [K]
+        type(varslice_class) :: t2m_ann ! Annual surface temperature [K]
+        type(varslice_class) :: pr_ann  ! Annual precipitation [mm/yr]
+        ! Anomaly
+        type(varslice_class) :: dts     ! Surface temperature anomaly [K]
+        type(varslice_class) :: dpr     ! Precipitation relative anomaly [%]
+        type(varslice_class) :: dto     ! Ocean temperature anomaly [K]
+        type(varslice_class) :: dso     ! Ocean salinity anomaly [PSU]
         
     end type
 
@@ -185,7 +189,7 @@ contains
         ! ESM Projection period 
         character(len=256) :: grp_ts_proj 
         character(len=256) :: grp_pr_proj 
-        character(len=256) :: grp_zs_prof
+        character(len=256) :: grp_zs_proj
         character(len=256) :: grp_to_proj 
         character(len=256) :: grp_so_proj
 
@@ -281,7 +285,7 @@ contains
         ! Load reference surface elevation
         call varslice_update(esm%zs_ref)
 
-        if (trim(esm%ctrl_run_type) .eq. "transient")
+        if (trim(esm%ctrl_run_type) .eq. "transient") then
             ! ESM reference period
             call varslice_init_nml_esm(esm%ts_esm_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
             call varslice_init_nml_esm(esm%pr_esm_ref,  filename,trim(grp_pr_ref), domain,grid_name,esm%gcm,esm%scenario)
@@ -336,10 +340,10 @@ contains
         
             case("ctrl","opt")
                 ! If ctrl or opt, run only reference field.
-                esm%dts = 0.0_wp
-                esm%dpr = 1.0_wp
-                esm%dto = 0.0_wp
-                esm%dso = 0.0_wp 
+                esm%dts%var = 0.0_wp
+                esm%dpr%var = 1.0_wp
+                esm%dto%var = 0.0_wp
+                esm%dso%var = 0.0_wp 
         
             case("transient")
                 ! === Compute reference field ===
@@ -349,32 +353,32 @@ contains
                     ! === Atmospheric fields === 
                     call varslice_update(esm%ts_hist,[time],method="extrap",rep=1)
                     call varslice_update(esm%pr_hist,[time],method="extrap",rep=1)
-                    esm%dts = esm%ts_hist-esm%ts_esm_ref
-                    esm%dpr = esm%pr_hist/(esm%pr_esm_ref+1e-12)
+                    !esm%dts = esm%ts_hist-esm%ts_esm_ref
+                    !esm%dpr = esm%pr_hist/(esm%pr_esm_ref+1e-12)
                     ! ===   Oceanic fields   ===
                     call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                     call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
-                    esm%dto = esm%to_hist-esm%to_esm_ref
-                    esm%dso = esm%so_hist-esm%so_esm_ref
+                    !esm%dto = esm%to_hist-esm%to_esm_ref
+                    !esm%dso = esm%so_hist-esm%so_esm_ref
                 ! === Projection period ===
                 else if (time .gt. time_proj(1)) then
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_proj, [time],method="extrap",rep=1)
                     call varslice_update(esm%pr_proj, [time],method="extrap",rep=1)
-                    esm%dts  = esm%ts_proj-esm%ts_esm_ref
-                    esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
+                    !esm%dts  = esm%ts_proj-esm%ts_esm_ref
+                    !esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
                     ! ===   Oceanic fields   ===
                     call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
                     call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
-                    esm%dto = esm%to_proj-esm%to_esm_ref
-                    esm%dso = esm%so_proj-esm%so_esm_ref
+                    !esm%dto = esm%to_proj-esm%to_esm_ref
+                    !esm%dso = esm%so_proj-esm%so_esm_ref
                 ! === Reference period ===
                 ! Only used if there is a gap between the historical and projection period
                 else if (time .gt. time_hist(2) .and. time .lt. time_proj(1)) then
-                    esm%dts = 0.0_wp
-                    esm%dpr = 1.0_wp
-                    esm%dto = 0.0_wp
-                    esm%dso = 0.0_wp 
+                    esm%dts%var = 0.0_wp
+                    esm%dpr%var = 1.0_wp
+                    esm%dto%var = 0.0_wp
+                    esm%dso%var = 0.0_wp 
                 end if
                 
 
@@ -386,14 +390,14 @@ contains
         
         if (use_ref_atm) then
             ! set atmosphere to reference values
-            esm%dts = 0.0_wp
-            esm%dpr = 1.0_wp
+            esm%dts%var = 0.0_wp
+            esm%dpr%var = 1.0_wp
         end if
         
         if (use_ref_ocn) then
             ! set ocean to reference values
-            esm%dto = 0.0_wp
-            esm%dso = 0.0_wp
+            esm%dto%var = 0.0_wp
+            esm%dso%var = 0.0_wp
         end if
 
         return 
@@ -413,10 +417,11 @@ contains
         character(len=*),        intent(IN)    :: domain
 
         ! Local variables 
-        integer  :: year_rand, m, year 
-        real(wp) :: rand, tmp 
+        integer  :: m, year 
+        real(wp) :: rand, tmp, year_rand, lapse 
         character(len=56) :: slice_method 
         logical :: south
+        real(wp), parameter :: pi        = 3.14159265359
 
         south = .FALSE. 
         if (trim(domain).eq."Antarctica") south = .TRUE.
@@ -448,9 +453,9 @@ contains
         ! Convert atmospheric fields to model elevation
         do m = 1,12 
             if(south) then ! Southern Hemisphere
-                lapse = (esm%par%lapse(1)+(esm%par%lapse(2)-esm%par%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+                lapse = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
             else ! Northern Hemisphere
-                lapse = (esm%par%lapse(1)+(esm%par%lapse(1)-esm%par%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
+                lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
             end if    
             esm%ts_ref(:,:,m) = esm%ts_ref(:,:,m) + lapse*(esm%zs_ref-z_srf_ylm)
             ! jablasco: do i have to divide with 365? check!
