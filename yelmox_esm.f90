@@ -80,13 +80,7 @@ program yelmox_esm
 
     end type 
 
-    type esm_atm_params
-        real(wp) :: lapse(2)
-        real(wp) :: f_p
-    end type
-
     type(ctrl_params)     :: ctl
-    type(esm_atm_params)  :: esm_atm
     type(ice_opt_params)  :: opt 
     type(esm_experiment_class) :: esmexp 
 
@@ -101,6 +95,8 @@ program yelmox_esm
     call nml_read(path_par,"esm","expname",          ctl%esm_expname)
     call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)
     call nml_read(path_par,"esm","dt_formatted",     ctl%esm_dt_formatted)
+    call nml_read(path_par,"esm","lapse",            esm1%lapse)
+    call nml_real(path_par,"esm","f_p",              esm1%beta_p)
 
     ! What does this?
     if (index(ctl%esm_par_file,"ant") .gt. 0) then
@@ -129,10 +125,6 @@ program yelmox_esm
         call optimize_par_load(opt,path_par,"opt")
 
     end if 
-
-    ! Load ESM atm parameters (so far, lapse rate + clausius clap)
-    call nml_read(path_par,"esm_atm","lapse", esm_atm%par%lapse)
-    call nml_real(path_par,"esm_atm","f_p",   esm_atm%par%f_p)
 
     ! Get output times
     call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
@@ -627,11 +619,11 @@ contains
 
         implicit none
 
-        type(yelmo_class),      intent(IN) :: ylmo
-        type(isos_class),       intent(IN) :: isos
-        type(esm_class),        intent(IN) :: esm
-        type(marshelf_class),   intent(IN) :: mshlf
-        type(smbpal_class),     intent(IN) :: srf
+        type(yelmo_class),       intent(IN) :: ylmo
+        type(isos_class),        intent(IN) :: isos
+        type(esm_forcing_class), intent(IN) :: esm
+        type(marshelf_class),    intent(IN) :: mshlf
+        type(smbpal_class),      intent(IN) :: srf
 
         character(len=*),       intent(IN) :: filename
         real(wp),               intent(IN) :: time
@@ -836,18 +828,18 @@ contains
         
         ! Atmospheric boundary conditions
         ! jablasco: todo create!
-        call nc_write(filename,"t2m_ann",esm%now%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
+        call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"t2m_sum",esm%now%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
+        call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"pr_ann",esm%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dt2m_ann",esm%now%dt2m_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dt2m_sum",esm%now%dt2m_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dpr_ann",esm%now%dpr_ann,units="%",long_name="Precipitation anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dt2m_ann",esm%dts,units="K",long_name="Near-surface air temperature anomaly (ann)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dt2m_sum",esm%now%dt2m_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dpr_ann",esm%now%dpr_ann,units="%",long_name="Precipitation anomaly (ann)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
 
         ! Oceanic boundary conditions
@@ -1514,10 +1506,10 @@ contains
 
         implicit none 
         
-        type(esm_class), intent(INOUT) :: esm
-        real(wp),        intent(IN)    :: to_ann(:,:,:) 
-        real(wp),        intent(IN)    :: so_ann(:,:,:)
-        real(wp),        intent(IN)    :: depth(:) 
+        type(esm_forcing_class), intent(INOUT) :: esm
+        real(wp),                intent(IN)    :: to_ann(:,:,:) 
+        real(wp),                intent(IN)    :: so_ann(:,:,:)
+        real(wp),                intent(IN)    :: depth(:) 
         
         ! Local variables 
         integer :: i, j, k, nx, ny, nk 

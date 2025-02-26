@@ -32,7 +32,6 @@ module esm
         character(len=256)     :: ctrl_run_type
         real(wp)               :: lapse(2)
         real(wp)               :: beta_p
-        logical                :: clim_var
 
         ! === Climatologies ===
         ! Atmosphere
@@ -411,7 +410,7 @@ contains
 
     end subroutine esm_forcing_update
 
-    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,domain)
+    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,clim_var,domain)
         ! Routine to compute the esm reference climatology
         ! This is a monthly file
 
@@ -421,6 +420,7 @@ contains
         real(wp),                intent(IN)    :: z_srf_ylm
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
+        logical,                 intent(IN)    :: clim_var
         character(len=*),        intent(IN)    :: domain
 
         ! Local variables 
@@ -438,7 +438,7 @@ contains
         slice_method = "extrap" 
 
         ! Obtain reference climatologies
-        if (esm%clim_var) then
+        if (clim_var) then
             ! If climate variability is true, we select a random year from the climatology period
             call random_number(rand)
             year_rand = NINT((time_ref(2)-time_ref(1))*rand)
