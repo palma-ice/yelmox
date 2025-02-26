@@ -31,9 +31,8 @@
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
-    with_time   = True
-    monthly     = True 
-    time_par    = 1979, 2022, 1
+    with_time   = True 
+    time_par    = 1979, 2022, 1, 12
 /
 
 &gcm_pr_ref
@@ -44,8 +43,7 @@
     unit_scale  = 1.0         
     unit_offset = 0.0 
     with_time   = True
-    monthly     = True 
-    time_par    = 1979, 2022, 1
+    time_par    = 1979, 2022, 1, 12
 /
 
 &gcm_zsrf_ref
@@ -55,9 +53,8 @@
     units_out   = "m"
     unit_scale  = 1.0         
     unit_offset = 0.0 
-    with_time   = False
-    monthly     = False 
-    time_par    = 2020, 2020, 0
+    with_time   = False 
+    time_par    = 2000, 2000, 0, 1
 /
 
 ! ======= Historical period =======
@@ -69,8 +66,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    monthly     = False
-    time_par    = 1950, 1994, 1
+    time_par    = 1950, 1994, 1, 1
 /
 
 &gcm_pr_hist
@@ -78,11 +74,10 @@
     name        = "pr_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
+    unit_scale  = 31556926.0        ! CMIP standard sec_to_year  
     unit_offset = 0.0 
-    with_time   = True
-    monthly     = False 
-    time_par    = 1950, 1994, 1
+    with_time   = True 
+    time_par    = 1950, 1994, 1, 1
 /
 
 ! ======== Projection period ========
@@ -94,8 +89,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    monthly     = False
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2300, 1, 1
 /
 
 &gcm_pr_proj
@@ -106,35 +100,32 @@
     unit_scale  = 31556926.0        ! CMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
-    monthly     = False
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2300, 1, 1
 /
 
 ! ========      OCEAN      =========
 
 ! ======== Reference period ========
 &to_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_thetao.nc"
     name        = "to"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 273.15 
-    with_time   = False
-    monthly     = False 
-    time_par    = 2020, 2020, 0
+    with_time   = True
+    time_par    = 1979, 2024, 1, 1
 /
 
 &so_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_so.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
     unit_scale  = 1.0 
     unit_offset = 0.0 
-    with_time   = False
-    monthly     = False 
-    time_par    = 2020, 2020, 0
+    with_time   = True
+    time_par    = 1979, 2024, 1, 1
 /
 
 ! ======== Historical period ========
@@ -146,8 +137,7 @@
     unit_scale  = 1.0
     unit_offset = 273.15 
     with_time   = True
-    monthly     = False 
-    time_par    = 1850, 1994, 1
+    time_par    = 1850, 1994, 1, 1
 /
 
 &gcm_so_hist
@@ -158,8 +148,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    monthly     = False
-    time_par    = 1850, 1994, 1
+    time_par    = 1850, 1994, 1, 1
 /
 
 ! ======== Projection period ========
@@ -171,8 +160,7 @@
     unit_scale  = 1.0
     unit_offset = 273.15 
     with_time   = True 
-    monthly     = False
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2300, 1, 1
 /
 
 &gcm_so_proj
@@ -183,8 +171,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    monthly     = False
-    time_par    = 1995, 2300, 1
+    time_par    = 1995, 2300, 1, 1
 /
 
 ! === Other fields ===
@@ -197,8 +184,7 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = False
-    monthly     = False 
-    time_par    = 2020, 2020, 0
+    time_par    = 2020, 2020, 0, 0
 /
 
 ! =====================================================

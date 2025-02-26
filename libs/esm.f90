@@ -31,38 +31,17 @@ module esm
         character(len=256)     :: grid_name 
         character(len=256)     :: ctrl_run_type
 
-        ! Climatologies
+        ! === Climatologies ===
         ! Atmosphere
         type(varslice_class)   :: ts_ref
         type(varslice_class)   :: pr_ref
+        
         ! Ocean
         type(varslice_class)   :: to_ref
         type(varslice_class)   :: so_ref
 
+        ! ===      ESM      ===
         ! Atmospheric fields
-        type(varslice_class)   :: ts
-        type(varslice_class)   :: pr
-        type(varslice_class)   :: dts
-        type(varslice_class)   :: dpr
-
-        ! Oceanic fields 
-        type(varslice_class)   :: to
-        type(varslice_class)   :: so
-        type(varslice_class)   :: dto
-        type(varslice_class)   :: dso
-
-        ! General fields 
-        type(varslice_class)   :: basins
-        type(varslice_class)   :: zs_ref
-        type(varslice_class)   :: zs_esm_ref
-        type(varslice_class)   :: zs_hist
-        type(varslice_class)   :: zs_proj
-
-        ! ESM fields
-        ! Atmospheric fields
-        type(varslice_class)   :: ts_ref 
-        type(varslice_class)   :: pr_ref
-
         type(varslice_class)   :: ts_esm_ref 
         type(varslice_class)   :: pr_esm_ref 
 
@@ -73,9 +52,6 @@ module esm
         type(varslice_class)   :: pr_proj
 
         ! Oceanic fields 
-        type(varslice_class)   :: to_ref
-        type(varslice_class)   :: so_ref
-
         type(varslice_class)   :: to_esm_ref
         type(varslice_class)   :: so_esm_ref
 
@@ -84,6 +60,22 @@ module esm
 
         type(varslice_class)   :: to_proj
         type(varslice_class)   :: so_proj
+
+        ! General fields 
+        type(varslice_class)   :: basins
+        type(varslice_class)   :: zs_ref
+        type(varslice_class)   :: zs_esm_ref
+        type(varslice_class)   :: zs_hist
+        type(varslice_class)   :: zs_proj
+
+        ! Output fields
+        real(wp), allocatable :: t2m_sum(:,:) ! Summer surface temperature [K]
+        real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
+        real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]
+        real(wp), allocatable :: dts(:,:,:)   ! Surface temperature anomaly [K]
+        real(wp), allocatable :: dpr(:,:,:)   ! Precipitation relative anomaly [%]
+        real(wp), allocatable :: dto(:,:,:)   ! Ocean temperature anomaly [K]
+        real(wp), allocatable :: dso(:,:,:)   ! Ocean salinity anomaly [PSU]
         
     end type
 
@@ -199,7 +191,7 @@ contains
 
         integer  :: iloc, k 
         real(wp) :: tmp
-        real(wp) :: time_par_ref(3),time_par_hist(3),time_par_proj(3) 
+        real(wp) :: time_par_ref(4),time_par_hist(4),time_par_proj(4) 
     
         ! First determine whether gcm+scenario provided or experiment
         ! obtain valid values for gcm and scenario to start.
@@ -281,37 +273,39 @@ contains
         call varslice_init_nml_esm(esm%basins,  filename,"imbie_basins",domain,grid_name,esm%gcm,esm%scenario)
             
         ! Reference period
-        ! jablasco: right now, temporal size of atm and ocn files not equal
         call varslice_init_nml_esm(esm%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%pr_ref,  filename,trim(grp_pr_ref), domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%zs_ref,  filename,trim(grp_zs_ref), domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%to_ref,  filename,trim(grp_to_ref),domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%so_ref,  filename,trim(grp_so_ref),domain,grid_name,esm%gcm,esm%scenario)
-        ! ESM reference period
-        call varslice_init_nml_esm(esm%ts_esm_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%pr_esm_ref,  filename,trim(grp_pr_ref), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%zs_esm_ref,  filename,trim(grp_zs_ref), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%to_esm_ref,  filename,trim(grp_to_ref),domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%so_esm_ref,  filename,trim(grp_so_ref),domain,grid_name,esm%gcm,esm%scenario)
-        ! ESM historical period
-        call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%zs_hist, filename,trim(grp_zs_hist), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist),domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist),domain,grid_name,esm%gcm,esm%scenario)
-        ! ESM projection period
-        call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%zs_proj, filename,trim(grp_zs_proj), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj),domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj),domain,grid_name,esm%gcm,esm%scenario)
-
-        ! === Load time-independent fields === 
-        ! Surface elevation
+        ! Load reference surface elevation
         call varslice_update(esm%zs_ref)
-        call varslice_update(esm%zs_esm_ref)
-        call varslice_update(esm%zs_hist)
-        call varslice_update(esm%zs_proj)
+
+        if (trim(esm%ctrl_run_type) .eq. "transient")
+            ! ESM reference period
+            call varslice_init_nml_esm(esm%ts_esm_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%pr_esm_ref,  filename,trim(grp_pr_ref), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%zs_esm_ref,  filename,trim(grp_zs_ref), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%to_esm_ref,  filename,trim(grp_to_ref), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%so_esm_ref,  filename,trim(grp_so_ref), domain,grid_name,esm%gcm,esm%scenario)
+            ! ESM historical period
+            call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%zs_hist, filename,trim(grp_zs_hist), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain,grid_name,esm%gcm,esm%scenario)
+            ! ESM projection period
+            call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%zs_proj, filename,trim(grp_zs_proj), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
+            call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
+            ! === Load ESM surface elevations === 
+            call varslice_update(esm%zs_esm_ref)
+            call varslice_update(esm%zs_hist)
+            call varslice_update(esm%zs_proj)
+        end if
+        
 
         return 
     
@@ -348,49 +342,41 @@ contains
                 esm%dso = 0.0_wp 
         
             case("transient")
-                ! Historical period
-                if (time .lt. time_ref(1)) then
+                ! === Compute reference field ===
+                ! To do
+                ! === Historical period ===
+                if (time .lt. time_hist(2)) then
                     ! === Atmospheric fields === 
-                    call varslice_update(esm%ts_hist,[time],method=slice_method)
-                    call varslice_update(esm%pr_hist,[time],method=slice_method)
+                    call varslice_update(esm%ts_hist,[time],method="extrap",rep=1)
+                    call varslice_update(esm%pr_hist,[time],method="extrap",rep=1)
                     esm%dts = esm%ts_hist-esm%ts_esm_ref
                     esm%dpr = esm%pr_hist/(esm%pr_esm_ref+1e-12)
                     ! ===   Oceanic fields   ===
-                    call varslice_update(esm%to_hist,[time],method=slice_method)
-                    call varslice_update(esm%so_hist,[time],method=slice_method)
+                    call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
+                    call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
                     esm%dto = esm%to_hist-esm%to_esm_ref
                     esm%dso = esm%so_hist-esm%so_esm_ref
-                ! Reference period
-                else if (time .gt. time_ref(1) .and. time .lt. time_ref(2)) then
+                ! === Projection period ===
+                else if (time .gt. time_proj(1)) then
+                    ! === Atmospheric fields ===
+                    call varslice_update(esm%ts_proj, [time],method="extrap",rep=1)
+                    call varslice_update(esm%pr_proj, [time],method="extrap",rep=1)
+                    esm%dts  = esm%ts_proj-esm%ts_esm_ref
+                    esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
+                    ! ===   Oceanic fields   ===
+                    call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
+                    call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
+                    esm%dto = esm%to_proj-esm%to_esm_ref
+                    esm%dso = esm%so_proj-esm%so_esm_ref
+                ! === Reference period ===
+                ! Only used if there is a gap between the historical and projection period
+                else if (time .gt. time_hist(2) .and. time .lt. time_proj(1)) then
                     esm%dts = 0.0_wp
                     esm%dpr = 1.0_wp
                     esm%dto = 0.0_wp
                     esm%dso = 0.0_wp 
-                ! Projection period
-                else if (time .gt. time_ref(2) .and. time .le. time_proj(2)) then
-                    ! === Atmospheric fields ===
-                    call varslice_update(esm%ts_proj, [time],method=slice_method)
-                    call varslice_update(esm%pr_proj, [time],method=slice_method)
-                    esm%dts  = esm%ts_proj-esm%ts_esm_ref
-                    esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
-                    ! ===   Oceanic fields   ===
-                    call varslice_update(esm%to_proj,[time],method=slice_method)
-                    call varslice_update(esm%so_proj,[time],method=slice_method)
-                    esm%dto = esm%to_proj-esm%to_esm_ref
-                    esm%dso = esm%so_proj-esm%so_esm_ref
-                ! If longer than projection period, take the mean of the last 30 years
-                else
-                    ! === Atmospheric fields ===
-                    call varslice_update(esm%ts_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
-                    call varslice_update(esm%pr_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
-                    esm%dts  = esm%ts_proj-esm%ts_esm_ref
-                    esm%dpr  = esm%pr_proj/(esm%pr_esm_ref+1e-12)
-                    ! ===   Oceanic fields   ===
-                    call varslice_update(esm%to_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
-                    call varslice_update(esm%so_proj, [time_proj_end-30.0,time_proj_end],method="range_mean")
-                    esm%dto  = esm%to_proj
-                    esm%dso  = esm%so_proj        
                 end if
+                
 
             case DEFAULT
                 write(*,*) "esm_forcing_update:: Error: ctrl_run_type not recognized: "//trim(esm%ctrl_run_type)
@@ -444,22 +430,19 @@ contains
             call random_number(rand)
             year_rand = NINT((time_ref(2)-time_ref(1))*rand)
             ! === Atmospheric fields ===
-            ! jablasco: problem taking one year
-            do m = 1, 12 
-                call varslice_update(esm%ts_ref[:,:,m],[12*year_rand+m],method=slice_method)
-                call varslice_update(esm%pr_ref[:,:,m],[12*year_rand+m],method=slice_method)
-            end do
+            call varslice_update(esm%ts_ref,[year_rand],method="interp",rep=12)
+            call varslice_update(esm%pr_ref,[year_rand],method="interp",rep=12)
             ! ===   Oceanic fields   ===
-            call varslice_update(esm%to_ref,[year_rand],method=slice_method)
-            call varslice_update(esm%so_ref,[year_rand],method=slice_method)
+            call varslice_update(esm%to_ref,[year_rand],method="interp",rep=1)
+            call varslice_update(esm%so_ref,[year_rand],method="interp",rep=1)
         else
             ! If no climate variability, mean over the whole reference period
             ! === Atmospheric fields ===
             call varslice_update(esm%ts_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
             call varslice_update(esm%pr_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
             ! ===   Oceanic fields   ===
-            call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean")
-            call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean")       
+            call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
+            call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)       
         end if
 
         ! Convert atmospheric fields to model elevation

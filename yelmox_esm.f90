@@ -497,7 +497,7 @@ program yelmox_esm
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2D,ts%time)) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,ts%time)
+                call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
             end if
 
             if (timeout_check(tm_1D,ts%time)) then
@@ -591,7 +591,7 @@ program yelmox_esm
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2D,ts%time)) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,ts%time)
+                call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
             end if
            
              
@@ -637,13 +637,13 @@ program yelmox_esm
     
 contains
     
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,esm,mshlf,srf,filename,time)
 
         implicit none
 
         type(yelmo_class),      intent(IN) :: ylmo
         type(isos_class),       intent(IN) :: isos
-        type(snapclim_class),   intent(IN) :: snp
+        type(snapclim_class),   intent(IN) :: esm
         type(marshelf_class),   intent(IN) :: mshlf
         type(smbpal_class),     intent(IN) :: srf
 
@@ -847,13 +847,24 @@ contains
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
+        
+        ! Atmospheric boundary conditions
+        ! jablasco: todo create!
+        call nc_write(filename,"t2m_ann",esm%now%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
+        call nc_write(filename,"t2m_sum",esm%now%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        call nc_write(filename,"pr_ann",esm%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dt2m_ann",esm%now%dt2m_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dt2m_sum",esm%now%dt2m_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dpr_ann",esm%now%dpr_ann,units="%",long_name="Precipitation anomaly (ann)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
 
+        ! Oceanic boundary conditions
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
@@ -894,16 +905,6 @@ contains
             call nc_write(filename,"A_box",mshlf%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         end if
-
-        !call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-        !              dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
-
-        call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         !call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
         !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1046,14 +1047,13 @@ contains
 
     ! === CLIMATE ====
 
-    subroutine calc_climate_esm(smbp,mshlf,esm,snp,ylmo,time,time_bp,time_ref,time_hist,time_proj)
+    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,time,time_bp,time_ref,time_hist,time_proj)
 
         implicit none 
 
         type(smbpal_class),         intent(INOUT) :: smbp
         type(marshelf_class),       intent(INOUT) :: mshlf 
         type(esm_forcing_class),    intent(INOUT) :: esm
-        type(snapclim_class),       intent(IN)    :: snp
         type(yelmo_class),          intent(IN)    :: ylmo
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp
