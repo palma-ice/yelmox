@@ -315,21 +315,19 @@ contains
 
     end subroutine marshelf_update_shelf_3D
 
-    subroutine marshelf_interp_shelf(out2D,in3d,H_ice,z_bed,f_grnd,z_sl,depth,interp_method,interp_depth, &
-                                  depth_const,depth_min,depth_max)
+    subroutine marshelf_interp_shelf(out2D,mshlf,in3d,H_ice,z_bed,f_grnd,z_sl,depth)
         ! Calculate 2D fields from 3D ocean fields representative
 
         implicit none
 
         real(wp), intent(INOUT) :: out2d(:,:)
+        type(marshelf_class), intent(IN) :: mshlf
         real(wp), intent(IN) :: in3d(:,:,:)
         real(wp), intent(IN) :: H_ice(:,:)
         real(wp), intent(IN) :: z_bed(:,:)
         real(wp), intent(IN) :: f_grnd(:,:)
         real(wp), intent(IN) :: z_sl(:,:)
         real(wp), intent(IN) :: depth(:)
-        character(len=56),  intent(IN) :: interp_method,interp_depth
-        real(wp), optional, intent(IN) :: depth_const,depth_min,depth_max
 
         ! Local variables
         integer :: i, j, nx, ny, nz
@@ -351,7 +349,7 @@ contains
 
             ! 1. Calculate the depth of the current shelf base
 
-            select case(trim(interp_depth))
+            select case(trim(mshlf%par%interp_depth))
 
                 case("shlf")
                 ! Assign the depth to the shelf depth
@@ -364,7 +362,7 @@ contains
                 depth_shlf = z_sl(i,j) - z_bed(i,j)
                 else
                 ! Open ocean, depth == constant value, eg 2000 m.
-                depth_shlf = depth_const
+                depth_shlf = mshlf%par%depth_const
                 end if
 
                 case("bed")
@@ -374,24 +372,24 @@ contains
 
                 case("const")
 
-                depth_shlf = depth_const
+                depth_shlf = mshlf%par%depth_const
 
                 case DEFAULT
 
-                write(*,*) "marshelf_update_shelf_3D:: Error: interp_depth method not recognized."
-                write(*,*) "interp_depth = ", trim(interp_depth)
+                write(*,*) "marshelf_interp_shelf:: Error: interp_depth method not recognized."
+                write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
 
             end select
 
             ! 2. Calculate weighting function for vertical depths ===========================
 
-            select case(trim(interp_method))
+            select case(trim(mshlf%par%interp_method))
 
                 case("mean")
                 ! Equal weighting of layers within a specified depth range
 
                 call calc_shelf_variable_mean(wt_shlf,depth, &
-                        depth_range=[depth_min,depth_max])
+                        depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
 
                 case("layer")
                 ! All weight given to the nearest layer to depth of shelf
@@ -404,7 +402,7 @@ contains
                 call  calc_shelf_variable_depth(wt_shlf,depth,depth_shlf)
 
                 case DEFAULT
-                write(*,*) "marshelf_interp_shelf:: error: interp_method not recognized: ", interp_method
+                write(*,*) "marshelf_interp_shelf:: error: interp_method not recognized: ", mshlf%par%interp_method
                 write(*,*) "Must be one of [mean,layer,interp]"
                 stop
 

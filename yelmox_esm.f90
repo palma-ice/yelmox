@@ -96,7 +96,7 @@ program yelmox_esm
     call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)
     call nml_read(path_par,"esm","dt_formatted",     ctl%esm_dt_formatted)
     call nml_read(path_par,"esm","lapse",            esm1%lapse)
-    call nml_real(path_par,"esm","f_p",              esm1%beta_p)
+    call nml_read(path_par,"esm","f_p",              esm1%beta_p)
 
     ! What does this?
     if (index(ctl%esm_par_file,"ant") .gt. 0) then
@@ -112,7 +112,7 @@ program yelmox_esm
     call nml_read(path_par,trim(ctl%run_step),"time_ref",     ctl%time_ref)     ! [yr,yr] Reference period
     call nml_read(path_par,trim(ctl%run_step),"time_hist",    ctl%time_hist)    ! [yr,yr] Historical period
     call nml_read(path_par,trim(ctl%run_step),"time_proj",    ctl%time_proj)    ! [yr,yr] Projection period
-    call nml_real(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)     ! Climate variability
+    call nml_read(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)     ! Climate variability
     call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method) ! Calendar choice ("const" or "rel")
     call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)  ! Assumed time bp for const method
         
@@ -1063,8 +1063,10 @@ contains
         
         ! === Oceanic boundary conditions ===
         ! Update oceanic fields at desired levels
-        
-        ! call shelf_extrapolation
+        call marshelf_interp_shelf(mshlf%now%T_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
+                                   ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
+        call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
+                                        ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
 
         !call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
         !                ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-esm%to_ref%z, &
@@ -1225,8 +1227,6 @@ contains
                         standard_name="grounded_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"sftflf",MAX(ylmo%tpo%now%f_ice-ylmo%tpo%now%f_grnd,0.0),units="1",long_name="Floating ice sheet area fraction", &
                         standard_name="floating_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_coll",esm1%mask_shlf%var(:,:,1,1),units="1",long_name="Collapse mask", &
-                        standard_name="",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -1514,37 +1514,37 @@ contains
 
     end function interp_linear
 
-    subroutine load_ocn_bnd(esm,to_ann,so_ann,depth)
-
-        implicit none 
-        
-        type(esm_forcing_class), intent(INOUT) :: esm
-        real(wp),                intent(IN)    :: to_ann(:,:,:) 
-        real(wp),                intent(IN)    :: so_ann(:,:,:)
-        real(wp),                intent(IN)    :: depth(:) 
-        
-        ! Local variables 
-        integer :: i, j, k, nx, ny, nk 
-        
-        nx = size(to_ann,1)
-        ny = size(to_ann,2) 
-        nk = size(esm%to,3)
-        
-        do k = 1, nk 
-        do j = 1, ny 
-        do i = 1, nx 
-        
-            ! Interpolate ocean variables to the levels of interest
-            esm%to_ann(i,j,k) = interp_linear(depth,to_ann(i,j,:),xout=esm%depth(k))
-            esm%so_ann(i,j,k) = interp_linear(depth,so_ann(i,j,:),xout=esm%depth(k))
-                    
-        end do 
-        end do 
-        end do 
-        
-        return 
-        
-    end subroutine load_ocn_bnd
+    !subroutine load_ocn_bnd(esm,to_ann,so_ann,depth)
+    !
+    !    implicit none 
+    !    
+    !    type(esm_forcing_class), intent(INOUT) :: esm
+    !    real(wp),                intent(IN)    :: to_ann(:,:,:) 
+    !    real(wp),                intent(IN)    :: so_ann(:,:,:)
+    !    real(wp),                intent(IN)    :: depth(:) 
+    !   
+    !    ! Local variables 
+    !    integer :: i, j, k, nx, ny, nk 
+    !    
+    !    nx = size(to_ann,1)
+    !    ny = size(to_ann,2) 
+    !    nk = size(esm%to,3)
+    !    
+    !    do k = 1, nk 
+    !    do j = 1, ny 
+    !    do i = 1, nx 
+    !    
+    !        ! Interpolate ocean variables to the levels of interest
+    !        esm%to_ann(i,j,k) = interp_linear(depth,to_ann(i,j,:),xout=esm%depth(k))
+    !        esm%so_ann(i,j,k) = interp_linear(depth,so_ann(i,j,:),xout=esm%depth(k))
+    !                
+    !    end do 
+    !    end do 
+    !    end do 
+    !    
+    !    return 
+    !    
+    !end subroutine load_ocn_bnd
 
     subroutine calc_iceberg_island(iceberg_mask,f_grnd,H_ice)
         ! Subroutine for finding icebergs 

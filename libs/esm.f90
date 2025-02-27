@@ -81,8 +81,8 @@ module esm
         real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
         real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]        
         ! Applied anomaly
-        real(wp), allocatable :: dto(:,:)     ! Ocean temperature anomaly [K]
-        real(wp), allocatable :: dso(:,:)     ! Ocean salinity anomaly [PSU]
+        !real(wp), allocatable :: dto(:,:)     ! Ocean temperature anomaly [K]
+        !real(wp), allocatable :: dso(:,:)     ! Ocean salinity anomaly [PSU]
     end type
 
     type esm_ice_var_class
@@ -123,6 +123,7 @@ module esm
     public :: esm_experiment_def
     public :: esm_forcing_init
     public :: esm_forcing_update
+    public :: esm_clim_update
     
     public :: esm_write_init
     public :: esm_write_step
@@ -348,8 +349,8 @@ contains
                 ! If ctrl or opt, run only reference field.
                 esm%dts = 0.0_wp
                 esm%dpr = 1.0_wp
-                esm%dto = 0.0_wp
-                esm%dso = 0.0_wp 
+                !esm%dto = 0.0_wp
+                !esm%dso = 0.0_wp 
         
             case("transient")
                 ! === Compute reference field ===
@@ -383,8 +384,8 @@ contains
                 else if (time .gt. time_hist(2) .and. time .lt. time_proj(1)) then
                     esm%dts = 0.0_wp
                     esm%dpr = 1.0_wp
-                    esm%dto = 0.0_wp
-                    esm%dso = 0.0_wp 
+                    !esm%dto = 0.0_wp
+                    !esm%dso = 0.0_wp 
                 end if
                 
 
@@ -402,8 +403,8 @@ contains
         
         if (use_ref_ocn) then
             ! set ocean to reference values
-            esm%dto = 0.0_wp
-            esm%dso = 0.0_wp
+            !esm%dto = 0.0_wp
+            !esm%dso = 0.0_wp
         end if
 
         return 

@@ -18,9 +18,9 @@
     tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 30e3              ! [yr] Ending time (model years)
+    time_end        = 10.0 !30e3              ! [yr] Ending time (model years)
     time_equil      = 0.0               ! [yr] Equilibration time
-    dtt             = 5.0               ! [yr] Main loop timestep 
+    dtt             = 1.0  !5.0              ! [yr] Main loop timestep 
 
     ! Time intervals (check with ESM forcings)
     time_hist       = 1850.0, 1990.0    ! [yr] Year interval used as Historical period
@@ -29,7 +29,7 @@
                                         ! If "opt" this time interval will be used as optimization 
     clim_var        = True              ! include climate variability
     with_ice_sheet  = True              ! Is the ice sheet active?
-    equil_method    = "relax"           ! "none", "relax", "opt"
+    equil_method    = "opt"           ! "none", "relax", "opt"
 /
 
 &transient
