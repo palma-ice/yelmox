@@ -16,11 +16,6 @@
     shlf_collapse   = False
 /
 
-&expAE01
-    experiment      = "NorESM1-M_RCP26-repeat"
-    shlf_collapse   = False
-/
-
 ! =========== ATMOSPHERE ===========
 
 ! ======== Reference period ========
@@ -177,14 +172,14 @@
 ! === Other fields ===
 
 &imbie_basins
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
     name        = "basinNumber"
     units_in    = "1"
     units_out   = "1"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = False
-    time_par    = 2020, 2020, 0, 0
+    time_par    = 2020, 2020, 0, 1
 /
 
 ! =====================================================

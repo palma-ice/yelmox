@@ -240,6 +240,8 @@ contains
         end if
     
         ! Define the current experiment characteristics
+        ! jablasco: que hace esto?
+        esm%ctrl_run_type = trim(scenario_now)
         esm%gcm        = trim(gcm_now)
         esm%scenario   = trim(scenario_now) 
         esm%experiment = trim(esm%gcm)//"_"//trim(esm%scenario) 
@@ -281,14 +283,15 @@ contains
  
         ! Initialize all variables from namelist entries 
         ! General fields (needed? switch to reese basins?)
-        call varslice_init_nml_esm(esm%basins,  filename,"imbie_basins",domain,grid_name,esm%gcm,esm%scenario)
+        write(*,*) "path: ",  trim(grp_ts_ref)
+        call varslice_init_nml_esm(esm%basins,  filename,"basinNumber",   domain,grid_name,esm%gcm,esm%scenario)
             
         ! Reference period
         call varslice_init_nml_esm(esm%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%pr_ref,  filename,trim(grp_pr_ref), domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%zs_ref,  filename,trim(grp_zs_ref), domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%to_ref,  filename,trim(grp_to_ref),domain,grid_name,esm%gcm,esm%scenario)
-        call varslice_init_nml_esm(esm%so_ref,  filename,trim(grp_so_ref),domain,grid_name,esm%gcm,esm%scenario)
+        call varslice_init_nml_esm(esm%to_ref,  filename,trim(grp_to_ref), domain,grid_name,esm%gcm,esm%scenario)
+        call varslice_init_nml_esm(esm%so_ref,  filename,trim(grp_so_ref), domain,grid_name,esm%gcm,esm%scenario)
         ! Load reference surface elevation
         call varslice_update(esm%zs_ref)
 

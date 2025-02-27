@@ -206,6 +206,8 @@ program yelmox_esm
 
     ! Define specific regions of interest =====================
 
+    allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+
     select case(trim(domain))
 
         case("Antarctica")
