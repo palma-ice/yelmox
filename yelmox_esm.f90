@@ -279,7 +279,8 @@ program yelmox_esm
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
                           time=ts%time,time_bp=ts%time_rel, &
-                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj)
+                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
+                          clim_var=ctl%clim_var,domain=yelmo1%par%domain)
     
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -463,7 +464,8 @@ program yelmox_esm
             ! adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
                                   time=ts%time,time_bp=ts%time_rel, &
-                                  time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj) 
+                                  time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
+                                  clim_var=ctl%clim_var,domain=yelmo1%par%domain) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -557,7 +559,8 @@ program yelmox_esm
 
             ! Get ISMIP6 climate and ocean forcing
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel, &
-                                  ctl%time_ref,ctl%time_hist,ctl%time_proj)
+                                  ctl%time_ref,ctl%time_hist,ctl%time_proj, &
+                                  clim_var=ctl%clim_var,domain=yelmo1%par%domain)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -850,6 +853,8 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf,units="PSU",long_name="Shelf salinity anomaly", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,units="K",long_name="Shelf freezing temperature", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -1026,7 +1031,7 @@ contains
 
     ! === CLIMATE ====
 
-    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,time,time_bp,time_ref,time_hist,time_proj)
+    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,time,time_bp,time_ref,time_hist,time_proj,clim_var,domain,use_ref_atm,use_ref_ocn)
 
         implicit none 
 
@@ -1037,27 +1042,33 @@ contains
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp
         real(wp),                   intent(IN)    :: time_ref(2),time_hist(2),time_proj(2)
-        
+        logical,                    intent(IN)    :: clim_var
+        character(len=*),           intent(IN)    :: domain
+        logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
+
         ! === Atmospheric boundary conditions ===
 
         ! Step 1: set the reference climatologies (monthly data)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
-                             dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
-                             domain=ylmo%par%domain)
+                             time_ref,clim_var,domain)
 
         ! Step 2: Calculate anomaly fields
-        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time,time_ref,use_ref_atm,use_ref_ocn)
+        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time, &
+                                time_ref,time_hist,time_proj, &
+                                use_ref_atm=.false.,use_ref_ocn=.false.)
 
         ! Calculate the smb fields 
-        call smbpal_update_monthly(smbp,esm%ts_ref+dts_now,esm%pr_ref*dpr, &
+        call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
         
         ! === Oceanic boundary conditions ===
-        ! Update oceanic fields at draft level
-        call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-esm%to%z, &
-                        esm%to%var(:,:,:,1)+dto,esm%so%var(:,:,:,1)+dso, &
-                        dto_ann=esm%to%var(:,:,:,1)-esm%to_ref%var(:,:,:,1))
+        ! Update oceanic fields at desired levels
+        
+        ! call shelf_extrapolation
+
+        !call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
+        !                ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-esm%to_ref%z, &
+        !                esm%to_ref%var(:,:,:,1)+esm%dto,esm%so_ref%var(:,:,:,1)+esm%dso)
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &

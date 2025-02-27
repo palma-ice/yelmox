@@ -104,6 +104,7 @@ module marine_shelf
         real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
         real(wp), allocatable :: dT_shlf(:,:)           ! [K] Shelf temperature anomaly relative to ref. state
         real(wp), allocatable :: S_shlf(:,:)            ! [PSU] Shelf salinity
+        real(wp), allocatable :: dS_shlf(:,:)           ! [PSU] Shelf salinity anomaly relative to ref. state
         real(wp), allocatable :: T_fp_shlf(:,:)         ! [K] Shelf freezing-point temperature
         real(wp), allocatable :: T_shlf_basin(:,:)      ! [K] Shelf temperature
         real(wp), allocatable :: S_shlf_basin(:,:)      ! [PSU] Shelf salinity
@@ -136,6 +137,7 @@ module marine_shelf
     private
     public :: marshelf_class
     public :: marshelf_update_shelf
+    public :: marshelf_interp_shelf
     public :: marshelf_update
     public :: marshelf_init
     public :: marshelf_end 
@@ -312,6 +314,119 @@ contains
         return 
 
     end subroutine marshelf_update_shelf_3D
+
+    subroutine marshelf_interp_shelf(out2D,in3d,H_ice,z_bed,f_grnd,z_sl,depth,interp_method,interp_depth, &
+                                  depth_const,depth_min,depth_max)
+        ! Calculate 2D fields from 3D ocean fields representative
+
+        implicit none
+
+        real(wp), intent(INOUT) :: out2d(:,:)
+        real(wp), intent(IN) :: in3d(:,:,:)
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: z_bed(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: z_sl(:,:)
+        real(wp), intent(IN) :: depth(:)
+        character(len=56),  intent(IN) :: interp_method,interp_depth
+        real(wp), optional, intent(IN) :: depth_const,depth_min,depth_max
+
+        ! Local variables
+        integer :: i, j, nx, ny, nz
+        real(wp), allocatable :: depth_shlf
+        real(wp), allocatable :: wt_shlf(:)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+        nz = size(depth,1)
+
+        ! Allocate objects
+        allocate(wt_shlf(nz))
+        wt_shlf = 0.0
+        out2d   = 0.0
+
+        ! Loop over domain and update variables at each point (vertical interpolation)
+        do j = 1, ny
+        do i = 1, nx
+
+            ! 1. Calculate the depth of the current shelf base
+
+            select case(trim(interp_depth))
+
+                case("shlf")
+                ! Assign the depth to the shelf depth
+
+                if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .lt. 1.0) then
+                ! Floating ice, depth == z_ice_base
+                depth_shlf = H_ice(i,j)*rho_ice_sw
+                else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
+                ! Grounded ice, depth == H_ocn = z_sl-z_bed
+                depth_shlf = z_sl(i,j) - z_bed(i,j)
+                else
+                ! Open ocean, depth == constant value, eg 2000 m.
+                depth_shlf = depth_const
+                end if
+
+                case("bed")
+                ! Assign the depth corresponding to the bedrock
+
+                depth_shlf = z_sl(i,j) - z_bed(i,j)
+
+                case("const")
+
+                depth_shlf = depth_const
+
+                case DEFAULT
+
+                write(*,*) "marshelf_update_shelf_3D:: Error: interp_depth method not recognized."
+                write(*,*) "interp_depth = ", trim(interp_depth)
+
+            end select
+
+            ! 2. Calculate weighting function for vertical depths ===========================
+
+            select case(trim(interp_method))
+
+                case("mean")
+                ! Equal weighting of layers within a specified depth range
+
+                call calc_shelf_variable_mean(wt_shlf,depth, &
+                        depth_range=[depth_min,depth_max])
+
+                case("layer")
+                ! All weight given to the nearest layer to depth of shelf
+
+                call calc_shelf_variable_layer(wt_shlf,depth,depth_shlf)
+
+                case("interp")
+                ! Interpolation weights from the two nearest layers to depth of shelf
+
+                call  calc_shelf_variable_depth(wt_shlf,depth,depth_shlf)
+
+                case DEFAULT
+                write(*,*) "marshelf_interp_shelf:: error: interp_method not recognized: ", interp_method
+                write(*,*) "Must be one of [mean,layer,interp]"
+                stop
+
+            end select
+
+            ! Normalize weighting function
+            if (sum(wt_shlf) .gt. 0.0_wp) then
+                wt_shlf = wt_shlf / sum(wt_shlf)
+            else
+                write(*,*) "marshelf_interp_shelf:: Error: weighting should be > 0."
+                stop
+            end if
+
+            ! 3. Calculate water properties at depths of interest ============================
+            out2d(i,j)  = sum(in3d(i,j,:) * wt_shlf)
+
+        end do
+        end do 
+
+        return
+
+    end subroutine marshelf_interp_shelf
 
     subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
         
@@ -1721,6 +1836,7 @@ contains
         allocate(now%T_shlf(nx,ny))
         allocate(now%dT_shlf(nx,ny))
         allocate(now%S_shlf(nx,ny))
+        allocate(now%dS_shlf(nx,ny))
         allocate(now%T_fp_shlf(nx,ny))
         allocate(now%T_shlf_basin(nx,ny))
         allocate(now%S_shlf_basin(nx,ny))       
@@ -1744,6 +1860,7 @@ contains
         now%T_shlf          = 0.0
         now%dT_shlf         = 0.0
         now%S_shlf          = 0.0
+        now%dS_shlf          = 0.0
         now%T_fp_shlf       = 0.0 
         now%T_shlf_basin    = 0.0
         now%S_shlf_basin    = 0.0 
@@ -1778,6 +1895,7 @@ contains
         if (allocated(now%T_shlf))          deallocate(now%T_shlf)
         if (allocated(now%dT_shlf))         deallocate(now%dT_shlf)
         if (allocated(now%S_shlf))          deallocate(now%S_shlf)
+        if (allocated(now%dS_shlf))          deallocate(now%dS_shlf)
         if (allocated(now%T_fp_shlf))       deallocate(now%T_fp_shlf)
         if (allocated(now%T_shlf_basin))    deallocate(now%T_shlf_basin)
         if (allocated(now%S_shlf_basin))    deallocate(now%S_shlf_basin)       
@@ -1880,7 +1998,9 @@ contains
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
@@ -1993,6 +2113,7 @@ contains
         call nc_read_interp(filename,"T_shlf",mshlf%now%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dT_shlf",mshlf%now%dT_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"S_shlf",mshlf%now%S_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dS_shlf",mshlf%now%dS_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"S_shlf_basin",mshlf%now%S_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)

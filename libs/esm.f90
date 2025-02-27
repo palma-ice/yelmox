@@ -71,16 +71,16 @@ module esm
         type(varslice_class)   :: zs_proj
         
         ! === Diagnostic fields ===
-        ! Updated field
+        ! Monthly fields
         real(wp), allocatable :: t2m(:,:,:)   ! Monthly surface temperature [K]
         real(wp), allocatable :: pr(:,:,:)    ! Monthly precipitation [mm/yr]
+        real(wp), allocatable :: dts(:,:,:)     ! Surface temperature anomaly [K]
+        real(wp), allocatable :: dpr(:,:,:)     ! Precipitation relative anomaly [%]
         ! Yelmo observed field
         real(wp), allocatable :: t2m_sum(:,:) ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
         real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]        
         ! Applied anomaly
-        real(wp), allocatable :: dts(:,:)     ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dpr(:,:)     ! Precipitation relative anomaly [%]
         real(wp), allocatable :: dto(:,:)     ! Ocean temperature anomaly [K]
         real(wp), allocatable :: dso(:,:)     ! Ocean salinity anomaly [PSU]
     end type
@@ -328,7 +328,7 @@ contains
         implicit none 
 
         type(esm_forcing_class), intent(INOUT) :: esm
-        real(wp), intent(IN) :: z_srf_ylm
+        real(wp), intent(IN) :: z_srf_ylm(:,:)
         real(wp), intent(IN) :: time
         real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2)
         logical,  intent(IN), optional :: use_ref_atm 
@@ -417,7 +417,7 @@ contains
         implicit none
 
         type(esm_forcing_class), intent(INOUT) :: esm
-        real(wp),                intent(IN)    :: z_srf_ylm
+        real(wp),                intent(IN)    :: z_srf_ylm(:,:)
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
         logical,                 intent(IN)    :: clim_var
