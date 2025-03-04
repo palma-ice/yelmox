@@ -847,12 +847,12 @@ contains
         ! ESM Atmospheric boundary fields            
         !call nc_write(filename,"t2m",esm%to_ref%var(:,:,1,1),units="K",long_name="Near-surface air temperature (ann)", &
         !              dim1="xc",dim2="yc",dim3="time",start=[1,1,1,n],ncid=ncid)
-        !call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
-        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
-        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         !call nc_write(filename,"dt2m_ann",esm%dts,units="K",long_name="Near-surface air temperature anomaly (ann)", &
         !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         !call nc_write(filename,"dt2m_sum",esm%now%dt2m_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
