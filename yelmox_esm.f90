@@ -288,10 +288,7 @@ program yelmox_esm
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
-        ! jablasco: add anomaly here for init?
-        !call smbpal_update_monthly_equil(smbpal1,esm1%t2m,esm1%pr, &
-        !     yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
-        call smbpal_update_monthly_equil(smbpal1,esm1%ts_ref%var(:,:,:,1),esm1%pr_ref%var(:,:,:,1), &
+        call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
             yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
 
@@ -815,8 +812,8 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
@@ -847,17 +844,15 @@ contains
         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-        ! Atmospheric boundary conditions
-        ! jablasco: todo create!
-            
-        call nc_write(filename,"t2m",esm%to_ref%var(:,:,1,1),units="K",long_name="Near-surface air temperature (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! ESM Atmospheric boundary fields            
+        !call nc_write(filename,"t2m",esm%to_ref%var(:,:,1,1),units="K",long_name="Near-surface air temperature (ann)", &
+        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,1,n],ncid=ncid)
+        !call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         !call nc_write(filename,"dt2m_ann",esm%dts,units="K",long_name="Near-surface air temperature anomaly (ann)", &
         !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         !call nc_write(filename,"dt2m_sum",esm%now%dt2m_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
@@ -1089,9 +1084,7 @@ contains
                                 use_ref_atm=.false.,use_ref_ocn=.false.)
 
         ! Calculate the smb fields 
-        !call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
-        !                           ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
-        call smbpal_update_monthly(smbp,esm%ts_ref%var(:,:,:,1),esm%pr_ref%var(:,:,:,1)/365.0, &
+        call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
             ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
         ! === Oceanic boundary conditions ===
         ! Update oceanic fields at desired levels
@@ -1100,10 +1093,6 @@ contains
                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
-
-        !call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-        !                ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-esm%to_ref%z, &
-        !                esm%to_ref%var(:,:,:,1)+esm%dto,esm%so_ref%var(:,:,:,1)+esm%dso)
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &

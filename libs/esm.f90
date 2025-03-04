@@ -303,7 +303,7 @@ contains
  
         ! Initialize all variables from namelist entries 
         ! General fields (needed? switch to reese basins?)
-        call varslice_init_nml_esm(esm%basins,  filename,  "imbie_basins", domain,grid_name,esm%gcm,esm%scenario)
+        call varslice_init_nml_esm(esm%basins,  filename,  "basins", domain,grid_name,esm%gcm,esm%scenario)
             
         ! Reference period
         call varslice_init_nml_esm(esm%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
@@ -374,9 +374,8 @@ contains
             case("ctrl","opt")
                 ! If ctrl or opt, run only reference field.
                 
-
-                !esm%dts = 0.0_wp
-                !esm%dpr = 1.0_wp
+                esm%dts = 0.0_wp
+                esm%dpr = 1.0_wp
                 !esm%dto = 0.0_wp
                 !esm%dso = 0.0_wp 
         
@@ -500,10 +499,18 @@ contains
             esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1) * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
         end do
 
-        write(*,*) "tsmax = ",maxval(esm%t2m)
-        write(*,*) "prmax = ",maxval(esm%pr)
-        write(*,*) "tsmin = ",minval(esm%t2m)
-        write(*,*) "prmin = ",minval(esm%pr)
+        ! Compute diagnostic fields
+        esm%t2m_ann = sum(esm%t2m,dim=3) / 12.0
+        esm%pr_ann  = sum(esm%pr,dim=3) / 12.0 
+        if(south) then
+            esm%t2m_sum = (esm%t2m(:,:,1)+esm%t2m(:,:,2)+esm%t2m(:,:,12)) / 3.0
+        else
+            esm%t2m_sum = (esm%t2m(:,:,6)+esm%t2m(:,:,7)+esm%t2m(:,:,8)) / 3.0
+        end if      
+        !write(*,*) "tsmax = ",maxval(esm%t2m)
+        !write(*,*) "prmax = ",maxval(esm%pr)
+        !write(*,*) "tsmin = ",minval(esm%t2m)
+        !write(*,*) "prmin = ",minval(esm%pr)
 
         return
 

@@ -171,9 +171,9 @@
 
 ! === Other fields ===
 
-&imbie_basins
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
-    name        = "basinNumber"
+&basins
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
+    name        = "basin_reese"
     units_in    = "1"
     units_out   = "1"
     unit_scale  = 1.0 

@@ -58,7 +58,7 @@
 
 &tm_2D
     method          = "const"           ! "const", "file", "times"
-    dt              = 2e3
+    dt              = 1.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /
