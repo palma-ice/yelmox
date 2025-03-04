@@ -66,6 +66,7 @@ program yelmox_esm
         character(len=56)  :: tstep_method
         real(wp) :: tstep_const
 
+        logical  :: kill_shelves
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
 
@@ -125,6 +126,7 @@ program yelmox_esm
     call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method) ! Calendar choice ("const" or "rel")
     call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)  ! Assumed time bp for const method
         
+    call nml_read(path_par,trim(ctl%run_step),"kill_shelves",  ctl%kill_shelves)    ! Kill shelves beyond pd?
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
 
@@ -304,6 +306,11 @@ program yelmox_esm
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=ts%time,thrm_method="robin-cold")
+
+    ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
+    if (ctl%kill_shelves) then
+        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%ice_allowed = .FALSE.
+    end if
     
 ! ================= RUN STEPS ===============================================
 
@@ -1097,7 +1104,6 @@ contains
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
-        write(*,*) "Test ShlfUpdate Finish"
 
         return
 
