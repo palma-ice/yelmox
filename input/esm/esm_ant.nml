@@ -20,29 +20,29 @@
 
 ! ======== Reference period ========
 &gcm_ts_ref
-    filename    = "ice_data/Antarctica/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
     name        = "t2m"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1979, 2022, 1, 12
+    time_par    = 1979.0, 2022.0, 1.0, 12.0
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/Antarctica/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
     name        = "precip"
-    units_in    = "kg m-2"
+    units_in    = "kg m-2 month-1"
     units_out   = "mm yr-1"
-    unit_scale  = 1.0         
+    unit_scale  = 0.08333         
     unit_offset = 0.0 
     with_time   = True
-    time_par    = 1979, 2022, 1, 12
+    time_par    = 1979.0, 2022.0, 1.0, 12.0
 /
 
-&gcm_zsrf_ref
-    filename    = "ice_data/Antarctica/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+&gcm_zs_ref
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
     name        = "z_srf"
     units_in    = "m"
     units_out   = "m"
@@ -69,7 +69,7 @@
     name        = "pr_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31556926.0        ! CMIP standard sec_to_year  
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
     time_par    = 1950, 1994, 1, 1
@@ -101,9 +101,9 @@
 ! ========      OCEAN      =========
 
 ! ======== Reference period ========
-&to_ref
+&gcm_to_ref
     filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_thetao.nc"
-    name        = "to"
+    name        = "thetao"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0 
@@ -112,7 +112,7 @@
     time_par    = 1979, 2024, 1, 1
 /
 
-&so_ref
+&gcm_so_ref
     filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_so.nc"
     name        = "so"
     units_in    = "PSU"

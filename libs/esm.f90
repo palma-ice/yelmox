@@ -283,8 +283,7 @@ contains
  
         ! Initialize all variables from namelist entries 
         ! General fields (needed? switch to reese basins?)
-        write(*,*) "path: ",  trim(grp_ts_ref)
-        call varslice_init_nml_esm(esm%basins,  filename,"basinNumber",   domain,grid_name,esm%gcm,esm%scenario)
+        call varslice_init_nml_esm(esm%basins,  filename,  "imbie_basins", domain,grid_name,esm%gcm,esm%scenario)
             
         ! Reference period
         call varslice_init_nml_esm(esm%ts_ref,  filename,trim(grp_ts_ref), domain,grid_name,esm%gcm,esm%scenario)
@@ -320,6 +319,9 @@ contains
             call varslice_update(esm%zs_hist)
             call varslice_update(esm%zs_proj)
         end if
+
+        ! Allocate objects
+        !esm_allocate()
 
         return 
     
@@ -424,12 +426,14 @@ contains
         real(wp),                intent(IN)    :: z_srf_ylm(:,:)
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
+        !real(dp),                intent(IN)    :: time_ref(2)
         logical,                 intent(IN)    :: clim_var
         character(len=*),        intent(IN)    :: domain
 
         ! Local variables 
         integer  :: m, year 
-        real(wp) :: rand, tmp, year_rand, lapse
+        real(wp) :: rand, tmp, lapse
+        real(wp) :: year_rand
         real(wp), parameter :: pi = 3.14159265359 
         character(len=56)   :: slice_method 
 
@@ -441,11 +445,14 @@ contains
         ! Get slices for current time
         slice_method = "extrap" 
 
+        write(*,*) "clim_var = ", clim_var
+        write(*,*) "time_ref = ", time_ref(1), time_ref(2)
         ! Obtain reference climatologies
         if (clim_var) then
             ! If climate variability is true, we select a random year from the climatology period
             call random_number(rand)
-            year_rand = NINT((time_ref(2)-time_ref(1))*rand)
+            year_rand = NINT((time_ref(2)-time_ref(1))*rand + time_ref(1))  
+            write(*,*) "year_rand = ", year_rand
             ! === Atmospheric fields ===
             call varslice_update(esm%ts_ref,[year_rand],method="interp",rep=12)
             call varslice_update(esm%pr_ref,[year_rand],method="interp",rep=12)
@@ -465,15 +472,20 @@ contains
         ! Convert atmospheric fields to model elevation
         do m = 1,12 
             if(south) then ! Southern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.0-30.0)/360.0))
+                lapse = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.4375-30.4375)/365.25))
             else ! Northern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.0-30.0)/360.0))
+                lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
             end if    
-            esm%t2m(:,:,m) = esm%ts_ref%var(:,:,m,1) + lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
-            ! jablasco: do i have to divide with 365? check!
+            esm%t2m(:,:,m) = esm%ts_ref%var(:,:,1,1) !+ lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
+            ! jablasco: do i have to divide with 365? in theopry variable already modified in  check!
             ! [mm/yr] => [mm/d] do before when loading?
-            esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1)/365.0 * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
+            esm%pr(:,:,m)  = esm%pr_ref%var(:,:,1,1) !* exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
         end do
+
+        write(*,*) "tsmax = ",maxval(esm%t2m)
+        write(*,*) "tsmax = ",maxval(esm%pr)
+        write(*,*) "prmin = ",minval(esm%t2m)
+        write(*,*) "prmin = ",minval(esm%pr)
 
         return
 
@@ -481,7 +493,7 @@ contains
 
     ! === varslice wrapper routines with esm specific options ===================
 
-    subroutine varslice_init_nml_esm(vs,filename,group,domain,grid_name,gcm,scenario,time_par)
+    subroutine varslice_init_nml_esm(vs,filename,group,domain,grid_name,gcm,scenario,verbose)
         ! Routine to load information related to a given 
         ! transient variable, so that it can be processed properly.
 
@@ -490,21 +502,15 @@ contains
         type(varslice_class),   intent(INOUT) :: vs
         character(len=*),       intent(IN)    :: filename
         character(len=*),       intent(IN)    :: group
-        character(len=*),       intent(IN)    :: domain
-        character(len=*),       intent(IN)    :: grid_name
+        character(len=*),       intent(IN), optional :: domain
+        character(len=*),       intent(IN), optional :: grid_name
         character(len=*),       intent(IN)    :: gcm
         character(len=*),       intent(IN)    :: scenario
-        real(wp), optional,     intent(IN)    :: time_par(4)
-
+        logical,                intent(IN), optional :: verbose 
+        ! Local variables 
+        
         ! First load parameters from nml file 
-        call varslice_par_load_esm(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose=.TRUE.)
-
-        if (present(time_par)) then 
-            if (minval(time_par) .ge. 0.0) then
-                ! Use time_par option provided as an argument
-                vs%par%time_par = time_par 
-            end if
-        end if
+        call varslice_par_load_esm(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose)
 
         ! Perform remaining init operations 
         call varslice_init_data(vs) 
@@ -514,59 +520,80 @@ contains
     end subroutine varslice_init_nml_esm
 
     subroutine varslice_par_load_esm(par,filename,group,domain,grid_name,gcm,scenario,verbose)
-        ! Wrapper to routine varslice::varslice_par_load() that includes
-        ! additional parsing arguments of esm gcm and scenario. 
 
         type(varslice_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: group
-        character(len=*), intent(IN) :: domain
-        character(len=*), intent(IN) :: grid_name  
+        character(len=*), intent(IN), optional :: domain
+        character(len=*), intent(IN), optional :: grid_name   
         character(len=*), intent(IN) :: gcm
         character(len=*), intent(IN) :: scenario
-        logical :: verbose 
-
+        logical, optional :: verbose 
+    
         ! Local variables
-        logical  :: init_pars 
-        real(wp) :: time_par(3) 
+        logical  :: init_pars
         logical  :: print_summary 
-
-        init_pars     = .FALSE.
-        print_summary = verbose 
-
+        integer  :: i 
+    
+        init_pars = .FALSE.
+    
+        print_summary = .TRUE. 
+        if (present(verbose)) print_summary = verbose 
+    
         call nml_read(filename,group,"filename",       par%filename,     init=init_pars)
         call nml_read(filename,group,"name",           par%name,         init=init_pars)
         call nml_read(filename,group,"units_in",       par%units_in,     init=init_pars)
         call nml_read(filename,group,"units_out",      par%units_out,    init=init_pars)
         call nml_read(filename,group,"unit_scale",     par%unit_scale,   init=init_pars)   
         call nml_read(filename,group,"unit_offset",    par%unit_offset,  init=init_pars)   
-        call nml_read(filename,group,"with_time",      par%with_time,    init=init_pars)
+        call nml_read(filename,group,"with_time",      par%with_time,    init=init_pars)   
         call nml_read(filename,group,"time_par",       par%time_par,     init=init_pars)   
-        
+            
         ! Parse filename as needed
         call parse_path(par%filename,domain,grid_name)
         call parse_path_esm(par%filename,gcm,scenario)
 
+        ! fesm utils: Parse filename as needed
+        !if (present(domain) .and. present(grid_name)) then
+        !    call parse_path(par%filename,domain,grid_name)
+        !end if 
+    
+        ! See if multiple files are available
+        call get_matching_files(par%filenames, par%filename)
+            
         ! Make sure time parameters are consistent time_par=[x0,x1,dx]
-        if (par%time_par(3) .eq. 0) par%time_par(2) = par%time_par(1) 
-
+        if (par%time_par(3) .eq. 0.0) par%time_par(2) = par%time_par(1) 
+    
+        if (par%time_par(4) .gt. 1.0) then
+            par%with_time_sub = .TRUE.
+        else
+            par%with_time_sub = .FALSE.
+        end if
+    
         ! Summary 
         if (print_summary) then  
             write(*,*) "Loading: ", trim(filename), ":: ", trim(group)
-            write(*,*) "filename    = ", trim(par%filename)
-            write(*,*) "name        = ", trim(par%name)
-            write(*,*) "units_in    = ", trim(par%units_in)
-            write(*,*) "units_out   = ", trim(par%units_out)
-            write(*,*) "unit_scale  = ", par%unit_scale
-            write(*,*) "unit_offset = ", par%unit_offset
-            write(*,*) "with_time   = ", par%with_time
+            write(*,*) "filename      = ", trim(par%filename)
+            if (size(par%filenames,1) .gt. 1) then
+                write(*,*) "filenames     = "
+                do i = 1, size(par%filenames,1)
+                    write(*,*) "                  ", trim(par%filenames(i))
+                end do
+            end if
+            write(*,*) "name          = ", trim(par%name)
+            write(*,*) "units_in      = ", trim(par%units_in)
+            write(*,*) "units_out     = ", trim(par%units_out)
+            write(*,*) "unit_scale    = ", par%unit_scale
+            write(*,*) "unit_offset   = ", par%unit_offset
+            write(*,*) "with_time     = ", par%with_time
+            write(*,*) "with_time_sub = ", par%with_time_sub
             if (par%with_time) then
                 write(*,*) "time_par    = ", par%time_par
             end if
         end if 
-
+    
         return
-
+    
     end subroutine varslice_par_load_esm
     
     subroutine parse_path_esm(path,gcm,scenario)

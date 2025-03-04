@@ -57,7 +57,13 @@ program yelmox_esm
         real(wp) :: time_end
         real(wp) :: time_equil   ! Only for spinup 
         real(wp) :: dtt
+        !real(dp) :: time_init
+        !real(dp) :: time_end
+        !real(dp) :: time_equil   ! Only for spinup 
+        !real(dp) :: dtt
 
+        !real(dp) :: time_hist(2) 
+        !rreal(dp) :: time_ref(2) 
         real(wp) :: time_hist(2) 
         real(wp) :: time_proj(2)  
         real(wp) :: time_ref(2)  
@@ -271,19 +277,20 @@ program yelmox_esm
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
+    ! Update forcing to present-day reference using esm forcing
+    call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
+                          time=ts%time,time_bp=ts%time_rel, &
+                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
+                          clim_var=ctl%clim_var,domain=yelmo1%par%domain)
+
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
         ! jablasco: add anomaly here for init?
         call smbpal_update_monthly_equil(smbpal1,esm1%t2m,esm1%pr, &
              yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
-    
-    ! Update forcing to present-day reference using esm forcing
-    call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
-                          time=ts%time,time_bp=ts%time_rel, &
-                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
-                          clim_var=ctl%clim_var,domain=yelmo1%par%domain)
-    
+
+    ! Update Yelmo boundary fields
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
@@ -834,6 +841,9 @@ contains
         
         ! Atmospheric boundary conditions
         ! jablasco: todo create!
+            
+        call nc_write(filename,"t2m",esm%to_ref%var(:,:,:,1),units="K",long_name="Near-surface air temperature (ann)", &
+                      dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
         call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
@@ -1054,17 +1064,30 @@ contains
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
                              time_ref,clim_var,domain)
 
+        ! Ocean
+        !write(*,*) "Tomax = ",maxval(esm%to_ref%var(:,:,:,1))
+        !write(*,*) "Somax = ",maxval(esm%so_ref%var(:,:,:,1))
+        !write(*,*) "Tomin = ",minval(esm%to_ref%var(:,:,:,1))
+        !write(*,*) "Somin = ",minval(esm%so_ref%var(:,:,:,1))
+        ! Atm
+        write(*,*) "Tsrefmax = ",maxval(esm%ts_ref%var(:,:,1,1))
+        write(*,*) "Prrefmax = ",maxval(esm%pr_ref%var(:,:,1,1))
+        write(*,*) "Tsrefmin = ",minval(esm%ts_ref%var(:,:,1,1))
+        write(*,*) "Prrefmin = ",minval(esm%pr_ref%var(:,:,1,1))
+
         ! Step 2: Calculate anomaly fields
         call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time, &
                                 time_ref,time_hist,time_proj, &
                                 use_ref_atm=.false.,use_ref_ocn=.false.)
 
         ! Calculate the smb fields 
-        call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
-                                   ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
-        
+        !call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
+        !                           ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
+        call smbpal_update_monthly(smbp,esm%ts_ref%var(:,:,:,1),esm%pr_ref%var(:,:,:,1)/365.0, &
+            ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
         ! === Oceanic boundary conditions ===
         ! Update oceanic fields at desired levels
+        ! To do: anomalies
         call marshelf_interp_shelf(mshlf%now%T_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
@@ -1077,6 +1100,7 @@ contains
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
+        write(*,*) "Test ShlfUpdate Finish"
 
         return
 

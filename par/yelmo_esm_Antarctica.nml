@@ -383,10 +383,10 @@
     trans_a         =  0.46 
     trans_b         =  6e-5
     trans_c         =  0.01
-    itm_c           = -75.0
+    itm_c           = -55.0
     itm_t           =  10.0
-    itm_b           =  -2.0 
-    itm_lat0        =  65.0 
+    itm_b           =  3.0 
+    itm_lat0        =  -60.0 
 
     ! ## Surface albedo
     alb_snow_dry       =  0.8
