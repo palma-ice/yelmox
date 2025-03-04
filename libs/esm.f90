@@ -70,20 +70,45 @@ module esm
         type(varslice_class)   :: zs_hist
         type(varslice_class)   :: zs_proj
         
+        ! To do: eliminate this into new group
         ! === Diagnostic fields ===
+        ! === Atmosphere ===
         ! Monthly fields
         real(wp), allocatable :: t2m(:,:,:)   ! Monthly surface temperature [K]
         real(wp), allocatable :: pr(:,:,:)    ! Monthly precipitation [mm/yr]
-        real(wp), allocatable :: dts(:,:,:)     ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dpr(:,:,:)     ! Precipitation relative anomaly [%]
-        ! Yelmo observed field
+        real(wp), allocatable :: dts(:,:,:)   ! Surface temperature anomaly [K]
+        real(wp), allocatable :: dpr(:,:,:)   ! Precipitation relative anomaly [%]
+        ! Mean fields
         real(wp), allocatable :: t2m_sum(:,:) ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
-        real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]        
-        ! Applied anomaly
-        !real(wp), allocatable :: dto(:,:)     ! Ocean temperature anomaly [K]
-        !real(wp), allocatable :: dso(:,:)     ! Ocean salinity anomaly [PSU]
+        real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]
+        ! === Ocean ===?
+
     end type
+
+    ! To do: create state class. Cleaner.
+    !type esm_state_class
+    !    ! === Diagnostic fields ===
+    !    ! === Atmosphere ===
+    !    ! Monthly fields
+    !    real(wp), allocatable :: t2m(:,:,:)   ! Monthly surface temperature [K]
+    !    real(wp), allocatable :: pr(:,:,:)    ! Monthly precipitation [mm/yr]
+    !    real(wp), allocatable :: dts(:,:,:)   ! Surface temperature anomaly [K]
+    !    real(wp), allocatable :: dpr(:,:,:)   ! Precipitation relative anomaly [%]
+    !    ! Yelmo observed field
+    !    real(wp), allocatable :: t2m_sum(:,:) ! Summer surface temperature [K]
+    !    real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
+    !    real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]        
+    !    
+    !    ! === Ocean ===
+    !    !real(wp), allocatable :: dto(:,:)     ! Ocean temperature anomaly [K]
+    !    !real(wp), allocatable :: dso(:,:)     ! Ocean salinity anomaly [PSU]
+    !end type
+    !
+    !type esm_class
+    !    type(esm_forcing_class) :: par 
+    !    type(esm_state_class)   :: now
+    !end type
 
     type esm_ice_var_class
         character(len=56)  :: name 
@@ -108,11 +133,6 @@ module esm
     type esm_ice_class
         type(esm_ice_var_class), allocatable :: vars(:)
     end type 
-
-    ! TO DO: create a general ESM class
-    !type esm_class
-    !
-    !end type
 
     private
     public :: esm_forcing_class
@@ -321,7 +341,8 @@ contains
         end if
 
         ! Allocate objects
-        !esm_allocate()
+        call esm_allocate(esm,size(esm%zs_ref%var,1),size(esm%zs_ref%var,2))
+        write(*,*) "dim1, dim2", size(esm%zs_ref%var,1),size(esm%zs_ref%var,2)
 
         return 
     
@@ -352,8 +373,10 @@ contains
         
             case("ctrl","opt")
                 ! If ctrl or opt, run only reference field.
-                esm%dts = 0.0_wp
-                esm%dpr = 1.0_wp
+                
+
+                !esm%dts = 0.0_wp
+                !esm%dpr = 1.0_wp
                 !esm%dto = 0.0_wp
                 !esm%dso = 0.0_wp 
         
@@ -426,30 +449,27 @@ contains
         real(wp),                intent(IN)    :: z_srf_ylm(:,:)
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
-        !real(dp),                intent(IN)    :: time_ref(2)
         logical,                 intent(IN)    :: clim_var
         character(len=*),        intent(IN)    :: domain
 
         ! Local variables 
         integer  :: m, year 
-        real(wp) :: rand, tmp, lapse
-        real(wp) :: year_rand
+        real(wp) :: tmp, lapse
         real(wp), parameter :: pi = 3.14159265359 
         character(len=56)   :: slice_method 
+        logical :: south 
+        real(wp) :: rand, year_rand
 
-        ! Select domain
-        logical :: south
+        ! Get slices for current time
+        slice_method = "extrap"
+
+        ! select domain
         south = .FALSE. 
         if (trim(domain).eq."Antarctica") south = .TRUE.
 
-        ! Get slices for current time
-        slice_method = "extrap" 
-
-        write(*,*) "clim_var = ", clim_var
-        write(*,*) "time_ref = ", time_ref(1), time_ref(2)
         ! Obtain reference climatologies
         if (clim_var) then
-            ! If climate variability is true, we select a random year from the climatology period
+            ! We select a random year from the climatology period
             call random_number(rand)
             year_rand = NINT((time_ref(2)-time_ref(1))*rand + time_ref(1))  
             write(*,*) "year_rand = ", year_rand
@@ -476,15 +496,13 @@ contains
             else ! Northern Hemisphere
                 lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
             end if    
-            esm%t2m(:,:,m) = esm%ts_ref%var(:,:,1,1) !+ lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
-            ! jablasco: do i have to divide with 365? in theopry variable already modified in  check!
-            ! [mm/yr] => [mm/d] do before when loading?
-            esm%pr(:,:,m)  = esm%pr_ref%var(:,:,1,1) !* exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
+            esm%t2m(:,:,m) = esm%ts_ref%var(:,:,m,1) + lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
+            esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1) * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
         end do
 
         write(*,*) "tsmax = ",maxval(esm%t2m)
-        write(*,*) "tsmax = ",maxval(esm%pr)
-        write(*,*) "prmin = ",minval(esm%t2m)
+        write(*,*) "prmax = ",maxval(esm%pr)
+        write(*,*) "tsmin = ",minval(esm%t2m)
         write(*,*) "prmin = ",minval(esm%pr)
 
         return
@@ -553,11 +571,6 @@ contains
         call parse_path(par%filename,domain,grid_name)
         call parse_path_esm(par%filename,gcm,scenario)
 
-        ! fesm utils: Parse filename as needed
-        !if (present(domain) .and. present(grid_name)) then
-        !    call parse_path(par%filename,domain,grid_name)
-        !end if 
-    
         ! See if multiple files are available
         call get_matching_files(par%filenames, par%filename)
             
@@ -676,7 +689,6 @@ contains
         call nc_write(filename,"area",  area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=map_name,units="km^2")
         call nc_write_attr(filename,"area","coordinates","lat2D lon2D")
         
-
         return
 
     end subroutine esm_write_init
@@ -822,5 +834,49 @@ contains
         return 
 
     end subroutine ice_var_par_load
+
+    ! Initlialize allocatable objects
+    subroutine esm_allocate(esm,nx,ny)
+
+        implicit none 
+    
+        type(esm_forcing_class) :: esm 
+        integer :: nx, ny 
+    
+        ! Make object is deallocated
+        call esm_deallocate(esm)
+    
+        ! Allocate variables
+        allocate(esm%t2m(nx,ny,12))
+        allocate(esm%pr(nx,ny,12))
+        allocate(esm%dts(nx,ny,12))
+        allocate(esm%dpr(nx,ny,12))
+        allocate(esm%t2m_ann(nx,ny))
+        allocate(esm%t2m_sum(nx,ny))
+        allocate(esm%pr_ann(nx,ny))
+    
+        return
+    
+    end subroutine esm_allocate
+    
+    subroutine esm_deallocate(esm)
+    
+        implicit none 
+    
+        type(esm_forcing_class) :: esm
+    
+            ! Allocate state objects
+            if (allocated(esm%t2m))     deallocate(esm%t2m)
+            if (allocated(esm%pr))      deallocate(esm%pr)
+            if (allocated(esm%dts))     deallocate(esm%dts)
+            if (allocated(esm%dpr))     deallocate(esm%dpr)
+            if (allocated(esm%t2m_sum)) deallocate(esm%t2m_sum)
+            if (allocated(esm%t2m_ann)) deallocate(esm%t2m_ann)
+            if (allocated(esm%pr_ann))  deallocate(esm%pr_ann)
+
+            return
+    
+        end subroutine esm_deallocate
+    
 
 end module esm
