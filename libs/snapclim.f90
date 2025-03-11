@@ -193,7 +193,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins,group)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -206,25 +206,34 @@ contains
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
         real(wp), intent(IN) :: basins(:,:)
+        character(len=*),  intent(IN), optional :: group
 
         ! Local variables 
         logical :: load_atm1, load_atm2, load_atm3 
         logical :: load_ocn1, load_ocn2, load_ocn3
         integer :: k, nzo  
-        real(wp), allocatable :: depth(:) 
+        real(wp), allocatable :: depth(:)  
+        character(len=32) :: nml_group
+
+        ! Make sure we know the namelist group for the snap block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "snap"         ! Default parameter blcok name
+        end if
 
         ! Load parameters 
-        call snapclim_par_load(snp%par,snp%hybrid,filename)
+        call snapclim_par_load(snp%par,snp%hybrid,filename,group=nml_group)
         snp%par%nx = nx 
         snp%par%ny = ny 
 
         ! If using recon method load parameters 
         if (trim(snp%par%atm_type) .eq. "recon") then 
-            call recon_par_load(snp%recon,filename,domain,grid_name)
+            call recon_par_load(snp%recon,filename,domain,grid_name,group=trim(nml_group)//"_recon")
         end if 
 
         if (trim(snp%par%ocn_type) .eq. "recon") then
-            call recon_par_load(snp%recon,filename,domain,grid_name)
+            call recon_par_load(snp%recon,filename,domain,grid_name,group=trim(nml_group)//"_recon")
         end if
 
         ! Determine which snapshots should be loaded (atm)
@@ -300,14 +309,14 @@ contains
 
         ! == clim0: reference climate (eg, present day) ==
 
-        call snapshot_par_load(snp%clim0%par,filename,"snap_clim0",domain,grid_name,init=.TRUE.)
+        call snapshot_par_load(snp%clim0%par,filename,trim(nml_group)//"_clim0",domain,grid_name,init=.TRUE.)
         call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
         call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
-            call snapshot_par_load(snp%clim1%par,filename,"snap_clim1",domain,grid_name,init=.TRUE.)                
+            call snapshot_par_load(snp%clim1%par,filename,trim(nml_group)//"_clim1",domain,grid_name,init=.TRUE.)                
             if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
@@ -316,7 +325,7 @@ contains
         if (load_atm2 .or. load_ocn2) then
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
-            call snapshot_par_load(snp%clim2%par,filename,"snap_clim2",domain,grid_name,init=.TRUE.)                
+            call snapshot_par_load(snp%clim2%par,filename,trim(nml_group)//"_clim2",domain,grid_name,init=.TRUE.)                
             if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
@@ -325,7 +334,7 @@ contains
         if (load_atm3 .or. load_ocn3) then
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
-            call snapshot_par_load(snp%clim3%par,filename,"snap_clim3",domain,grid_name,init=.TRUE.)
+            call snapshot_par_load(snp%clim3%par,filename,trim(nml_group)//"_clim3",domain,grid_name,init=.TRUE.)
             if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
             if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
@@ -1498,7 +1507,7 @@ contains
     end subroutine read_ocean_snapshot_reconstruction
 
     
-    subroutine snapclim_par_load(par,hpar,filename,init)
+    subroutine snapclim_par_load(par,hpar,filename,init,group)
         ! == Parameters from namelist file ==
 
         implicit none 
@@ -1508,35 +1517,46 @@ contains
         character(len=*), intent(IN) :: filename 
         logical, optional :: init 
         logical :: init_pars 
+        character(len=*), intent(IN), optional   :: group
+
+        ! Local variables
+        character(len=32) :: nml_group
+
+        ! Make sure we know the namelist group for the snap block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "snap"         ! Default parameter blcok name
+        end if
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"snap","atm_type",           par%atm_type,       init=init_pars)
-        call nml_read(filename,"snap","ocn_type",           par%ocn_type,       init=init_pars)
-        call nml_read(filename,"snap","fname_at",           par%fname_at,       init=init_pars)
-        call nml_read(filename,"snap","fname_ao",           par%fname_ao,       init=init_pars)
-        call nml_read(filename,"snap","fname_ap",           par%fname_ap,       init=init_pars)
-        call nml_read(filename,"snap","fname_as",           par%fname_as,       init=init_pars)        
-        call nml_read(filename,"snap","fname_bt",           par%fname_bt,       init=init_pars)
-        call nml_read(filename,"snap","fname_bo",           par%fname_bo,       init=init_pars)
-        call nml_read(filename,"snap","fname_bp",           par%fname_bp,       init=init_pars)
-        call nml_read(filename,"snap","fname_bs",           par%fname_bs,       init=init_pars)
-        call nml_read(filename,"snap","lapse",              par%lapse,          init=init_pars)
-        call nml_read(filename,"snap","dTa_const",          par%dTa_const,      init=init_pars)
-        call nml_read(filename,"snap","dTo_const",          par%dTo_const,      init=init_pars)
-        call nml_read(filename,"snap","dSo_const",          par%dSo_const,      init=init_pars)
-        call nml_read(filename,"snap","f_to",               par%f_to,           init=init_pars)
-        call nml_read(filename,"snap","f_p",                par%f_p,            init=init_pars)
-        !call nml_read(filename,"snap","f_p_ne",             par%f_p_ne,         init=init_pars)
-        call nml_read(filename,"snap","f_stdev",            par%f_stdev,        init=init_pars)
+        call nml_read(filename,nml_group,"atm_type",           par%atm_type,       init=init_pars)
+        call nml_read(filename,nml_group,"ocn_type",           par%ocn_type,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_at",           par%fname_at,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_ao",           par%fname_ao,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_ap",           par%fname_ap,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_as",           par%fname_as,       init=init_pars)        
+        call nml_read(filename,nml_group,"fname_bt",           par%fname_bt,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_bo",           par%fname_bo,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_bp",           par%fname_bp,       init=init_pars)
+        call nml_read(filename,nml_group,"fname_bs",           par%fname_bs,       init=init_pars)
+        call nml_read(filename,nml_group,"lapse",              par%lapse,          init=init_pars)
+        call nml_read(filename,nml_group,"dTa_const",          par%dTa_const,      init=init_pars)
+        call nml_read(filename,nml_group,"dTo_const",          par%dTo_const,      init=init_pars)
+        call nml_read(filename,nml_group,"dSo_const",          par%dSo_const,      init=init_pars)
+        call nml_read(filename,nml_group,"f_to",               par%f_to,           init=init_pars)
+        call nml_read(filename,nml_group,"f_p",                par%f_p,            init=init_pars)
+        !call nml_read(filename,nml_group,"f_p_ne",             par%f_p_ne,         init=init_pars)
+        call nml_read(filename,nml_group,"f_stdev",            par%f_stdev,        init=init_pars)
         
-        call nml_read(filename,"snap_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
-        call nml_read(filename,"snap_hybrid","f_eem",       hpar%f_eem,        init=init_pars)
-        call nml_read(filename,"snap_hybrid","f_glac",      hpar%f_glac,       init=init_pars)
-        call nml_read(filename,"snap_hybrid","f_hol",       hpar%f_hol,        init=init_pars)
-        call nml_read(filename,"snap_hybrid","f_seas",      hpar%f_seas,       init=init_pars)
-        call nml_read(filename,"snap_hybrid","f_to",        hpar%f_to,         init=init_pars)
+        call nml_read(filename,trim(nml_group)//"_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
+        call nml_read(filename,trim(nml_group)//"_hybrid","f_eem",       hpar%f_eem,        init=init_pars)
+        call nml_read(filename,trim(nml_group)//"_hybrid","f_glac",      hpar%f_glac,       init=init_pars)
+        call nml_read(filename,trim(nml_group)//"_hybrid","f_hol",       hpar%f_hol,        init=init_pars)
+        call nml_read(filename,trim(nml_group)//"_hybrid","f_seas",      hpar%f_seas,       init=init_pars)
+        call nml_read(filename,trim(nml_group)//"_hybrid","f_to",        hpar%f_to,         init=init_pars)
         
         ! For now, impose the value of f_p_ne=1.0 to use the unmodified value of f_p everywhere
         ! ajr: note that this parameter is domain specific (to Greenland). 
@@ -1547,7 +1567,7 @@ contains
 
     end subroutine snapclim_par_load
 
-    subroutine recon_par_load(par,filename,domain,grid_name,init)
+    subroutine recon_par_load(par,filename,domain,grid_name,init,group)
 
         implicit none 
 
@@ -1556,20 +1576,29 @@ contains
         character(len=*), intent(IN) :: domain, grid_name
         logical, optional :: init 
         logical :: init_pars 
+        character(len=*),  intent(IN), optional :: group
 
         ! Local variables 
         integer    :: k, nt
+        character(len=32) :: nml_group
+        
+        ! Make sure we know the namelist group for the snap block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "snap_recon"         ! Default parameter blcok name
+        end if
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"snap_recon","clim_path",    par%clim_path,    init=init_pars)
-        call nml_read(filename,"snap_recon","clim_names",   par%clim_names,   init=init_pars)
-        call nml_read(filename,"snap_recon","clim_monthly", par%clim_monthly, init=init_pars)
+        call nml_read(filename,trim(nml_group),"clim_path",    par%clim_path,    init=init_pars)
+        call nml_read(filename,trim(nml_group),"clim_names",   par%clim_names,   init=init_pars)
+        call nml_read(filename,trim(nml_group),"clim_monthly", par%clim_monthly, init=init_pars)
 
-        call nml_read(filename,"snap_recon","ocn_path",     par%ocn_path,     init=init_pars)
-        call nml_read(filename,"snap_recon","ocn_names",    par%ocn_names,    init=init_pars)
-        call nml_read(filename,"snap_recon","ocn_monthly",  par%ocn_monthly,  init=init_pars)
+        call nml_read(filename,trim(nml_group),"ocn_path",     par%ocn_path,     init=init_pars)
+        call nml_read(filename,trim(nml_group),"ocn_names",    par%ocn_names,    init=init_pars)
+        call nml_read(filename,trim(nml_group),"ocn_monthly",  par%ocn_monthly,  init=init_pars)
 
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
