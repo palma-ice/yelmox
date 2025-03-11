@@ -4,22 +4,13 @@ module ismip6
     
     use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
 
+    use precision
     use nml  
     use ncio 
     use varslice
 
     implicit none 
-
-    ! Internal constants
-    integer,  parameter :: dp  = kind(1.d0)
-    integer,  parameter :: sp  = kind(1.0)
-
-    ! Choose the working precision of the library (sp,dp)
-    integer,  parameter :: wp = sp 
-
-    ! Define default missing value 
-    real(wp), parameter :: mv = -9999.0_wp 
-
+    
     ! Class for holding ice-forcing data from ISMIP6 archives
     type ismip6_forcing_class
         
@@ -278,8 +269,8 @@ contains
         
         integer  :: iloc, k 
         real(wp) :: tmp
-        real(wp) :: time_par_proj(3) 
-        real(wp) :: time_par_proj_msk(3) 
+        real(wp) :: time_par_proj(4) 
+        real(wp) :: time_par_proj_msk(4) 
 
         ! First determine whether gcm+scenario provided or experiment
         ! obtain valid values for gcm and scenario to start.
@@ -411,20 +402,20 @@ contains
             case("CESM2-WACCM_ssp585","HadGEM2-ES_RCP85")
                 ! Cases that end on year 2299
 
-                time_par_proj     = [1995.0,2299.0,1.0_wp]
-                time_par_proj_msk = [1995.0,2300.0,1.0_wp]
+                time_par_proj     = [1995.0,2299.0,1.0,0.0]
+                time_par_proj_msk = [1995.0,2300.0,1.0,0.0]
 
             case("UKESM1-0-LL_ssp585")
                 ! Cases that end on year 2301
             
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [1995.0,2301.0,1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [1995.0,2301.0,1.0,0.0]
 
             case DEFAULT
                 ! Set negative values to time_par so that values are used directly from the file
 
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [-1.0,-1.0,-1.0,0.0]
 
         end select
 
@@ -1071,7 +1062,7 @@ contains
         character(len=*),       intent(IN)    :: grid_name
         character(len=*),       intent(IN)    :: gcm
         character(len=*),       intent(IN)    :: scenario
-        real(wp), optional,     intent(IN)    :: time_par(3)
+        real(wp), optional,     intent(IN)    :: time_par(4)
 
         ! First load parameters from nml file 
         call varslice_par_load_ismip6(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose=.TRUE.)
@@ -1105,7 +1096,6 @@ contains
 
         ! Local variables
         logical  :: init_pars 
-        real(wp) :: time_par(3) 
         logical  :: print_summary 
 
         init_pars     = .FALSE.
@@ -1540,8 +1530,8 @@ end if
         
         integer  :: iloc, k 
         real(wp) :: tmp
-        real(wp) :: time_par_proj(3) 
-        real(wp) :: time_par_proj_msk(3) 
+        real(wp) :: time_par_proj(4) 
+        real(wp) :: time_par_proj_msk(4) 
 
         ! First determine whether gcm+scenario provided or experiment
         ! obtain valid values for gcm and scenario to start.
@@ -1668,20 +1658,20 @@ end if
             case("CESM2-WACCM_ssp585","HadGEM2-ES_RCP85")
                 ! Cases that end on year 2299
 
-                time_par_proj     = [1995.0,2299.0,1.0_wp]
-                time_par_proj_msk = [1995.0,2300.0,1.0_wp]
+                time_par_proj     = [1995.0,2299.0,1.0,0.0]
+                time_par_proj_msk = [1995.0,2300.0,1.0,0.0]
 
             case("UKESM1-0-LL_ssp585")
                 ! Cases that end on year 2301
             
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [1995.0,2301.0,1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [1995.0,2301.0,1.0,0.0]
 
             case DEFAULT
                 ! Set negative values to time_par so that values are used directly from the file
 
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [-1.0,-1.0,-1.0,0.0]
 
         end select
 
