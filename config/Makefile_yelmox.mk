@@ -45,8 +45,8 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+# $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
+# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 # $(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
 # 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -76,7 +76,7 @@ $(objdir)/smbpal_precision.o: $(libdir)/smbpal/smbpal_precision.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/smb_itm.o: $(libdir)/smbpal/smb_itm.f90 $(objdir)/smbpal_precision.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/smb_pdd.o: $(libdir)/smbpal/smb_pdd.f90 $(objdir)/smbpal_precision.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -101,6 +101,22 @@ $(objdir)/pico.o: $(libdir)/pico/pico.f90 $(objdir)/pico_geometry.o $(objdir)/pi
 
 $(objdir)/ice_sub_regions.o: $(libdir)/ice_sub_regions.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $^
+
+# oceanic models for bipolar mode
+$(objdir)/obm_defs.o: $(libdir)/obm/obm_defs.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+$(objdir)/ice2ocean.o: $(libdir)/obm/ice2ocean.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+$(objdir)/ocean2ice.o: $(libdir)/obm/ocean2ice.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+$(objdir)/atm2ocean.o: $(libdir)/obm/atm2ocean.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+$(objdir)/stommel.o: $(libdir)/obm/stommel.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+$(objdir)/nautilus.o: $(libdir)/obm/nautilus.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+$(objdir)/obm.o: $(libdir)/obm/obm.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # General yelmox helper modules for different applications 
 $(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
@@ -130,6 +146,13 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smb_pdd.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/snapclim.o \
-						$(objdir)/ice_sub_regions.o
+						$(objdir)/ice_sub_regions.o\
+						$(objdir)/obm_defs.o\
+						$(objdir)/ice2ocean.o\
+						$(objdir)/ocean2ice.o\
+						$(objdir)/atm2ocean.o\
+						$(objdir)/stommel.o\
+						$(objdir)/nautilus.o\
+						$(objdir)/obm.o
 
 yelmox_help = 			$(objdir)/yelmox_hysteresis_help.o
