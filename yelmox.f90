@@ -81,10 +81,6 @@ program yelmox
     type(negis_params)   :: ngs 
 
     ! Internal parameters
-    logical  :: running_laurentide
-    logical  :: laurentide_init_const_H 
-    real(wp) :: laurentide_time_equil 
-
     logical  :: running_greenland
     logical  :: greenland_init_marine_H
     logical  :: scale_glacial_smb
@@ -181,10 +177,6 @@ program yelmox
 
     ! Define specific regions of interest =====================
 
-    ! Shortcut switches for later use
-    running_laurentide = .FALSE. 
-    running_greenland  = .FALSE. 
-
     allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
     
     select case(trim(domain))
@@ -207,26 +199,6 @@ program yelmox
             call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
         case("Laurentide")
-
-            running_laurentide = .TRUE. 
-
-            laurentide_init_const_H = .FALSE.
-
-            if (laurentide_init_const_H) then 
-                ! Make sure relaxation spinup is short, but transient spinup
-                ! with modified positive smb over North America is reasonably long.
-
-                ctl%time_equil        = 10.0 
-                laurentide_time_equil = 5e3 
-
-            else 
-                ! When starting from ice-6g, positive smb spinup is not necessary.
-                ! however ctl%time_equil should not be changed, as it may be useful
-                ! for spinning up thermodynamics.
-
-                laurentide_time_equil = 0.0 
-
-            end if 
 
             ! Make sure to set ice_allowed to prevent ice from growing in 
             ! Greenland (and on grid borders)
@@ -381,80 +353,22 @@ end if
     if (.not. yelmo1%par%use_restart) then 
         ! No restart file used, perform various initialization steps
 
-        if (running_laurentide) then 
-            ! Start with some ice thickness for testing
+        select case(trim(domain))
 
-            ! Load LGM reconstruction into reference ice thickness
-            path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
-                        "/"//trim(yelmo1%par%grid_name)//"_TOPO-ICE-6G_C.nc"
-            call nc_read(path_lgm,"dz",yelmo1%bnd%H_ice_ref,start=[1,1,1], &
-                                count=[yelmo1%tpo%par%nx,yelmo1%tpo%par%ny,1]) 
+        case("Laurentide")
+            ! Special start-up steps for Laurentide
 
-            ! Start with some ice cover to speed up initialization
-            if (laurentide_init_const_H) then
-            
-                yelmo1%tpo%now%H_ice = 0.0
-                where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%bnd%z_bed .gt. 0.0) yelmo1%tpo%now%H_ice = 1000.0 
-                where (yelmo1%bnd%regions .eq. 1.12) yelmo1%tpo%now%H_ice = 1000.0 
-
+            if (trim(ctl%tstep_method) .eq. "const") then
+                ! Steady-state simulation, start with lgm state
+                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,method="ref_lgm", &
+                                                        with_ice_sheet=ctl%with_ice_sheet)
             else
-                ! Set LGM reconstruction as initial ice thickness over North America
-                where ( yelmo1%bnd%z_bed .gt. -500.0 .and. &
-                        (   yelmo1%bnd%regions .eq. 1.1  .or. &
-                            yelmo1%bnd%regions .eq. 1.11 .or. &
-                            yelmo1%bnd%regions .eq. 1.12) )
-                    yelmo1%tpo%now%H_ice = yelmo1%bnd%H_ice_ref
-                end where 
+                ! Transient simulation - start with no ice thickness
+                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,method="zero", &
+                                                        with_ice_sheet=ctl%with_ice_sheet)
+            end if
 
-                ! Apply Gaussian smoothing to keep things stable
-                call smooth_gauss_2D(yelmo1%tpo%now%H_ice,dx=yelmo1%grd%dx,f_sigma=2.0)
-            
-            end if 
-            
-            ! Load sediment mask 
-            path_lgm = "ice_data/Laurentide/"//trim(yelmo1%par%grid_name)//&
-                        "/"//trim(yelmo1%par%grid_name)//"_SED-L97.nc"
-            call nc_read(path_lgm,"z_sed",yelmo1%bnd%H_sed) 
-
-            if (ctl%with_ice_sheet) then
-                ! Run Yelmo for briefly to update surface topography
-                call yelmo_update_equil(yelmo1,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
-
-                ! Addtional cleanup - remove floating ice 
-                where( yelmo1%tpo%now%mask_bed .eq. 5) yelmo1%tpo%now%H_ice = 0.0 
-                call yelmo_update_equil(yelmo1,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
-            end if 
-
-            ! Update snapclim to reflect new topography 
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
-
-            ! Update smbpal
-            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel) 
-            yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-            yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
-
-            if (laurentide_init_const_H) then
-                ! Additionally ensure smb is postive for land above 50degN in Laurentide region
-                ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
-                where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
-                        yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
-                
-                if (ctl%with_ice_sheet) then
-                    ! Run yelmo for several years to ensure stable central ice dome
-                    call yelmo_update_equil(yelmo1,ts%time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
-                end if 
-
-            else 
-
-                if (ctl%with_ice_sheet) then
-                    ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                    call yelmo_update_equil(yelmo1,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
-                end if 
-
-            end if 
-
-        else if (running_greenland) then
+        case("Greenland")
             ! Special start-up steps for Greenland
 
             if (ngs%use_negis_par) then 
@@ -486,7 +400,7 @@ end if
 
             end if
                 
-        else 
+        case DEFAULT 
             ! Run simple startup equilibration step 
             
             if (ctl%with_ice_sheet) then
@@ -495,7 +409,7 @@ end if
                 call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
             end if 
 
-        end if
+        end select
         
     end if 
 
@@ -643,17 +557,6 @@ end if
             ! Modify glacial smb
             call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
         end if
-    
-        ! yelmo1%bnd%smb   = yelmo1%dta%pd%smb
-        ! yelmo1%bnd%T_srf = yelmo1%dta%pd%t2m
-        
-        if (running_laurentide .and. laurentide_init_const_H  &
-                .and. ts%time_elapsed .lt. laurentide_time_equil ) then 
-            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
-            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
-            where (yelmo1%bnd%regions .eq. 1.1 .and. yelmo1%grd%lat .gt. 50.0 .and. &
-                        yelmo1%bnd%z_bed .gt. 0.0 .and. yelmo1%bnd%smb .lt. 0.0 ) yelmo1%bnd%smb = 0.5 
-        end if 
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
@@ -713,6 +616,103 @@ end if
     
 contains
     
+    subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,method,with_ice_sheet)
+
+        implicit none
+
+        type(yelmo_class),      intent(INOUT) :: ylmo
+        type(snapclim_class),   intent(INOUT) :: snp
+        type(smbpal_class),     intent(INOUT) :: smb
+        type(tstep_class),      intent(IN)    :: ts
+        character(len=*),       intent(IN)    :: method
+        logical,                intent(IN)    :: with_ice_sheet
+
+        ! Local variables
+        character(len=1024) :: path_lgm
+
+        ! Load LGM reconstruction into reference ice thickness
+        path_lgm = "ice_data/Laurentide/"//trim(ylmo%par%grid_name)//&
+                    "/"//trim(ylmo%par%grid_name)//"_TOPO-ICE-6G_C.nc"
+        call nc_read(path_lgm,"dz",ylmo%bnd%H_ice_ref,start=[1,1,1], &
+                            count=[ylmo%tpo%par%nx,ylmo%tpo%par%ny,1]) 
+
+        ! Determine initial ice thickness
+        select case(trim(method))
+
+        case("const")
+            ! Start with some ice cover to speed up initialization
+
+            ylmo%tpo%now%H_ice = 0.0
+            where (ylmo%bnd%regions .eq. 1.1 .and. ylmo%bnd%z_bed .gt. 0.0) ylmo%tpo%now%H_ice = 1000.0 
+            where (ylmo%bnd%regions .eq. 1.12) ylmo%tpo%now%H_ice = 1000.0 
+
+        case("ref_lgm")
+            ! Set LGM reconstruction as initial ice thickness over North America
+            
+            where ( ylmo%bnd%z_bed .gt. -500.0 .and. &
+                    (   ylmo%bnd%regions .eq. 1.1  .or. &
+                        ylmo%bnd%regions .eq. 1.11 .or. &
+                        ylmo%bnd%regions .eq. 1.12) )
+                ylmo%tpo%now%H_ice = ylmo%bnd%H_ice_ref
+            end where 
+
+            ! Apply Gaussian smoothing to keep things stable
+            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
+        
+        case DEFAULT
+            ! Zero ice thickness
+
+            ! Pass - do nothing
+
+        end select 
+        
+        ! Load sediment mask 
+        path_lgm = "ice_data/Laurentide/"//trim(ylmo%par%grid_name)//&
+                    "/"//trim(ylmo%par%grid_name)//"_SED-L97.nc"
+        call nc_read(path_lgm,"z_sed",ylmo%bnd%H_sed) 
+
+        if (with_ice_sheet) then
+            ! Run Yelmo for briefly to update surface topography
+            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+
+            ! Addtional cleanup - remove floating ice 
+            where( ylmo%tpo%now%mask_bed .eq. 5) ylmo%tpo%now%H_ice = 0.0 
+            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+        end if 
+
+        ! Update snapclim to reflect new topography 
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain=domain,dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
+
+        ! Update smbpal
+        call smbpal_update_monthly(smb,snp%now%tas,snp%now%pr, &
+                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,ts%time_rel) 
+        ylmo%bnd%smb   = smb%ann%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+        ylmo%bnd%T_srf = smb%ann%tsrf 
+
+        if (trim(method) .eq. "const") then
+            ! Additionally ensure smb is postive for land above 50degN in Laurentide region
+            ! to make sure ice grows everywhere needed (Coridilleran ice sheet mainly)
+            where (ylmo%bnd%regions .eq. 1.1 .and. ylmo%grd%lat .gt. 50.0 .and. &
+                    ylmo%bnd%z_bed .gt. 0.0 .and. ylmo%bnd%smb .lt. 0.0 ) ylmo%bnd%smb = 0.5 
+            
+            if (with_ice_sheet) then
+                ! Run yelmo for several years to ensure stable central ice dome
+                call yelmo_update_equil(ylmo,ts%time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
+            end if 
+
+        else 
+
+            if (with_ice_sheet) then
+                ! Run yelmo for several years with constant boundary conditions to stabilize fields
+                call yelmo_update_equil(ylmo,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+            end if 
+
+        end if 
+
+        return
+
+    end subroutine yelmox_init_laurentide_lgm
+
     subroutine calc_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
 
         implicit none
