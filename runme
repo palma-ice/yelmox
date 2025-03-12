@@ -564,11 +564,11 @@ def generate_jobscript(template,cmd,jobname,account,qos,mem,wall,partition,omp,e
     job_script = job_script.replace('<ACCOUNT>',account)
     job_script = job_script.replace('<CMD>',cmd)
     
-    if not mem is None:
-        job_script = job_script.replace('<MEM>', "{}".format(mem))
-    else:
+    if mem is None or mem == -1:
         job_script = job_script.replace('#SBATCH --mem=<MEM>', "")
-
+    else:
+        job_script = job_script.replace('<MEM>', "{}".format(mem))
+        
     return job_script
 
 

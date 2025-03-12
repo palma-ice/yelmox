@@ -1,6 +1,6 @@
 {
 
-    "exe_default" : "libyelmox/bin/yelmox.x",
+    "exe_default" : "yelmox",
 
     "par_path_as_argument" : true,
 
