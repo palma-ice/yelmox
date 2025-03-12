@@ -166,7 +166,7 @@ program yelmox
 
     ! Bipolar simulation objects
     type(yelmox_class) :: yelmox_north, yelmox_south  ! Northern and Southern hemisphere objects (each one is a yelmox domain)
-    type(obm_class)    :: obm                         ! Ocean Box Model object
+    type(obm_class)    :: obm_object                         ! Ocean Box Model object
     character(len=512) :: path_par                    ! Generalistic namelist
 
     ! #### Start YelmoX-Bipolar simulation ##### !
@@ -275,19 +275,19 @@ program yelmox
         obm_file = trim(outfldr)//trim(ctl%obm_name)//".nc"
         obm_file_restart = trim(outfldr)//trim(ctl%obm_name)//"_restart.nc"
 
-        call obm_init(obm, ctl%path_par_ocn, ctl%obm_name)
+        call obm_init(obm_object, ctl%path_par_ocn, ctl%obm_name)
         call write_obm_init(obm_file, ts%time, "years")
-        call write_obm_update(obm, obm_file, ctl%obm_name, ts%time)
+        call write_obm_update(obm_object, obm_file, ctl%obm_name, ts%time)
 
         if (ctl%active_north) then
             if (ctl%atm2obm) then
-                call update_theta_from_snapclim(obm%thetan, yelmox_north%snp1%now%tsl_ann, yelmox_north%hydro_mask, "north", ctl%obm_name)
+                call update_theta_from_snapclim(obm_object%thetan, yelmox_north%snp1%now%tsl_ann, yelmox_north%hydro_mask, "north", ctl%obm_name)
             end if
         end if
 
         if (ctl%active_south) then
             if (ctl%atm2obm) then
-                call update_theta_from_snapclim(obm%thetas, yelmox_south%snp1%now%tsl_ann, yelmox_south%hydro_mask, "south", ctl%obm_name)
+                call update_theta_from_snapclim(obm_object%thetas, yelmox_south%snp1%now%tsl_ann, yelmox_south%hydro_mask, "south", ctl%obm_name)
             end if
         end if
 
@@ -337,29 +337,29 @@ program yelmox
         if (ctl%active_obm) then
             if (ctl%ism2obm) then   ! apply fwf forcing to obm via ism domains
                 if (ctl%active_north) then
-                    obm%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
+                    obm_object%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
                                         yelmox_north%yelmo1%bnd%c%sec_year, &
                                         yelmox_north%yelmo1%tpo%now%H_ice,yelmox_north%yelmo1%tpo%now%dHidt, &
                                         yelmox_north%yelmo1%tpo%now%f_grnd, &
                                         yelmox_north%yelmo1%tpo%par%dx,yelmox_north%yelmo1%tpo%par%dy, yelmox_north%hydro_mask, "north")
                 else
-                    obm%fn = 0.0
+                    obm_object%fn = 0.0
                 end if
                 if (ctl%active_south) then
-                    obm%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
+                    obm_object%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
                                         yelmox_south%yelmo1%bnd%c%sec_year, &
                                         yelmox_south%yelmo1%tpo%now%H_ice,yelmox_south%yelmo1%tpo%now%dHidt, &
                                         yelmox_south%yelmo1%tpo%now%f_grnd, &
                                         yelmox_south%yelmo1%tpo%par%dx,yelmox_south%yelmo1%tpo%par%dy, yelmox_south%hydro_mask, "south")
                 else
-                    obm%fs = 0.0
+                    obm_object%fs = 0.0
                 end if
             else
-                obm%fn = 0.0
-                obm%fs = 0.0
+                obm_object%fn = 0.0
+                obm_object%fs = 0.0
             end if
 
-            call obm_update(obm, ctl%dtt, ctl%obm_name)
+            call obm_update(obm_object, ctl%dtt, ctl%obm_name)
         end if ! use_obm
 
         ! == ICE SHEET ===================================================
@@ -408,22 +408,22 @@ program yelmox
             ! atm2obm
             if (ctl%atm2obm) then
                 if (ctl%active_north) then
-                    call update_theta_from_snapclim(obm%thetan, yelmox_north%snp1%now%tsl_ann, yelmox_north%hydro_mask, "north", ctl%obm_name)
+                    call update_theta_from_snapclim(obm_object%thetan, yelmox_north%snp1%now%tsl_ann, yelmox_north%hydro_mask, "north", ctl%obm_name)
                 end if
                 if (ctl%active_south) then
-                    call update_theta_from_snapclim(obm%thetas, yelmox_south%snp1%now%tsl_ann, yelmox_south%hydro_mask, "south", ctl%obm_name)
+                    call update_theta_from_snapclim(obm_object%thetas, yelmox_south%snp1%now%tsl_ann, yelmox_south%hydro_mask, "south", ctl%obm_name)
                 end if
             end if
 
             ! obm2ism
             if (ctl%obm2ism) then
                 if (ctl%active_north) then
-                    call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm%tn, ctl%obm_name)
-                    call calc_ocean_salinity_field(yelmox_north%snp1%now%so_ann, obm%sn)
+                    call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm_object%tn, ctl%obm_name)
+                    call calc_ocean_salinity_field(yelmox_north%snp1%now%so_ann, obm_object%sn)
                 end if
                 if (ctl%active_south) then
-                    call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm%ts, ctl%obm_name)
-                    call calc_ocean_salinity_field(yelmox_south%snp1%now%so_ann, obm%ss)
+                    call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm_object%ts, ctl%obm_name)
+                    call calc_ocean_salinity_field(yelmox_south%snp1%now%so_ann, obm_object%ss)
                 end if
             end if
 
@@ -512,11 +512,11 @@ program yelmox
 
         if (ctl%active_obm) then
             if (timeout_check(tm_1D,ts%time)) then
-                call write_obm_update(obm, obm_file, ctl%obm_name, ts%time)
+                call write_obm_update(obm_object, obm_file, ctl%obm_name, ts%time)
             end if
 
             if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-                call write_obm_restart(obm, obm_file_restart, ts%time, "years")
+                call write_obm_restart(obm_object, obm_file_restart, ts%time, "years")
             end if
         end if
 
@@ -544,7 +544,7 @@ program yelmox
         call yelmox_bipolar_restart_write(bsl,yelmox_south%isos1,yelmox_south%yelmo1,ts%time,hemisphere="south")
     end if
     if (ctl%active_obm) then
-        call write_obm_restart(obm, obm_file_restart, ts%time, "years")
+        call write_obm_restart(obm_object, obm_file_restart, ts%time, "years")
     end if
 
     ! Finalize program
