@@ -21,8 +21,7 @@
 
     "par_paths" : 
         {
-            "rembo"  : "par/rembo_Greenland.nml",
-            "bipolar" : "par/yelmox_bipolar.nml"
+            "rembo"  : "par/rembo_Greenland.nml"
         },
         
     "files" : ["git_yelmo.txt"], 
