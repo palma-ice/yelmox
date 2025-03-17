@@ -36,7 +36,7 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file2D_small, domain
     character(len=256) :: file1D_hyst, file_isos, file_bsl, file_rembo
     character(len=512) :: path_par
-    real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart
+    real(wp) :: time_init, time_end, time_equil, dtt, dt_restart
     real(wp) :: dtt_now, deltat_tot
     character(len=56)  :: tstep_method
     real(wp) :: tstep_const
