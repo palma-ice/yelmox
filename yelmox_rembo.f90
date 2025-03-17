@@ -509,7 +509,7 @@ program yelmox
             call yelmox_write_step(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=ts%time)
         end if 
 
-        if (write_restart .and. mod(time,dt_restart)==0) then 
+        if (write_restart .and. mod(ts%time,dt_restart)==0) then 
             call yelmox_restart_write(isos1,yelmo1,mshlf1,rembo_ann,ts%time)
         end if 
 
