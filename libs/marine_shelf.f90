@@ -2246,6 +2246,81 @@ contains
         return 
     end subroutine axis_init
 
+    subroutine ocn_variable_extrapolation(var,H_ice,basin_mask,depth,z_bed)
+
+        implicit none
+
+        real(wp), intent(INOUT) :: var(:,:,:)
+        real(wp), intent(IN)    :: H_ice(:,:), mask_ocn(:,:), basin_mask(:,:)
+
+        ! Local variables 
+        integer :: i, j, k, l 
+        integer :: nx, ny, nz, nb
+        real(wp), allocatable :: mask_border(:,:)
+        real(wp), allocatable :: mean_var_basin(:,:), npts_basin(:,:)
+        ! Define default missing value 
+        real(wp), parameter :: mv = -9999.0_wp
+
+        nx = size(var,1)
+        ny = size(var,2)
+        nz = size(var,3)
+        nb = MAX(basin_mask)
+
+        ! Allocate objects
+        allocate(mask_border(nx,ny))
+        allocate(mean_var_basin(nb,nz))
+        allocate(npts_basin(nb,nz))
+        mask_border    = 0.0_wp
+        mean_var_basin = 0.0_wp
+        npts_basin     = 0.0_wp
+
+        ! 1. Define the mask of grid points with information closest to the ice front or mv.
+        ! 0 -> ocean; 2 -> mv or ice; 1 -> ocean point in contact with mv
+        where(H_ice(:,:) .gt. 0.0_wp) mask_border(:,:) = 2.0_wp
+        where(var(:,:,1) .eq. mv)     mask_border(:,:) = 2.0_wp
+
+        do i = 2,nx-1
+        do j = 2,ny-1
+            if(mask_border(i,j,k) .eq. 0.0 .and. 
+                (mask_border(i+1,j,k) .eq. 2.0 .or. mask_border(i-1,j,k) .eq. 2.0 .or.
+                mask_border(i,j+1,k) .eq. 2.0 .or. mask_border(i,j-1,k) .eq. 2.0)) then
+                mask_border(i,j) = 1.0_wp
+            end if
+        end do
+        end do
+
+        ! 2 Compute the mean of the border by basins and depth.
+        do k = 1,nz
+            if (mask_border[i,j] .eq. 1.0 .and. z_bed[i,j] .lt. depth[k]) then
+                mean_var_basin(INT(basin_mask[i,j]),k) = mean_var_basin(INT(basin_mask[i,j]),k) + var[i,j,k]
+                npts_basin(INT(basin_mask[i,j]),k)     = mean_var_basin(INT(basin_mask[i,j]),k) + 1.0_wp
+            end if
+        end do
+        mean_var_basin = mean_var_basin/(npts_basin+1e-8)
+
+        ! if the number of points is zero at some point, set to previous value
+        do l = 1,nb
+        do k = 2,nz
+            if (n_pts(l,k) .eq. 0.0_wp) then
+                mean_var_basin(l,k) = mean_var_basin(l,k-1) 
+            end if
+        end do
+        end do
+
+        ! 3. Assign the mean value by basin
+        do k = 1,nz
+        do i = 1,nx
+        do j = 1,ny
+            if (mask_border[i,j] .eq. 2.0) then
+                var[i,j,k] = mean_var_basin(INT(basin_mask[i,j]),k)
+        end do 
+        end do
+        end do
+
+        return
+
+    end subroutine ocn_variable_extrapolation
+
 end module marine_shelf
 
 

@@ -507,10 +507,6 @@ contains
         else
             esm%t2m_sum = (esm%t2m(:,:,6)+esm%t2m(:,:,7)+esm%t2m(:,:,8)) / 3.0
         end if      
-        !write(*,*) "tsmax = ",maxval(esm%t2m)
-        !write(*,*) "prmax = ",maxval(esm%pr)
-        !write(*,*) "tsmin = ",minval(esm%t2m)
-        !write(*,*) "prmin = ",minval(esm%pr)
 
         return
 
