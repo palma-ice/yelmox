@@ -1076,17 +1076,6 @@ contains
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
                              time_ref,clim_var,domain)
 
-        ! Ocean
-        !write(*,*) "Tomax = ",maxval(esm%to_ref%var(:,:,:,1))
-        !write(*,*) "Somax = ",maxval(esm%so_ref%var(:,:,:,1))
-        !write(*,*) "Tomin = ",minval(esm%to_ref%var(:,:,:,1))
-        !write(*,*) "Somin = ",minval(esm%so_ref%var(:,:,:,1))
-        ! Atm
-        write(*,*) "Tsrefmax = ",maxval(esm%ts_ref%var(:,:,:,1))
-        write(*,*) "Prrefmax = ",maxval(esm%pr_ref%var(:,:,:,1))
-        write(*,*) "Tsrefmin = ",minval(esm%ts_ref%var(:,:,:,1))
-        write(*,*) "Prrefmin = ",minval(esm%pr_ref%var(:,:,:,1))
-
         ! Step 2: Calculate anomaly fields
         call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time, &
                                 time_ref,time_hist,time_proj, &
@@ -1095,13 +1084,36 @@ contains
         ! Calculate the smb fields 
         call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
             ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
+
+        if (.TRUE.) then
+            ! Atm
+            write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
+            write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
+        end if
+
         ! === Oceanic boundary conditions ===
+        ! Interpolate ocean data to the interior
+        call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
+        call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
+
+        if (.TRUE.) then
+            ! Ocean
+            write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
+            write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
+            write(*,*) "To_min = ",minval(esm%to_ref%var(:,:,:,1))
+            write(*,*) "So_min = ",minval(esm%so_ref%var(:,:,:,1))
+        end if
+
         ! Update oceanic fields at desired levels
-        ! To do: anomalies
         call marshelf_interp_shelf(mshlf%now%T_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
+
+        ! Update oceanic anomaly fields at desired level
+        ! TO DO
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
