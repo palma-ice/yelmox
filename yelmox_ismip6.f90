@@ -1146,6 +1146,7 @@ contains
         real(wp), allocatable :: dts_now(:,:) 
         real(wp), allocatable :: dpr_now(:,:)
         real(wp), allocatable :: dsmb_now(:,:) 
+        integer               :: k
 
         allocate(dts_now(ylmo%grd%nx,ylmo%grd%ny))
         allocate(dpr_now(ylmo%grd%nx,ylmo%grd%ny))
@@ -1168,7 +1169,6 @@ contains
         
         
         ! Step 2: update the ISMIP6 forcing to the current year
-
         call ismip6_forcing_update(ismp,time)
         
         ! Calculate anomaly fields accounting for elevation difference with reference topo
@@ -1202,9 +1202,22 @@ contains
         !  reference ocean fields with internal depth dimension) 
 
         ! Update marine_shelf shelf fields
-        ! jablasco: set anomaly to zero
         ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
-        ! jablasco: volvamos al ppio! dto_ann=ismp%to%var(:,:,:,1)*0.0
+
+        ! insert NaNs in pd mask
+        do k=1,size(ismp%to%var, 3)
+            where(ylmo%bnd%H_ice_ref .gt. 0.0_wp) 
+                ismp%to%var(:,:,k,1) = mv
+                ismp%so%var(:,:,k,1) = mv
+                ismp%tf%var(:,:,k,1) = mv
+            end where
+        end do
+
+        ! populate NaNs using oceanic extrapolation
+        call ocn_variable_extrapolation(ismp%to%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-ismp%to%z,ylmo%bnd%z_bed)
+        call ocn_variable_extrapolation(ismp%so%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-ismp%so%z,ylmo%bnd%z_bed)
+        call ocn_variable_extrapolation(ismp%tf%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-ismp%to%z,ylmo%bnd%z_bed)
+        
         call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                         ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
                         ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
