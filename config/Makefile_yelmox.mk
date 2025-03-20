@@ -27,6 +27,9 @@ $(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/pico.o
 $(objdir)/ismip6.o: $(libdir)/ismip6.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
+$(objdir)/esm.o: $(libdir)/esm.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
 # $(objdir)/isostasy.o: $(libdir)/isostasy.f90 $(objdir)/nml.o
 # 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -135,6 +138,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/interp1D.o \
 					    $(objdir)/insolation.o \
 					    $(objdir)/ismip6.o \
+					    $(objdir)/esm.o \
 					    $(objdir)/marine_shelf.o \
                         $(objdir)/pico_geometry.o \
                         $(objdir)/pico_physics.o \

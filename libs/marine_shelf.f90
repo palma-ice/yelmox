@@ -101,9 +101,15 @@ module marine_shelf
         real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
         real(wp), allocatable :: bmb_corr(:,:)          ! Basal mass balance correction field
         
+        !real(wp), allocatable :: T_ocn(:,:,:)           ! [K] Shelf temperature
+        !real(wp), allocatable :: dT_ocn(:,:,:)          ! [K] Shelf temperature anomaly relative to ref. state
+        !real(wp), allocatable :: S_ocn(:,:,:)           ! [PSU] Shelf salinity
+        !real(wp), allocatable :: dS_ocn(:,:,:)          ! [PSU] Shelf salinity anomaly relative to ref. state
+
         real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
         real(wp), allocatable :: dT_shlf(:,:)           ! [K] Shelf temperature anomaly relative to ref. state
         real(wp), allocatable :: S_shlf(:,:)            ! [PSU] Shelf salinity
+        real(wp), allocatable :: dS_shlf(:,:)           ! [PSU] Shelf salinity anomaly relative to ref. state
         real(wp), allocatable :: T_fp_shlf(:,:)         ! [K] Shelf freezing-point temperature
         real(wp), allocatable :: T_shlf_basin(:,:)      ! [K] Shelf temperature
         real(wp), allocatable :: S_shlf_basin(:,:)      ! [PSU] Shelf salinity
@@ -136,11 +142,13 @@ module marine_shelf
     private
     public :: marshelf_class
     public :: marshelf_update_shelf
+    public :: marshelf_interp_shelf
     public :: marshelf_update
     public :: marshelf_init
     public :: marshelf_end 
     public :: marshelf_restart_write
     public :: marshelf_restart_read
+    public :: ocn_variable_extrapolation
 
 contains 
     
@@ -312,6 +320,117 @@ contains
         return 
 
     end subroutine marshelf_update_shelf_3D
+
+    subroutine marshelf_interp_shelf(out2D,mshlf,in3d,H_ice,z_bed,f_grnd,z_sl,depth)
+        ! Calculate 2D fields from 3D ocean fields representative
+
+        implicit none
+
+        real(wp), intent(INOUT) :: out2d(:,:)
+        type(marshelf_class), intent(IN) :: mshlf
+        real(wp), intent(IN) :: in3d(:,:,:)
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: z_bed(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: z_sl(:,:)
+        real(wp), intent(IN) :: depth(:)
+
+        ! Local variables
+        integer :: i, j, nx, ny, nz
+        real(wp), allocatable :: depth_shlf
+        real(wp), allocatable :: wt_shlf(:)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+        nz = size(depth,1)
+
+        ! Allocate objects
+        allocate(wt_shlf(nz))
+        wt_shlf = 0.0
+        out2d   = 0.0
+
+        ! Loop over domain and update variables at each point (vertical interpolation)
+        do j = 1, ny
+        do i = 1, nx
+
+            ! 1. Calculate the depth of the current shelf base
+
+            select case(trim(mshlf%par%interp_depth))
+
+                case("shlf")
+                ! Assign the depth to the shelf depth
+
+                if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .lt. 1.0) then
+                ! Floating ice, depth == z_ice_base
+                depth_shlf = H_ice(i,j)*rho_ice_sw
+                else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
+                ! Grounded ice, depth == H_ocn = z_sl-z_bed
+                depth_shlf = z_sl(i,j) - z_bed(i,j)
+                else
+                ! Open ocean, depth == constant value, eg 2000 m.
+                depth_shlf = mshlf%par%depth_const
+                end if
+
+                case("bed")
+                ! Assign the depth corresponding to the bedrock
+
+                depth_shlf = z_sl(i,j) - z_bed(i,j)
+
+                case("const")
+
+                depth_shlf = mshlf%par%depth_const
+
+                case DEFAULT
+
+                write(*,*) "marshelf_interp_shelf:: Error: interp_depth method not recognized."
+                write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
+
+            end select
+
+            ! 2. Calculate weighting function for vertical depths ===========================
+
+            select case(trim(mshlf%par%interp_method))
+
+                case("mean")
+                ! Equal weighting of layers within a specified depth range
+
+                call calc_shelf_variable_mean(wt_shlf,depth, &
+                        depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+
+                case("layer")
+                ! All weight given to the nearest layer to depth of shelf
+
+                call calc_shelf_variable_layer(wt_shlf,depth,depth_shlf)
+
+                case("interp")
+                ! Interpolation weights from the two nearest layers to depth of shelf
+
+                call  calc_shelf_variable_depth(wt_shlf,depth,depth_shlf)
+
+                case DEFAULT
+                write(*,*) "marshelf_interp_shelf:: error: interp_method not recognized: ", mshlf%par%interp_method
+                write(*,*) "Must be one of [mean,layer,interp]"
+                stop
+
+            end select
+
+            ! Normalize weighting function
+            if (sum(wt_shlf) .gt. 0.0_wp) then
+                wt_shlf = wt_shlf / sum(wt_shlf)
+            else
+                write(*,*) "marshelf_interp_shelf:: Error: weighting should be > 0."
+                stop
+            end if
+
+            ! 3. Calculate water properties at depths of interest ============================
+            out2d(i,j)  = sum(in3d(i,j,:) * wt_shlf)
+
+        end do
+        end do 
+
+        return
+
+    end subroutine marshelf_interp_shelf
 
     subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
         
@@ -1721,6 +1840,7 @@ contains
         allocate(now%T_shlf(nx,ny))
         allocate(now%dT_shlf(nx,ny))
         allocate(now%S_shlf(nx,ny))
+        allocate(now%dS_shlf(nx,ny))
         allocate(now%T_fp_shlf(nx,ny))
         allocate(now%T_shlf_basin(nx,ny))
         allocate(now%S_shlf_basin(nx,ny))       
@@ -1744,6 +1864,7 @@ contains
         now%T_shlf          = 0.0
         now%dT_shlf         = 0.0
         now%S_shlf          = 0.0
+        now%dS_shlf          = 0.0
         now%T_fp_shlf       = 0.0 
         now%T_shlf_basin    = 0.0
         now%S_shlf_basin    = 0.0 
@@ -1778,6 +1899,7 @@ contains
         if (allocated(now%T_shlf))          deallocate(now%T_shlf)
         if (allocated(now%dT_shlf))         deallocate(now%dT_shlf)
         if (allocated(now%S_shlf))          deallocate(now%S_shlf)
+        if (allocated(now%dS_shlf))          deallocate(now%dS_shlf)
         if (allocated(now%T_fp_shlf))       deallocate(now%T_fp_shlf)
         if (allocated(now%T_shlf_basin))    deallocate(now%T_shlf_basin)
         if (allocated(now%S_shlf_basin))    deallocate(now%S_shlf_basin)       
@@ -1880,7 +2002,9 @@ contains
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
@@ -1993,6 +2117,7 @@ contains
         call nc_read_interp(filename,"T_shlf",mshlf%now%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"dT_shlf",mshlf%now%dT_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"S_shlf",mshlf%now%S_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dS_shlf",mshlf%now%dS_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
         call nc_read_interp(filename,"S_shlf_basin",mshlf%now%S_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
@@ -2127,6 +2252,101 @@ contains
         return 
     end subroutine axis_init
 
+    subroutine ocn_variable_extrapolation(var, H_ice, basin_mask, depth, z_bed)
+
+        implicit none
+        
+        real(wp), intent(INOUT) :: var(:,:,:)
+        real(wp), intent(IN)    :: H_ice(:,:), basin_mask(:,:), depth(:), z_bed(:,:)
+        
+        ! Local variables
+        integer :: i, j, k, l
+        integer :: nx, ny, nz, nb
+        real(wp), allocatable :: mask_border(:,:)
+        real(wp), allocatable :: mean_var_basin(:,:), npts_basin(:,:)
+        ! Define default missing value
+        real(wp), parameter :: mv = -9999.0_wp
+        
+        nx = size(var, 1)
+        ny = size(var, 2)
+        nz = size(var, 3)
+        nb = maxval(int(basin_mask))
+
+        ! Allocate objects
+        allocate(mask_border(nx, ny))
+        allocate(mean_var_basin(nb, nz))
+        allocate(npts_basin(nb, nz))
+        
+        ! Initialize variables
+        mask_border = 0.0_wp
+        mean_var_basin = 0.0_wp
+        npts_basin = 0.0_wp
+
+        ! 1. Define the mask of grid points with information closest to the ice front or mv.
+        ! 0 -> ocean; 2 -> mv or ice; 1 -> ocean point in contact with mv
+        where (H_ice .gt. 0.0_wp .or. var(:,:,1) .eq. mv)
+            mask_border = 2.0_wp
+        end where
+        
+        ! Loop to set mask_border to 1.0_wp for ocean points in contact with mv
+        do j = 2, ny-1
+        do i = 2, nx-1
+            if (mask_border(i, j) .eq. 0.0_wp) then
+                if (mask_border(i+1, j) .eq. 2.0_wp .or. mask_border(i-1, j) .eq. 2.0_wp .or. &
+                    mask_border(i, j+1) .eq. 2.0_wp .or. mask_border(i, j-1) .eq. 2.0_wp) then
+                        mask_border(i, j) = 1.0_wp
+                end if
+            end if
+        end do
+        end do
+        
+        ! 2. Compute the mean of the border by basins and depth.
+        do k = 1, nz
+        do j = 1, ny
+        do i = 1, nx
+            if (mask_border(i, j) .eq. 1.0_wp .and. z_bed(i, j) .lt. depth(k)) then
+                l = int(basin_mask(i, j))
+                ! ignore basin 0 for the moment (outside of continental-shelf break)
+                if (l .gt. 0) then
+                    mean_var_basin(l, k) = mean_var_basin(l, k) + var(i, j, k)
+                    npts_basin(l, k)     = npts_basin(l, k) + 1.0_wp
+                end if
+            end if
+        end do
+        end do
+        end do
+        
+        mean_var_basin = mean_var_basin / (npts_basin+1e-8)
+        
+        ! If the number of points is zero at some depth, set to previous value
+        do l = 1, nb
+        do k = 2, nz
+            if (npts_basin(l, k) .eq. 0.0_wp) then
+                mean_var_basin(l, k) = mean_var_basin(l, k-1)
+            end if
+        end do
+        end do
+        
+        ! 3. Assign the mean value by basin
+        do k = 1, nz
+        do j = 1, ny
+        do i = 1, nx
+            if (mask_border(i, j) .eq. 2.0_wp) then
+                l = int(basin_mask(i, j))
+                ! ignore basin 0 for the moment (outside of continental-shelf break)
+                if (l .gt. 0) var(i, j, k) = mean_var_basin(l, k)
+            end if
+        end do
+        end do
+        end do
+        
+        !if (.TRUE.) then
+        !    write(*,*) "var_max = ",maxval(var(:,:,:))
+        !    write(*,*) "var_min = ",minval(var(:,:,:))
+        !end if
+
+        return
+
+    end subroutine ocn_variable_extrapolation
+
 end module marine_shelf
-
-

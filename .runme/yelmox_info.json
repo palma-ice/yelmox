@@ -11,7 +11,8 @@
             "rembo"     : "libyelmox/bin/yelmox_rembo.x",
             "ismip6"    : "libyelmox/bin/yelmox_ismip6.x",
             "rtip"      : "libyelmox/bin/yelmox_rtip.x",
-            "bipolar"   : "libyelmox/bin/yelmox_bipolar.x"
+            "bipolar"   : "libyelmox/bin/yelmox_bipolar.x",
+	    "esm"    : "libyelmox/bin/yelmox_esm.x"
         },
 
     "grp_aliases" : 

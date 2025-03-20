@@ -1,5 +1,5 @@
 
-program yelmox_ismip6
+program yelmox_esm
 
     use nml
     use ncio
@@ -12,46 +12,39 @@ program yelmox_ismip6
     
     ! External libraries
     use geothermal
-    use ismip6
+    use esm
     use fastisostasy    ! also reexports barysealevel
     use marine_shelf
     use sediments
     use smbpal
-    use snapclim
     
-    use hyster
-
     implicit none 
 
-    character(len=256) :: outfldr, file2D, file2D_small
-    character(len=256) :: file1D_hyst
-    character(len=256) :: file1D_ismip6, file2D_ismip6
+    character(len=256) :: outfldr, file2D
+    character(len=256) :: file1D_esm, file2D_esm
     character(len=256) :: file_isos, file_bsl
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
     character(len=512) :: path_tf_corr 
-    character(len=512) :: ismip6_path_par
+    character(len=512) :: esm_path_par
     integer  :: n, m
     real(wp) :: time_wt
-
+        
     real(sp) :: convert_km3_Gt
-
+        
     type(tstep_class)           :: ts
-    
+            
     type(yelmo_class)           :: yelmo1
     type(bsl_class)             :: bsl
-    type(snapclim_class)        :: snp1
     type(marshelf_class)        :: mshlf1
     type(smbpal_class)          :: smbpal1
     type(sediments_class)       :: sed1
     type(geothermal_class)      :: gthrm1
     type(isos_class)            :: isos1
-    type(ismip6_forcing_class)  :: ismp1
-    type(hyster_class)          :: hyst1
+    type(esm_forcing_class)     :: esm1
 
-    logical,  allocatable :: tmp_mask(:,:) 
-    
-    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm
+    logical,  allocatable :: tmp_mask(:,:)
+    type(timeout_class) :: tm_1D, tm_2D
 
     ! Model timing
     type(timer_class)  :: tmr
@@ -62,62 +55,78 @@ program yelmox_ismip6
         character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
-        real(wp) :: time_equil      ! Only for spinup
+        real(wp) :: time_equil   ! Only for spinup 
         real(wp) :: dtt
+
+        real(wp) :: time_hist(2) 
+        real(wp) :: time_proj(2)  
+        real(wp) :: time_ref(2)  
+        logical  :: clim_var
 
         character(len=56)  :: tstep_method
         real(wp) :: tstep_const
 
+        logical  :: kill_shelves
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
 
-        character(len=56) :: abumip_scenario
-        real(wp)          :: abumip_bmb 
-        
-        character(len=56) :: hyst_scenario 
-        real(wp)          :: hyst_f_to 
-        real(wp)          :: hyst_f_ta
-
-        character(len=512) :: ismip6_par_file
-        character(len=56)  :: ismip6_expname
-        logical            :: ismip6_write_formatted
-        real(wp)           :: ismip6_dt_formatted
+        character(len=512) :: esm_par_file
+        character(len=56)  :: esm_expname
+        logical            :: esm_write_formatted
+        real(wp)           :: esm_dt_formatted
 
         real(wp) :: isos_tau_1 
         real(wp) :: isos_tau_2 
         real(wp) :: isos_sigma 
 
-    end type
+    end type 
 
     type(ctrl_params)     :: ctl
     type(ice_opt_params)  :: opt 
-    type(ismip6_experiment_class) :: ismip6exp 
+    type(esm_experiment_class) :: esmexp 
+
+    ! Set the seed for reproducibility of randomnes
+    integer :: seed_size
+    integer, allocatable :: seed(:)
+    call random_seed(size=seed_size) ! Get the size of the seed array
+    allocate(seed(seed_size))        ! Allocate the seed array
+    seed = 100                       ! Set the seed value (any integer value as the seed)
+    call random_seed(put=seed)       ! Initialize the random number generator with the seed
+        
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
 
     ! Control parameters 
     call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
-    
-    ! ISMIP6 parameters 
-    call nml_read(path_par,"ismip6","par_file",         ctl%ismip6_par_file)
-    call nml_read(path_par,"ismip6","expname",          ctl%ismip6_expname)
-    call nml_read(path_par,"ismip6","write_formatted",  ctl%ismip6_write_formatted)
-    call nml_read(path_par,"ismip6","dt_formatted",     ctl%ismip6_dt_formatted)
 
-    if (index(ctl%ismip6_par_file,"ant") .gt. 0) then
+    ! esm parameters 
+    call nml_read(path_par,"esm","par_file",         ctl%esm_par_file)
+    call nml_read(path_par,"esm","expname",          ctl%esm_expname)
+    call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)
+    call nml_read(path_par,"esm","dt_formatted",     ctl%esm_dt_formatted)
+    call nml_read(path_par,"esm","lapse",            esm1%lapse)
+    call nml_read(path_par,"esm","f_p",              esm1%beta_p)
+
+    ! What does this?
+    if (index(ctl%esm_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
-        call ismip6_experiment_def(ismip6exp,ctl%ismip6_expname,ctl%ismip6_par_file,"UCM","YELMO")
+        call esm_experiment_def(esmexp,ctl%esm_expname,ctl%esm_par_file,"UCM","YELMO",yelmo1%par%domain)
     end if
 
     ! Read run_step specific control parameters
-    call nml_read(path_par,trim(ctl%run_step),"time_init",  ctl%time_init)      ! [yr] Starting time
-    call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
-    call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step 
-    call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
-    call nml_read(path_par,trim(ctl%run_step),"tstep_method",ctl%tstep_method)  ! Calendar choice ("const" or "rel")
-    call nml_read(path_par,trim(ctl%run_step),"tstep_const", ctl%tstep_const)   ! Assumed time bp for const method
-    
+    call nml_read(path_par,trim(ctl%run_step),"time_init",    ctl%time_init)    ! [yr] Starting time
+    call nml_read(path_par,trim(ctl%run_step),"time_end",     ctl%time_end)     ! [yr] Ending time
+    call nml_read(path_par,trim(ctl%run_step),"dtt",          ctl%dtt)          ! [yr] Main loop time step 
+    call nml_read(path_par,trim(ctl%run_step),"time_equil",   ctl%time_equil)   ! [yr] Years to relax first
+    call nml_read(path_par,trim(ctl%run_step),"time_ref",     ctl%time_ref)     ! [yr,yr] Reference period
+    call nml_read(path_par,trim(ctl%run_step),"time_hist",    ctl%time_hist)    ! [yr,yr] Historical period
+    call nml_read(path_par,trim(ctl%run_step),"time_proj",    ctl%time_proj)    ! [yr,yr] Projection period
+    call nml_read(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)     ! Climate variability
+    call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method) ! Calendar choice ("const" or "rel")
+    call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)  ! Assumed time bp for const method
+        
+    call nml_read(path_par,trim(ctl%run_step),"kill_shelves",  ctl%kill_shelves)    ! Kill shelves beyond pd?
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
 
@@ -128,43 +137,23 @@ program yelmox_ismip6
 
     end if 
 
-    ! Check if special scenario is being run, make parameter adjustments
-    select case(trim(ctl%run_step))
-        
-        case("abumip") 
-
-            call nml_read(path_par,"abumip","scenario",          ctl%abumip_scenario)
-            call nml_read(path_par,"abumip","bmb",               ctl%abumip_bmb)
-
-        case("hysteresis") 
-
-            call nml_read(path_par,"hysteresis","scenario",      ctl%hyst_scenario)
-            call nml_read(path_par,"hysteresis","f_to",          ctl%hyst_f_to)
-            call nml_read(path_par,"hysteresis","f_ta",          ctl%hyst_f_ta)
-
-    end select
-
     ! Get output times
     call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
     call timeout_init(tm_2D,  path_par,"tm_2D",  "heavy",  ctl%time_init,ctl%time_end)
-    call timeout_init(tm_2Dsm,path_par,"tm_2Dsm","medium", ctl%time_init,ctl%time_end)
     
     ! Assume program is running from the output folder
     outfldr = "./"
 
     ! Define input and output locations
-    file2D              = trim(outfldr)//"yelmo2D.nc"
-    file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
+    file2D           = trim(outfldr)//"yelmo2D.nc"
     
-    file_isos           = trim(outfldr)//"fastisostasy.nc"
-    file_bsl            = trim(outfldr)//"bsl.nc"
+    file_isos        = trim(outfldr)//"fastisostasy.nc"
+    file_bsl         = trim(outfldr)//"bsl.nc"
     
-    file1D_hyst         = trim(outfldr)//"yelmo1D_hyst.nc"
+    file1D_esm       = trim(outfldr)//"yelmo1D_esm.nc"
+    file2D_esm       = trim(outfldr)//"yelmo2D_esm.nc"
 
-    file1D_ismip6       = trim(outfldr)//"yelmo1D_ismip6.nc"
-    file2D_ismip6       = trim(outfldr)//"yelmo2D_ismip6.nc"
-
-    tmr_file            = trim(outfldr)//"timer_table.txt" 
+    tmr_file         = trim(outfldr)//"timer_table.txt"
 
     !  =========================================================
     ! Print summary of run settings 
@@ -176,22 +165,25 @@ program yelmox_ismip6
     write(*,*) "dtt:       ",   ctl%dtt  
     write(*,*) 
     
-    write(*,*) "ismip6_par_file:        ", trim(ctl%ismip6_par_file)
-    write(*,*) "ismip6_expname:         ", trim(ctl%ismip6_expname)
-    write(*,*) "ismip6_experiment:      ", trim(ismip6exp%experiment)
+    write(*,*) "esm_par_file:        ", trim(ctl%esm_par_file)
+    write(*,*) "esm_expname:         ", trim(ctl%esm_expname)
+    write(*,*) "esm_experiment:      ", trim(esmexp%experiment)
     
     select case(trim(ctl%run_step))
 
         case("spinup")
 
-            write(*,*) "time_equil:  ",    ctl%time_equil 
-            write(*,*) "tstep_const: ",    ctl%tstep_const
+            write(*,*) "time_equil: ",   ctl%time_equil 
+            write(*,*) "tstep_const: ",  ctl%tstep_const 
+            write(*,*) "time_opt: ",     ctl%time_ref(1),ctl%time_ref(2)
 
         case("transient")
 
-            write(*,*) "ismip6_shlf_collapse:   ", ismip6exp%shlf_collapse
-            write(*,*) "ismip6_write_formatted: ", ctl%ismip6_write_formatted
-            write(*,*) "ismip6_file_suffix:     ", trim(ismip6exp%file_suffix)
+            write(*,*) "esm_write_formatted: ", ctl%esm_write_formatted
+            write(*,*) "esm_file_suffix:     ", trim(esmexp%file_suffix)
+            write(*,*) "time_hist: ",           ctl%time_hist(1),ctl%time_hist(2)
+            write(*,*) "time_ref: ",            ctl%time_ref(1),ctl%time_ref(2)
+            write(*,*) "time_proj: ",           ctl%time_proj(1),ctl%time_proj(2)
             
     end select
 
@@ -201,12 +193,12 @@ program yelmox_ismip6
     
     ! Start timing
     call timer_step(tmr,comp=-1) 
-    
+
     ! === Initialize timestepping ===
     
     call tstep_init(ts,ctl%time_init,ctl%time_end,method=ctl%tstep_method,units="year", &
-                                time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
-
+                    time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
+    
     ! === Initialize ice sheet model =====
     
     ! Initialize data objects and load initial topography
@@ -226,7 +218,7 @@ program yelmox_ismip6
     ! Define specific regions of interest =====================
 
     allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-    
+
     select case(trim(domain))
 
         case("Antarctica")
@@ -237,15 +229,15 @@ program yelmox_ismip6
             ! APIS
             call get_ice_sub_region(tmp_mask,"APIS",yelmo1%par%domain,yelmo1%par%grid_name)
             call yelmo_region_init(yelmo1%regs(1),"APIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
-
+    
             ! WAIS
             call get_ice_sub_region(tmp_mask,"WAIS",yelmo1%par%domain,yelmo1%par%grid_name)
             call yelmo_region_init(yelmo1%regs(2),"WAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
-
+    
             ! EAIS
             call get_ice_sub_region(tmp_mask,"EAIS",yelmo1%par%domain,yelmo1%par%grid_name)
             call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
-
+    
     end select
 
 
@@ -258,33 +250,15 @@ program yelmox_ismip6
     call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
         yelmo1%grd%dx, yelmo1%grd%dy)
     
-    ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
-    
+    ! Initialize ESM atmospheric and oceanic objects 
+    esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
+    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,experiment=esmexp%experiment)
+   
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
     
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
-    
-    ! Initialize variables inside of ismip6 object 
-    ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
-    call ismip6_forcing_init(ismp1,ismip6_path_par,domain,grid_name,experiment=ismip6exp%experiment, &
-                                                                    shlf_collapse=ismip6exp%shlf_collapse)
-    
-    ! ===== tf_corr initialization ======
-
-    ! Make sure that tf is prescribed externally
-    mshlf1%par%tf_method = 0  
-    
-    if (.not. mshlf1%par%use_restart) then
-        ! Initialize tf_corr to be equal to tf_corr_basin, and
-        ! set tf_corr_basin to zero (all corrections will be contained in one field)
-
-        mshlf1%now%tf_corr       = mshlf1%now%tf_corr_basin
-        mshlf1%now%tf_corr_basin = 0.0_wp
-
-    end if 
     
     ! === Update external modules and pass variables to yelmo boundaries =======
 
@@ -308,19 +282,19 @@ program yelmox_ismip6
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-    ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    ! Update forcing to present-day reference using esm forcing
+    call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
+                          time=ts%time,time_bp=ts%time_rel, &
+                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
+                          clim_var=ctl%clim_var,domain=yelmo1%par%domain)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
-        call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
+        call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
+            yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
-    
-    ! Update forcing to present-day reference using ISMIP6 forcing
-    call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-                time=ts%time,time_bp=ts%time_rel)
-    
+
+    ! Update Yelmo boundary fields
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
@@ -332,6 +306,11 @@ program yelmox_ismip6
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
     call yelmo_init_state(yelmo1,time=ts%time,thrm_method="robin-cold")
+
+    ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
+    if (ctl%kill_shelves) then
+        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%ice_allowed = .FALSE.
+    end if
     
 ! ================= RUN STEPS ===============================================
 
@@ -394,10 +373,6 @@ program yelmox_ismip6
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
         
-        ! == Advance timesteps ===
-
-        call tstep_print_header(ts)
-
         do while (.not. ts%is_finished)
 
             ! == Update timestep ===
@@ -505,8 +480,10 @@ program yelmox_ismip6
 
             ! Update forcing to present-day reference, but 
             ! adjusting to ice topography
-            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-                        time=ts%time,time_bp=ts%time_rel)
+            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
+                                  time=ts%time,time_bp=ts%time_rel, &
+                                  time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
+                                  clim_var=ctl%clim_var,domain=yelmo1%par%domain) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -519,7 +496,7 @@ program yelmox_ismip6
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2D,ts%time)) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,ts%time)
+                call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
             end if
 
             if (timeout_check(tm_1D,ts%time)) then
@@ -536,8 +513,8 @@ program yelmox_ismip6
             if (mod(ts%time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
                 write(*,"(a,f14.4)") "yelmo:: time = ", ts%time
             end if 
-            
-        end do 
+
+        end do
 
         write(*,*)
         write(*,*) "spinup complete."
@@ -557,41 +534,30 @@ program yelmox_ismip6
         ! Additionally make sure isostasy is updated every timestep 
         isos1%par%dt_prognostics = 1.0_wp 
         isos1%par%dt_diagnostics = 10.0_wp 
-        
+
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
         call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
-        if (ctl%ismip6_write_formatted) then
-            ! Initialize output files for ISMIP6
-            call yelmo_write_init(yelmo1,file2D_ismip6,time_init=ts%time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed) 
+        if (ctl%esm_write_formatted) then
+            ! Initialize output files for esm
+            call yelmo_write_init(yelmo1,file2D_esm,time_init=ts%time,units="years")
+            call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed) 
         end if 
 
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
-        
+
         ! == Advance timesteps ===
 
         call tstep_print_header(ts)
-
+        
         do while (.not. ts%is_finished)
 
             ! == Update timestep ===
 
             call tstep_update(ts,ctl%dtt)
             call tstep_print(ts)
-            
-            if (ismip6exp%shlf_collapse) then
-                ! Perform mask_shlf_collapse experiments
-                ! Set H to zero where mask==1, then compute Yelmo.
-
-                if(ts%time .ge. 2015) then
-                    !where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
-                    where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%bnd%ice_allowed = .FALSE.
-                end if
-            end if
-
             call timer_step(tmrs,comp=0) 
             
             ! == ISOSTASY and SEA LEVEL ===========================================
@@ -605,18 +571,14 @@ program yelmox_ismip6
             ! == ICE SHEET ===================================================
             if (ctl%with_ice_sheet) call yelmo_update(yelmo1,ts%time)
 
-            if (ismip6exp%shlf_collapse) then
-                ! Clean up icebergs for mask_shlf_collapse experiments
-            call calc_iceberg_island(ismp1%iceberg_mask,yelmo1%tpo%now%f_grnd,yelmo1%tpo%now%H_ice) 
-            where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
-end if 
-
             call timer_step(tmrs,comp=2,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="yelmo") 
 
             ! == CLIMATE and OCEAN ==========================================
 
             ! Get ISMIP6 climate and ocean forcing
-            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,ts%time,ts%time_rel)
+            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel, &
+                                  ctl%time_ref,ctl%time_hist,ctl%time_proj, &
+                                  clim_var=ctl%clim_var,domain=yelmo1%par%domain)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -629,7 +591,7 @@ end if
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2D,ts%time)) then
-                call write_step_2D_combined(yelmo1,isos1,snp1,mshlf1,smbpal1,file2D,ts%time)
+                call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
             end if
            
              
@@ -637,11 +599,11 @@ end if
                  call yelmo_regions_write(yelmo1,ts%time)
             end if 
 
-            ! ISMIP6 output if desired:
-            if (ctl%ismip6_write_formatted) then
-                if (mod(nint(ts%time_elapsed*100),nint(ctl%ismip6_dt_formatted*100))==0) then
-                    call write_step_2D_ismip6(yelmo1,file2D_ismip6,ts%time)
-                    call write_1D_ismip6(yelmo1,file1D_ismip6,ts%time)
+            ! esm output if desired:
+            if (ctl%esm_write_formatted) then
+                if (mod(nint(ts%time_elapsed*100),nint(ctl%esm_dt_formatted*100))==0) then
+                    call write_step_2D_esm(yelmo1,file2D_esm,ts%time)
+                    call write_1D_esm(yelmo1,file1D_esm,ts%time)
                 end if
             end if
 
@@ -667,6 +629,9 @@ end if
 
     end select
 
+    ! Deallocate the seed array
+    deallocate(seed) 
+
     ! Finalize program
     call yelmo_end(yelmo1,time=ts%time)
 
@@ -675,18 +640,15 @@ end if
     
 contains
     
-    subroutine write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
+    subroutine write_step_2D_combined(ylmo,isos,esm,mshlf,srf,filename,time)
 
         implicit none
 
-        type(yelmo_class),      intent(IN) :: ylmo
-        type(isos_class),       intent(IN) :: isos
-        type(snapclim_class),   intent(IN) :: snp
-        type(marshelf_class),   intent(IN) :: mshlf
-        type(smbpal_class),     intent(IN) :: srf
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
+        type(yelmo_class),       intent(IN) :: ylmo
+        type(isos_class),        intent(IN) :: isos
+        type(esm_forcing_class), intent(IN) :: esm
+        type(marshelf_class),    intent(IN) :: mshlf
+        type(smbpal_class),      intent(IN) :: srf
 
         character(len=*),       intent(IN) :: filename
         real(wp),               intent(IN) :: time
@@ -851,16 +813,14 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        !call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
-        !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/a ice equiv.",long_name="Net surface mass balance", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
@@ -890,18 +850,34 @@ contains
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
+        
+        ! ESM Atmospheric boundary fields            
+        call nc_write(filename,"ts_ref_jan",esm%ts_ref%var(:,:,1,1),units="K",long_name="RACMO2.3 air temp January", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"so_ref_srf",esm%so_ref%var(:,:,1,1),units="PSU",long_name="ERA-INT ORAS5 salinity surface", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)                
+        call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
+        call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dt2m_ann",esm%dts,units="K",long_name="Near-surface air temperature anomaly (ann)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dt2m_sum",esm%now%dt2m_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dpr_ann",esm%now%dpr_ann,units="%",long_name="Precipitation anomaly (ann)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        
 
+        ! Oceanic boundary conditions
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf,units="PSU",long_name="Shelf salinity anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,units="K",long_name="Shelf freezing temperature", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -937,16 +913,6 @@ contains
             call nc_write(filename,"A_box",mshlf%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         end if
-
-        !call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-        !              dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
-
-        call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         !call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
         !              dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1029,12 +995,6 @@ contains
         implicit none 
         
         type(yelmo_class), intent(IN) :: ylmo
-!         type(snapclim_class),   intent(IN) :: snp 
-!         type(marshelf_class),   intent(IN) :: mshlf 
-!         type(smbpal_class),     intent(IN) :: srf  
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
         
         character(len=*), intent(IN) :: filename
         real(wp),         intent(IN) :: time
@@ -1095,144 +1055,65 @@ contains
 
     ! === CLIMATE ====
 
-    subroutine calc_climate_standard(snp,smbp,mshlf,ylmo,time,time_bp)
+    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,time,time_bp,time_ref,time_hist,time_proj,clim_var,domain,use_ref_atm,use_ref_ocn)
 
         implicit none 
 
-        type(snapclim_class),       intent(INOUT) :: snp 
-        type(smbpal_class),         intent(INOUT) :: smbp 
-        type(marshelf_class),       intent(INOUT) :: mshlf
-        type(yelmo_class),          intent(IN)    :: ylmo
-        real(wp),                   intent(IN)    :: time 
-        real(wp),                   intent(IN)    :: time_bp 
-        
-        ! Step 1: udpate the climate to the present time 
-
-        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=ylmo%par%domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
-
-        ! Step 2: update the smb fields 
-
-        call smbpal_update_monthly(smbp,snp%now%tas,snp%now%pr, &
-                                   ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time) 
-        
-        ! Step 3: update the marine_shelf fields 
-
-        call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,snp%now%depth, &
-                        snp%now%to_ann,snp%now%so_ann,dto_ann=snp%now%to_ann-snp1%clim0%to_ann)
-
-        call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-                             ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=yelmo1%grd%dx)
-
-        return
-
-    end subroutine calc_climate_standard
-
-    subroutine calc_climate_ismip6(snp,smbp,mshlf,ismp,ylmo,time,time_bp,dTa,dTo)
-
-        implicit none 
-
-        type(snapclim_class),       intent(INOUT) :: snp 
         type(smbpal_class),         intent(INOUT) :: smbp
         type(marshelf_class),       intent(INOUT) :: mshlf 
-        type(ismip6_forcing_class), intent(INOUT) :: ismp
+        type(esm_forcing_class),    intent(INOUT) :: esm
         type(yelmo_class),          intent(IN)    :: ylmo
         real(wp),                   intent(IN)    :: time 
-        real(wp),                   intent(IN)    :: time_bp 
-        real(wp), intent(IN), optional :: dTa
-        real(wp), intent(IN), optional :: dTo
-        
-        ! Local variables
-        real(wp), allocatable :: dts_now(:,:) 
-        real(wp), allocatable :: dpr_now(:,:)
-        real(wp), allocatable :: dsmb_now(:,:) 
-        integer               :: k
+        real(wp),                   intent(IN)    :: time_bp
+        real(wp),                   intent(IN)    :: time_ref(2),time_hist(2),time_proj(2)
+        logical,                    intent(IN)    :: clim_var
+        character(len=*),           intent(IN)    :: domain
+        logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
 
-        allocate(dts_now(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(dpr_now(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(dsmb_now(ylmo%grd%nx,ylmo%grd%ny))
-        
-        ! Step 1: set climate to present day from input fields
-        ! and calculate present-day smb based on this climate.
+        ! === Atmospheric boundary conditions ===
 
-        ! Set present-day climate
-        !snp%now = snp%clim0
+        ! Step 1: set the reference climatologies (monthly data)
+        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
+                             time_ref,clim_var,domain)
 
-        ! Set present-day climate with optional constant atmospheric anomaly
-        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp, &
-                                        dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
-                                        domain=ylmo%par%domain,dTa=dTa,dTo=0.0_wp)
+        ! Step 2: Calculate anomaly fields
+        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time, &
+                                time_ref,time_hist,time_proj, &
+                                use_ref_atm=.false.,use_ref_ocn=.false.)
 
-        ! Calculate smb for present day 
-        call smbpal_update_monthly(smbp,snp%now%tas,snp%now%pr, &
-                                   ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time) 
-        
-        
-        ! Step 2: update the ISMIP6 forcing to the current year
-        call ismip6_forcing_update(ismp,time)
-        
-        ! Calculate anomaly fields accounting for elevation difference with reference topo
-        dts_now  = ismp%ts%var(:,:,1,1)  !+ ismp%dts_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
-        dpr_now  = ismp%pr%var(:,:,1,1) 
-        dsmb_now = ismp%smb%var(:,:,1,1) !+ ismp%dsmb_dz%var(:,:,1,1)*(ylmo%tpo%now%z_srf-ismp%z_srf%var(:,:,1,1))
+        ! Calculate the smb fields 
+        call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
+            ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
 
-        ! Step 3: apply ISMIP6 anomalies to climate and smb fields
-        ! (apply to climate just for consistency)
+        if (.TRUE.) then
+            ! Atm
+            write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
+            write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
+        end if
 
-        ! Update climatic fields 
-        do m = 1,12
-            snp%now%tas(:,:,m) = snp%now%tas(:,:,m) + dts_now 
-            snp%now%pr(:,:,m)  = snp%now%pr(:,:,m)  + dpr_now/365.0 ! [mm/yr] => [mm/d]
-        end do 
+        ! === Oceanic boundary conditions ===
+        ! Interpolate ocean data to the interior
+        call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
+        call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
 
-        snp%now%ta_ann = sum(snp%now%tas,dim=3) / 12.0_wp 
-        if (trim(domain) .eq. "Antarctica") then 
-            snp%now%ta_sum  = sum(snp%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
-        else 
-            snp%now%ta_sum  = sum(snp%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer 
-        end if 
-        snp%now%pr_ann = sum(snp%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/yr]
-        
-        ! Update smb fields
-        smbp%ann%smb  = smbp%ann%smb  + dsmb_now*1.0/(yelmo1%bnd%c%conv_we_ie*1e-3) ! [m ie/yr] => [mm we/yr]
-        smbp%ann%tsrf = smbp%ann%tsrf + dts_now
+        if (.TRUE.) then
+            ! Ocean
+            write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
+            write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
+            write(*,*) "To_min = ",minval(esm%to_ref%var(:,:,:,1))
+            write(*,*) "So_min = ",minval(esm%so_ref%var(:,:,:,1))
+        end if
 
-        ! Step 4: update marine_shelf based on ISMIP6 fields 
-        ! (no need to mix with present-day climate, since ismip6 includes the
-        !  reference ocean fields with internal depth dimension) 
+        ! Update oceanic fields at desired levels
+        call marshelf_interp_shelf(mshlf%now%T_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
+                                   ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
+        call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
+                                        ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
 
-        ! Update marine_shelf shelf fields
-        ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
-
-        ! insert NaNs in pd mask
-        do k=1,size(ismp%to%var, 3)
-            where(ylmo%bnd%H_ice_ref .gt. 0.0_wp) 
-                ismp%to%var(:,:,k,1) = mv
-                ismp%so%var(:,:,k,1) = mv
-                ismp%tf%var(:,:,k,1) = mv
-            end where
-        end do
-
-        ! populate NaNs using oceanic extrapolation
-        call ocn_variable_extrapolation(ismp%to%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-ismp%to%z,ylmo%bnd%z_bed)
-        call ocn_variable_extrapolation(ismp%so%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-ismp%so%z,ylmo%bnd%z_bed)
-        call ocn_variable_extrapolation(ismp%tf%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-ismp%to%z,ylmo%bnd%z_bed)
-        
-        call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
-                        ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
-                        dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
-                        tf_ann=ismp%tf%var(:,:,:,1))
-
-        ! Update temperature forcing field with tf_corr and tf_corr_basin
-        mshlf%now%tf_shlf = mshlf%now%tf_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
-
-        if (present(dTo)) then 
-            ! Update temperature fields with hysteresis anomaly 
-            mshlf1%now%T_shlf  = mshlf1%now%T_shlf  + dTo
-            mshlf1%now%dT_shlf = mshlf1%now%dT_shlf + dTo
-            mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + dTo
-        end if 
+        ! Update oceanic anomaly fields at desired level
+        ! TO DO
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
@@ -1240,517 +1121,11 @@ contains
 
         return
 
-    end subroutine calc_climate_ismip6
+    end subroutine calc_climate_esm
 
-! ======================================
-!
-! Hysteresis related output routines 
-!
-! ======================================
+    ! ===== esm output routines =========
 
-
-subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class),      intent(IN) :: ylmo
-        type(isos_class),       intent(IN) :: isos 
-        type(snapclim_class),   intent(IN) :: snp 
-        type(marshelf_class),   intent(IN) :: mshlf 
-        type(smbpal_class),     intent(IN) :: srf  
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
-        
-        character(len=*),  intent(IN) :: filename
-        real(wp), intent(IN) :: time
-
-        ! Local variables
-        integer  :: ncid, n 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_time_index(filename,"time",time,ncid)
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
-
-        ! Write present-day data metrics (rmse[H],etc)
-        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        
-        ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"mb_net",ylmo%tpo%now%mb_net,units="m",long_name="Applied net mass balance", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"H_grnd",ylmo%tpo%now%H_grnd,units="m",long_name="Ice thickness overburden", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"f_ice",ylmo%tpo%now%f_ice,units="1",long_name="Ice fraction in grid cell", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"dist_grline",ylmo%tpo%now%dist_grline,units="km", &
-!                       long_name="Distance to nearest grounding-line point", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"c_bed",ylmo%dyn%now%c_bed,units="Pa",long_name="Bed friction coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m^-1",long_name="Basal friction coefficient", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_eff_int",ylmo%dyn%now%visc_eff_int,units="Pa a m",long_name="Depth-integrated effective viscosity (SSA)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"taud",ylmo%dyn%now%taud,units="Pa",long_name="Driving stress", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)        
-        call nc_write(filename,"taub",ylmo%dyn%now%taub,units="Pa",long_name="Basal stress", &
-                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"uxy_bar",ylmo%dyn%now%uxy_bar,units="m/a",long_name="Vertically integrated velocity magnitude", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"T_ice",ylmo%thrm%now%T_ice,units="K",long_name="Ice temperature", &
-!                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        
-        !call nc_write(filename,"T_prime",ylmo%thrm%now%T_ice-ylmo%thrm%now%T_pmp,units="deg C",long_name="Homologous ice temperature", &
-        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"f_pmp",ylmo%thrm%now%f_pmp,units="1",long_name="Fraction of grid point at pmp", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        !call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"bmb_grnd",ylmo%thrm%now%bmb_grnd,units="m/a ice equiv.",long_name="Basal mass balance (grounded)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"H_w",ylmo%thrm%now%H_w,units="m",long_name="Basal water layer thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        !call nc_write(filename,"ATT",ylmo%mat%now%ATT,units="a^-1 Pa^-3",long_name="Rate factor", &
-        !              dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-
-        call nc_write(filename,"enh_bar",ylmo%mat%now%enh_bar,units="1",long_name="Vertically averaged enhancement factor", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Vertically integrated viscosity", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! Boundaries
-        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
-        call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/a ice equiv.",long_name="Net surface mass balance", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"smb_errpd",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"T_srf",ylmo%bnd%T_srf,units="K",long_name="Surface temperature", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"bmb_shlf",ylmo%bnd%bmb_shlf,units="m/a ice equiv.",long_name="Basal mass balance (shelf)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW m-2",long_name="Geothermal heat flux", &
-                      dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-        
-        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Net basal mass balance", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Net margin-front mass balance", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! External data
-        call nc_write(filename,"dzbdt",isos%out%dwdt,units="m/a",long_name="Bedrock uplift rate", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
- 
-        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn,units="",long_name="Marine-shelf ocean mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-       
-        !call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-        !              dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
-              
-        call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! Comparison with present-day 
-        call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf_pd_err",ylmo%dta%pd%err_z_srf,units="m",long_name="Surface elevation error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"ssa_mask_acx",ylmo%dyn%now%ssa_mask_acx,units="1",long_name="SSA mask (acx)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"ssa_mask_acy",ylmo%dyn%now%ssa_mask_acy,units="1",long_name="SSA mask (acy)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"dzsdx",ylmo%tpo%now%dzsdx,units="m/m",long_name="Surface slope", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dzsdy",ylmo%tpo%now%dzsdy,units="m/m",long_name="Surface slope", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"f_grnd_acx",ylmo%tpo%now%f_grnd_acx,units="1",long_name="Grounded fraction (acx)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"f_grnd_acy",ylmo%tpo%now%f_grnd_acy,units="1",long_name="Grounded fraction (acy)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"taub_acx",ylmo%dyn%now%taub_acx,units="Pa",long_name="Basal stress (x)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"taub_acy",ylmo%dyn%now%taub_acy,units="Pa",long_name="Basal stress (y)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"taud_acx",ylmo%dyn%now%taud_acx,units="Pa",long_name="Driving stress (x)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"taud_acy",ylmo%dyn%now%taud_acy,units="Pa",long_name="Driving stress (y)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"ux_b",ylmo%dyn%now%ux_b,units="m/a",long_name="Basal sliding velocity (x)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"uy_b",ylmo%dyn%now%uy_b,units="m/a",long_name="Basal sliding velocity (y)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"ux_i_bar",ylmo%dyn%now%ux_i_bar,units="m/a",long_name="Internal shear velocity (x)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"uy_i_bar",ylmo%dyn%now%uy_i_bar,units="m/a",long_name="Internal shear velocity (y)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"ux_bar",ylmo%dyn%now%ux_bar,units="m/a",long_name="Vertically averaged velocity (x)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"uy_bar",ylmo%dyn%now%uy_bar,units="m/a",long_name="Vertically averaged velocity (y)", &
-!                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"beta_acx",ylmo%dyn%now%beta_acx,units="Pa a m-1",long_name="Dragging coefficient (x)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"beta_acy",ylmo%dyn%now%beta_acy,units="Pa a m-1",long_name="Dragging coefficient (y)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine yx_hyst_write_step_2D_combined
-
-    subroutine yx_hyst_write_step_2D_combined_small(ylmo,isos,snp,mshlf,srf,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class),      intent(IN) :: ylmo
-        type(isos_class),       intent(IN) :: isos 
-        type(snapclim_class),   intent(IN) :: snp 
-        type(marshelf_class),   intent(IN) :: mshlf 
-        type(smbpal_class),     intent(IN) :: srf  
-        !type(sediments_class),  intent(IN) :: sed 
-        !type(geothermal_class), intent(IN) :: gthrm
-        !type(isos_class),       intent(IN) :: isos
-        
-        character(len=*),  intent(IN) :: filename
-        real(wp), intent(IN) :: time
-
-        ! Local variables
-        integer  :: ncid, n
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_time_index(filename,"time",time,ncid)
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
-
-        ! Write present-day data metrics (rmse[H],etc)
-        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
-        
-        ! == yelmo_topography ==
-        call nc_write(filename,"H_ice",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"z_srf",ylmo%tpo%now%z_srf,units="m",long_name="Surface elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-!         call nc_write(filename,"beta",ylmo%dyn%now%beta,units="Pa a m-1",long_name="Basal friction coefficient", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_b",ylmo%dyn%now%uxy_b,units="m/a",long_name="Basal sliding velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"uxy_s",ylmo%dyn%now%uxy_s,units="m/a",long_name="Surface velocity magnitude", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="K",long_name="Basal homologous ice temperature", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! Boundaries
-        call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
-!         call nc_write(filename,"z_sl",ylmo%bnd%z_sl,units="m",long_name="Sea level rel. to present", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"smb",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Basal mass balance", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        ! External data
-!         call nc_write(filename,"dzbdt",isos%now%dzbdt,units="m/a",long_name="Bedrock uplift rate", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-!         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-!         call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-!                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dTa_sum",snp%now%ta_sum-snp%clim0%ta_sum,units="K",long_name="Near-surface air temperature anomaly (sum)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dPr_ann",(snp%now%pr_ann-snp%clim0%pr_ann)*1e-3,units="m/a water equiv.",long_name="Precipitation anomaly (ann)", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine yx_hyst_write_step_2D_combined_small
-
-    subroutine yx_hyst_write_yelmo_init_1D_combined(dom,filename,time_init,units,mask,dT_min,dT_max)
-
-        implicit none 
-
-        type(yelmo_class), intent(IN) :: dom 
-        character(len=*),  intent(IN) :: filename, units 
-        real(wp),          intent(IN) :: time_init
-        logical,           intent(IN) :: mask(:,:) 
-        real(wp),          intent(IN) :: dT_min 
-        real(wp),          intent(IN) :: dT_max
-
-        ! Local variables
-        integer :: n 
-        real(wp), allocatable :: dT_axis(:) 
-
-        ! Initialize netcdf file and dimensions
-        call nc_create(filename)
-        call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,    units="kilometers")
-        call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,    units="kilometers")
-        call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,    units="1")
-        call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
-        
-        !============================================================
-        ! Add temperature axis to 1D hysteresis file 
-        allocate(dT_axis(1000))
-        do n = 1, 1000 
-            dT_axis(n) = dT_min + (dT_max-dT_min)*(n-1)/real(1000-1,wp)
-        end do 
-        call nc_write_dim(filename,"dT_axis",x=dT_axis,units="degC")
-        
-        ! Populate variable with missing values for now to initialize it
-        dT_axis = missing_value 
-        call nc_write(filename,"V_dT",dT_axis,dim1="dT_axis",missing_value=missing_value)
-        !============================================================
-        
-        ! Static information
-        call nc_write(filename,"mask", mask,  units="1",long_name="Region mask",dim1="xc",dim2="yc")
-        
-        return
-
-    end subroutine yx_hyst_write_yelmo_init_1D_combined
-
-    subroutine yx_hyst_write_step_1D_combined(ylm,hyst,snp,filename,time)
-
-        implicit none 
-        
-        type(yelmo_class),    intent(IN) :: ylm
-        type(hyster_class),   intent(IN) :: hyst
-        type(snapclim_class), intent(IN) :: snp 
-        character(len=*),     intent(IN) :: filename
-        real(wp),             intent(IN) :: time
-
-        ! Local variables
-        integer  :: ncid, n, k
-        real(wp) :: dT_axis(1000) 
-        type(yregions_class) :: reg 
-
-        ! Assume region to write is the global region of yelmo 
-        reg = ylm%reg 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_time_index(filename,"time",time,ncid)
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-
-        ! ===== Hyst / forcing variables ===== 
-
-        call nc_write(filename,"hyst_f_now",hyst%f_now,units="K",long_name="hyst: forcing value", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 a)",long_name="hyst: forcing rate of change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/a",long_name="hyst: volume rate of change", &
-                      dim1="time",start=[n],ncid=ncid)
-
-        ! Write volume in volume-dT phase space
-        call nc_read(filename,"dT_axis",dT_axis) 
-        k = minloc(abs(dT_axis-hyst%f_now),dim=1)
-        call nc_write(filename,"V_dT",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
-                      dim1="time",start=[k],ncid=ncid)
-        
-        ! ===== Total ice variables =====
-
-        call nc_write(filename,"H_ice",reg%H_ice,units="m",long_name="Mean ice thickness", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"z_srf",reg%z_srf,units="m",long_name="Mean surface elevation", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dHidt",reg%dHidt,units="m/a",long_name="Mean rate ice thickness change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"H_ice_max",reg%H_ice_max,units="m/a",long_name="Max ice thickness", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dzsdt",reg%dzsdt,units="m/a",long_name="Mean rate surface elevation change", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-        call nc_write(filename,"V_ice",reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"A_ice",reg%A_ice*1e-6,units="1e6 km^2",long_name="Ice area", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dVidt",reg%dVidt,units="km^3/a",long_name="Rate volume change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"fwf",reg%fwf,units="Sv",long_name="Rate volume change", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
-                      dim1="time",start=[n],ncid=ncid)
-
-        call nc_write(filename,"uxy_bar",reg%uxy_bar,units="m/a",long_name="Mean depth-ave velocity", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_s",reg%uxy_s,units="m/a",long_name="Mean surface velocity", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_b",reg%uxy_b,units="m/a",long_name="Mean basal velocity", &
-                      dim1="time",start=[n],ncid=ncid)
-
-        call nc_write(filename,"z_bed",reg%z_bed,units="m",long_name="Mean bedrock elevation", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"smb",reg%smb,units="m/a",long_name="Mean surface mass balance", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"T_srf",reg%T_srf,units="K",long_name="Mean surface temperature", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb",reg%bmb,units="m/a",long_name="Mean total basal mass balance", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-
-
-        ! ===== Grounded ice variables =====
-
-        call nc_write(filename,"H_ice_g",reg%H_ice_g,units="m",long_name="Mean ice thickness (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"z_srf_g",reg%z_srf_g,units="m",long_name="Mean surface elevation (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_ice_g",reg%V_ice_g*1e-6,units="1e6 km^3",long_name="Ice volume (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"A_ice_g",reg%A_ice_g*1e-6,units="1e6 km^2",long_name="Ice area (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-
-        call nc_write(filename,"uxy_bar_g",reg%uxy_bar_g,units="m/a",long_name="Mean depth-ave velocity (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_s_g",reg%uxy_s_g,units="m/a",long_name="Mean surface velocity (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_b_g",reg%uxy_b_g,units="m/a",long_name="Mean basal velocity (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-        call nc_write(filename,"f_pmp",reg%f_pmp,units="1",long_name="Temperate fraction (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-        call nc_write(filename,"H_w",reg%H_w,units="m",long_name="Mean basal water thickness (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-        call nc_write(filename,"bmb_g",reg%bmb_g,units="m/a",long_name="Mean basal mass balance (grounded)", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-        ! ===== Floating ice variables =====
-
-        call nc_write(filename,"H_ice_f",reg%H_ice_f,units="m",long_name="Mean ice thickness (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_ice_f",reg%V_ice_f*1e-6,units="1e6 km^3",long_name="Ice volume (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"A_ice_f",reg%A_ice_f*1e-6,units="1e6 km^2",long_name="Ice area (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-
-        call nc_write(filename,"uxy_bar_f",reg%uxy_bar_f,units="m/a",long_name="Mean depth-ave velocity (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_s_f",reg%uxy_s_f,units="m/a",long_name="Mean surface velocity (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"uxy_b_f",reg%uxy_b_f,units="m/a",long_name="Mean basal velocity (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        
-        call nc_write(filename,"z_sl",reg%z_sl,units="m",long_name="Mean sea level (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_shlf",reg%bmb_shlf,units="m/a",long_name="Mean basal mass balance (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"T_shlf",reg%T_shlf,units="K",long_name="Mean marine shelf temperature (floating)", &
-                      dim1="time",start=[n],ncid=ncid)
-
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return 
-
-    end subroutine yx_hyst_write_step_1D_combined
-
-
-    ! ===== ISMIP6 output routines =========
-
-    subroutine write_step_2D_ismip6(ylmo,filename,time)
+    subroutine write_step_2D_esm(ylmo,filename,time)
 
         implicit none
 
@@ -1763,10 +1138,10 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         real(wp) :: rho_ice 
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
-        real(wp) :: ismip6_correction
+        real(wp) :: esm_correction
         real(wp) :: yr_to_sec
         
-        ! ISMIP6 variables
+        ! esm variables
         real(wp), allocatable :: bmb_grnd_masked(:,:)
         real(wp), allocatable :: bmb_shlf_masked(:,:)
         real(wp), allocatable :: z_base(:,:)
@@ -1797,7 +1172,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         rho_ice             = 917.0             ! ice density kg/m3
         m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
         density_corr        = rho_ice/1000.0    ! ice density correction with pure water
-        ismip6_correction   = m3yr_to_kgs*density_corr
+        esm_correction   = m3yr_to_kgs*density_corr
         yr_to_sec           = 31556952.0
 
         ! Open the file for writing
@@ -1810,7 +1185,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
 
-        ! Write ismip6 variables 
+        ! Write esm variables 
 
         ! == yelmo_topography ==
         call nc_write(filename,"lithk",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
@@ -1834,11 +1209,11 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         
         where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0) bmb_grnd_masked = ylmo%thrm%now%bmb_grnd
         where(ylmo%tpo%now%H_ice .gt. 0.0 .and. ylmo%tpo%now%f_grnd_bmb .eq. 0.0) bmb_shlf_masked = ylmo%bnd%bmb_shlf
-        call nc_write(filename,"acabf",ylmo%bnd%smb*ismip6_correction,units="kg m-2 s-1",long_name="Surface mass balance flux", &
+        call nc_write(filename,"acabf",ylmo%bnd%smb*esm_correction,units="kg m-2 s-1",long_name="Surface mass balance flux", &
                         standard_name="land_ice_surface_specific_mass_balance_flux", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"libmassbfgr",bmb_grnd_masked*ismip6_correction,units="kg m-2 s-1",long_name="Basal mass balance flux beneath grounded ice", &
+        call nc_write(filename,"libmassbfgr",bmb_grnd_masked*esm_correction,units="kg m-2 s-1",long_name="Basal mass balance flux beneath grounded ice", &
                         standard_name="land_ice_basal_specific_mass_balance_flux", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"libmassbffl",bmb_shlf_masked*ismip6_correction,units="kg m-2 s-1",long_name="Basal mass balance flux beneath floating ice", &
+        call nc_write(filename,"libmassbffl",bmb_shlf_masked*esm_correction,units="kg m-2 s-1",long_name="Basal mass balance flux beneath floating ice", &
                         standard_name="float_ice_basal_specific_mass_balance_flux", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_velocities ==
@@ -1881,11 +1256,11 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0 .and. ylmo%tpo%now%f_grnd_bmb .lt. 1.0) flux_grl = ylmo%tpo%now%dHidt
         call nc_write(filename,"strbasemag",ylmo%dyn%now%taub,units="Pa",long_name="Basal drag", &
                         standard_name="Basal drag", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"licalvf",ylmo%tpo%now%cmb*ismip6_correction,units="kg m-2 s-1",long_name="Calving flux", &
+        call nc_write(filename,"licalvf",ylmo%tpo%now%cmb*esm_correction,units="kg m-2 s-1",long_name="Calving flux", &
                         standard_name="land_ice_specific_mass_flux_due_to_calving", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"lifmassbf",(ylmo%tpo%now%fmb+ylmo%tpo%now%cmb)*ismip6_correction,units="kg m-2 s-1",long_name="Ice front melt and calving flux", &
+        call nc_write(filename,"lifmassbf",(ylmo%tpo%now%fmb+ylmo%tpo%now%cmb)*esm_correction,units="kg m-2 s-1",long_name="Ice front melt and calving flux", &
                         standard_name="land_ice_specific_mass_flux_due_to_calving_and_ice_front_melting", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"ligroundf",flux_grl*ismip6_correction,units="kg m-2 s-1",long_name="Grounding line flux", &
+        call nc_write(filename,"ligroundf",flux_grl*esm_correction,units="kg m-2 s-1",long_name="Grounding line flux", &
                         standard_name="land_ice_specific_mass_flux_at_grounding_line", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! == yelmo_masks ==
@@ -1895,15 +1270,13 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
                         standard_name="grounded_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"sftflf",MAX(ylmo%tpo%now%f_ice-ylmo%tpo%now%f_grnd,0.0),units="1",long_name="Floating ice sheet area fraction", &
                         standard_name="floating_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_coll",ismp1%mask_shlf%var(:,:,1,1),units="1",long_name="Collapse mask", &
-                        standard_name="",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! ATM and OCN test files
-        ! call nc_write(filename,"T_atm_snap",ismp1%ts%var(:,:,1,1),units="K",long_name="Surface temperature anomaly", &
+        ! call nc_write(filename,"T_atm_snap",esm1%ts%var(:,:,1,1),units="K",long_name="Surface temperature anomaly", &
         !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"Tf_snap",ismp1%tf%var(:,:,1,1),units="K",long_name="TF map", &
+        ! call nc_write(filename,"Tf_snap",esm1%tf%var(:,:,1,1),units="K",long_name="TF map", &
         !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         ! call nc_write(filename,"T_srf",yelmo1%bnd%T_srf,units="K",long_name="Surface temperature Yelmo", &
         !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1917,9 +1290,9 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         return
 
-    end subroutine write_step_2D_ismip6
+    end subroutine write_step_2D_esm
 
-    subroutine write_1D_ismip6(dom,filename,time)
+    subroutine write_1D_esm(dom,filename,time)
 
         implicit none
 
@@ -1934,7 +1307,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         real(wp) :: rho_ice
         real(wp) :: density_corr
         real(wp) :: m3yr_to_kgs
-        real(wp) :: ismip6_correction
+        real(wp) :: esm_correction
         real(wp) :: yr_to_sec
         
         real(wp) :: m3_km3
@@ -1980,7 +1353,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         rho_ice             = 917.0             ! ice density kg/m3
         m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
         density_corr        = rho_ice/1000.0    ! ice density correction with pure water
-        ismip6_correction   = m3yr_to_kgs*density_corr
+        esm_correction   = m3yr_to_kgs*density_corr
         yr_to_sec           = 31556952.0
         
         m3_km3              = 1e-9 
@@ -2007,10 +1380,10 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
         npts_grl  = count(mask_grl)      
         npts_frnt = count(mask_frnt) 
 
-        ! Calculate additional variables of interest for ISMIP6
+        ! Calculate additional variables of interest for esm
 
         ! To do: these variables should be defined locally!
-        ! ISMIP6 boundary: jablasco
+        ! esm boundary: jablasco
         smb_tot     = sum(dom%bnd%smb,    mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
         bmb_tot     = sum(dom%tpo%now%bmb,mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
         bmb_shlf_t  = sum(dom%tpo%now%bmb,mask=mask_flt)*(dx*dy)    ! m^3/yr: flux
@@ -2078,17 +1451,17 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
                       standard_name="floating_ice_shelf_area",dim1="time",start=[n],ncid=ncid)
 
         ! ==== Fluxes ====
-        call nc_write(filename,"tendacabf",smb_tot*ismip6_correction,units="kg s-1",long_name="Total SMB flux", &
+        call nc_write(filename,"tendacabf",smb_tot*esm_correction,units="kg s-1",long_name="Total SMB flux", &
                       standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlibmassbf ",bmb_tot*ismip6_correction,units="kg s-1",long_name="Total BMB flux", &
+        call nc_write(filename,"tendlibmassbf ",bmb_tot*esm_correction,units="kg s-1",long_name="Total BMB flux", &
                       standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlibmassbffl",bmb_shlf_t*ismip6_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
+        call nc_write(filename,"tendlibmassbffl",bmb_shlf_t*esm_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
                       standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlicalvf",calv_flt*ismip6_correction,units="kg s-1",long_name="Total calving flux", &
+        call nc_write(filename,"tendlicalvf",calv_flt*esm_correction,units="kg s-1",long_name="Total calving flux", &
                       standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlifmassbf",flux_frnt*ismip6_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
+        call nc_write(filename,"tendlifmassbf",flux_frnt*esm_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
                       standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendligroundf",flux_grl*ismip6_correction,units="kg s-1",long_name="Total grounding line flux", &
+        call nc_write(filename,"tendligroundf",flux_grl*esm_correction,units="kg s-1",long_name="Total grounding line flux", &
                       standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
 
         ! Close the netcdf file
@@ -2096,7 +1469,7 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
         return
 
-    end subroutine write_1D_ismip6
+    end subroutine write_1D_esm
 
     subroutine yelmox_restart_write(bsl,isos,ylmo,mshlf,time,fldr)
 
@@ -2141,4 +1514,175 @@ subroutine yx_hyst_write_step_2D_combined(ylmo,isos,snp,mshlf,srf,filename,time)
 
     end subroutine yelmox_restart_write
 
-end program yelmox_ismip6
+    ! =================================
+    !
+    !         General routines
+    !
+    ! =================================
+
+    function interp_linear(x,y,xout) result(yout)
+        ! Simple linear interpolation of a point (used for ice-shelf draft)
+
+        implicit none 
+ 
+        real(wp), dimension(:), intent(IN) :: x, y
+        real(wp), intent(IN) :: xout
+        real(wp) :: yout 
+        integer :: i, j, n, nout 
+        real(wp) :: alph
+
+        n    = size(x) 
+
+        if (xout .lt. x(1)) then
+            yout = y(1)
+        else if (xout .gt. x(n)) then
+            yout = y(n)
+        else
+            do j = 1, n 
+                if (x(j) .ge. xout) exit 
+            end do
+
+            if (j .eq. 1) then 
+                yout = y(1) 
+            else if (j .eq. n+1) then 
+                yout = y(n)
+            else 
+                alph = (xout - x(j-1)) / (x(j) - x(j-1))
+                yout = y(j-1) + alph*(y(j) - y(j-1))
+
+            end if 
+        end if 
+
+        return 
+
+    end function interp_linear
+
+    !subroutine load_ocn_bnd(esm,to_ann,so_ann,depth)
+    !
+    !    implicit none 
+    !    
+    !    type(esm_forcing_class), intent(INOUT) :: esm
+    !    real(wp),                intent(IN)    :: to_ann(:,:,:) 
+    !    real(wp),                intent(IN)    :: so_ann(:,:,:)
+    !    real(wp),                intent(IN)    :: depth(:) 
+    !   
+    !    ! Local variables 
+    !    integer :: i, j, k, nx, ny, nk 
+    !    
+    !    nx = size(to_ann,1)
+    !    ny = size(to_ann,2) 
+    !    nk = size(esm%to,3)
+    !    
+    !    do k = 1, nk 
+    !    do j = 1, ny 
+    !    do i = 1, nx 
+    !    
+    !        ! Interpolate ocean variables to the levels of interest
+    !        esm%to_ann(i,j,k) = interp_linear(depth,to_ann(i,j,:),xout=esm%depth(k))
+    !        esm%so_ann(i,j,k) = interp_linear(depth,so_ann(i,j,:),xout=esm%depth(k))
+    !                
+    !    end do 
+    !    end do 
+    !    end do 
+    !    
+    !    return 
+    !    
+    !end subroutine load_ocn_bnd
+
+    subroutine calc_iceberg_island(iceberg_mask,f_grnd,H_ice)
+        ! Subroutine for finding icebergs 
+    
+        implicit none
+    
+        real(wp), intent(OUT) :: iceberg_mask(:,:) ! Iceberg island (lonely ice shelves)
+        real(wp), intent(IN)  :: f_grnd(:,:)       ! [1]  Grounded grid-cell fraction 
+        real(wp), intent(IN)  :: H_ice(:,:)        ! [m]  Ice thickness
+    
+        ! Local variables 
+        integer  :: i, j, nx, ny, q
+        integer  :: im1, ip1, jm1, jp1
+        integer,  parameter :: iter_max = 1000
+    
+        real(wp), allocatable :: mask_ref(:,:)
+        real(wp), allocatable :: iceberg_mask_ref(:,:)
+    
+        nx = size(f_grnd,1)
+       ny = size(f_grnd,2)
+    
+        allocate(mask_ref(nx,ny))
+        allocate(iceberg_mask_ref(nx,ny))
+    
+        ! 0: Assign mask values. 0 = ocn; 1 = flt; 2 = grd/grl
+        ! ======================
+    
+        do j = 1, ny
+        do i = 1, nx
+    
+            ! Grounded point or partially floating point with floating neighbors
+            if (f_grnd(i,j) .gt. 0.0) then
+                mask_ref(i,j) = 2.0
+            else if (f_grnd(i,j) .eq. 0.0 .and. H_ice(i,j) .gt. 0.0) then
+                mask_ref(i,j) = 1.0
+            else
+                mask_ref(i,j) = 0.0
+            end if
+    
+        end do
+        end do
+            
+        ! 1. Next, determine the extension of the grounded and connected flt
+        ! points ===
+    
+        ! Initialize the iceberg_mask_ref
+        iceberg_mask_ref = mask_ref
+    
+        do q = 1, iter_max
+    
+            do j = 1, ny
+            do i = 1, nx
+    
+            ! Get neighbor indices
+            im1 = max(1,i-1)
+            ip1 = min(nx,i+1)
+            jm1 = max(1,j-1)
+            jp1 = min(ny,j+1)
+    
+            ! Grounded point or partially floating point with floating neighbors
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(im1,j) .eq. 1.0) then
+                iceberg_mask_ref(im1,j) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(ip1,j) .eq. 1.0) then
+                iceberg_mask_ref(ip1,j) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(i,jm1) .eq. 1.0) then
+                iceberg_mask_ref(i,jm1) = 2.0
+            end if
+            if (iceberg_mask_ref(i,j) .eq. 2.0 .and. iceberg_mask_ref(i,jp1) .eq. 1.0) then
+                iceberg_mask_ref(i,jp1) = 2.0
+            end if
+    
+            end do
+            end do
+        end do
+            
+        ! 2. Where numbers are still 1.0 -> icebergs ======================
+    
+        do j = 1, ny
+        do i = 1, nx
+    
+            ! Grounded point or partially floating point with floating neighbors
+            if (iceberg_mask_ref(i,j) .eq. 1.0) then
+                iceberg_mask(i,j) = 1.0
+            else
+                iceberg_mask(i,j) = 0.0
+            end if
+    
+        end do
+        end do
+    
+    
+        return
+    
+    end subroutine calc_iceberg_island    
+
+end program yelmox_esm
