@@ -20,7 +20,7 @@
 
 &tm_2D
     method          = "const"           ! "const", "file", "times"
-    dt              = 200.0
+    dt              = 250.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /
@@ -163,6 +163,7 @@
 
 &yneff 
     method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    nxi             = 1                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
     const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
@@ -272,14 +273,14 @@
 &snap
     atm_type           = "snap_1ind"
     ocn_type           = "fraction"
-    fname_at           = "input/ones.dat"          !"input/alpha_orbital_t2018_new.dat"
-    fname_ao           = "input/ones.dat"
-    fname_ap           = "input/ones.dat"          !"input/alpha_orbital_t2018_new.dat"
-    fname_as           = "input/ones.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
+    fname_at           = "input/alpha_orbital_r2020.dat"
+    fname_ao           = "input/alpha_orbital_r2020.dat"
+    fname_ap           = "input/alpha_orbital_r2020.dat"
+    fname_as           = "input/alpha_orbital_r2020.dat"
+    fname_bt           = "input/alpha_orbital_r2020.dat"
+    fname_bo           = "input/alpha_orbital_r2020.dat"
+    fname_bp           = "input/alpha_orbital_r2020.dat"
+    fname_bs           = "input/alpha_orbital_r2020.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = -25.0  
     dTo_const          = 0.0            !(-2.5)

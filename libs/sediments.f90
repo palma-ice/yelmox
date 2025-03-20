@@ -38,7 +38,7 @@ module sediments
 
 contains 
 
-    subroutine sediments_init(sed,filename,nx,ny,domain,grid_name)
+    subroutine sediments_init(sed,filename,nx,ny,domain,grid_name,group)
         ! Eventually interface should use 'sed' object directly
         ! instead of input/output arrays 
 
@@ -48,10 +48,20 @@ contains
         character(len=*),      intent(IN)    :: filename 
         integer,               intent(IN)    :: nx, ny 
         character(len=*),      intent(IN)    :: domain, grid_name
+        character(len=*),  intent(IN), optional :: group
 
+        ! Local variables
+        character(len=32) :: nml_group
+        
+        ! Make sure we know the namelist group for the sediments block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "sediments"         ! Default parameter blcok name
+        end if
 
         ! Load sediments parameters
-        call sediments_par_load(sed%par,filename,domain,grid_name,init=.TRUE.)
+        call sediments_par_load(sed%par,filename,domain,grid_name,init=.TRUE.,group=nml_group)
 
         ! Allocate the sediments object 
         call sediments_allocate(sed%now,nx,ny)
@@ -127,20 +137,31 @@ contains
     end subroutine sediments_end
 
 
-    subroutine sediments_par_load(par,filename,domain,grid_name,init)
+    subroutine sediments_par_load(par,filename,domain,grid_name,init,group)
 
         type(sediments_param_class), intent(OUT) :: par
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain, grid_name 
         logical, optional :: init 
         logical :: init_pars 
+        character(len=*),  intent(IN), optional :: group
+
+        ! Local variables
+        character(len=32) :: nml_group
+        
+        ! Make sure we know the namelist group for the sediments block
+        if (present(group)) then
+            nml_group = trim(group)
+        else
+            nml_group = "sediments"         ! Default parameter blcok name
+        end if
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
 
-        call nml_read(filename,"sediments","use_obs",    par%use_obs,     init=init_pars)
-        call nml_read(filename,"sediments","obs_path",   par%obs_path,    init=init_pars)
-        call nml_read(filename,"sediments","obs_name",   par%obs_name,    init=init_pars)
+        call nml_read(filename,nml_group,"use_obs",    par%use_obs,     init=init_pars)
+        call nml_read(filename,nml_group,"obs_path",   par%obs_path,    init=init_pars)
+        call nml_read(filename,nml_group,"obs_name",   par%obs_name,    init=init_pars)
 
         ! Replace gridding template values from path
         call parse_path(par%obs_path,domain,grid_name)

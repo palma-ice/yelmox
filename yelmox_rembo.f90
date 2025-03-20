@@ -36,7 +36,7 @@ program yelmox
     character(len=256) :: outfldr, file1D, file2D, file2D_small, domain
     character(len=256) :: file1D_hyst, file_isos, file_bsl, file_rembo
     character(len=512) :: path_par
-    real(wp) :: time_init, time_end, time_equil, time, dtt, dt_restart
+    real(wp) :: time_init, time_end, time_equil, dtt, dt_restart
     real(wp) :: dtt_now, deltat_tot
     character(len=56)  :: tstep_method
     real(wp) :: tstep_const
@@ -509,7 +509,7 @@ program yelmox
             call yelmox_write_step(yelmo1,rembo_ann,isos1,mshlf1,file2D,time=ts%time)
         end if 
 
-        if (write_restart .and. mod(time,dt_restart)==0) then 
+        if (write_restart .and. mod(ts%time,dt_restart)==0) then 
             call yelmox_restart_write(isos1,yelmo1,mshlf1,rembo_ann,ts%time)
         end if 
 

@@ -243,6 +243,7 @@
 &yneff
  method          = 3          
  const           = 10000000.0 
+ nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
  p               = 1.0        
  H_w_max         = -1         
  N0              = 1000.0     
@@ -251,6 +252,7 @@
  Cc              = 0.12       
  s_const         = 0.5        
 /
+
 &ymat
  flow_law        = 'glen'     
  rf_method       = 1          

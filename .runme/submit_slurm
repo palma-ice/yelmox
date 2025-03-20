@@ -2,6 +2,7 @@
 #SBATCH --qos=<QOS>
 #SBATCH --partition=<PARTITION>
 #SBATCH --time=<WALL>
+#SBATCH --mem=<MEM>
 #SBATCH --job-name=<JOBNAME>
 #SBATCH --account=<ACCOUNT>
 #SBATCH --output=./out.out
