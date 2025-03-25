@@ -2254,6 +2254,13 @@ contains
 
     subroutine ocn_variable_extrapolation(var, H_ice, basin_mask, depth, z_bed)
 
+        ! First we convert to mv (missing values) the regions where there is ice or no ocean data information.
+        ! Then we take the ocean information of the grid points which are in contact with mv.
+        ! We do the mean of these grid points at different basins and depths and extrapolate them into the ice shelf cavities.
+        ! If we reach a depth where there are no surrounding grid points because we have reached a sill, then we do vertical extrapolation inside the ice-shelf cavity from the level above.
+    
+
+
         implicit none
         
         real(wp), intent(INOUT) :: var(:,:,:)
