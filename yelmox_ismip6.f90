@@ -553,10 +553,6 @@ program yelmox_ismip6
         write(*,*)
         write(*,*) "Performing transient."
         write(*,*) 
-
-        ! Additionally make sure isostasy is updated every timestep 
-        isos1%par%dt_prognostics = 1.0_wp 
-        isos1%par%dt_diagnostics = 10.0_wp 
         
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
