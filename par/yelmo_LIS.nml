@@ -273,14 +273,14 @@
 &snap
     atm_type           = "snap_1ind"
     ocn_type           = "fraction"
-    fname_at           = "input/fixed-0.8.dat"
-    fname_ao           = "input/fixed-0.8.dat"
-    fname_ap           = "input/fixed-0.8.dat"
-    fname_as           = "input/fixed-0.8.dat"
-    fname_bt           = "input/fixed-0.8.dat"
-    fname_bo           = "input/fixed-0.8.dat"
-    fname_bp           = "input/fixed-0.8.dat"
-    fname_bs           = "input/fixed-0.8.dat"
+    fname_at           = "input/fixed-1.0.dat"
+    fname_ao           = "input/fixed-1.0.dat"
+    fname_ap           = "input/fixed-1.0.dat"
+    fname_as           = "input/fixed-1.0.dat"
+    fname_bt           = "input/fixed-1.0.dat"
+    fname_bo           = "input/fixed-1.0.dat"
+    fname_bp           = "input/fixed-1.0.dat"
+    fname_bs           = "input/fixed-1.0.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = -25.0  
     dTo_const          = 0.0            !(-2.5)
