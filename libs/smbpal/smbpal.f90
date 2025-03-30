@@ -371,20 +371,12 @@ contains
         insol_time = time_bp
         if (smb%par%const_insol) insol_time = smb%par%const_kabp*1e3
         
-! HEAD
         ! Set sigma to snow sigma everywhere for pdd calcs
-     !   smb%now%sigma = smb%par%sigma_snow
+        smb%now%sigma = smb%par%sigma_snow
         
-!END HEAD
-
         ! Fill in local versions for easier access 
         par = smb%par 
         now = smb%now 
-      
-        ! jablasco
-        ! Set sigma to snow sigma everywhere for pdd calcs
-        !smb%now%sigma = par%sigma_snow
-        now%sigma = par%sigma_snow
 
         ! First calculate PDDs for the whole year (input to itm)
         now%PDDs = 0.0 
@@ -576,6 +568,7 @@ contains
         call nml_read(filename,nml_group,"const_kabp",par%const_kabp,init=init_pars)
         call nml_read(filename,nml_group,"abl_method",par%abl_method,init=init_pars)
         call nml_read(filename,nml_group,"sigma_snow",par%sigma_snow,init=init_pars)
+        call nml_read(filename,nml_group,"sigma_land",par%sigma_land,init=init_pars)
         call nml_read(filename,nml_group,"sigma_melt",par%sigma_melt,init=init_pars)
         call nml_read(filename,nml_group,"sf_a",par%sf_a,init=init_pars)
         call nml_read(filename,nml_group,"sf_b",par%sf_b,init=init_pars)
