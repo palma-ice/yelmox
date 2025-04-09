@@ -11,9 +11,12 @@
 
 ! ====== ESM experiment definitions ======
 
-&ctrlAE
+&ctrl
     experiment      = "ctrl"
-    shlf_collapse   = False
+/
+
+&1pctCO2
+    experiment      = "1pctCO2"
 /
 
 ! =========== ATMOSPHERE ===========
