@@ -12,7 +12,8 @@
             "ismip6"    : "libyelmox/bin/yelmox_ismip6.x",
             "rtip"      : "libyelmox/bin/yelmox_rtip.x",
             "bipolar"   : "libyelmox/bin/yelmox_bipolar.x",
-	    "esm"    : "libyelmox/bin/yelmox_esm.x"
+	    "esm"       : "libyelmox/bin/yelmox_esm.x",
+	    "glaciers"  : "libyelmox/bin/yelmox_glaciers.x"
         },
 
     "grp_aliases" : 
