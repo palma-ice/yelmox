@@ -52,6 +52,7 @@ module obm_defs
         real(preci) :: therm_exp_coeff
         real(preci) :: haline_exp_coeff
         real(preci) :: reference_salinity
+        real(preci) :: overturning_threshold
         real(preci) :: thermal_coupling_constant
         real(preci) :: emp_flow_k
         real(preci) :: depth_s

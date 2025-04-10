@@ -2,7 +2,7 @@
     tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
     tstep_const     = 0.0               ! Assumed time for "const" method
     time_init       = 0            ! [yr] Starting time 
-    time_end        = 50e3               ! [yr] Ending time
+    time_end        = 1e3               ! [yr] Ending time
     time_equil      = 1e3               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
@@ -11,23 +11,16 @@
     equil_method    = "none"           ! "none", "relax", "opt"
     
     ! YelmoX domains parameters
-    active_north = True
-    active_south = True
+    active_north = False
+    active_south = False
 
     ! Coupling parameters
     !   ISM = Ice Sheet Model; OBM = Ocean Box Model; ATM = Atmosphere    
     obm2ism = False                       ! Activate OBM to ISM coupling?
-    atm2obm = False                        ! Activate ATM to OBM coupling?
     ism2obm = False                       ! Activate ISM to OBM coupling?
-    fwf_definition = "ablation"               ! "mb", "ablation"
-    couple_atmosphere_temperature = False     ! pass atmosphere anomaly to obm?
-    couple_ocean_temperature = False     ! pass ocean anomaly to obm?
-    couple_fwf = False ! pass fwf to obm? 
-    
+    atm2obm = False                        ! Activate ATM to OBM coupling?
     hydro_mask_north = "ice_data/Greenland/GRL-16KM/GRL-16KM_BASINS_spm.nc"
     hydro_mask_south = "ice_data/Antarctica/ANT-32KM/ANT-32KM_BASINS_spm.nc"
-
-    
 
     ! Ocean Box Model control parameters
     active_obm   = True                 ! Is Ocean Box Model active or are we running isolated YelmoX domains?
@@ -64,10 +57,6 @@
     hyster_rate = 0.0           ! rate becomes an amplitude if using "sin" forcing method
     hyster_positive_branch_time = 0.0   ! time becomes a period if using "sin" forcing method
 
-    ! ctrl
-    use_restart = False
-    restart = 'none'
-
     ! Constants
     specific_heat_capacity = 4000       ! [Jkg-1ºC-1] Specific heat capacity of seawater   
     density_of_seawater = 1025          ! [kgm-3] Density of seawater   
@@ -93,20 +82,20 @@
     ! Initial conditions
     tn_init = 4.7                       ! [ºC] Northern box temperature
     tt_init = 11.4                      ! [ºC] Tropical box temperature
-    ttd_init = 4.7                      ! [ºC] Tropical deep box temperature
-    ts_init = 6.4                       ! [ºC] Southern box temperature
+    ttd_init = 5.0                      ! [ºC] Tropical deep box temperature
+    ts_init = 6.5                       ! [ºC] Southern box temperature
 
-    sn_init = 35.2                      ! [psu] Northern box salinity
-    st_init = 35.2                     ! [psu] Tropical box salinity
-    std_init = 35.2                     ! [psu] Tropical deep box salinity
-    ss_init = 35.2                     ! [psu] Southern box salinity
+    sn_init = 36.0                      ! [psu] Northern box salinity
+    st_init = 35.08                     ! [psu] Tropical box salinity
+    std_init = 35.5                     ! [psu] Tropical deep box salinity
+    ss_init = 34.98                     ! [psu] Southern box salinity
 
     fn_init = 0.0                       ! [Sv] External fwf in the north
     ft_init = 0.0                       ! [Sv] External fwf in the tropics
     fs_init = 0.0                       ! [Sv] External fwf in the south
 
-    phit_init = 0.065              ! [Sv] Freshwater transport from southern to tropical box
-    phin_init = 0.014              ! [Sv] Freshwater transport from tropical to northern box
+    phit_init = 4.41504e11              ! [m3a-1] Freshwater transport from southern to tropical box
+    phin_init = 2.04984e12              ! [m3a-1] Freshwater transport from tropical to northern box
 
     thetas_init = 6.6                   ! [ºC] Relaxation temperature of the southern box
     thetan_init = 2.7                   ! [ºC] Relaxation temperature of the northern box
@@ -121,8 +110,8 @@
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "zero"      ! "zero", "stress-b12"
-    bmb_gl_method       = "pmpt"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
+    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -196,16 +185,16 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
+    scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
     is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction
     z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
-    z1              =  0.0              ! [m] Bedrock rel. to sea level, upper limit
-    cf_min          =  0.001            ! [-- or deg] Minimum value of cf
-    cf_ref          =  0.1              ! [-- or deg] Reference/const/max value of cf
+    z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
+    cf_min          =  0.01             ! [-- or deg] Minimum value of cf
+    cf_ref          =  0.8              ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 
@@ -215,7 +204,7 @@
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    delta           = 0.8              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
     Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
     s_const         = 0.5               ! [--] *neff_method=4* Imposed constant till water saturation level    
@@ -304,7 +293,7 @@
     disable_kill    = .false.    
     zeta_scale      = 'exp'      
     zeta_exp        = 2.0        
-    nz_aa           = 6         
+    nz_aa           = 10         
     dt_method       = 2          
     dt_min          = 0.1       
     cfl_max         = 0.5        
@@ -507,18 +496,18 @@
 &snap_north
     atm_type = "anom" 
     ocn_type = "anom" 
-    fname_at = "input/ones.dat" 
-    fname_ao = "input/ones.dat" 
-    fname_ap = "input/ones.dat" 
-    fname_as = "input/ones.dat"  
+    fname_at = "input/epica_deglaciation.dat" 
+    fname_ao = "input/epica_deglaciation.dat" 
+    fname_ap = "input/epica_deglaciation.dat" 
+    fname_as = "input/salinity_index_deglaciation.dat" 
     fname_bt = "input/ones.dat" 
     fname_bo = "input/ones.dat" 
     fname_bp = "input/ones.dat" 
     fname_bs = "input/ones.dat" 
     lapse = 0.0080 0.0065 ! lapse_ann, lapse_sum
-    dTa_const = 0.0 
-    dTo_const = 0.0 
-    dSo_const = 0.0 
+    dTa_const = 2.0 
+    dTo_const = -2.5 
+    dSo_const = 3.0 
     f_to = 0.25 
     f_p = 0.05 
     f_stdev = 0.0 
@@ -527,18 +516,18 @@
 &snap_south
     atm_type = "anom" 
     ocn_type = "anom" 
-    fname_at = "input/ones.dat" 
-    fname_ao = "input/ones.dat" 
-    fname_ap = "input/ones.dat" 
-    fname_as = "input/ones.dat"  
+    fname_at = "input/epica_deglaciation.dat" 
+    fname_ao = "input/epica_deglaciation.dat" 
+    fname_ap = "input/epica_deglaciation.dat" 
+    fname_as = "input/salinity_index_deglaciation.dat" 
     fname_bt = "input/ones.dat" 
     fname_bo = "input/ones.dat" 
     fname_bp = "input/ones.dat" 
     fname_bs = "input/ones.dat" 
     lapse = 0.0080 0.0065 ! lapse_ann, lapse_sum
-    dTa_const = 0.0 
-    dTo_const = 0.0 
-    dSo_const = 0.0 
+    dTa_const = 2.0 
+    dTo_const = -2.5 
+    dSo_const = 3.0 
     f_to = 0.25 
     f_p = 0.05 
     f_stdev = 0.0 
@@ -743,83 +732,81 @@
 /
 
 &marine_shelf_north
-    bmb_method = 'quad-nl'      ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method = 2               ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf, 3: nahosmip
-    interp_depth = "shlf"       ! "shlf", "bed", "const"
-    interp_method = "interp"    ! "mean", "layer", "interp"
-    find_ocean = True           ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
-    restart = "none"            ! Load fields from a restart file?
-    corr_method = "tf-grl"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number = 1            ! 1 2 3
-    basin_bmb_corr = 0.0        ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr = 0.5         ! 1.0   2.0  3.0
-    tf_correction = False 
-    tf_path = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc" 
-    tf_name = "dT_nl" 
-    bmb_max = 0.0               ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0)
-    c_deep = -10.0              ! [m/yr] Melt rate in deep ocean, should be negative but not huge
-    depth_deep = 2000.0         ! [m] Depth at which deep ocean is assumed
-    depth_const = 1000.0        ! [m] Constant shelf depth for interp_depth=const
-    depth_min = 1100.0          ! [m] interp_method=mean, min depth to include
-    depth_max = 1500.0          ! [m] interp_method=mean, max depth to include
-    lambda1 = -0.0575           ! [degC PSU−1] Liquidus slope
-    lambda2 = 0.0832            ! [degC] Liquidus intercept
-    lambda3 = 7.59e-4           ! [degC m−1] Liquidus pressure coefficient
-    gamma_lin = 630.0           ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad = 11100.0        ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
-    gamma_quad_nl = 14500       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
-    gamma_prime = 100.0         ! [-] Scalar when '*-slope' method is used
-    kappa_grz = 10.0            ! [m/yr K-1] Heat flux coefficient [kappa*dT]
-    c_grz = 1.0                 ! [-] bmb_ref scalar [c_grz*bmb_ref]
-    f_grz_shlf = 10.0           ! [-] Ratio of grz melt to shelf melt
-    grz_length = 32.0           ! [km] Length scale of assumed grounding zone
-    use_obs = False              ! Load obs for bmb_ref
-    obs_path = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc" 
-    obs_name = "bm_eq_reese" 
-    obs_scale = 1.0             ! [-] bmb_ref = obs_scale*bmb_obs
-    obs_lim = 100.0             ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name = "none"         ! "northwest" "northeast" "east"
-    basin_bmb = 0.0             ! -1.0       -1.0   -1.0   
+    bmb_method      = 'anom'     
+    tf_method       = 2          
+    interp_depth    = 'shlf'     
+    interp_method   = 'interp'   
+    find_ocean      = .true.     
+    corr_method     = 'none'     
+    basin_number    = 1          
+    basin_bmb_corr  = 0.0        
+    basin_tf_corr   = 0.0        
+    tf_correction   = .false.    
+    tf_path         = 'ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc'
+    tf_name         = 'dT_nl'    
+    bmb_max         = 0.0        
+    c_deep          = -10        
+    depth_deep      = 500.0      
+    depth_const     = 0.0        
+    depth_min       = 320.0      
+    depth_max       = 330.0      
+    lambda1         = -0.0575    
+    lambda2         = 0.0832     
+    lambda3         = 0.000759   
+    gamma_lin       = 630.0      
+    gamma_quad      = 11100.0    
+    gamma_quad_nl   = 14500.0    
+    gamma_prime     = 100.0      
+    kappa_grz       = 15         
+    c_grz           = 1.0        
+    f_grz_shlf      = 10.0       
+    grz_length      = 32.0       
+    use_obs         = .false.    
+    obs_path        = 'ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc'
+    obs_name        = 'bm_eq_reese'
+    obs_scale       = 50         
+    obs_lim         = 100.0      
+    basin_name      = 'none'     
+    basin_bmb       = 0.0        
 /
 
 &marine_shelf_south
-    bmb_method = 'quad-nl'      ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method = 1               ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf, 3: nahosmip
-    interp_depth = "shlf"       ! "shlf", "bed", "const"
-    interp_method = "interp"    ! "mean", "layer", "interp"
-    find_ocean = True           ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
-    restart = "none"            ! Load fields from a restart file?
-    corr_method = "tf-ant"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number = 1            ! 1 2 3
-    basin_bmb_corr = 0.0        ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr = 0.5         ! 1.0   2.0  3.0
+    bmb_method = 'quad-nl' ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method = 2 ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf, 3: nahosmip
+    interp_depth = "shlf" ! "shlf", "bed", "const"
+    interp_method = "interp" ! "mean", "layer", "interp"
+    find_ocean = True ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
+    corr_method = "tf-ant" ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
+    basin_number = 1 ! 1 2 3
+    basin_bmb_corr = 0.0 ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
+    basin_tf_corr = 0.5 ! 1.0   2.0  3.0
     tf_correction = False 
     tf_path = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc" 
     tf_name = "dT_nl" 
-    bmb_max = 0.0               ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0)
-    c_deep = -10.0              ! [m/yr] Melt rate in deep ocean, should be negative but not huge
-    depth_deep = 2000.0         ! [m] Depth at which deep ocean is assumed
-    depth_const = 1000.0        ! [m] Constant shelf depth for interp_depth=const
-    depth_min = 1100.0          ! [m] interp_method=mean, min depth to include
-    depth_max = 1500.0          ! [m] interp_method=mean, max depth to include
-    lambda1 = -0.0575           ! [degC PSU−1] Liquidus slope
-    lambda2 = 0.0832            ! [degC] Liquidus intercept
-    lambda3 = 7.59e-4           ! [degC m−1] Liquidus pressure coefficient
-    gamma_lin = 630.0           ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad = 11100.0        ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
-    gamma_quad_nl = 14500       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
-    gamma_prime = 100.0         ! [-] Scalar when '*-slope' method is used
-    kappa_grz = 10.0            ! [m/yr K-1] Heat flux coefficient [kappa*dT]
-    c_grz = 1.0                 ! [-] bmb_ref scalar [c_grz*bmb_ref]
-    f_grz_shlf = 10.0           ! [-] Ratio of grz melt to shelf melt
-    grz_length = 32.0           ! [km] Length scale of assumed grounding zone
-    use_obs = False              ! Load obs for bmb_ref
+    bmb_max = 0.0 ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0)
+    c_deep = -10.0 ! [m/yr] Melt rate in deep ocean, should be negative but not huge
+    depth_deep = 2000.0 ! [m] Depth at which deep ocean is assumed
+    depth_const = 1000.0 ! [m] Constant shelf depth for interp_depth=const
+    depth_min = 1100.0 ! [m] interp_method=mean, min depth to include
+    depth_max = 1500.0 ! [m] interp_method=mean, max depth to include
+    lambda1 = -0.0575 ! [degC PSU−1] Liquidus slope
+    lambda2 = 0.0832 ! [degC] Liquidus intercept
+    lambda3 = 7.59e-4 ! [degC m−1] Liquidus pressure coefficient
+    gamma_lin = 630.0 ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad = 11100.0 ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
+    gamma_quad_nl = 14500 ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
+    gamma_prime = 100.0 ! [-] Scalar when '*-slope' method is used
+    kappa_grz = 10.0 ! [m/yr K-1] Heat flux coefficient [kappa*dT]
+    c_grz = 1.0 ! [-] bmb_ref scalar [c_grz*bmb_ref]
+    f_grz_shlf = 10.0 ! [-] Ratio of grz melt to shelf melt
+    grz_length = 32.0 ! [km] Length scale of assumed grounding zone
+    use_obs = True ! Load obs for bmb_ref
     obs_path = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc" 
     obs_name = "bm_eq_reese" 
-    obs_scale = 1.0             ! [-] bmb_ref = obs_scale*bmb_obs
-    obs_lim = 100.0             ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name = "none"         ! "northwest" "northeast" "east"
-    basin_bmb = 0.0             ! -1.0       -1.0   -1.0   
+    obs_scale = 1.0 ! [-] bmb_ref = obs_scale*bmb_obs
+    obs_lim = 100.0 ! [m/yr] Maximum magnitude of bmb_ref
+    basin_name = "none" ! "northwest" "northeast" "east"
+    basin_bmb = 0.0 ! -1.0       -1.0   -1.0
 /
 
 &pico_north
@@ -983,18 +970,10 @@
 /
 
 &tf_corr_ant
-    ronne   =  0.0                  ! [K] tf_corr for ronne basin (basin=1)
-    ross    =  0.0                  ! [K] tf_corr for ronne ross  (basin=12)
-    pine    = -1.5                  ! [K] tf_corr for ronne pine  (basin=14)
-    abbott  =  0.0                  ! [K] tf_corr for Abbott glacier (basin=15)
-/
-
-&tf_corr_grl
-    ne      = 0.0                   ! [K] tf_corr for northeast/negis basin (basin=2)
-    e       = 0.0                   ! [K] tf_corr for eastern basin (basin=3)
-    se      = 0.0 !3.0                   ! [K] tf_corr for southeast basin (basin=4)
-    w       = 0.0                   ! [K] tf_corr for western basin (basins=[6,7,8])
-    nw      = 0.0 !2.0
+    ronne = 0.0 ! [K] tf_corr for ronne basin (basin=1)
+    ross = 0.0 ! [K] tf_corr for ross basin (basin=12)
+    pine = 0.0 ! [K] tf_corr for pine island (basin=14)
+    abbott = 0.0 ! [K] tf_corr for Abbott glacier (basin=15)
 /
 
 &isos_ant

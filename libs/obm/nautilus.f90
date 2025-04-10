@@ -39,12 +39,20 @@ module nautilus
         type(obm_class), intent(INOUT) :: ntls
         character(len=*),  intent(IN) :: filename, group 
 
+        integer          :: n
+        logical          :: use_restart
+        character(len=256) :: ocn_restart
+
         ! Read parameters from namelist file
+        call nml_read(filename, group, "use_restart", use_restart)
+        call nml_read(filename, group, "restart", ocn_restart)
+
         call nml_read(filename, group, "specific_heat_capacity", ntls%par%specific_heat_capacity)
         call nml_read(filename, group, "density_of_seawater", ntls%par%density_of_seawater)
         call nml_read(filename, group, "therm_exp_coeff", ntls%par%therm_exp_coeff)
         call nml_read(filename, group, "haline_exp_coeff", ntls%par%haline_exp_coeff)
         call nml_read(filename, group, "reference_salinity", ntls%par%reference_salinity)
+        call nml_read(filename, group, "overturning_threshold", ntls%par%overturning_threshold)
         call nml_read(filename, group, "thermal_coupling_constant", ntls%par%thermal_coupling_constant)
         call nml_read(filename, group, "emp_flow_k", ntls%par%emp_flow_k)
         call nml_read(filename, group, "vol_n", ntls%par%vol_n)
@@ -57,26 +65,54 @@ module nautilus
         call nml_read(filename, group, "depth_s", ntls%par%depth_s)
 
         ! Initialize prognostic states of the model
-        call nml_read(filename, group, "tn_init", ntls%tn)
-        call nml_read(filename, group, "tt_init", ntls%tt)
-        call nml_read(filename, group, "ttd_init", ntls%ttd)
-        call nml_read(filename, group, "ts_init", ntls%ts)
-        call nml_read(filename, group, "sn_init", ntls%sn)
-        call nml_read(filename, group, "st_init", ntls%st)
-        call nml_read(filename, group, "std_init", ntls%std)
-        call nml_read(filename, group, "ss_init", ntls%ss)
-        call nml_read(filename, group, "fn_init", ntls%fn)
-        call nml_read(filename, group, "ft_init", ntls%ft) 
-        call nml_read(filename, group, "fs_init", ntls%fs) 
-        call nml_read(filename, group, "phin_init", ntls%phin)
-        call nml_read(filename, group, "phit_init", ntls%phit) 
-        call nml_read(filename, group, "thetan_init", ntls%thetan)
-        call nml_read(filename, group, "thetat_init", ntls%thetat) 
-        call nml_read(filename, group, "thetas_init", ntls%thetas)
-        call nml_read(filename, group, "lambdan_init", ntls%lambdan)
-        call nml_read(filename, group, "lambdat_init", ntls%lambdat)
-        call nml_read(filename, group, "lambdatd_init", ntls%lambdatd)  
-        call nml_read(filename, group, "lambdas_init", ntls%lambdas)
+        if (use_restart) then
+            n = nc_size(ocn_restart,"time")
+            call nc_read(ocn_restart,"tn",ntls%tn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tt",ntls%tt,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ttd",ntls%ttd,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ts",ntls%ts,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"sn",ntls%sn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"st",ntls%st,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"std",ntls%std,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ss",ntls%ss,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"fn",ntls%fn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ft",ntls%ft,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"fs",ntls%fs,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"phin",ntls%phin,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"phit",ntls%phit,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetan",ntls%thetan,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetat",ntls%thetat,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetas",ntls%thetas,start=[n],count=[1]) 
+            ! call nc_read(ocn_restart,"lambdan",ntls%lambdan,start=[n],count=[1]) 
+            ! call nc_read(ocn_restart,"lambdat",ntls%lambdat,start=[n],count=[1]) 
+            ! call nc_read(ocn_restart,"lambdatd",ntls%lambdatd,start=[n],count=[1])
+            ! call nc_read(ocn_restart,"lambdas",ntls%lambdas,start=[n],count=[1])  
+            call nml_read(filename, group, "lambdan_init", ntls%lambdan)
+            call nml_read(filename, group, "lambdat_init", ntls%lambdat)
+            call nml_read(filename, group, "lambdatd_init", ntls%lambdatd)  
+            call nml_read(filename, group, "lambdas_init", ntls%lambdas)
+        else
+            call nml_read(filename, group, "tn_init", ntls%tn)
+            call nml_read(filename, group, "tt_init", ntls%tt)
+            call nml_read(filename, group, "ttd_init", ntls%ttd)
+            call nml_read(filename, group, "ts_init", ntls%ts)
+            call nml_read(filename, group, "sn_init", ntls%sn)
+            call nml_read(filename, group, "st_init", ntls%st)
+            call nml_read(filename, group, "std_init", ntls%std)
+            call nml_read(filename, group, "ss_init", ntls%ss)
+            call nml_read(filename, group, "fn_init", ntls%fn)
+            call nml_read(filename, group, "ft_init", ntls%ft) 
+            call nml_read(filename, group, "fs_init", ntls%fs) 
+            call nml_read(filename, group, "phin_init", ntls%phin)
+            call nml_read(filename, group, "phit_init", ntls%phit) 
+            call nml_read(filename, group, "thetan_init", ntls%thetan)
+            call nml_read(filename, group, "thetat_init", ntls%thetat) 
+            call nml_read(filename, group, "thetas_init", ntls%thetas)
+            call nml_read(filename, group, "lambdan_init", ntls%lambdan)
+            call nml_read(filename, group, "lambdat_init", ntls%lambdat)
+            call nml_read(filename, group, "lambdatd_init", ntls%lambdatd)  
+            call nml_read(filename, group, "lambdas_init", ntls%lambdas)
+        end if
 
         return
 
@@ -88,20 +124,24 @@ module nautilus
 
         type(obm_class), intent(INOUT) :: ntls  
         real(prec), intent(IN)    :: dt 
-        real(wp), parameter :: factor = 365*24*60*60 * 1e6
+        real(prec), parameter :: factor = 365*24*60*60 * 1e6
 
         ! Local variables
         real(prec) :: dTsdt, dTndt, dTtdt, dTtddt 
         real(prec) :: dSsdt, dSndt, dStdt, dStddt 
-        real(prec) :: fn, ft, fs
+        real(prec) :: fn, ft, fs, phin, phit
+        real(prec), parameter :: maximum_overturning=100.0, maximum_salinity=50.0, minimum_salinity=0.0
 
         ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1)
         fn = ntls%fn * factor
         ft = ntls%ft * factor
         fs = ntls%fs * factor
 
+        phin = ntls%phin * factor
+        phit = ntls%phit * factor
+
         ! Update diagnostic variables
-        ntls%m = calc_overturning(ntls%par%emp_flow_k, ntls%par%haline_exp_coeff, ntls%par%therm_exp_coeff, ntls%ts, ntls%ss, ntls%tn, ntls%sn)
+        ntls%m = max(calc_overturning(ntls%par%emp_flow_k, ntls%par%haline_exp_coeff, ntls%par%therm_exp_coeff, ntls%ts, ntls%ss, ntls%tn, ntls%sn), ntls%par%overturning_threshold*factor)
         call calc_all_lambda(ntls)
 
         ! Compute time derivatives, box loop: [...-> South --> Tropics --> North --> Tropics Deep -...]
@@ -110,9 +150,9 @@ module nautilus
         dTndt = calc_temperature_derivative(ntls%par%vol_n, ntls%lambdan, ntls%m, -ntls%tn, ntls%tt, ntls%thetan)                                          
         dTtddt = calc_temperature_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%ttd, ntls%tn, 0.0)   
         
-        dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%par%reference_salinity, ntls%m, -ntls%ss, ntls%std, ntls%phit, -fs)
-        dStdt = calc_salinity_derivative(ntls%par%vol_t, ntls%par%reference_salinity, ntls%m, -ntls%st, ntls%ss, ntls%phin, -ntls%phit)
-        dSndt = calc_salinity_derivative(ntls%par%vol_n, ntls%par%reference_salinity, ntls%m, -ntls%sn, ntls%st, -fn, -ntls%phin)
+        dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%par%reference_salinity, ntls%m, -ntls%ss, ntls%std, phit, -fs)
+        dStdt = calc_salinity_derivative(ntls%par%vol_t, ntls%par%reference_salinity, ntls%m, -ntls%st, ntls%ss, phin, -phit)
+        dSndt = calc_salinity_derivative(ntls%par%vol_n, ntls%par%reference_salinity, ntls%m, -ntls%sn, ntls%st, -fn, -phin)
         dStddt = calc_salinity_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%std, ntls%sn, 0.0, 0.0)
 
         ! Update prognostic variables
@@ -121,10 +161,10 @@ module nautilus
         ntls%tn = update_state(ntls%tn, dTndt, dt)
         ntls%ttd = update_state(ntls%ttd, dTtddt, dt)
 
-        ntls%ss = update_state(ntls%ss, dSsdt, dt)
-        ntls%st = update_state(ntls%st, dStdt, dt)
-        ntls%sn = update_state(ntls%sn, dSndt, dt)
-        ntls%std = update_state(ntls%std, dStddt, dt)
+        ntls%ss = max(min(update_state(ntls%ss, dSsdt, dt), maximum_salinity), minimum_salinity)
+        ntls%st = max(min(update_state(ntls%st, dStdt, dt), maximum_salinity), minimum_salinity)
+        ntls%sn = max(min(update_state(ntls%sn, dSndt, dt), maximum_salinity), minimum_salinity)
+        ntls%std = max(min(update_state(ntls%std, dStddt, dt), maximum_salinity), minimum_salinity)
 
         return
 

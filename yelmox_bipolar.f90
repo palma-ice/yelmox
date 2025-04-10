@@ -153,9 +153,10 @@ program yelmox
         ! bipolar-specific control parameters
         logical            :: active_north, active_south
         logical            :: obm2ism, ism2obm, atm2obm, use_yelmox, active_obm
+        logical            :: couple_ocean_temperature, couple_atmosphere_temperature, couple_fwf
         character(len=512) :: path_par_ocn, obm_name
         character(len=512) :: hydro_mask_north, hydro_mask_south
-        
+
     end type 
 
     ! ctrl params
@@ -168,11 +169,25 @@ program yelmox
     type(yelmox_class) :: yelmox_north, yelmox_south  ! Northern and Southern hemisphere objects (each one is a yelmox domain)
     type(obm_class)    :: obm_object                         ! Ocean Box Model object
     character(len=512) :: path_par                    ! Generalistic namelist
-
+    logical            :: hyster_on
+    character(len=512) :: hyster_forcing, hyster_forcing_method, fwf_definition
+    real(wp)           :: hyster_rate, hyster_positive_branch_time
+    real(wp) :: at, ao 
+    real(wp) :: dTa_now, dTo_now  
+    
     ! #### Start YelmoX-Bipolar simulation ##### !
 
     ! Group 1: Determine the general parameter file and read parameters
     call read_parameters(path_par, ctl, yelmox_north, yelmox_south, tm_1D, tm_2D, tm_2Dsm)
+
+    if (ctl%obm_name .eq. "nautilus") then
+        call nml_read(path_par, ctl%obm_name, "hyster_on", hyster_on)
+        call nml_read(path_par, ctl%obm_name, "hyster_forcing", hyster_forcing)
+        call nml_read(path_par, ctl%obm_name, "hyster_forcing_method", hyster_forcing_method)
+        call nml_read(path_par, ctl%obm_name, "hyster_rate", hyster_rate)
+        call nml_read(path_par, ctl%obm_name, "hyster_positive_branch_time", hyster_positive_branch_time)
+    end if
+    call nml_read(path_par, "ctrl", "fwf_definition", fwf_definition)
 
     ! Hard-coded for now:
     ctl%dt_clim = 10.0      ! [yrs] Frequency to update snapclim snapshot
@@ -207,12 +222,11 @@ program yelmox
     ! Assume program is running from the output folder
     outfldr = "./"
 
-    ! Group 2: Define input and output locations ! yelmox.f90 lines 196-200
-    call define_input_and_output_locations(outfldr, "north", yelmox_north)
-    call define_input_and_output_locations(outfldr, "south", yelmox_south)
-
+    ! Group 2: Define some input and output locations ! yelmox.f90 lines 196-200
     file_bsl = trim(outfldr)//"bsl.nc"
     tmr_file = trim(outfldr)//"timer_table.txt"
+    call define_input_and_output_locations(outfldr, "north", yelmox_north) ! 2D files
+    call define_input_and_output_locations(outfldr, "south", yelmox_south)
 
     ! Print summary of run settings 
     write(*,*)
@@ -250,7 +264,7 @@ program yelmox
         call initialize_external_models(path_par, yelmox_north,"isos_north","snap_north","smbpal_north","itm_north","marine_shelf_north","sediments_north","geothermal_north")   ! yelmox.f90 lines 396-419
         call initialize_boundary_conditions(ctl, yelmox_north, bsl, ts)   
 
-        call initialize_output_files(yelmox_north, ts)
+        call initialize_output_files(outfldr, yelmox_north, ts, "north")
 
         write(*,*) "Northern Hemisphere domain initialized"
     end if
@@ -263,9 +277,9 @@ program yelmox
         call nc_read(yelmox_south%path_hydro_mask,"mask",yelmox_south%hydro_mask)
         
         call initialize_external_models(path_par, yelmox_south,"isos_south","snap_south","smbpal_south","itm_south","marine_shelf_south","sediments_south","geothermal_south")   ! yelmox.f90 lines 396-419
-        call initialize_boundary_conditions(ctl, yelmox_south, bsl, ts)   
-
-        call initialize_output_files(yelmox_south, ts)
+        call initialize_boundary_conditions(ctl, yelmox_south, bsl, ts)  
+        
+        call initialize_output_files(outfldr, yelmox_south, ts, "south")
 
         write(*,*) "Southern Hemisphere domain initialized"
     end if
@@ -275,7 +289,7 @@ program yelmox
         obm_file = trim(outfldr)//trim(ctl%obm_name)//".nc"
         obm_file_restart = trim(outfldr)//trim(ctl%obm_name)//"_restart.nc"
 
-        call obm_init(obm_object, ctl%path_par_ocn, ctl%obm_name)
+        call obm_init(obm_object, path_par, ctl%obm_name)
         call write_obm_init(obm_file, ts%time, "years")
         call write_obm_update(obm_object, obm_file, ctl%obm_name, ts%time)
 
@@ -335,31 +349,8 @@ program yelmox
 
         ! == Ocean Box Model ===================================================
         if (ctl%active_obm) then
-            if (ctl%ism2obm) then   ! apply fwf forcing to obm via ism domains
-                if (ctl%active_north) then
-                    obm_object%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
-                                        yelmox_north%yelmo1%bnd%c%sec_year, &
-                                        yelmox_north%yelmo1%tpo%now%H_ice,yelmox_north%yelmo1%tpo%now%dHidt, &
-                                        yelmox_north%yelmo1%tpo%now%f_grnd, &
-                                        yelmox_north%yelmo1%tpo%par%dx,yelmox_north%yelmo1%tpo%par%dy, yelmox_north%hydro_mask, "north")
-                else
-                    obm_object%fn = 0.0
-                end if
-                if (ctl%active_south) then
-                    obm_object%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
-                                        yelmox_south%yelmo1%bnd%c%sec_year, &
-                                        yelmox_south%yelmo1%tpo%now%H_ice,yelmox_south%yelmo1%tpo%now%dHidt, &
-                                        yelmox_south%yelmo1%tpo%now%f_grnd, &
-                                        yelmox_south%yelmo1%tpo%par%dx,yelmox_south%yelmo1%tpo%par%dy, yelmox_south%hydro_mask, "south")
-                else
-                    obm_object%fs = 0.0
-                end if
-            else
-                obm_object%fn = 0.0
-                obm_object%fs = 0.0
-            end if
-
-            call obm_update(obm_object, ctl%dtt, ctl%obm_name)
+            write(*,*) "Updating OBM ... time elapsed = ", ts%time_elapsed
+            call obm_update(obm_object, dtt_now, ctl%obm_name)
         end if ! use_obm
 
         ! == ICE SHEET ===================================================
@@ -405,28 +396,91 @@ program yelmox
                 call snapclim_update(yelmox_south%snp1,z_srf=yelmox_south%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox_south%domain,dx=yelmox_south%yelmo1%grd%dx,basins=yelmox_south%yelmo1%bnd%basins) 
             end if
 
-            ! atm2obm
-            if (ctl%atm2obm) then
+        end if
+
+        ! atm2obm
+        if (ctl%atm2obm) then
+            if (ctl%active_north) then
+                call update_theta_from_snapclim(obm_object%thetan, yelmox_north%snp1%now%tsl_ann, yelmox_north%hydro_mask, "north", ctl%obm_name)
+            else
+                obm_object%thetan = obm_object%thetan
+            end if
+            if (ctl%active_south) then
+                call update_theta_from_snapclim(obm_object%thetas, yelmox_south%snp1%now%tsl_ann, yelmox_south%hydro_mask, "south", ctl%obm_name)
+            else
+                obm_object%thetas = obm_object%thetas
+            end if
+        end if
+
+        ! ism2obm (pass ocean mean temperature to obm)
+        if (ctl%ism2obm) then
+            if (ctl%couple_ocean_temperature) then
                 if (ctl%active_north) then
-                    call update_theta_from_snapclim(obm_object%thetan, yelmox_north%snp1%now%tsl_ann, yelmox_north%hydro_mask, "north", ctl%obm_name)
+                    ao = series_interp(yelmox_north%snp1%ao%time, yelmox_north%snp1%ao%var, ts%time)
+                    dTo_now = ao*yelmox_north%snp1%par%dTo_const
+                    call calc_temp_anom(obm_object%tn,obm_object%par%tn_init,dTo_now)
                 end if
                 if (ctl%active_south) then
-                    call update_theta_from_snapclim(obm_object%thetas, yelmox_south%snp1%now%tsl_ann, yelmox_south%hydro_mask, "south", ctl%obm_name)
+                    ao = series_interp(yelmox_south%snp1%ao%time, yelmox_south%snp1%ao%var, ts%time)
+                    dTo_now = ao*yelmox_south%snp1%par%dTo_const
+                    call calc_temp_anom(obm_object%ts,obm_object%par%ts_init,dTo_now)
                 end if
             end if
-
-            ! obm2ism
-            if (ctl%obm2ism) then
+            if (ctl%couple_atmosphere_temperature) then
                 if (ctl%active_north) then
-                    call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm_object%tn, ctl%obm_name)
-                    call calc_ocean_salinity_field(yelmox_north%snp1%now%so_ann, obm_object%sn)
+                    at = series_interp(yelmox_north%snp1%at%time, yelmox_north%snp1%at%var, ts%time)
+                    dTa_now = at*yelmox_north%snp1%par%dTa_const
+                    call calc_temp_anom(obm_object%thetan,obm_object%par%thetan_init,dTa_now)
                 end if
                 if (ctl%active_south) then
-                    call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm_object%ts, ctl%obm_name)
-                    call calc_ocean_salinity_field(yelmox_south%snp1%now%so_ann, obm_object%ss)
+                    at = series_interp(yelmox_south%snp1%at%time, yelmox_south%snp1%at%var, ts%time)
+                    dTa_now = at*yelmox_south%snp1%par%dTa_const
+                    call calc_temp_anom(obm_object%thetas,obm_object%par%thetas_init,dTa_now)
                 end if
             end if
+            if (ctl%couple_fwf) then
+                if (ctl%active_north) then 
+                    obm_object%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
+                                        yelmox_north%yelmo1%bnd%c%sec_year, &
+                                        yelmox_north%yelmo1%tpo%now%mb_net, &
+                                        yelmox_north%yelmo1%tpo%now%smb, &
+                                        yelmox_north%yelmo1%tpo%now%bmb, &
+                                        yelmox_north%yelmo1%tpo%now%cmb, &
+                                        yelmox_north%yelmo1%tpo%now%H_ice, &
+                                        yelmox_north%yelmo1%tpo%now%dHidt, &
+                                        yelmox_north%yelmo1%tpo%now%f_grnd, &
+                                        yelmox_north%yelmo1%tpo%par%dx,yelmox_north%yelmo1%tpo%par%dy,yelmox_north%hydro_mask,"north",fwf_definition)
+                end if
+                if (ctl%active_south) then
+                    obm_object%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
+                                        yelmox_south%yelmo1%bnd%c%sec_year, &
+                                        yelmox_south%yelmo1%tpo%now%mb_net, &
+                                        yelmox_south%yelmo1%tpo%now%smb, &
+                                        yelmox_south%yelmo1%tpo%now%bmb, &
+                                        yelmox_south%yelmo1%tpo%now%cmb, &
+                                        yelmox_south%yelmo1%tpo%now%H_ice, &
+                                        yelmox_south%yelmo1%tpo%now%dHidt, &
+                                        yelmox_south%yelmo1%tpo%now%f_grnd, &
+                                        yelmox_south%yelmo1%tpo%par%dx,yelmox_south%yelmo1%tpo%par%dy,yelmox_south%hydro_mask,"south",fwf_definition)
+                end if
+                if (ctl%obm_name .eq. "nautilus") then
+                    if (hyster_on) then
+                        call update_bipolar_hyster_forcing(ts%time, ctl%time_init, obm_object, dtt_now, hyster_positive_branch_time, hyster_rate, hyster_forcing, hyster_forcing_method)
+                    end if
+                end if
+            end if
+        end if 
 
+        ! obm2ism
+        if (ctl%obm2ism) then
+            if (ctl%active_north) then
+                call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm_object%tn, ctl%obm_name)
+                call calc_ocean_salinity_field(yelmox_north%snp1%now%so_ann, obm_object%sn)
+            end if
+            if (ctl%active_south) then
+                call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm_object%ts, ctl%obm_name)
+                call calc_ocean_salinity_field(yelmox_south%snp1%now%so_ann, obm_object%ss)
+            end if
         end if
 
         ! == SURFACE MASS BALANCE ==============================================
@@ -538,10 +592,10 @@ program yelmox
 
     ! Write the restart snapshot for the end of the simulation
     if (ctl%active_north) then
-        call yelmox_bipolar_restart_write(bsl,yelmox_north%isos1,yelmox_north%yelmo1,ts%time,hemisphere="north")
+        call yelmox_bipolar_restart_write(bsl,yelmox_north%isos1,yelmox_north%yelmo1,yelmox_north%mshlf1,ts%time,hemisphere="north")
     end if
     if (ctl%active_south) then
-        call yelmox_bipolar_restart_write(bsl,yelmox_south%isos1,yelmox_south%yelmo1,ts%time,hemisphere="south")
+        call yelmox_bipolar_restart_write(bsl,yelmox_south%isos1,yelmox_south%yelmo1,yelmox_south%mshlf1,ts%time,hemisphere="south")
     end if
     if (ctl%active_obm) then
         call write_obm_restart(obm_object, obm_file_restart, ts%time, "years")
@@ -682,7 +736,10 @@ contains
 
         ! Local variables
         integer  :: ncid, n
-        real(wp) :: time_prev 
+        real(wp) :: time_prev
+        integer  :: nx, ny, nz, nk, i, j, k
+        real(wp), allocatable :: w_ocn_3D(:,:,:), norm_w_ocn_3D(:,:,:), mask_ocn(:,:,:), zetas(:)
+        real(wp) :: dx, dy, dz, max_w_ocn_3D, npts_tot 
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -805,6 +862,56 @@ contains
         end if
 
         ! == snapclim ==
+        nx = size(snp%now%ta_ann,1)
+        ny = size(snp%now%ta_ann,2)
+        npts_tot  = real(nx*ny)
+
+        call nc_write(filename,"meanTa_ann",sum(snp%now%ta_ann)/npts_tot,units="K",long_name="Mean near-surface air temperature (ann)", &
+                      dim1="time",start=[n],ncid=ncid)
+
+        nx = size(snp%now%to_ann,1)
+        ny = size(snp%now%to_ann,2)
+        nk = size(snp%now%to_ann,3)
+
+        allocate(w_ocn_3D(nx,ny,nk))
+        allocate(norm_w_ocn_3D(nx,ny,nk))
+        allocate(mask_ocn(nx,ny,nk))
+        allocate(zetas(nk))
+
+        w_ocn_3D(:,:,:) = 0.0 
+        norm_w_ocn_3D(:,:,:) = 0.0 
+
+        mask_ocn = snp%now%to_ann
+        zetas = snp%now%depth
+        dx = ylmo%tpo%par%dx
+        dy = ylmo%tpo%par%dy
+
+        do i = 1,nx
+            do j = 1,ny
+                do k = 1,nk
+                    dz = abs(zetas(k+1) - zetas(k)) 
+                    if (mask_ocn(i, j, k) <= 273.15) then
+                        w_ocn_3D(i, j, k) = 0.0
+                    else
+                        w_ocn_3D(i, j, k) = dx*dy*dz
+                    endif
+                enddo
+            enddo
+        enddo
+        max_w_ocn_3D = maxval(w_ocn_3D)
+        write(*,*) "SERGIO ", max_w_ocn_3D
+        norm_w_ocn_3D = w_ocn_3D/max(max_w_ocn_3D, 1.0) ! to avoid dividing by zero
+        
+        ! call nc_write(filename,"w_ocn_3D1",w_ocn_3D(:,:,1),units="--",long_name="", &
+        !               dim1="xc", dim2="yc", dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"w_ocn_3Dk",w_ocn_3D(:,:,nk),units="--",long_name="", &
+        !               dim1="xc", dim2="yc", dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"norm_w_ocean_3D1",norm_w_ocn_3D(:,:,1),units="--",long_name="", &
+        !               dim1="xc", dim2="yc", dim3="time",start=[1,1,n],ncid=ncid)
+        ! call nc_write(filename,"norm_w_ocean_3Dk",norm_w_ocn_3D(:,:,nk),units="--",long_name="", &
+        !               dim1="xc", dim2="yc", dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"meanTo_ann",sum(snp%now%to_ann*norm_w_ocn_3D)/sum(norm_w_ocn_3D),units="K",long_name="Mean ocean temperature (ann)", &
+                      dim1="time",start=[n],ncid=ncid)
 
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -883,56 +990,184 @@ contains
     end subroutine yelmox_write_step
 
     ! Bipolar specific subroutines
-    ! subroutine rewrite_common_parameters(filename, dom)
+
+    function series_interp(series_time, series_var,time) result(var)
+        ! Wrapper for simple `interp_linear` function
+        ! for series_types. 
+        implicit none 
+
+        real(wp), dimension(:), intent(IN) :: series_time, series_var
+        real(wp) :: time 
+        real(wp) :: var 
+        integer :: nt, i 
+
+        ! Interpolate series object
+        var = interp_linear(series_time,series_var,xout=time)
+
+        return 
+
+    end function series_interp
+
+    function interp_linear(x,y,xout) result(yout)
+        ! Simple linear interpolation of a point
+
+        implicit none 
+ 
+        real(wp), dimension(:), intent(IN) :: x, y
+        real(wp), intent(IN) :: xout
+        real(wp) :: yout 
+        integer :: i, j, n, nout 
+        real(wp) :: alph
+
+        n    = size(x) 
+
+        if (xout .lt. x(1)) then
+            yout = y(1)
+        else if (xout .gt. x(n)) then
+            yout = y(n)
+        else
+            do j = 1, n 
+                if (x(j) .ge. xout) exit 
+            end do
+
+            if (j .eq. 1) then 
+                yout = y(1) 
+            else if (j .eq. n+1) then 
+                yout = y(n)
+            else 
+                alph = (xout - x(j-1)) / (x(j) - x(j-1))
+                yout = y(j-1) + alph*(y(j) - y(j-1))
+
+            end if 
+        end if 
+
+        return 
+
+    end function interp_linear
+
+    elemental subroutine calc_temp_anom(temp_now,temp0,dT)
+        ! Calculate current climate from clim0 plus anomaly 
+
+        implicit none 
+
+        real(wp), intent(OUT) :: temp_now 
+        real(wp), intent(IN)  :: temp0 
+        real(wp), intent(IN)  :: dT            ! Current anomaly value to impose
         
-    !     implicit none
-
-    !     character(len=512), intent(IN)    :: filename
-    !     type(yelmo_class), intent(INOUT) :: dom
-
-    !     ! == topography ==
-
-    !     call ytopo_par_load(dom%tpo%par,filename,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
-
-    !     !call ytopo_alloc(dom%tpo%now,dom%tpo%par%nx,dom%tpo%par%ny)
+        temp_now = temp0 + dT 
         
-    !     write(*,*) "rewrite_common_parameters:: topography rewritten."
-        
-    !     ! == dynamics == 
+        return
 
-    !     call ydyn_par_load(dom%dyn%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    end subroutine calc_temp_anom
 
-    !     !call ydyn_alloc(dom%dyn%now,dom%dyn%par%nx,dom%dyn%par%ny,dom%dyn%par%nz_aa,dom%dyn%par%nz_ac)
-        
-    !     write(*,*) "rewrite_common_parameters:: dynamics rewritten."
-        
-    !     ! == material == 
+    function r8_normal_ab ( a, b )
 
-    !     call ymat_par_load(dom%mat%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    !*****************************************************************************80
+    !
+    !! r8_normal_ab() returns a scaled pseudonormal R8.
+    !
+    !  Discussion:
+    !
+    !    The normal probability distribution function (PDF) is sampled,
+    !    with mean A and standard deviation B.
+    !
+    !  Licensing:
+    !
+    !    This code is distributed under the MIT license.
+    !
+    !  Modified:
+    !
+    !    06 August 2013
+    !
+    !  Author:
+    !
+    !    John Burkardt
+    !
+    !  Parameters:
+    !
+    !    Input, real ( kind = rk ) A, the mean of the PDF.
+    !
+    !    Input, real ( kind = rk ) B, the standard deviation of the PDF.
+    !
+    !    Output, real ( kind = rk ) R8_NORMAL_AB, a sample of the normal PDF.
+    !
+        implicit none
+    
+        integer, parameter :: rk = kind ( 1.0D+00 )
+    
+        real ( wp) a
+        real ( wp ) b
+        real ( kind = rk ) r1
+        real ( kind = rk ) r2
+        real ( kind = rk ) r8_normal_ab
+        real ( kind = rk ), parameter :: r8_pi = 3.141592653589793D+00
+        real ( kind = rk ) x
+    
+        call random_number ( harvest = r1 )
+        call random_number ( harvest = r2 )
+        x = sqrt ( - 2.0D+00 * log ( r1 ) ) * cos ( 2.0D+00 * r8_pi * r2 )
+    
+        r8_normal_ab = a + b * x
+    
+        return
+    end
 
-    !     !call ymat_alloc(dom%mat%now,dom%mat%par%nx,dom%mat%par%ny,dom%mat%par%nz_aa,dom%mat%par%nz_ac,dom%mat%par%n_iso)
-        
-    !     write(*,*) "rewrite_common_parameters:: material rewritten."
-        
-    !     ! == thermodynamics == 
-        
-    !     call ytherm_par_load(dom%thrm%par,filename,dom%par%zeta_aa,dom%par%zeta_ac,dom%grd%nx,dom%grd%ny,dom%grd%dx,init=.TRUE.)
+    subroutine update_bipolar_hyster_forcing(t, t0, ocn_object, dt, branch_time_thr, rate, forcing, forc_method)
+        implicit none
+        real(wp), intent(IN) :: t, t0
+        type(obm_class), intent(INOUT) :: ocn_object
+        real(wp) :: dt
+        character(len=512) :: forcing, forc_method
+        real(wp)           :: rate, branch_time_thr, factor
 
-    !     !call ytherm_alloc(dom%thrm%now,dom%thrm%par%nx,dom%thrm%par%ny,dom%thrm%par%nz_aa,dom%thrm%par%nz_ac,dom%thrm%par%nzr_aa)
-        
-    !     write(*,*) "rewrite_common_parameters:: thermodynamics rewritten."
+        select case(trim(forc_method))
+            case("triangular")
+                if (t <= branch_time_thr) then
+                    factor = rate * dt
+                else
+                    factor = -1 * rate * dt
+                end if
+            case("sin")
+                if (trim(forcing) .eq. "phit") then
+                    factor = -ocn_object%phit + rate * sin(2*3.14159265358979*(t-t0)/branch_time_thr)    ! to allow negative values around 0.0
+                else if (trim(forcing) .eq. "fn") then
+                    factor = -ocn_object%fn + rate * sin(2*3.14159265358979*(t-t0)/branch_time_thr)    ! to allow negative values around 0.0
+                end if
+            case("noise")
+                if (trim(forcing) .eq. "phit") then
+                    factor = -ocn_object%phit + r8_normal_ab(0.0, rate)
+                else if (trim(forcing) .eq. "fn") then
+                    factor = -ocn_object%fn + r8_normal_ab(0.0, rate)   
+                end if
+            case("linear")
+                factor = rate * dt
+        end select
 
-    !     return
+        select case(trim(forcing))
+            case("phit")
+                ocn_object%phit = ocn_object%phit + factor
+            case("phin")
+                ocn_object%phin = ocn_object%phin + factor
+            case("fs")
+                ocn_object%fs = ocn_object%fs + factor
+            case("fn")
+                ocn_object%fn = ocn_object%fn + factor
+            case("global_melt")
+                ocn_object%fn = ocn_object%fn + factor
+                ocn_object%fs = ocn_object%fs + factor
+        end select
+        return
 
-    ! end subroutine rewrite_common_parameters
+    end subroutine update_bipolar_hyster_forcing
 
-    subroutine yelmox_bipolar_restart_write(bsl,isos,ylmo,time,fldr,hemisphere)
+    subroutine yelmox_bipolar_restart_write(bsl,isos,ylmo,mshlf,time,fldr,hemisphere)
 
         implicit none
 
         type(bsl_class),    intent(IN) :: bsl
         type(isos_class),   intent(IN) :: isos
         type(yelmo_class),  intent(IN) :: ylmo
+        type(marshelf_class), intent(IN) :: mshlf
         real(wp),           intent(IN) :: time 
         character(len=*),   intent(IN), optional :: fldr
         character(len=5),   intent(IN), optional :: hemisphere
@@ -945,9 +1180,11 @@ contains
         character(len=56) :: file_bsl   = "bsl_restart.nc"
         character(len=56) :: file_isos  = "isos_restart.nc"
         character(len=56) :: file_yelmo = "yelmo_restart.nc"
+        character(len=56) :: file_mshlf = "marine_shelf.nc"
 
         file_bsl   = "bsl_"//trim(hemisphere)//"_restart.nc"
         file_isos  = "isos_"//trim(hemisphere)//"_restart.nc"
+        file_mshlf = "marine_shelf_"//trim(hemisphere)//"_restart.nc"
         file_yelmo = "yelmo_"//trim(hemisphere)//"_restart.nc"
         
         if (present(fldr)) then
@@ -966,6 +1203,7 @@ contains
         call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
+        call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
 
         return
 
@@ -981,7 +1219,6 @@ contains
         type(ctrl_params),   intent(INOUT) :: ctl          ! run control parameters
         type(yelmox_class),  intent(INOUT) :: yelmox1, yelmox2
         type(timeout_class), intent(INOUT) :: tm_1D, tm_2D, tm_2Dsm
-        
 
         ! Determine the parameter file from the command line 
         call yelmo_load_command_line_args(path_par)
@@ -1004,7 +1241,6 @@ contains
         call nml_read(path_par, "ctrl", "ism2obm",         ctl%ism2obm)
         call nml_read(path_par, "ctrl", "obm2ism",         ctl%obm2ism)
         call nml_read(path_par, "ctrl", "atm2obm",         ctl%atm2obm)
-        call nml_read(path_par, "ctrl", "path_par_ocn",    ctl%path_par_ocn)
         call nml_read(path_par, "ctrl", "obm_name",        ctl%obm_name)
 
         if (ctl%active_north) then
@@ -1014,6 +1250,11 @@ contains
         if (ctl%active_south) then
             !call nml_read(path_par,"ctrl","path_par_south", yelmox2%path_par)
             call nml_read(path_par,"ctrl","hydro_mask_south", yelmox2%path_hydro_mask)
+        end if
+        if (ctl%ism2obm) then
+            call nml_read(path_par, "ctrl", "couple_atmosphere_temperature",        ctl%couple_atmosphere_temperature)
+            call nml_read(path_par, "ctrl", "couple_ocean_temperature",        ctl%couple_ocean_temperature)
+            call nml_read(path_par, "ctrl", "couple_fwf",        ctl%couple_fwf)
         end if
 
         ! Get output times
@@ -1033,7 +1274,6 @@ contains
         character(len=5), intent(IN)    :: hemisphere
         type(yelmox_class), intent(INOUT) :: yelmox
 
-        yelmox%yelmo1%reg%fnm      = trim(outf)//trim(hemisphere)//"_yelmo1D.nc"
         yelmox%file2D              = trim(outf)//trim(hemisphere)//"_yelmo2D.nc"
         yelmox%file2D_small        = trim(outf)//trim(hemisphere)//"_yelmo2Dsm.nc"
         yelmox%file_isos           = trim(outf)//trim(hemisphere)//"_fastisostasy.nc"
@@ -1060,7 +1300,7 @@ contains
         ! Initialize data objects and load initial topography
         call yelmo_init(yelmox%yelmo1,filename=path_par,grid_def="file",time=ts%time, group=group)
         !call rewrite_common_parameters(filename=path_par, dom=yelmox%yelmo1)  ! Rewrite those parameters that are common between domains (remove in future version, spm)
-        
+        write(*,*)"AQUI"
         ! Store domain name as a shortcut 
         yelmox%domain = yelmox%yelmo1%par%domain  
 
@@ -1142,7 +1382,7 @@ contains
                 yelmox%running_greenland = .TRUE.
 
                 ! Should extra ice be imposed over continental shelf to mimic LGM state to start
-                yelmox%greenland_init_marine_H = .TRUE. 
+                yelmox%greenland_init_marine_H = .FALSE. 
                 
                 ! Should glacial smb be modified to reduce negative smb values
                 yelmox%scale_glacial_smb = .FALSE. 
@@ -1413,17 +1653,20 @@ contains
 
     end subroutine initialize_boundary_conditions
 
-    subroutine initialize_output_files(yelmox, ts)
+    subroutine initialize_output_files(outf, yelmox, ts, hemisphere)
 
         implicit none
 
         ! Arguments
+        character(len=256), intent(IN)    :: outf
         type(yelmox_class),  intent(INOUT) :: yelmox
         type(tstep_class),   intent(IN)    :: ts
+        character(len=5), intent(IN)    :: hemisphere
 
         call yelmo_write_init(yelmox%yelmo1,yelmox%file2D,time_init=ts%time,units="years") 
         call yelmo_write_init(yelmox%yelmo1,yelmox%file2D_small,time_init=ts%time,units="years") 
 
+        yelmox%yelmo1%reg%fnm      = trim(outf)//trim(hemisphere)//"_yelmo1D.nc"
         call yelmo_regions_write(yelmox%yelmo1,ts%time,init=.TRUE.,units="years")
 
         return
@@ -1545,7 +1788,7 @@ contains
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-            call yelmox_bipolar_restart_write(bsl,yelmox%isos1,yelmox%yelmo1,ts%time,hemisphere=hemisphere)
+            call yelmox_bipolar_restart_write(bsl,yelmox%isos1,yelmox%yelmo1,yelmox%mshlf1,ts%time,hemisphere=hemisphere)
         end if 
 
         return
