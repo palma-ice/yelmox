@@ -30,12 +30,9 @@
     dtt             = 10.0              ! [yr] Main loop timestep 
 
     ! Time intervals (check with ESM forcings)
-    time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
-    
-    ! To do: delete
     time_hist       = 1850.0, 1990.0    ! [yr] Year interval used as Historical period
     time_proj       = 2020.0, 2300.0    ! [yr] Year interval used as Projection period
-    time_ref        = 1990.0, 2020.0    ! [yr] Year interval used as Reference
+    time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization 
     clim_var        = True              ! include climate variability
     kill_shelves    = True
@@ -54,7 +51,7 @@
     use_hist        = False             ! load historical period. If false, use ref before projection.
     time_hist       = 1850.0, 1990.0    ! [yr] Year interval used as Historical period
     time_proj       = 2020.0, 2300.0    ! [yr] Year interval used as Projection period
-    time_ref        = 1990.0, 2020.0    ! [yr] Year interval used as Reference
+    time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization 
     clim_var        = False             ! include climate variability
     kill_shelves    = True
@@ -86,7 +83,7 @@
 &opt
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
-    cf_time_end     = 5e3              ! [yr] When should optimization of basal friction stop?
+    cf_time_end     = 5e3               ! [yr] When should optimization of basal friction stop?
     cf_init         = 0.1               ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
     cf_min          = 0.01              ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 

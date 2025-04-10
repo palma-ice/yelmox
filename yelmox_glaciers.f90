@@ -15,7 +15,6 @@ program yelmox
     ! External libraries
     use fastisostasy    ! also reexports barysealevel
     use snapclim
-    use marine_shelf
     use smbpal
     use sediments
     use geothermal
@@ -27,7 +26,6 @@ program yelmox
     type(yelmo_class)      :: yelmo1
     type(bsl_class)        :: bsl
     type(snapclim_class)   :: snp1
-    type(marshelf_class)   :: mshlf1
     type(smbpal_class)     :: smbpal1
     type(sediments_class)  :: sed1
     type(geothermal_class) :: gthrm1
@@ -276,9 +274,6 @@ end if
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
     
-    ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
-    
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
     call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%H_sed = sed1%now%H 
@@ -320,15 +315,9 @@ end if
         call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
     end if
 
-    call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                        snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-    call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-    yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
-    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+    ! Set these boudnary conditions to zero for glaciers.
+    yelmo1%bnd%bmb_shlf = 0.0_wp
+    yelmo1%bnd%T_shlf   = 0.0_wp  
 
     call yelmo_print_bound(yelmo1%bnd) 
     
@@ -474,19 +463,6 @@ end if
 
                 end if
 
-                if (opt%opt_tf .and. &
-                        (ts%time_elapsed .ge. opt%tf_time_init .and. ts%time_elapsed .le. opt%tf_time_end) ) then
-                    ! Perform tf_corr optimization
-
-                    call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
-                                                opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
-                    ! call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                    !                         yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim, &
-                    !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
-                
-                end if 
-
             case("relax")
                 ! ===== relaxation spinup ==================
 
@@ -559,27 +535,15 @@ end if
         end if
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-        if (trim(yelmo1%par%domain) .eq. "Pyrenees") then
-                yelmo1%bnd%bmb_shlf = 0.0_wp
-                yelmo1%bnd%T_shlf   = 0.0_wp
-        else
-                call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
-                                snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
-
-                call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-                yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
-                yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
-        end if
+        yelmo1%bnd%bmb_shlf = 0.0_wp
+        yelmo1%bnd%T_shlf   = 0.0_wp
         
         call timer_step(tmrs,comp=3,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="climate") 
 
         ! == MODEL OUTPUT =======================================================
 
         if (timeout_check(tm_2D,ts%time)) then
-            call yelmox_write_step(yelmo1,snp1,mshlf1,smbpal1,file2D,ts%time)
+            call yelmox_write_step(yelmo1,snp1,smbpal1,file2D,ts%time)
         end if
 
         if (timeout_check(tm_2Dsm,ts%time) .and. .FALSE.) then 
@@ -592,7 +556,7 @@ end if
 
         write(*,*) "Javi L599"
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-            call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+            call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
         end if 
  
         write(*,*) "Javi L600"
@@ -613,7 +577,7 @@ end if
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,ts%time]*1e-3,label="timeloop") 
     
     ! Write the restart snapshot for the end of the simulation
-    call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+    call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=ts%time)
@@ -828,13 +792,12 @@ contains
 
     end subroutine negis_update_cb_ref
 
-    subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
+    subroutine yelmox_write_step(ylmo,snp,srf,filename,time)
 
         implicit none 
         
         type(yelmo_class),      intent(IN) :: ylmo
         type(snapclim_class),   intent(IN) :: snp 
-        type(marshelf_class),   intent(IN) :: mshlf 
         type(smbpal_class),     intent(IN) :: srf 
         !type(sediments_class),  intent(IN) :: sed 
         !type(geothermal_class), intent(IN) :: gthrm
@@ -989,50 +952,7 @@ contains
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        ! == marine_shelf ==
-
-        if (.FALSE.) then
-                call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"S_shlf",mshlf%now%S_shlf,units="PSU",long_name="Shelf salinity", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn,units="", &
-                                long_name="Ocean mask (0: land, 1: grline, 2: fltline, 3: open ocean, 4: deep ocean, 5: lakes)", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf,units="K",long_name="Shelf thermal forcing", &
-                                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
-                if (trim(mshlf%par%bmb_method) .eq. "pico") then 
-                        call nc_write(filename,"d_shlf",mshlf%pico%now%d_shlf,units="km",long_name="Shelf distance to grounding line", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"d_if",mshlf%pico%now%d_if,units="km",long_name="Shelf distance to ice front", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"boxes",mshlf%pico%now%boxes,units="",long_name="Shelf boxes", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)      
-                        call nc_write(filename,"r_shlf",mshlf%pico%now%r_shlf,units="",long_name="Ratio of ice shelf", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"T_box",mshlf%pico%now%T_box,units="K?",long_name="Temperature of boxes", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"S_box",mshlf%pico%now%S_box,units="PSU",long_name="Salinity of boxes", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"A_box",mshlf%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                else 
-                        call nc_write(filename,"tf_basin",mshlf%now%tf_basin,units="K",long_name="Mean basin thermal forcing", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf,units="K",long_name="Shelf thermal forcing", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing applied correction factor", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-                        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,units="K",long_name="Shelf thermal forcing basin-wide correction factor", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        call nc_write(filename,"slope_base",mshlf%now%slope_base,units="",long_name="Shelf-base slope", &
-                                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                end if 
-        end if
         ! Close the netcdf file
         call nc_close(ncid)
 
@@ -1040,14 +960,13 @@ contains
 
     end subroutine yelmox_write_step
 
-    subroutine yelmox_restart_write(bsl,isos,ylmo,mshlf,time,fldr)
+    subroutine yelmox_restart_write(bsl,isos,ylmo,time,fldr)
 
         implicit none
 
         type(bsl_class),      intent(IN) :: bsl
         type(isos_class),     intent(IN) :: isos
         type(yelmo_class),    intent(IN) :: ylmo
-        type(marshelf_class), intent(IN) :: mshlf
         real(wp),             intent(IN) :: time 
         character(len=*),     intent(IN), optional :: fldr
         
@@ -1059,7 +978,6 @@ contains
         character(len=56), parameter :: file_bsl   = "bsl_restart.nc"
         character(len=56), parameter :: file_isos  = "isos_restart.nc"
         character(len=56), parameter :: file_yelmo = "yelmo_restart.nc"
-        character(len=56), parameter :: file_mshlf = "marine_shelf.nc"
 
         if (present(fldr)) then
             outfldr = trim(fldr)
@@ -1078,8 +996,6 @@ contains
         call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
-        ! jablasco: false for pyrenees
-        !call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
 
         return
 
