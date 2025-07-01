@@ -64,55 +64,82 @@ module nautilus
         call nml_read(filename, group, "depth_td", ntls%par%depth_td)
         call nml_read(filename, group, "depth_s", ntls%par%depth_s)
 
+        call nml_read(filename, group, "thermal_ampl_north", ntls%par%thermal_ampl_north)
+        call nml_read(filename, group, "thermal_ampl_tropics", ntls%par%thermal_ampl_tropics)
+        call nml_read(filename, group, "thermal_ampl_south", ntls%par%thermal_ampl_south)
+
+        call nml_read(filename, group, "nh_hydro_sensitivity", ntls%par%hn)
+        call nml_read(filename, group, "sh_hydro_sensitivity", ntls%par%hs)
+        call nml_read(filename, group, "nh_temp_constant", ntls%par%pnh)
+        call nml_read(filename, group, "sh_temp_constant", ntls%par%psh)
+        
+
         ! Initialize prognostic states of the model
         if (use_restart) then
             n = nc_size(ocn_restart,"time")
-            call nc_read(ocn_restart,"tn",ntls%tn,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"tt",ntls%tt,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ttd",ntls%ttd,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ts",ntls%ts,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"sn",ntls%sn,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"st",ntls%st,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"std",ntls%std,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ss",ntls%ss,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"fn",ntls%fn,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ft",ntls%ft,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"fs",ntls%fs,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"phin",ntls%phin,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"phit",ntls%phit,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetan",ntls%thetan,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetat",ntls%thetat,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetas",ntls%thetas,start=[n],count=[1]) 
-            ! call nc_read(ocn_restart,"lambdan",ntls%lambdan,start=[n],count=[1]) 
-            ! call nc_read(ocn_restart,"lambdat",ntls%lambdat,start=[n],count=[1]) 
-            ! call nc_read(ocn_restart,"lambdatd",ntls%lambdatd,start=[n],count=[1])
-            ! call nc_read(ocn_restart,"lambdas",ntls%lambdas,start=[n],count=[1])  
-            call nml_read(filename, group, "lambdan_init", ntls%lambdan)
-            call nml_read(filename, group, "lambdat_init", ntls%lambdat)
-            call nml_read(filename, group, "lambdatd_init", ntls%lambdatd)  
-            call nml_read(filename, group, "lambdas_init", ntls%lambdas)
+            call nc_read(ocn_restart,"tn",ntls%par%tn_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tt",ntls%par%tt_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ttd",ntls%par%ttd_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ts",ntls%par%ts_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"sn",ntls%par%sn_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"st",ntls%par%st_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"std",ntls%par%std_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ss",ntls%par%ss_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"fn",ntls%par%fn_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ft",ntls%par%ft_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"fs",ntls%par%fs_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"phin",ntls%par%phin_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"phit",ntls%par%phit_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetan",ntls%par%thetan_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetat",ntls%par%thetat_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetas",ntls%par%thetas_init,start=[n],count=[1]) 
+            call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
+            call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
+            call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
+            call nml_read(filename, group, "lambdas_init", ntls%par%lambdas_init)
         else
-            call nml_read(filename, group, "tn_init", ntls%tn)
-            call nml_read(filename, group, "tt_init", ntls%tt)
-            call nml_read(filename, group, "ttd_init", ntls%ttd)
-            call nml_read(filename, group, "ts_init", ntls%ts)
-            call nml_read(filename, group, "sn_init", ntls%sn)
-            call nml_read(filename, group, "st_init", ntls%st)
-            call nml_read(filename, group, "std_init", ntls%std)
-            call nml_read(filename, group, "ss_init", ntls%ss)
-            call nml_read(filename, group, "fn_init", ntls%fn)
-            call nml_read(filename, group, "ft_init", ntls%ft) 
-            call nml_read(filename, group, "fs_init", ntls%fs) 
-            call nml_read(filename, group, "phin_init", ntls%phin)
-            call nml_read(filename, group, "phit_init", ntls%phit) 
-            call nml_read(filename, group, "thetan_init", ntls%thetan)
-            call nml_read(filename, group, "thetat_init", ntls%thetat) 
-            call nml_read(filename, group, "thetas_init", ntls%thetas)
-            call nml_read(filename, group, "lambdan_init", ntls%lambdan)
-            call nml_read(filename, group, "lambdat_init", ntls%lambdat)
-            call nml_read(filename, group, "lambdatd_init", ntls%lambdatd)  
-            call nml_read(filename, group, "lambdas_init", ntls%lambdas)
+            call nml_read(filename, group, "tn_init", ntls%par%tn_init)
+            call nml_read(filename, group, "tt_init", ntls%par%tt_init)
+            call nml_read(filename, group, "ttd_init", ntls%par%ttd_init)
+            call nml_read(filename, group, "ts_init", ntls%par%ts_init)
+            call nml_read(filename, group, "sn_init", ntls%par%sn_init)
+            call nml_read(filename, group, "st_init", ntls%par%st_init)
+            call nml_read(filename, group, "std_init", ntls%par%std_init)
+            call nml_read(filename, group, "ss_init", ntls%par%ss_init)
+            call nml_read(filename, group, "fn_init", ntls%par%fn_init)
+            call nml_read(filename, group, "ft_init", ntls%par%ft_init) 
+            call nml_read(filename, group, "fs_init", ntls%par%fs_init) 
+            call nml_read(filename, group, "phin_init", ntls%par%phin_init)
+            call nml_read(filename, group, "phit_init", ntls%par%phit_init) 
+            call nml_read(filename, group, "thetan_init", ntls%par%thetan_init)
+            call nml_read(filename, group, "thetat_init", ntls%par%thetat_init) 
+            call nml_read(filename, group, "thetas_init", ntls%par%thetas_init)
+            call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
+            call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
+            call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
+            call nml_read(filename, group, "lambdas_init", ntls%par%lambdas_init)
         end if
+
+        ntls%tn = ntls%par%tn_init
+        ntls%tt = ntls%par%tt_init
+        ntls%ttd = ntls%par%ttd_init
+        ntls%ts = ntls%par%ts_init
+        ntls%sn = ntls%par%sn_init
+        ntls%st = ntls%par%st_init
+        ntls%std = ntls%par%std_init
+        ntls%ss = ntls%par%ss_init    
+        ntls%fn = ntls%par%fn_init
+        ntls%ft = ntls%par%tt_init
+        ntls%fs = ntls%par%fs_init  
+        ntls%phin = ntls%par%phin_init
+        ntls%phit = ntls%par%phit_init    
+        ntls%thetan = ntls%par%thetan_init
+        ntls%thetat = ntls%par%thetat_init
+        ntls%thetas = ntls%par%thetas_init    
+        ntls%lambdan = ntls%par%lambdan_init
+        ntls%lambdat = ntls%par%lambdat_init
+        ntls%lambdatd = ntls%par%lambdatd_init
+        ntls%lambdas = ntls%par%lambdas_init    
 
         return
 
