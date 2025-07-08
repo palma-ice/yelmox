@@ -30,8 +30,8 @@ $(objdir)/ismip6.o: $(libdir)/ismip6.f90
 $(objdir)/esm.o: $(libdir)/esm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/isostasy.o: $(libdir)/isostasy.f90 $(objdir)/nml.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
+$(objdir)/isostasy.o: $(libdir)/isostasy.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 #$(objdir)/ncio.o: $(libdir)/ncio.f90
 #	$(FC) $(DFLAGS) $(FFLAGS) $(INC_NC) -c -o $@ $<

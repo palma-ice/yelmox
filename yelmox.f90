@@ -13,19 +13,21 @@ program yelmox
     use ice_sub_regions
 
     ! External libraries
-    use fastisostasy    ! also reexports barysealevel
+    !use fastisostasy    ! also reexports barysealevel
     use snapclim
     use marine_shelf
     use smbpal
     use sediments
     use geothermal
     
+    use isostasy
+
     implicit none 
 
     type(tstep_class)      :: ts
     
     type(yelmo_class)      :: yelmo1
-    type(bsl_class)        :: bsl
+    !type(bsl_class)        :: bsl
     type(snapclim_class)   :: snp1
     type(marshelf_class)   :: mshlf1
     type(smbpal_class)     :: smbpal1
@@ -34,7 +36,7 @@ program yelmox
     type(isos_class)       :: isos1
     
     character(len=256) :: outfldr, file2D, file2D_small, domain
-    character(len=256) :: file_isos, file_bsl
+    !character(len=256) :: file_isos, file_bsl
     character(len=512) :: path_par
     character(len=512) :: path_lgm
     real(wp) :: dT_now
@@ -134,8 +136,8 @@ program yelmox
     file2D              = trim(outfldr)//"yelmo2D.nc"
     file2D_small        = trim(outfldr)//"yelmo2Dsm.nc"
 
-    file_isos           = trim(outfldr)//"fastisostasy.nc"
-    file_bsl            = trim(outfldr)//"bsl.nc"
+    !file_isos           = trim(outfldr)//"fastisostasy.nc"
+    !file_bsl            = trim(outfldr)//"bsl.nc"
 
     tmr_file            = trim(outfldr)//"timer_table.txt"
 
@@ -265,10 +267,13 @@ end if
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Initialize barysealevel model
-    call bsl_init(bsl, path_par, ts%time_rel)
+    !call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
+    !call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
+
+    ! Initialize bedrock model 
+    call isos_init(isos1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%grd%dx)
 
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
@@ -289,18 +294,26 @@ end if
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
-    ! Barystatic sea level
-    call bsl_update(bsl, year_bp=ts%time_rel)
-    call bsl_write_init(bsl, file_bsl, ts%time)
+    ! ! Barystatic sea level
+    ! call bsl_update(bsl, year_bp=ts%time_rel)
+    ! call bsl_write_init(bsl, file_bsl, ts%time)
 
-    ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
-    call isos_write_init_extended(isos1, file_isos, ts%time)
+    ! ! Initialize the isostasy reference state using reference topography fields
+    ! call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+    ! call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
+    ! call isos_write_init_extended(isos1, file_isos, ts%time)
+    
+    !yelmo1%bnd%z_bed = isos1%out%z_bed
+    !yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-    yelmo1%bnd%z_bed = isos1%out%z_bed
-    yelmo1%bnd%z_sl  = isos1%out%z_ss
-
+    ! Initialize isostasy using present-day topography 
+    ! values to calibrate the reference rebound
+    call isos_init_state(isos1,z_bed=yelmo1%bnd%z_bed,H_ice=yelmo1%tpo%now%H_ice, &
+                                    z_sl=yelmo1%bnd%z_sl,z_bed_ref=yelmo1%bnd%z_bed_ref, &
+                                    H_ice_ref=yelmo1%bnd%H_ice_ref, &
+                                    z_sl_ref=yelmo1%bnd%z_sl*0.0,time=ts%time)
+    
+    
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
@@ -516,10 +529,15 @@ end if
         call timer_step(tmrs,comp=0) 
         
         ! == ISOSTASY and SEA LEVEL ======================================================
-        call bsl_update(bsl, ts%time_rel)
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = isos1%out%z_bed
-        yelmo1%bnd%z_sl  = isos1%out%z_ss
+        ! call bsl_update(bsl, ts%time_rel)
+        ! call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+        ! yelmo1%bnd%z_bed = isos1%out%z_bed
+        ! yelmo1%bnd%z_sl  = isos1%out%z_ss
+
+        ! == ISOSTASY ==========================================================
+        call isos_update(isos1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_sl,ts%time) 
+        yelmo1%bnd%z_bed = isos1%now%z_bed
+        yelmo1%bnd%z_sl  = 0.0_wp       ! If sea-level changes, are needed, use the sealevel module from v1.801!
 
         call timer_step(tmrs,comp=1,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="isostasy") 
         
@@ -586,7 +604,7 @@ end if
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-            call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+            call yelmox_restart_write(isos1,yelmo1,mshlf1,ts%time)
         end if 
 
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
@@ -606,7 +624,7 @@ end if
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,ts%time]*1e-3,label="timeloop") 
     
     ! Write the restart snapshot for the end of the simulation
-    call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+    call yelmox_restart_write(isos1,yelmo1,mshlf1,ts%time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=ts%time)
@@ -1033,11 +1051,11 @@ contains
 
     end subroutine yelmox_write_step
 
-    subroutine yelmox_restart_write(bsl,isos,ylmo,mshlf,time,fldr)
+    subroutine yelmox_restart_write(isos,ylmo,mshlf,time,fldr)
 
         implicit none
 
-        type(bsl_class),      intent(IN) :: bsl
+        !type(bsl_class),      intent(IN) :: bsl
         type(isos_class),     intent(IN) :: isos
         type(yelmo_class),    intent(IN) :: ylmo
         type(marshelf_class), intent(IN) :: mshlf
@@ -1067,11 +1085,11 @@ contains
         ! Make directory (use -p to ignore if directory already exists)
         call execute_command_line('mkdir -p "' // trim(outfldr) // '"')
         
-        call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
-        call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
+        !call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
+        !call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
         call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
-
+        
         return
 
     end subroutine yelmox_restart_write
