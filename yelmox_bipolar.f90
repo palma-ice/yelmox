@@ -469,11 +469,13 @@ program yelmox
         ! obm2ism
         if (ctl%obm2ism) then
             if (ctl%active_north) then
-                call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm_object%tn-obm_object%par%tn_init, ctl%obm_name)
+                ! call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm_object%tn-obm_object%par%tn_init, ctl%obm_name)
+                call calc_ocean_temperature_field(yelmox_north%snp1%now%to_ann, obm_object%tn, ctl%obm_name)
                 !call calc_ocean_salinity_field(yelmox_north%snp1%now%so_ann, obm_object%sn-obm_object%par%sn_init)
             end if
             if (ctl%active_south) then
-                call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm_object%ts-obm_object%par%ts_init, ctl%obm_name)
+                ! call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm_object%ts-obm_object%par%ts_init, ctl%obm_name)
+                call calc_ocean_temperature_field(yelmox_south%snp1%now%to_ann, obm_object%ts, ctl%obm_name)
                 !call calc_ocean_salinity_field(yelmox_south%snp1%now%so_ann, obm_object%ss-obm_object%par%ss_init)
             end if
         end if
@@ -1412,7 +1414,6 @@ contains
 
         ! Initialize "climate" model (climate and ocean forcing)
         call snapclim_init(yelmox%snp1,path_par,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%yelmo1%bnd%basins,group=snapclim_group)
-        
         ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
         call smbpal_init(yelmox%smbpal1,path_par,x=yelmox%yelmo1%grd%xc,y=yelmox%yelmo1%grd%yc,lats=yelmox%yelmo1%grd%lat,group=smbpal_group,itm_group=itm_group)
         
