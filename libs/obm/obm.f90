@@ -137,9 +137,9 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"fs",obm_object%fs,units="Sv",long_name="(external) South Atlantic box fresh water flux", &
                 dim1="time",start=[n],ncid=ncid)  
-        call nc_write(filename,"phin",obm_object%phin / factor,units="Sv",long_name="Freshwater transport from tropical to northern box", &
+        call nc_write(filename,"phin",obm_object%phin, units="Sv",long_name="Freshwater transport from tropical to northern box", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"phit",obm_object%phit / factor,units="Sv",long_name="Freshwater transport from southern to tropical box", &
+        call nc_write(filename,"phit",obm_object%phit, units="Sv",long_name="Freshwater transport from southern to tropical box", &
                 dim1="time",start=[n],ncid=ncid) 
         call nc_write(filename,"thetan",obm_object%thetan,units="K",long_name="North Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)

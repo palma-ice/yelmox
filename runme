@@ -26,12 +26,16 @@ class DictAction(argparse.Action):
         for value in values:
             key, valstr = value.split('=')
             if ',' in valstr:
-                raise Exception('Only one value allowed for each parameter using -p: {}={}'.format(key,valstr))
+                if '[' not in valstr:
+                    raise Exception('Only one value allowed for each parameter using -p: {}={}'.format(key,valstr))
             try:
                 value = float(valstr)
                 if value % 1 == 0 and not '.' in valstr: value = int(value)
             except:
-                value = valstr 
+                if ('[' == valstr[0]) and (']' == valstr[-1]):
+                    value = valstr[1:-1].split(',') # list of strings, it should be given as var="[var1,var2,var3,...]" in the nml file, without '' or ""
+                else:
+                    value = valstr 
             getattr(namespace, self.dest)[key] = value
 
 def main():

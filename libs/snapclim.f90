@@ -2571,4 +2571,112 @@ contains
 
     end function gauss_values
 
+    ! subroutine write_snapclim_init(snp,filename,time_init,units,irange,jrange)
+    !     ! Initialize a NetCDF file for snapclim output.
+    !     ! Produces a file with all possible dimension information 
+    !     ! to be able to plot different variables of the user's choice. 
+    !     ! Also, irange=[i1,i2] and jrange=[j1,j2] can be used to limit 
+    !     ! the dimensions to a specific horizontal region of the domain.
+        
+    !     implicit none 
+
+    !     type(snapclim_class), intent(IN) :: snp 
+    !     character(len=*),  intent(IN) :: filename
+    !     real(wp),          intent(IN) :: time_init
+    !     character(len=*),  intent(IN) :: units 
+    !     integer,           intent(IN), optional :: irange(2)
+    !     integer,           intent(IN), optional :: jrange(2)
+        
+    !     ! Local variables
+    !     integer :: i1, i2, j1, j2
+
+    !     ! Initialize netcdf file and dimensions
+    !     call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
+    !     call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
+    !     call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
+    !     call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
+    !     call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
+    !     call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
+    !     call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
+        
+    !     call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+
+    !     ! Get indices for current domain of interest
+    !     call get_region_indices(i1,i2,j1,j2,snp%grd%nx,snap%grd%ny,irange,jrange)
+
+    !     ! Write static fields
+    !     ! ...
+        
+    !     return
+
+    ! end subroutine write_snapclim_init
+
+    ! subroutine write_snapclim_step(snp,filename,time)
+
+    !     implicit none 
+        
+    !     type(snapclim_class),   intent(IN) :: snp 
+        
+    !     character(len=*),  intent(IN) :: filename
+    !     real(wp), intent(IN) :: time
+
+    !     ! Local variables
+    !     integer  :: ncid, n
+    !     real(wp) :: time_prev 
+
+    !     ! Open the file for writing
+    !     call nc_open(filename,ncid,writable=.TRUE.)
+
+    !     ! Determine current writing time step 
+    !     n = nc_time_index(filename,"time",time,ncid)
+
+    !     ! Update the time step
+    !     call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+    !     ! Update variables
+    !     call nc_write(filename,"mask",time,dim1="time",start=[n],count=[1],ncid=ncid)
+    !     call nc_write(filename,"mask", snp%now%mask(i1:i2,j1:j2), dim1="xc",dim2="yc",units="",long_name="Mask")
+
+    !     ! write snapclim_state_class variables in snapclim.nc
+    ! !     type snapclim_state_class 
+
+    ! !     type(snapshot_param_class) :: par 
+
+    ! !     ! Climate variables 
+    ! !     real(wp), allocatable :: mask(:,:)     
+    ! !     real(wp), allocatable :: z_srf(:,:)
+
+    ! !     real(wp), allocatable :: tas(:,:,:)
+    ! !     real(wp), allocatable :: pr(:,:,:)
+    ! !     real(wp), allocatable :: pr_stdev_frac(:,:,:)
+    ! !     real(wp), allocatable :: sf(:,:,:)
+
+    ! !     real(wp), allocatable :: ta_ann(:,:)
+    ! !     real(wp), allocatable :: ta_sum(:,:)
+    ! !     real(wp), allocatable :: pr_ann(:,:)
+        
+    ! !     real(wp), allocatable :: pr_ann_stdev_frac(:,:)
+
+    ! !     real(wp), allocatable :: tsl(:,:,:)
+    ! !     real(wp), allocatable :: prcor(:,:,:)
+    ! !     real(wp), allocatable :: tsl_ann(:,:)
+    ! !     real(wp), allocatable :: tsl_sum(:,:)
+    ! !     real(wp), allocatable :: prcor_ann(:,:)
+    ! !     real(wp), allocatable :: beta_p(:,:)        
+
+    ! !     ! Oceanic variables
+    ! !     integer :: nzo
+    ! !     real(wp), allocatable :: depth(:) 
+    ! !     real(wp), allocatable :: mask_ocn(:,:,:) 
+    ! !     real(wp), allocatable :: to_ann(:,:,:) 
+    ! !     real(wp), allocatable :: so_ann(:,:,:) 
+        
+    ! !     real(wp) :: at, ao, ap, as 
+    ! !     real(wp) :: bt, bo, bp, bs
+
+    ! ! end type 
+
+
+    ! end subroutine write_snapclim
+
 end module snapclim
