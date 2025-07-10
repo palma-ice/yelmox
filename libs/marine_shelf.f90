@@ -622,10 +622,19 @@ contains
                                                         f_grnd,basins,H_ice,mshlf%now%mask_ocn)
 
                         ! Ensure tf_basin is non-negative following Lipscomb et al (2021)
-                        where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp 
+                        ! jalv: this line overcomes the option of bmb_max being greater than 0 (some refreezing) if temperatures
+                        ! decrease enoughe (for quad-nl cases)
+                        !where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp
 
                         call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
                             mshlf%par%gamma_quad_nl,omega)
+
+                        ! jalv: beacuse of the previous limitation of tf_basin to 0, do the following line if want to play and allow some accretion
+                        ! option 1: simply impose bmb_max where tf_basin is negative (quite brutal)
+                        !where(mshlf%now%tf_basin .le. 0.0_wp) mshlf%now%bmb_shlf = mshlf%par%bmb_max
+                        ! option 2: (more physical) asign a positive value of bmb where both tf_basin and tf are negative.
+                        ! This value will after be limited by bmb_max            
+                        where((mshlf%now%tf_basin .le. 0.0_wp).and.(mshlf%now%tf_shlf .le. 0.0_wp)) mshlf%now%bmb_shlf = -mshlf%now%bmb_shlf
                     
                     case("anom")
 
@@ -653,6 +662,7 @@ contains
         ! Below we should apply specific limitations. 
 
         ! Apply maximum refreezing rate 
+        ! test jalv: disable for testing whether bmb_max refreezing limitatiomns are properly coded
         where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
                                 mshlf%now%bmb_shlf = mshlf%par%bmb_max
 

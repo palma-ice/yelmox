@@ -12,7 +12,7 @@ module ice2ocean
 
 contains
 
-function calc_fwf(rho_water,rho_ice,sec_year,H_ice,dHidt,f_grnd,dx,dy,mask,hemisphere) result(fwf)
+function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx,dy,mask,hemisphere, fwf_def) result(fwf)
     ! This subroutine is based on yelmo_regions.f90 calc_yregions(...)
 
     implicit none 
@@ -21,86 +21,72 @@ function calc_fwf(rho_water,rho_ice,sec_year,H_ice,dHidt,f_grnd,dx,dy,mask,hemis
 
     ! Local variables
     integer  :: nx, ny
-    real(wp) :: npts_flt
+    real(wp) :: npts_flt, npts_tot, smb_tot, bmb_tot, cmb_tot, npts_tot_basin
 
     real(wp) :: m3_km3 = 1e-9 
     real(wp) :: conv_km3a_Sv
 
     real(wp)   :: rho_water, rho_ice ! bnd%c%rho_w, bnd%c%rho_ice
     real(wp)   :: sec_year ! bnd%c%sec_year
-    real(wp), allocatable   :: H_ice(:,:), dHidt(:,:) ! tpo%now%H_ice, tpo%now%dHidt
+    real(wp), allocatable   :: mb(:,:), smb(:,:), bmb(:,:), cmb(:,:), Hice(:,:), dHidt(:,:) ! tpo%now%mb, tpo%now%dHidt
     real(wp), allocatable   :: f_grnd(:,:)
     real(wp)           :: dx, dy ! tpo%par%dx, tpo%par%dy
     real(wp), allocatable :: mask(:,:) 
     character(len=*) :: hemisphere
 
-    logical, allocatable :: mask_flt(:,:), basin_mask(:,:), extended_north_basin_mask(:,:)
+    logical, allocatable :: mask_tot(:,:), mask_basin(:,:), mask_flt(:,:), basin_mask(:,:), extended_north_basin_mask(:,:)
     real(wp), allocatable :: H_af(:,:) 
     logical, parameter :: use_extended_north=.TRUE.
 
-    character(len=*), parameter :: fwf_def= "mask_and_floating_ice" !"mask_and_floating_ice" 
+    character(len=*) :: fwf_def
 
     ! Conversion parameter 
     conv_km3a_Sv = 1e-6*(1e9*rho_water/rho_ice)/sec_year   
 
     ! Grid size 
-    nx = size(H_ice,1)
-    ny = size(H_ice,2)
+    nx = size(dHidt,1)
+    ny = size(dHidt,2)
 
+    allocate(mask_tot(nx,ny))
     allocate(mask_flt(nx,ny))
     allocate(H_af(nx,ny)) 
     allocate(extended_north_basin_mask(nx,ny))
 
     ! Define masks
-    mask_flt  = (H_ice .gt. 0.0 .and. f_grnd .eq. 0.0)
+    mask_tot  = (Hice .gt. 0.0) 
+    mask_basin = (mask .eq. 1.0) 
+    mask_flt  = (dHidt .gt. 0.0 .and. f_grnd .eq. 0.0)
+    npts_tot  = real(count(mask_tot),wp)
+    npts_tot_basin = real(count(mask_basin),wp)
     npts_flt  = real(count(mask_flt),wp)
+
+    fwf_def = "dVdt" !"dVdt_mask"
 
     ! ===== Compute fwf =====
     select case(fwf_def)
-        case("floating_ice") 
-            fwf = -sum(dHidt)*dx*dy*m3_km3*conv_km3a_Sv ! mirar a calcular la derivada de V
-        case("mask_and_floating_ice")
-            ! Mask values:
-            !   1 = atlantic ocean
-            !   2 = arctic ocean
-            !   3 = subarctic ocean
-            !   4 = indian ocean
-            !   5 = pacific ocean
-            !   6 = southern ocean
-
-            select case(hemisphere)
-                case("north")
-                    if (use_extended_north) then
-                        extended_north_basin_mask = (mask .eq. 1 .or. mask .eq. 3)
-                        basin_mask = (mask_flt .and. extended_north_basin_mask)   ! floating points in the atlantic ocean area
-                    else
-                        basin_mask = (mask_flt .and. mask .eq. 1)   ! floating points in the atlantic ocean area
-                    end if
-
-                    if (real(count(basin_mask), wp) .gt. 0) then
-                        fwf = max(-sum(dHidt, mask=basin_mask)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
-                    else
-                        fwf = 0.0
-                    end if
-                case("south")
-                    basin_mask = (mask_flt .and. mask .eq. 6)   ! floating points in the southern ocean area
-                    
-                    if (real(count(basin_mask), wp) .gt. 0) then
-                        fwf = max(-sum(dHidt, mask=basin_mask)*dx*dy*m3_km3*conv_km3a_Sv, 0.0) * 1/3    ! fwf is multiplied for the proportion of atlantic ocean in the domain
-                    else
-                        fwf = 0.0
-                    end if
-                case DEFAULT
-                    basin_mask = mask_flt
-                    if (real(count(basin_mask), wp) .gt. 0) then
-                        fwf = max(-sum(dHidt, mask=basin_mask)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
-                    else
-                        fwf = 0.0
-                    end if
-            end select
-           
+        case("mb") 
+            fwf = -1*sum(mb,mask=mask_tot)*dx*dy/1e6/sec_year 
+        case("ablation")
+            where (smb .gt. 0.0) smb = 0.0
+            where (bmb .gt. 0.0) bmb = 0.0
+            where (cmb .gt. 0.0) cmb = 0.0
+            smb_tot = sum(smb,mask=mask_tot)  ! only negative values
+            bmb_tot = sum(bmb,mask=mask_tot)
+            cmb_tot = sum(cmb,mask=mask_tot)
+            fwf = -1*(smb_tot+bmb_tot+cmb_tot)*dx*dy/1e6/sec_year
+        case("dVdt")
+            !fwf = max(-sum(dHidt, mask=mask_tot)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
+            fwf = -sum(dHidt)*dx*dy*m3_km3*conv_km3a_Sv
+        case("dVdt_mask")
+            ! fwf = max(-sum(dHidt, mask=mask_basin)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
+            if (npts_tot_basin .gt. 0) then 
+                fwf = -sum(dHidt, mask=mask_basin)*dx*dy*m3_km3*conv_km3a_Sv
+            else
+                fwf = 0.0
+            end if
         case DEFAULT
             fwf = max(-sum(dHidt)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
+        
         end select
     return
 
