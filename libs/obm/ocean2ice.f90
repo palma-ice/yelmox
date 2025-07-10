@@ -23,8 +23,10 @@ subroutine calc_ocean_temperature_field(orig_otf, obm_temp, name)
 
     select case(name)
         case("stommel")
+            !orig_otf(:,:,:) = orig_otf(:,:,:) + obm_temp
             orig_otf(:,:,:) = obm_temp
         case("nautilus")
+            !orig_otf(:,:,:) = orig_otf(:,:,:) + (obm_temp + deg2kelvin)
             orig_otf(:,:,:) = obm_temp + deg2kelvin
         case DEFAULT
             orig_otf(:,:,:) = -9999
