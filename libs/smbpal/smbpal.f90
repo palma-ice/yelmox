@@ -165,7 +165,6 @@ contains
         ! Call monthly interface
         call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf, &
                         file_out,file_out_mon,file_out_day,write_init,calc_mon,write_now)
-
         return 
 
     end subroutine smbpal_update_2temp
@@ -187,9 +186,7 @@ contains
 
         ! Loop over equilibration years to update snowpack thickness 
         do n = 1, int(time_equil) 
-
             call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf)
-
         end do 
 
 
