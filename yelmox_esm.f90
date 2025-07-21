@@ -52,32 +52,34 @@ program yelmox_esm
     character(len=512) :: tmr_file 
     
     type ctrl_params
-        character(len=56) :: run_step
-        real(wp) :: time_init
-        real(wp) :: time_end
-        real(wp) :: time_equil   ! Only for spinup 
-        real(wp) :: dtt
+        character(len=56)   :: run_step
+        real(wp)            :: time_init
+        real(wp)            :: time_end
+        real(wp)            :: time_equil   ! Only for spinup 
+        real(wp)            :: dtt
 
-        real(wp) :: time_hist(2) 
-        real(wp) :: time_proj(2)  
-        real(wp) :: time_ref(2)  
-        logical  :: clim_var
+        real(wp)            :: time_hist(2) 
+        real(wp)            :: time_proj(2)  
+        real(wp)            :: time_ref(2)  
+        logical             :: clim_var
 
-        character(len=56)  :: tstep_method
-        real(wp) :: tstep_const
+        character(len=56)   :: tstep_method
+        real(wp)            :: tstep_const
 
-        logical  :: kill_shelves
-        logical  :: with_ice_sheet 
-        character(len=56) :: equil_method
+        logical             :: kill_shelves
+        logical             :: with_ice_sheet 
+        character(len=56)   :: equil_method
 
-        character(len=512) :: esm_par_file
-        character(len=56)  :: esm_expname
-        logical            :: esm_write_formatted
-        real(wp)           :: esm_dt_formatted
+        character(len=512)  :: esm_par_file
+        character(len=56)   :: esm_experiment
+        logical             :: esm_use_esm
+        character(len=56)   :: esm_name
+        logical             :: esm_write_formatted
+        real(wp)            :: esm_dt_formatted
 
-        real(wp) :: isos_tau_1 
-        real(wp) :: isos_tau_2 
-        real(wp) :: isos_sigma 
+        real(wp)            :: isos_tau_1 
+        real(wp)            :: isos_tau_2 
+        real(wp)            :: isos_sigma 
 
     end type 
 
@@ -85,7 +87,7 @@ program yelmox_esm
     type(ice_opt_params)  :: opt 
     type(esm_experiment_class) :: esmexp 
 
-    ! Set the seed for reproducibility of randomnes
+    ! Set the seed for reproducibility of randomnes (climate variability)
     integer :: seed_size
     integer, allocatable :: seed(:)
     call random_seed(size=seed_size) ! Get the size of the seed array
@@ -98,20 +100,26 @@ program yelmox_esm
     call yelmo_load_command_line_args(path_par)
 
     ! Control parameters 
-    call nml_read(path_par,"ctrl","run_step",   ctl%run_step)
+    call nml_read(path_par,"ctrl","run_step",        ctl%run_step)
 
     ! esm parameters 
     call nml_read(path_par,"esm","par_file",         ctl%esm_par_file)
-    call nml_read(path_par,"esm","expname",          ctl%esm_expname)
+    call nml_read(path_par,"esm","experiment",       ctl%esm_experiment)
+    call nml_read(path_par,"esm","use_esm",          ctl%esm_use_esm)
+    ! esm cmip conventions
     call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)
     call nml_read(path_par,"esm","dt_formatted",     ctl%esm_dt_formatted)
+    ! esm climate parameters
     call nml_read(path_par,"esm","lapse",            esm1%lapse)
     call nml_read(path_par,"esm","f_p",              esm1%beta_p)
+    call nml_read(path_par,"esm","f_ocn",            esm1%f_ocn)
+    call nml_read(path_par,"esm","f_polar",          esm1%f_polar)
+    call nml_read(path_par,"esm","dT_threshold",     esm1%dT_lim)
 
-    ! What does this?
+    ! What does this?: needed?
     if (index(ctl%esm_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
-        call esm_experiment_def(esmexp,ctl%esm_expname,ctl%esm_par_file,"UCM","YELMO",yelmo1%par%domain)
+        call esm_experiment_def(esmexp,ctl%esm_experiment,ctl%esm_par_file,"UCM","YELMO",yelmo1%par%domain)
     end if
 
     ! Read run_step specific control parameters
@@ -166,8 +174,9 @@ program yelmox_esm
     write(*,*) 
     
     write(*,*) "esm_par_file:        ", trim(ctl%esm_par_file)
-    write(*,*) "esm_expname:         ", trim(ctl%esm_expname)
-    write(*,*) "esm_experiment:      ", trim(esmexp%experiment)
+    write(*,*) "esm_experiment:      ", trim(ctl%esm_experiment)
+    write(*,*) "load_esm:            ", ctl%esm_use_esm
+    if (ctl%esm_use_esm) write(*,*) "esm_name: ", trim(ctl%esm_name)
     
     select case(trim(ctl%run_step))
 
@@ -180,7 +189,7 @@ program yelmox_esm
         case("transient")
 
             write(*,*) "esm_write_formatted: ", ctl%esm_write_formatted
-            write(*,*) "esm_file_suffix:     ", trim(esmexp%file_suffix)
+            write(*,*) "esm_file_suffix:     ", trim(ctl%esm_name)
             write(*,*) "time_hist: ",           ctl%time_hist(1),ctl%time_hist(2)
             write(*,*) "time_ref: ",            ctl%time_ref(1),ctl%time_ref(2)
             write(*,*) "time_proj: ",           ctl%time_proj(1),ctl%time_proj(2)
@@ -195,9 +204,8 @@ program yelmox_esm
     call timer_step(tmr,comp=-1) 
 
     ! === Initialize timestepping ===
-    
     call tstep_init(ts,ctl%time_init,ctl%time_end,method=ctl%tstep_method,units="year", &
-                    time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
+                    time_ref=2000.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
     
     ! === Initialize ice sheet model =====
     
@@ -252,7 +260,7 @@ program yelmox_esm
     
     ! Initialize ESM atmospheric and oceanic objects 
     esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
-    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,experiment=esmexp%experiment)
+    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,experiment=ctl%esm_experiment)
    
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
@@ -856,9 +864,9 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"so_ref_srf",esm%so_ref%var(:,:,1,1),units="PSU",long_name="ERA-INT ORAS5 salinity surface", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)                
-        call nc_write(filename,"t2m_ann",esm%t2m_ann,units="K",long_name="Near-surface air temperature (ann)", &
+        call nc_write(filename,"t2m_ann",esm%t2m_ann+esm%dts(:,:,1),units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"t2m_sum",esm%t2m_sum,units="K",long_name="Near-surface air temperature (sum)", &
+        call nc_write(filename,"t2m_sum",esm%t2m_sum+esm%dts(:,:,1),units="K",long_name="Near-surface air temperature (sum)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"pr_ann",esm%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1070,8 +1078,6 @@ contains
         character(len=*),           intent(IN)    :: domain
         logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
 
-        ! === Atmospheric boundary conditions ===
-
         ! Step 1: set the reference climatologies (monthly data)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
                              time_ref,clim_var,domain)
@@ -1081,12 +1087,19 @@ contains
                                 time_ref,time_hist,time_proj, &
                                 use_ref_atm=.false.,use_ref_ocn=.false.)
 
+        if (.TRUE.) then
+            ! Anomaly check
+            write(*,*) "dts = ",maxval(esm%dts)
+            write(*,*) "dto = ",maxval(esm%dto)
+        end if
+
+        ! === Atmospheric boundary conditions ===
         ! Calculate the smb fields 
         call smbpal_update_monthly(smbp,esm%t2m+esm%dts,esm%pr*esm%dpr, &
             ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
 
-        if (.TRUE.) then
-            ! Atm
+        if (.FALSE.) then
+            ! Atm check
             write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
             write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
             write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
@@ -1098,8 +1111,8 @@ contains
         call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
         call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
 
-        if (.TRUE.) then
-            ! Ocean
+        if (.FALSE.) then
+            ! Ocean check
             write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
             write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
             write(*,*) "To_min = ",minval(esm%to_ref%var(:,:,:,1))
@@ -1112,10 +1125,23 @@ contains
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
 
-        ! Update oceanic anomaly fields at desired level
-        ! TO DO
+        if (ctl%esm_use_esm) then
+            ! Update oceanic anomaly fields at desired level
+            ! TO DO
+            call marshelf_interp_shelf(mshlf%now%dT_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
+                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
+            call marshelf_interp_shelf(mshlf%now%dS_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
+                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
+            !mshlf%now%T_shlf = mshlf%now%T_shlf + mshlf%now%dT_shlf
+            !mshlf%now%S_shlf = mshlf%now%S_shlf + mshlf%now%dS_shlf
+        else
+            ! Homogeneous anomaly
+            mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto
+            mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso
+        end if
 
         ! Update bmb_shlf and mask_ocn
+        ! check: how is dT and dS shelf read in marine_shelf?
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
 

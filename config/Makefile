@@ -101,6 +101,13 @@ yelmox_esm : yelmo-static isostasy-static $(yelmox_libs)
 	@echo "    yelmox_esm.x is ready."
 	@echo " "
 
+yelmox_glaciers : yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_glaciers.x yelmox_glaciers.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_glaciers.x is ready."
+	@echo " "
+
 yelmox_rtip : yelmo-static isostasy-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip.x yelmox_rtip.f90 \
 		$(yelmox_libs) $(LFLAGS)
