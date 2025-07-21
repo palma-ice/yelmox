@@ -20,7 +20,7 @@
 
 &tm_2D
     method          = "const"           ! "const", "file", "times"
-    dt              = 250.0
+    dt              = 500.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /
@@ -132,7 +132,6 @@
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
-    n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-1 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
@@ -207,8 +206,6 @@
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
-    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
-    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
     use_const_cp    = False             ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = False             ! Use specified constant value of heat conductivity?
@@ -273,14 +270,14 @@
 &snap
     atm_type           = "snap_1ind"
     ocn_type           = "fraction"
-    fname_at           = "input/alpha_orbital_r2020.dat"
-    fname_ao           = "input/alpha_orbital_r2020.dat"
-    fname_ap           = "input/alpha_orbital_r2020.dat"
-    fname_as           = "input/alpha_orbital_r2020.dat"
-    fname_bt           = "input/alpha_orbital_r2020.dat"
-    fname_bo           = "input/alpha_orbital_r2020.dat"
-    fname_bp           = "input/alpha_orbital_r2020.dat"
-    fname_bs           = "input/alpha_orbital_r2020.dat"
+    fname_at           = "input/fixed-1.0.dat"
+    fname_ao           = "input/fixed-1.0.dat"
+    fname_ap           = "input/fixed-1.0.dat"
+    fname_as           = "input/fixed-1.0.dat"
+    fname_bt           = "input/fixed-1.0.dat"
+    fname_bo           = "input/fixed-1.0.dat"
+    fname_bp           = "input/fixed-1.0.dat"
+    fname_bs           = "input/fixed-1.0.dat"
     lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
     dTa_const          = -25.0  
     dTo_const          = 0.0            !(-2.5)

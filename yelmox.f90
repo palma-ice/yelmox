@@ -435,7 +435,7 @@ end if
         call tstep_update(ts,dtt_now)
         call tstep_print(ts)
         
-        ! Spin-up procedure - only relevant for time-time_init <= time_equil
+        ! Spin-up procedure - only relevant for time_elapsed <= time_equil
         select case(trim(ctl%equil_method))
             
             case("opt")
@@ -541,7 +541,7 @@ end if
         
         ! == CLIMATE (ATMOSPHERE AND OCEAN) ====================================
         
-        if (mod(nint(ts%time*100),nint(ctl%dt_clim*100))==0) then
+        if (mod(nint(ts%time_elapsed*100),nint(ctl%dt_clim*100))==0) then
                 ! Update snapclim
                 call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
         end if 
@@ -966,7 +966,6 @@ contains
         end if
 
         ! == snapclim ==
-        write(*,*) "Javi snapclim"
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &

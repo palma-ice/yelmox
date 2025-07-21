@@ -213,8 +213,7 @@
  beta_gl_stag    = 3          
  beta_gl_f       = 1.0        
  taud_gl_method  = 0          
- H_grnd_lim      = 500.0      
- n_sm_beta       = 0          
+ H_grnd_lim      = 500.0       
  beta_min        = 100.0      
  eps_0           = 1e-06      
  ssa_lis_opt     = '-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false'
@@ -278,9 +277,7 @@
  dt_method       = 'FE'       
  solver_advec    = 'impl-upwind'
  gamma           = 1.0        
- use_strain_sia  = .false.    
- n_sm_qstrn      = 0          
- n_sm_qb         = 0          
+ use_strain_sia  = .false.        
  use_const_cp    = .false.    
  const_cp        = 2009.0     
  use_const_kt    = .false.    
