@@ -210,7 +210,7 @@
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
     
-    ! === 
+    ! === stress/strain methods ===
     calv_tau            = 1.0               ! [a] Characteristic calving time
     calv_thin           = 30.0              ! [m/yr] Calving rate to apply to very thin ice
     k2                  = 3.2e9             ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)

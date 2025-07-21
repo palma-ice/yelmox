@@ -1,5 +1,0 @@
-esm.f_ocn esm.dT_threshold transient.clim_var
-     0.25              1.5              False
-     0.25              2.0              False
-     0.25              3.0              False
-     0.25              4.0              False
