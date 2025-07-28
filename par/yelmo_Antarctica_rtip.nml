@@ -72,6 +72,11 @@
     times           = 0
 /
 
+&tm_2D_fastiso
+ method          = 'const'
+ dt              = 500.0
+/
+
 &tm_2Dsm
     method          = "const"           ! "const", "file", "times"
     dt              = 100.0
@@ -180,7 +185,7 @@
     solver              = "impl-lis"        ! "expl", "impl-lis"
     calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
-    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt; "pmpt": partial melt and grounding zone
     fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
@@ -203,14 +208,15 @@
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
-    gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd
-    gz_Hg1              = 100.0             ! Grounding zone, limit of penetration of bmb_shlf
+    gz_Hg0              = 0.0               ! [m] Grounding zone, limit of penetration of bmb_grnd
+    gz_Hg1              = 100.0             ! [m] Grounding zone, limit of penetration of bmb_shlf
     fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
     k2                  = 3.2e9             ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
     w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
     Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+    Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
     Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
     zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
     zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
@@ -220,7 +226,6 @@
     dmb_sigma_ref       = 300.0             ! [m]   Reference bed roughness
     dmb_m_d             = 3.0               ! [-]   Discharge distance scaling exponent
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
-
 /
 
 &ydyn
@@ -350,11 +355,11 @@
     pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf" "mask" ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW18.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = True
     pd_smb_load       = True
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW18.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance
     pd_smb_monthly    = True
     pd_vel_load       = True
@@ -398,7 +403,7 @@
 /
 
 &snap_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW18.nc"
+    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc"
     clim_names      = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
     clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
     clim_time       = 0
@@ -587,11 +592,12 @@
     ! Options
     heterogeneous_ssh = .true.      ! Sea level varies spatially?
     interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
+    include_elastic = .true.        ! Include elastic deformation?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
+    dt_prognostics  = 1.0           ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    pad         = 512.              ! [km] Padding around the domain (preferably chosen as a power
+    pad         = 1024.             ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
 
     ! Rheology
@@ -599,15 +605,20 @@
                                     ! "uniform", "rheology_file"
     lithosphere = "rheology_file"   ! Choose lithospheric thickness field:
                                     ! "uniform", "rheology_file"
-    viscosity_scaling_method = "scale"  ! "scale" or "min" or "max"
-    viscosity_scaling = 1.              ! Only used if viscosity_scaling_method = "scale"
-    layering    = "equalized"       ! "parallel", "equalized" or "folded"
+    rheo_smoothing_radius = 0.0     ! [km] Gaussian moothing radius for lithospheric thickness
+                                    ! and mantle viscosity
+    viscosity_scaling_method = "scale"     ! "scale", "std", "min" or "max"
+    viscosity_scaling = 1.          ! "scale"   => visc = viscosity_scaling * visc
+                                    ! "std"     => visc = visc + viscosity_scaling * stddev(visc)
+                                    ! "min"     => visc = min(visc) * viscosity_scaling
+                                    ! "max"     => visc = max(visc) * viscosity_scaling
+    layering    = "parallel"        ! "parallel", "equalized" or "folded"
     nl          = 5                 ! [1] Number of viscous layers for sub-lithospheric mantle
-    dl          = 40.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
-    zl          = 260., 280., 300.  ! [km] Depth of layer boundaries.
+    dl          = 25.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 100, 150, 200, 250, 300     ! [km] Depth of layer boundaries.
                                     ! Only used if layering="equalized". First value 
                                     ! overwritten if visc_method="rheology_file".
-    viscosities = 1.e21, 1.e21, 2.e21         ! [Pa s] Layer viscosities. Only used if
+    viscosities = 1e21, 1e21, 1e21, 1e21, 2e21     ! [Pa s] Layer viscosities. Only used if
                                     ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
                                     ! viscosity field is provided.
     tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
@@ -627,8 +638,11 @@
 
     ! Files
     restart = "None"
-    mask_file = "isostasy_data/tools/masks/ANT-32KM_activemask.nc"
-    rheology_file = "isostasy_data/earth_structure/ANT-32KM_Pan2022.nc" ! should use: "isostasy_data/earth_structure/ANT-32KM_Lloyd2024.nc"
+    mask_file = "None"
+    rheology_file = "isostasy_data/earth_structure/ANT-16KM_GIA_HR24.nc"
+    litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
+    log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
+    stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
 /
 
 &barysealevel
@@ -636,7 +650,7 @@
                             ! "file": BSL = time series provided from sl_path
                             ! "fastiso": BSL = sum of contributions from fastiso domains
     bsl_init    = 0.0       ! [m] BSL relative to present day
-    sl_path     = "input/sl_deglaciation.dat"   ! Input time series filename
+    sl_path     = "none"    ! Input time series filename
     sl_name     = "none"    ! Variable name in netcdf file, if relevant
     A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
     A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
