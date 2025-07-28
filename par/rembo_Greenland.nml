@@ -5,7 +5,10 @@
     forcing_file        = "in_rembo/forcing/mis11.climber_paleo.dat"
     emb_clim_file       = "ice_data/Greenland/GRL-80KM/ERA-40/GRL-80KM_ERA-40_195801-200112.nc"
     clim_file           = "ice_data/Greenland/GRL-16KM/GRL-16KM_MARv3.11-ERA_annmean_1961-1990.nc"
-    
+    precip_mon_file     = "ice_data/Greenland/GRL-16KM/GRL-16KM_MARv3.11-ERA_monmean_1961-1990.nc"
+    precip_mon_nms      = "rf" "sf"
+    dppcorr_max         = 0.0 
+
 !## Program switches
     climchoice          =  1
     precip              =  1

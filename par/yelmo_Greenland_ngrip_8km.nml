@@ -1,15 +1,11 @@
 &ctrl
-    time_init       = -70000.0               ! [yr] Starting time
+    tstep_method    = "rel"             ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_const     = -21e3             ! Assumed time for "const" method
+    time_init       = -70000.0          ! [yr] Starting time
     time_end        = 0.0               ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
-    time_const      = 0.0          ! [yr CE] Assumed constant time for non-transient climate (-19050 == 21 kyr ago)
-    time_lgm_step   = 15e3              ! [yr] Time to switch time_const => -19050 (21 kyr ago)
-    time_pd_step    = 30e3              ! [yr] Time to switch time_const => 1950.0 (PD, 0 kyr ago)
     dtt             = 10.0              ! [yr] Main loop timestep 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
-    transient_clim  = True             ! Calculate transient climate? 
-    use_lgm_step    = False             ! Activate LGM step in forcing at time=time_lgm_step?
-    use_pd_step     = False             ! Activate PD step-return in forcing at time=time_pd_step?
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
 /
@@ -83,6 +79,15 @@
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
+    nml_ytopo       = "ytopo"
+    nml_ydyn        = "ydyn"
+    nml_ytill       = "ytill"
+    nml_yneff       = "yneff"
+    nml_ymat        = "ymat"
+    nml_ytherm      = "ytherm"
+    nml_masks       = "yelmo_masks"
+    nml_init_topo   = "yelmo_init_topo"
+    nml_data        = "yelmo_data"
     restart         = "None"            !"input/yelmo_restart.nc"
     restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True              ! Take H_ice from restart file
@@ -104,7 +109,7 @@
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1.0               ! Predictor-corrector tolerance 
-    
+
 /
 
 &ytopo
@@ -168,7 +173,6 @@
     beta_gl_f           = 0.1             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
-    n_sm_beta           = 0               ! [-] Standard deviation in gridpoints for Gaussian smoothing of beta (0==no smoothing)
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
@@ -201,6 +205,7 @@
 
 &yneff 
     method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
+    nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
     const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
@@ -239,8 +244,6 @@
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
-    n_sm_qstrn      = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of strain heating (0==no smoothing)
-    n_sm_qb         = 0                 ! [-] Standard deviation in gridpoints for Gaussian smoothing of basal heating (0==no smoothing)
     use_const_cp    = False             ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = False             ! Use specified constant value of heat conductivity?
@@ -454,6 +457,7 @@
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "mean"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
+    restart         = "none"        ! Load fields from a restart file?
     
     corr_method     = "tf-grl"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-grl": use values in tf_corr_grl parameter section
     basin_number    = 3.3 4.1 4.2 4.3              ! 1 2 3

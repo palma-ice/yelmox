@@ -1,6 +1,6 @@
 Makefile
 libyelmox
-libs/exlib
+fesm-utils
 libs/lis*
 coordinates
 yelmo

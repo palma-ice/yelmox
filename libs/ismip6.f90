@@ -4,22 +4,13 @@ module ismip6
     
     use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
 
+    use precision
     use nml  
     use ncio 
     use varslice
 
     implicit none 
-
-    ! Internal constants
-    integer,  parameter :: dp  = kind(1.d0)
-    integer,  parameter :: sp  = kind(1.0)
-
-    ! Choose the working precision of the library (sp,dp)
-    integer,  parameter :: wp = sp 
-
-    ! Define default missing value 
-    real(wp), parameter :: mv = -9999.0_wp 
-
+    
     ! Class for holding ice-forcing data from ISMIP6 archives
     type ismip6_forcing_class
         
@@ -278,8 +269,8 @@ contains
         
         integer  :: iloc, k 
         real(wp) :: tmp
-        real(wp) :: time_par_proj(3) 
-        real(wp) :: time_par_proj_msk(3) 
+        real(wp) :: time_par_proj(4) 
+        real(wp) :: time_par_proj_msk(4) 
 
         ! First determine whether gcm+scenario provided or experiment
         ! obtain valid values for gcm and scenario to start.
@@ -411,20 +402,20 @@ contains
             case("CESM2-WACCM_ssp585","HadGEM2-ES_RCP85")
                 ! Cases that end on year 2299
 
-                time_par_proj     = [1995.0,2299.0,1.0_wp]
-                time_par_proj_msk = [1995.0,2300.0,1.0_wp]
+                time_par_proj     = [1995.0,2299.0,1.0,0.0]
+                time_par_proj_msk = [1995.0,2300.0,1.0,0.0]
 
             case("UKESM1-0-LL_ssp585")
                 ! Cases that end on year 2301
             
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [1995.0,2301.0,1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [1995.0,2301.0,1.0,0.0]
 
             case DEFAULT
                 ! Set negative values to time_par so that values are used directly from the file
 
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [-1.0,-1.0,-1.0,0.0]
 
         end select
 
@@ -447,9 +438,9 @@ contains
         call varslice_init_nml_ismip6(ism%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,ism%gcm,ism%scenario)
         call varslice_init_nml_ismip6(ism%smb_hist,filename,trim(grp_smb_hist),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario)
 
         ! Oceanic fields
         call varslice_init_nml_ismip6(ism%to_ref,  filename,trim(grp_to_ref),domain,grid_name,ism%gcm,ism%scenario)
@@ -461,14 +452,14 @@ contains
         call varslice_init_nml_ismip6(ism%so_hist, filename,trim(grp_so_hist),domain,grid_name,ism%gcm,ism%scenario)
         call varslice_init_nml_ismip6(ism%tf_hist, filename,trim(grp_tf_hist),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario)
 
         if (ism%shlf_collapse) then 
             ! Shelf collapse fields
             call varslice_init_nml_ismip6(ism%mask_shlf_proj, filename,trim(grp_mask_shlf_proj), &
-                                                domain,grid_name,ism%gcm,ism%scenario,time_par_proj_msk)
+                                                domain,grid_name,ism%gcm,ism%scenario)
         end if
 
         ! Load time-independent fields
@@ -1058,7 +1049,7 @@ contains
 
     ! === varslice wrapper routines with ISMIP6 specific options ===================
 
-    subroutine varslice_init_nml_ismip6(vs,filename,group,domain,grid_name,gcm,scenario,time_par)
+    subroutine varslice_init_nml_ismip6(vs,filename,group,domain,grid_name,gcm,scenario,verbose)
         ! Routine to load information related to a given 
         ! transient variable, so that it can be processed properly.
 
@@ -1067,21 +1058,15 @@ contains
         type(varslice_class),   intent(INOUT) :: vs
         character(len=*),       intent(IN)    :: filename
         character(len=*),       intent(IN)    :: group
-        character(len=*),       intent(IN)    :: domain
-        character(len=*),       intent(IN)    :: grid_name
+        character(len=*),       intent(IN), optional :: domain
+        character(len=*),       intent(IN), optional :: grid_name
         character(len=*),       intent(IN)    :: gcm
         character(len=*),       intent(IN)    :: scenario
-        real(wp), optional,     intent(IN)    :: time_par(3)
-
+        logical,                intent(IN), optional :: verbose 
+        ! Local variables 
+        
         ! First load parameters from nml file 
-        call varslice_par_load_ismip6(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose=.TRUE.)
-
-        if (present(time_par)) then 
-            if (minval(time_par) .ge. 0.0) then
-                ! Use time_par option provided as an argument
-                vs%par%time_par = time_par 
-            end if
-        end if
+        call varslice_par_load_ismip6(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose)
 
         ! Perform remaining init operations 
         call varslice_init_data(vs) 
@@ -1091,26 +1076,26 @@ contains
     end subroutine varslice_init_nml_ismip6
 
     subroutine varslice_par_load_ismip6(par,filename,group,domain,grid_name,gcm,scenario,verbose)
-        ! Wrapper to routine varslice::varslice_par_load() that includes
-        ! additional parsing arguments of ISMIP6 gcm and scenario. 
 
         type(varslice_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: group
-        character(len=*), intent(IN) :: domain
-        character(len=*), intent(IN) :: grid_name  
+        character(len=*), intent(IN), optional :: domain
+        character(len=*), intent(IN), optional :: grid_name   
         character(len=*), intent(IN) :: gcm
         character(len=*), intent(IN) :: scenario
-        logical :: verbose 
-
+        logical, optional :: verbose 
+    
         ! Local variables
-        logical  :: init_pars 
-        real(wp) :: time_par(3) 
+        logical  :: init_pars
         logical  :: print_summary 
-
-        init_pars     = .FALSE.
-        print_summary = verbose 
-
+        integer  :: i 
+    
+        init_pars = .FALSE.
+    
+        print_summary = .TRUE. 
+        if (present(verbose)) print_summary = verbose 
+    
         call nml_read(filename,group,"filename",       par%filename,     init=init_pars)
         call nml_read(filename,group,"name",           par%name,         init=init_pars)
         call nml_read(filename,group,"units_in",       par%units_in,     init=init_pars)
@@ -1119,31 +1104,47 @@ contains
         call nml_read(filename,group,"unit_offset",    par%unit_offset,  init=init_pars)   
         call nml_read(filename,group,"with_time",      par%with_time,    init=init_pars)   
         call nml_read(filename,group,"time_par",       par%time_par,     init=init_pars)   
-        
+            
         ! Parse filename as needed
         call parse_path(par%filename,domain,grid_name)
         call parse_path_ismip6(par%filename,gcm,scenario)
 
+        ! See if multiple files are available
+        call get_matching_files(par%filenames, par%filename)
+            
         ! Make sure time parameters are consistent time_par=[x0,x1,dx]
-        if (par%time_par(3) .eq. 0) par%time_par(2) = par%time_par(1) 
-
+        if (par%time_par(3) .eq. 0.0) par%time_par(2) = par%time_par(1) 
+    
+        if (par%time_par(4) .gt. 1.0) then
+            par%with_time_sub = .TRUE.
+        else
+            par%with_time_sub = .FALSE.
+        end if
+    
         ! Summary 
         if (print_summary) then  
             write(*,*) "Loading: ", trim(filename), ":: ", trim(group)
-            write(*,*) "filename    = ", trim(par%filename)
-            write(*,*) "name        = ", trim(par%name)
-            write(*,*) "units_in    = ", trim(par%units_in)
-            write(*,*) "units_out   = ", trim(par%units_out)
-            write(*,*) "unit_scale  = ", par%unit_scale
-            write(*,*) "unit_offset = ", par%unit_offset
-            write(*,*) "with_time   = ", par%with_time
+            write(*,*) "filename      = ", trim(par%filename)
+            if (size(par%filenames,1) .gt. 1) then
+                write(*,*) "filenames     = "
+                do i = 1, size(par%filenames,1)
+                    write(*,*) "                  ", trim(par%filenames(i))
+                end do
+            end if
+            write(*,*) "name          = ", trim(par%name)
+            write(*,*) "units_in      = ", trim(par%units_in)
+            write(*,*) "units_out     = ", trim(par%units_out)
+            write(*,*) "unit_scale    = ", par%unit_scale
+            write(*,*) "unit_offset   = ", par%unit_offset
+            write(*,*) "with_time     = ", par%with_time
+            write(*,*) "with_time_sub = ", par%with_time_sub
             if (par%with_time) then
                 write(*,*) "time_par    = ", par%time_par
             end if
         end if 
-
+    
         return
-
+    
     end subroutine varslice_par_load_ismip6
     
     subroutine parse_path_ismip6(path,gcm,scenario)
@@ -1540,8 +1541,8 @@ end if
         
         integer  :: iloc, k 
         real(wp) :: tmp
-        real(wp) :: time_par_proj(3) 
-        real(wp) :: time_par_proj_msk(3) 
+        real(wp) :: time_par_proj(4) 
+        real(wp) :: time_par_proj_msk(4) 
 
         ! First determine whether gcm+scenario provided or experiment
         ! obtain valid values for gcm and scenario to start.
@@ -1668,20 +1669,20 @@ end if
             case("CESM2-WACCM_ssp585","HadGEM2-ES_RCP85")
                 ! Cases that end on year 2299
 
-                time_par_proj     = [1995.0,2299.0,1.0_wp]
-                time_par_proj_msk = [1995.0,2300.0,1.0_wp]
+                time_par_proj     = [1995.0,2299.0,1.0,0.0]
+                time_par_proj_msk = [1995.0,2300.0,1.0,0.0]
 
             case("UKESM1-0-LL_ssp585")
                 ! Cases that end on year 2301
             
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [1995.0,2301.0,1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [1995.0,2301.0,1.0,0.0]
 
             case DEFAULT
                 ! Set negative values to time_par so that values are used directly from the file
 
-                time_par_proj     = [-1.0_wp,-1.0_wp,-1.0_wp]
-                time_par_proj_msk = [-1.0_wp,-1.0_wp,-1.0_wp]
+                time_par_proj     = [-1.0,-1.0,-1.0,0.0]
+                time_par_proj_msk = [-1.0,-1.0,-1.0,0.0]
 
         end select
 
@@ -1704,9 +1705,9 @@ end if
         call varslice_init_nml_ismip6(ism%pr_hist, filename,trim(grp_pr_hist), domain,grid_name,ism%gcm,ism%scenario)
         call varslice_init_nml_ismip6(ism%smb_hist,filename,trim(grp_smb_hist),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%smb_proj,filename,trim(grp_smb_proj),domain,grid_name,ism%gcm,ism%scenario)
 
         ! Oceanic fields
         call varslice_init_nml_ismip6(ism%to_ref,  filename,trim(grp_to_ref),domain,grid_name,ism%gcm,ism%scenario)
@@ -1718,9 +1719,9 @@ end if
         call varslice_init_nml_ismip6(ism%so_hist, filename,trim(grp_so_hist),domain,grid_name,ism%gcm,ism%scenario)
         call varslice_init_nml_ismip6(ism%tf_hist, filename,trim(grp_tf_hist),domain,grid_name,ism%gcm,ism%scenario)
 
-        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
-        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario,time_par_proj)
+        call varslice_init_nml_ismip6(ism%to_proj, filename,trim(grp_to_proj),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%so_proj, filename,trim(grp_so_proj),domain,grid_name,ism%gcm,ism%scenario)
+        call varslice_init_nml_ismip6(ism%tf_proj, filename,trim(grp_tf_proj),domain,grid_name,ism%gcm,ism%scenario)
 
         ! Load time-independent fields
 

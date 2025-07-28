@@ -3,11 +3,13 @@ program yelmox_rtip
 
     use nml
     use ncio
+    use timestepping
     use timer
     use timeout
     use yelmo
     use ice_optimization
-
+    use ice_sub_regions
+    
     ! External libraries
     use geothermal
     use ismip6
@@ -29,8 +31,6 @@ program yelmox_rtip
     character(len=512) :: path_tf_corr
     character(len=512) :: ismip6_path_par
     integer  :: n, m, i1wais, i2wais, j1wais, j2wais, xmargin, ymargin
-    real(wp) :: time, time_bp
-    real(wp) :: time_elapsed
     real(wp) :: time_wt
 
     real(wp)            :: restart_every_df, f_last_restart
@@ -40,6 +40,8 @@ program yelmox_rtip
 
     real(sp) :: convert_km3_Gt
 
+    type(tstep_class)           :: ts
+    
     type(yelmo_class)           :: yelmo1
     type(bsl_class)             :: bsl
     type(snapclim_class)        :: snp1
@@ -58,34 +60,21 @@ program yelmox_rtip
     type(timer_class)  :: tmrs
     character(len=512) :: tmr_file
 
-    type reg_def_class
-        character(len=56)  :: name
-        character(len=512) :: fnm
-        logical, allocatable :: mask(:,:)
-        logical :: write
-    end type
-
-    type(reg_def_class) :: reg1
-    type(reg_def_class) :: reg2
-    type(reg_def_class) :: reg3
-
-    character(len=512)    :: regions_mask_fnm
-    real(wp), allocatable :: regions_mask(:,:)
+    logical, allocatable :: tmp_mask(:,:)
 
     type ctrl_params
         character(len=56) :: run_step
         real(wp) :: time_init
         real(wp) :: time_end
         real(wp) :: time_equil      ! Only for spinup
-        real(wp) :: time_const      ! Only for spinup
         real(wp) :: dtt
+
+        character(len=56)  :: tstep_method
+        real(wp) :: tstep_const
 
         logical  :: kill_shelves
         logical  :: with_ice_sheet
         character(len=56) :: equil_method
-
-        character(len=56) :: abumip_scenario
-        real(wp)          :: abumip_bmb
 
         character(len=56) :: hyst_scenario
         real(wp)          :: hyst_f_to
@@ -137,8 +126,9 @@ program yelmox_rtip
     call nml_read(path_par,trim(ctl%run_step),"time_end",   ctl%time_end)       ! [yr] Ending time
     call nml_read(path_par,trim(ctl%run_step),"dtt",        ctl%dtt)            ! [yr] Main loop time step
     call nml_read(path_par,trim(ctl%run_step),"time_equil", ctl%time_equil)     ! [yr] Years to equilibrate first
-    call nml_read(path_par,trim(ctl%run_step),"time_const", ctl%time_const)
-
+    call nml_read(path_par,trim(ctl%run_step),"tstep_method",ctl%tstep_method)  ! Calendar choice ("const" or "rel")
+    call nml_read(path_par,trim(ctl%run_step),"tstep_const", ctl%tstep_const)   ! Assumed time bp for const method
+    
     call nml_read(path_par,trim(ctl%run_step),"kill_shelves",  ctl%kill_shelves)    ! Kill shelves beyond pd?
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet?
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
@@ -154,11 +144,6 @@ program yelmox_rtip
 
     ! Check if special scenario is being run, make parameter adjustments
     select case(trim(ctl%run_step))
-
-        case("abumip")
-
-            call nml_read(path_par,"abumip","scenario",          ctl%abumip_scenario)
-            call nml_read(path_par,"abumip","bmb",               ctl%abumip_bmb)
 
         case("hysteresis")
 
@@ -198,10 +183,6 @@ program yelmox_rtip
 
     tmr_file            = trim(outfldr)//"timer_table.txt"
 
-    ! Set initial model time
-    time    = ctl%time_init
-    time_bp = time - 1950.0_wp
-
     ! Init restart file tracking
     restart_every_df = 0.4
     counter_restart = 0
@@ -224,10 +205,8 @@ program yelmox_rtip
 
         case("spinup")
 
-            write(*,*) "time_equil: ",    ctl%time_equil
-            write(*,*) "time_const: ",    ctl%time_const
-
-            time_bp = ctl%time_const - 1950.0_wp
+            write(*,*) "time_equil:  ",    ctl%time_equil
+            write(*,*) "tstep_const: ",    ctl%tstep_const
 
         case("transient")
 
@@ -235,14 +214,8 @@ program yelmox_rtip
             write(*,*) "ismip6_write_formatted: ", ctl%ismip6_write_formatted
             write(*,*) "ismip6_file_suffix:     ", trim(ismip6exp%file_suffix)
 
-        case("abumip")
-
-            write(*,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
-
     end select
 
-    write(*,*) "time    = ", time
-    write(*,*) "time_bp = ", time_bp
     write(*,*)
     write(*,*) "with_ice_sheet: ",  ctl%with_ice_sheet
     write(*,*) "equil_method:   ",  trim(ctl%equil_method)
@@ -250,10 +223,15 @@ program yelmox_rtip
     ! Start timing
     call timer_step(tmr,comp=-1)
 
+    ! === Initialize timestepping ===
+    
+    call tstep_init(ts,ctl%time_init,ctl%time_end,method=ctl%tstep_method,units="year", &
+                                time_ref=1950.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
+    
     ! === Initialize ice sheet model =====
 
     ! Initialize data objects and load initial topography
-    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=time)
+    call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ts%time)
     ! yelmo1%par%restart
 
     ! Store domain and grid_name as shortcuts
@@ -269,39 +247,26 @@ program yelmox_rtip
 
     ! Define specific regions of interest =====================
 
+    allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+    
     select case(trim(domain))
 
         case("Antarctica")
 
-            ! Define base regions for whole domain first
-            regions_mask_fnm = "ice_data/Antarctica/"//trim(yelmo1%par%grid_name)//&
-                                "/"//trim(yelmo1%par%grid_name)//"_BASINS-nasa.nc"
-            allocate(regions_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+            ! Initialize regions
+            call yelmo_regions_init(yelmo1,n=3)
 
-            ! Load mask from file
-            call nc_read(regions_mask_fnm,"mask_regions",regions_mask)
+            ! APIS
+            call get_ice_sub_region(tmp_mask,"APIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(1),"APIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! ajr (2023-03-13): files are now consistent, this fix should not be needed!
-            ! ! ajr: fix mask inconsistency at 16km resolution
-            ! ! Note: the files themselves should be fixed and made consistent!
-            ! if (trim(yelmo1%par%grid_name) .eq. "ANT-16KM") then
-            !     where(abs(regions_mask - 4.0) .lt. 1e-3) regions_mask = 1.0
-            !     where(abs(regions_mask - 5.0) .lt. 1e-3) regions_mask = 2.0
-            ! end if
+            ! WAIS
+            call get_ice_sub_region(tmp_mask,"WAIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(2),"WAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! APIS region (region=3.0 in regions map)
-            reg1%write = .TRUE.
-            reg1%name  = "APIS"
-            reg1%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg1%name)//".nc"
-
-            allocate(reg1%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg1%mask = .FALSE.
-            where(abs(regions_mask - 3.0) .lt. 1e-3) reg1%mask = .TRUE.
-
-            ! WAIS region (region=1.0 in regions map)
-            reg2%write = .TRUE.
-            reg2%name  = "WAIS"
-            reg2%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg2%name)//".nc"
+            ! EAIS
+            call get_ice_sub_region(tmp_mask,"EAIS",yelmo1%par%domain,yelmo1%par%grid_name)
+            call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
             i1wais = 70 ! 25
             j1wais = 130! 50
@@ -309,40 +274,12 @@ program yelmox_rtip
             j2wais = j1wais + 63
             ! call get_cropwais_indices(regions_mask, 1.0, i1wais, i2wais, j1wais, j2wais, xmargin, ymargin)
 
-            allocate(reg2%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg2%mask = .FALSE.
-            where(abs(regions_mask - 1.0) .lt. 1e-3) reg2%mask = .TRUE.
-
-            ! EAIS region (region=2.0 in regions map)
-            reg3%write = .TRUE.
-            reg3%name  = "EAIS"
-            reg3%fnm   = trim(outfldr)//"yelmo1D_"//trim(reg3%name)//".nc"
-
-            allocate(reg3%mask(yelmo1%grd%nx,yelmo1%grd%ny))
-            reg3%mask = .FALSE.
-            where(abs(regions_mask - 2.0) .lt. 1e-3) reg3%mask = .TRUE.
-
-            ! Adjust optimization cf_max field specifically for the WAIS and Amery
-            !where(abs(yelmo1%bnd%basins - 14.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
-            !where(abs(yelmo1%bnd%basins -  6.0) .lt. 1e-3) opt%cf_max = min(opt%cf_ref_wais,opt%cf_max)
-            ! Note ajr (2023-03-13): this is no longer needed as long as ytill.cf_ref is set to 0.1 instead of 1.0.
-            ! Also, it was not nice having cf_ref_wais inside of the opt object in ice_optimization.f90. This
-            ! will be removed. If it is needed in the future, cf_ref_wais should be included in a parameter
-            ! section loaded in this program directly.
-
-        case DEFAULT
-
-            reg1%write = .FALSE.
-            reg2%write = .FALSE.
-            reg3%write = .FALSE.
-
     end select
-
 
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! Initialize barysealevel model
-    call bsl_init(bsl, path_par, time_bp)
+    call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
     call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
@@ -367,20 +304,14 @@ program yelmox_rtip
     ! Make sure that tf is prescribed externally
     mshlf1%par%tf_method = 0
 
-    if (yelmo1%par%use_restart) then
-        ! Load tf_corr field from file
-
-        call load_tf_corr_from_restart(mshlf1%now%tf_corr,yelmo1%par%restart, &
-                                                yelmo1%par%domain,yelmo1%par%grid_name)
-
-    else
+    if (.not. mshlf1%par%use_restart) then
         ! Initialize tf_corr to be equal to tf_corr_basin, and
         ! set tf_corr_basin to zero (all corrections will be contained in one field)
 
         mshlf1%now%tf_corr       = mshlf1%now%tf_corr_basin
         mshlf1%now%tf_corr_basin = 0.0_wp
 
-    end if
+    end if 
 
     ! === Update external modules and pass variables to yelmo boundaries =======
 
@@ -393,8 +324,8 @@ program yelmox_rtip
     yelmo1%bnd%Q_geo = gthrm1%now%ghf
 
     ! Barystatic sea level
-    call bsl_update(bsl, year_bp=time_bp)
-    call bsl_write_init(bsl, file_bsl, time)
+    call bsl_update(bsl, year_bp=ts%time_rel)
+    call bsl_write_init(bsl, file_bsl, ts%time)
 
     ! Initialize the isostasy reference state using reference topography fields
     call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
@@ -406,17 +337,17 @@ program yelmox_rtip
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=time_bp,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then
         call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,time_bp,time_equil=100.0)
+                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if
 
     ! Update forcing to present-day reference using ISMIP6 forcing
     call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-                time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+                time=ts%time,time_bp=ts%time_rel)
 
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
@@ -428,7 +359,7 @@ program yelmox_rtip
 
     ! Initialize state variables (dyn,therm,mat)
     ! (initialize temps with robin method with a cold base)
-    call yelmo_init_state(yelmo1,time=time,thrm_method="robin-cold")
+    call yelmo_init_state(yelmo1,time=ts%time,thrm_method="robin-cold")
 
     ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
     if (ctl%kill_shelves) then
@@ -473,7 +404,7 @@ program yelmox_rtip
         if (ctl%with_ice_sheet .and. .not. yelmo1%par%use_restart) then
             ! Run yelmo alone for one or a few years with constant boundary conditions
             ! to sort out inconsistencies from initialization.
-            call yelmo_update_equil(yelmo1,time,time_tot=1.0_wp,dt=1.0_wp,topo_fixed=.FALSE.)
+            call yelmo_update_equil(yelmo1,ts%time,time_tot=1.0_wp,dt=1.0_wp,topo_fixed=.FALSE.)
         end if
 
         if (trim(ctl%equil_method) .eq. "opt") then
@@ -481,7 +412,7 @@ program yelmox_rtip
 
             if (ctl%with_ice_sheet .and. ctl%time_equil .gt. 0.0) then
                 ! Calculate thermodynamics with fixed ice sheet
-                call yelmo_update_equil(yelmo1,time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.TRUE.)
+                call yelmo_update_equil(yelmo1,ts%time,time_tot=ctl%time_equil,dt=ctl%dtt,topo_fixed=.TRUE.)
             end if
 
         end if
@@ -489,27 +420,30 @@ program yelmox_rtip
         write(*,*) "Initialization complete."
 
         ! Initialize output files for checking progress
-        call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", &
-            mask=yelmo1%bnd%ice_allowed)
 
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call yelmo_write_init(yelmo1,file2D_small,time_init=time,units="years")
-        call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
+        call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
+        call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years")
+        call yelmo_write_init(yelmo1, file2D_wais, ts%time, "years", &
                                     irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
 
-        call yelmo_write_init(yelmo1, file3D, time_init=time, units="years")
+        call yelmo_write_init(yelmo1, file3D, time_init=ts%time, units="years")
+
+        call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
         call timer_step(tmr,comp=1,label="initialization")
         call timer_step(tmrs,comp=-1)
 
-        ! Next perform 'coupled' model simulations for desired time
-        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+        ! == Advance timesteps ===
 
-            ! Get current time
-            time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp
-            time_elapsed = time - ctl%time_init
+        call tstep_print_header(ts)
 
+        do while (.not. ts%is_finished)
+
+            ! == Update timestep ===
+
+            call tstep_update(ts,ctl%dtt)
+            call tstep_print(ts)
+            
             !!ajr: only update optimized fields if ice sheet is running
             if (ctl%with_ice_sheet) then
 
@@ -517,11 +451,11 @@ program yelmox_rtip
 
             case("opt")
 
-                if (time_elapsed .le. opt%rel_time2) then
+                if (ts%time_elapsed .le. opt%rel_time2) then
                     ! Apply relaxation to the model
 
                     ! Update model relaxation time scale and error scaling (in [m])
-                    call optimize_set_transient_param(opt%rel_tau,time_elapsed, &
+                    call optimize_set_transient_param(opt%rel_tau,ts%time_elapsed, &
                         time1=opt%rel_time1, time2=opt%rel_time2, p1=opt%rel_tau1, &
                         p2=opt%rel_tau2,m=opt%rel_m)
 
@@ -539,7 +473,7 @@ program yelmox_rtip
                 ! === Optimization update step =========
 
                 if (opt%opt_cf .and. &
-                    (time_elapsed .ge. opt%cf_time_init .and. time_elapsed .le. opt%cf_time_end) ) then
+                    (ts%time_elapsed .ge. opt%cf_time_init .and. ts%time_elapsed .le. opt%cf_time_end) ) then
                     ! Perform cf_ref optimization
 
                     ! Update cb_ref based on error metric(s)
@@ -554,7 +488,7 @@ program yelmox_rtip
                 end if
 
                 if (opt%opt_tf .and. &
-                    (time_elapsed .ge. opt%tf_time_init .and. time_elapsed .le. opt%tf_time_end) ) then
+                    (ts%time_elapsed .ge. opt%tf_time_init .and. ts%time_elapsed .le. opt%tf_time_end) ) then
                     ! Perform tf_corr optimization
 
                     call optimize_tf_corr(mshlf1%now%tf_corr, yelmo1%tpo%now%H_ice, &
@@ -567,7 +501,7 @@ program yelmox_rtip
             case("relax")
                 ! ===== relaxation spinup ==================
 
-                if (time_elapsed .lt. ctl%time_equil) then
+                if (ts%time_elapsed .lt. ctl%time_equil) then
                     ! Turn on relaxation for now, to let thermodynamics equilibrate
                     ! without changing the topography too much. Important when
                     ! effective pressure = f(thermodynamics).
@@ -576,7 +510,7 @@ program yelmox_rtip
                     yelmo1%tpo%par%topo_rel_tau = 50.0
                     write(*,*) "timelog, tau = ", yelmo1%tpo%par%topo_rel_tau
 
-                else if (time_elapsed .eq. ctl%time_equil) then
+                else if (ts%time_elapsed .eq. ctl%time_equil) then
                     ! Disable relaxation now...
 
                     yelmo1%tpo%par%topo_rel     = 0
@@ -597,24 +531,24 @@ program yelmox_rtip
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
-            call bsl_update(bsl, time_bp)
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call bsl_update(bsl, ts%time_rel)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-            call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
+            call timer_step(tmrs,comp=1,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="isostasy")
 
             ! == ICE SHEET ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,ts%time)
             
-            call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
+            call timer_step(tmrs,comp=2,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="yelmo")
 
             ! == CLIMATE ===========================================================
 
             ! Update forcing to present-day reference, but
             ! adjusting to ice topography
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-                        time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp)
+                        time=ts%time,time_bp=ts%time_rel)
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
@@ -622,44 +556,48 @@ program yelmox_rtip
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
-            call timer_step(tmrs,comp=3,time_mod=[time-ctl%dtt,time]*1e-3,label="climate")
+            call timer_step(tmrs,comp=3,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="climate")
 
             ! == MODEL OUTPUT ===================================
 
-            if (timeout_check(tm_1D, time)) then
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
-                call bsl_write_step(bsl, file_bsl, time)
+            if (timeout_check(tm_1D, ts%time)) then
+                call yelmo_regions_write(yelmo1,ts%time)
+                call bsl_write_step(bsl, file_bsl, ts%time)
             end if
 
+            if (timeout_check(tm_2D, ts%time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
+            end if
+            
             if (timeout_check(tm_2D_fastiso, time)) then
                 call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
                 call isos_write_step_extended(isos1, file_isos, time)
             end if
-
-            if (timeout_check(tm_2Dsm, time)) then
+            
+            if (timeout_check(tm_2Dsm, ts%time)) then
                 call yelmox_write_step_small(yelmo1, isos1, snp1, &
-                    mshlf1,smbpal1,file2D_small,time)
+                    mshlf1,smbpal1,file2D_small,ts%time)
             end if
 
-            if ( timeout_check(tm_2Dwais,time) ) then
-                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, time, &
+            if ( timeout_check(tm_2Dwais,ts%time) ) then
+                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, ts%time, &
                     i1wais, i2wais, j1wais, j2wais)
             end if
 
-            if (timeout_check(tm_3D, time)) then
-                call yelmo_write_step(yelmo1, file3D, time, nms=["ux","uy","uz"])
+            if (timeout_check(tm_3D, ts%time)) then
+                call yelmo_write_step(yelmo1, file3D, ts%time, nms=["ux","uy","uz"])
             end if
 
 
-            call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io")
+            call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io")
 
-            if (mod(time_elapsed,10.0)==0) then
+            if (mod(ts%time_elapsed,10.0)==0) then
                 ! Print timestep timing info and write log table
-                call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
+                call timer_write_table(tmrs,[ts%time,ctl%dtt]*1e-3,"m",tmr_file,init=ts%time_elapsed .eq. 0.0)
             end if
 
-            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
-                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            if (mod(ts%time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", ts%time
             end if
 
         end do
@@ -669,7 +607,7 @@ program yelmox_rtip
         write(*,*)
 
         ! Write the restart snapshot for the end of the simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time_bp)
+        call yelmox_restart_write(bsl,isos1,yelmo1,ts%time_rel)
 
     case("transient")
         ! Here it is assumed that the model has gone through spinup
@@ -679,37 +617,35 @@ program yelmox_rtip
         write(*,*) "Performing transient."
         write(*,*)
 
-        ! Get current time
-        time    = ctl%time_init
-        time_bp = time - 1950.0_wp
-
         ! Initialize output files
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+        call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
+        call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
-            call yelmo_write_init(yelmo1,file2D_ismip6,time_init=time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
+            call yelmo_write_init(yelmo1,file2D_ismip6,time_init=ts%time,units="years")
+            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed)
         end if
 
         call timer_step(tmr,comp=1,label="initialization")
         call timer_step(tmrs,comp=-1)
 
-        ! Perform 'coupled' model simulations for desired time
-        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+        ! == Advance timesteps ===
 
-            ! Get current time
+        call tstep_print_header(ts)
 
-            time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp
-            time_elapsed = time - ctl%time_init
+        do while (.not. ts%is_finished)
 
+            ! == Update timestep ===
+
+            call tstep_update(ts,ctl%dtt)
+            call tstep_print(ts)
+            
             if (ismip6exp%shlf_collapse) then
             ! Perform mask_shlf_collapse experiments
             ! Set H to zero where mask==1, then compute Yelmo.
 
-                if(time .ge. 2015) then
+                if(ts%time .ge. 2015) then
                     !where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
                     where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%bnd%ice_allowed = .FALSE.
                 end if
@@ -718,15 +654,15 @@ program yelmox_rtip
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
-            call bsl_update(bsl, time_bp)
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call bsl_update(bsl, ts%time_rel)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-            call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
+            call timer_step(tmrs,comp=1,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="isostasy")
 
             ! == ICE SHEET ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,ts%time)
 
             if (ismip6exp%shlf_collapse) then
                         ! Clean up icebergs for mask_shlf_collapse experiments
@@ -735,12 +671,12 @@ program yelmox_rtip
                         where(ismp1%iceberg_mask .eq. 1.0) yelmo1%tpo%now%H_ice = 0.0
             end if
 
-            call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
+            call timer_step(tmrs,comp=2,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="yelmo")
 
             ! == CLIMATE and OCEAN ==========================================
 
             ! Get ISMIP6 climate and ocean forcing
-            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,time,time_bp)
+            call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1,ts%time,ts%time_rel)
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
@@ -748,7 +684,7 @@ program yelmox_rtip
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
-            call timer_step(tmrs,comp=3,time_mod=[time-ctl%dtt,time]*1e-3,label="climate")
+            call timer_step(tmrs,comp=3,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="climate")
 
             ! == MODEL OUTPUT ===================================
 
@@ -757,41 +693,41 @@ program yelmox_rtip
                 call bsl_write_step(bsl, file_bsl, time)
             end if
 
-            if (timeout_check(tm_2D, time)) then
-                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
+            if (timeout_check(tm_2D, ts%time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
             end if
 
-            if (timeout_check(tm_2Dsm,time)) then
+            if (timeout_check(tm_2Dsm,ts%time)) then
                 call yelmox_write_step_small(yelmo1, isos1, snp1, &
-                    mshlf1,smbpal1,file2D_small,time)
+                    mshlf1,smbpal1,file2D_small,ts%time)
             end if
 
-            if ( timeout_check(tm_2Dwais,time) ) then
-                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, time, &
+            if ( timeout_check(tm_2Dwais,ts%time) ) then
+                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, ts%time, &
                     i1wais, i2wais, j1wais, j2wais)
             end if
 
-            if (timeout_check(tm_3D, time)) then
-                call yelmo_write_step(yelmo1, file3D, time, nms=["ux","uy","uz"])
+            if (timeout_check(tm_3D, ts%time)) then
+                call yelmo_write_step(yelmo1, file3D, ts%time, nms=["ux","uy","uz"])
             end if
 
             ! ISMIP6 output if desired:
             if (ctl%ismip6_write_formatted) then
-                if (mod(nint(time_elapsed*100),nint(ctl%ismip6_dt_formatted*100))==0) then
-                    call yelmox_write_step_ismip6(yelmo1,file2D_ismip6,time)
-                    call yelmox_write_step_1D_ismip6(yelmo1,file1D_ismip6,time)
+                if (mod(nint(ts%time_elapsed*100),nint(ctl%ismip6_dt_formatted*100))==0) then
+                    call yelmox_write_step_ismip6(yelmo1,file2D_ismip6,ts%time)
+                    call yelmox_write_step_1D_ismip6(yelmo1,file1D_ismip6,ts%time)
                 end if
             end if
 
-            call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io")
+            call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io")
 
-            if (mod(time_elapsed,10.0)==0) then
+            if (mod(ts%time_elapsed,10.0)==0) then
                 ! Print timestep timing info and write log table
-                call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
+                call timer_write_table(tmrs,[ts%time,ctl%dtt]*1e-3,"m",tmr_file,init=ts%time_elapsed .eq. 0.0)
             end if
 
-            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
-                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            if (mod(ts%time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", ts%time
             end if
 
         end do
@@ -801,200 +737,7 @@ program yelmox_rtip
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
-
-    case("abumip")
-        ! Here it is assumed that the model has gone through spinup
-        ! and is ready for transient simulations
-
-        write(*,*)
-        write(*,*) "Performing transient. [abumip]"
-        write(*,*)
-
-        ! Get current time
-        time    = ctl%time_init
-        time_bp = time - 1950.0_wp
-
-        ! Initialize output files
-        call yelmo_write_init(yelmo1,file2D,time_init=time,units="years")
-        call yelmo_write_reg_init(yelmo1,file1D,time_init=time,units="years",mask=yelmo1%bnd%ice_allowed)
-
-        call timer_step(tmr,comp=1,label="initialization")
-        call timer_step(tmrs,comp=-1)
-
-        ! Perform 'coupled' model simulations for desired time
-        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
-
-            ! Get current time
-            time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp
-            time_elapsed = time - ctl%time_init
-
-            ! == ABUMIP =========================================================
-
-            ! Make parameter changes relevant to abumip
-
-            select case(trim(ctl%abumip_scenario))
-
-                case("abuc")
-
-                    ! Do nothing - control experiment
-
-                case("abuk")
-                    ! Ensure ice shelves are killed
-
-                    yelmo1%tpo%par%calv_flt_method = "kill"
-
-                case("abum")
-                    ! Apply 400 m/yr melt rate on shelves
-
-                    yelmo1%bnd%bmb_shlf = ctl%abumip_bmb     ! [m/yr]
-
-                case DEFAULT
-
-                    write(io_unit_err,*) ""
-                    write(io_unit_err,*) "yelmox_ismip6:: error: abumip scenario not recognized."
-                    write(io_unit_err,*) "abumip_scenario: ", trim(ctl%abumip_scenario)
-                    stop 1
-
-            end select
-
-            call timer_step(tmrs,comp=0)
-
-            ! == ISOSTASY and SEA LEVEL ===========================================
-            call bsl_update(bsl, time_bp)
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%out%z_bed
-            yelmo1%bnd%z_sl  = isos1%out%z_ss
-
-            call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
-
-            ! == ICE SHEET ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
-
-            call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
-
-            ! ISMIP6 forcing
-
-            ! Update ismip6 forcing to current time
-            call ismip6_forcing_update(ismp1,ctl%time_const)
-
-            ! Set climate to present day
-            snp1%now = snp1%clim0
-
-            ! == SURFACE MASS BALANCE ==============================================
-
-if (n .eq. 0) then
-                ! Calculate smb for present day
-                call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                           yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ctl%time_const)
-
-                ! Apply ISMIP6 anomalies
-                ! (apply to climate just for consistency)
-
-                smbpal1%ann%smb  = smbpal1%ann%smb  + ismp1%smb%var(:,:,1,1)*1.0/(yelmo1%bnd%c%conv_we_ie*1e-3) ! [m ie/yr] => [mm we/a]
-                smbpal1%ann%tsrf = smbpal1%ann%tsrf + ismp1%ts%var(:,:,1,1)
-
-                do m = 1,12
-                    snp1%now%tas(:,:,m) = snp1%now%tas(:,:,m) + ismp1%ts%var(:,:,1,1)
-                    snp1%now%pr(:,:,m)  = snp1%now%pr(:,:,m)  + ismp1%pr%var(:,:,1,1)/365.0 ! [mm/yr] => [mm/d]
-                end do
-
-                snp1%now%ta_ann = sum(snp1%now%tas,dim=3) / 12.0_wp
-                if (trim(domain) .eq. "Antarctica") then
-                    snp1%now%ta_sum  = sum(snp1%now%tas(:,:,[12,1,2]),dim=3)/3.0  ! Antarctica summer
-                else
-                    snp1%now%ta_sum  = sum(snp1%now%tas(:,:,[6,7,8]),dim=3)/3.0  ! NH summer
-                end if
-                snp1%now%pr_ann = sum(snp1%now%pr,dim=3)  / 12.0 * 365.0     ! [mm/d] => [mm/a]
-
-end if
-
-            ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
-
-            call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,-ismp1%to%z, &
-                            ismp1%to%var(:,:,:,1),ismp1%so%var(:,:,:,1), &
-                            dto_ann=ismp1%to%var(:,:,:,1)-ismp1%to_ref%var(:,:,:,1), &
-                            tf_ann=ismp1%tf%var(:,:,:,1))
-
-            ! Update temperature forcing field with tf_corr and tf_corr_basin
-            mshlf1%now%tf_shlf = mshlf1%now%tf_shlf + mshlf1%now%tf_corr + mshlf1%now%tf_corr_basin
-
-            call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                    yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
-
-            yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3
-            yelmo1%bnd%T_srf    = smbpal1%ann%tsrf
-
-            yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
-            yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
-
-            if (trim(ctl%abumip_scenario) .eq. "abum") then
-                ! Ensure bmb_shlf output is consistent with what is applied
-
-                yelmo1%bnd%bmb_shlf = ctl%abumip_bmb     ! [m/yr]
-
-            end if
-
-            call timer_step(tmrs,comp=3,time_mod=[time-ctl%dtt,time]*1e-3,label="climate")
-
-            ! == MODEL OUTPUT ===================================
-
-            if (timeout_check(tm_1D,time)) then
-                call yelmox_write_step_1D(yelmo1,hyst1,snp1,bsl,file1D,time=time)
-
-                if (reg1%write) then
-                    call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
-                end if
-
-                if (reg2%write) then
-                    call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
-                end if
-
-                if (reg3%write) then
-                    call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
-                end if
-
-            end if
-
-            if (timeout_check(tm_2D, time)) then
-                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
-            end if
-
-            if (timeout_check(tm_2Dsm,time)) then
-                call yelmox_write_step_small(yelmo1, isos1, snp1, &
-                    mshlf1,smbpal1,file2D_small,time)
-            end if
-
-            if ( timeout_check(tm_2Dwais,time) ) then
-                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, time, &
-                    i1wais, i2wais, j1wais, j2wais)
-            end if
-
-            if (timeout_check(tm_3D, time)) then
-                call yelmo_write_step(yelmo1, file3D, time, nms=["ux","uy","uz"])
-            end if
-
-            call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io")
-
-            if (mod(time_elapsed,10.0)==0) then
-                ! Print timestep timing info and write log table
-                call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
-            end if
-
-            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
-                write(*,"(a,f14.4)") "yelmo:: time = ", time
-            end if
-
-        end do
-
-        write(*,*)
-        write(*,*) "Transient complete."
-        write(*,*)
-
-        ! Write the restart snashot for the end of the transient simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
 
     case("hysteresis")
         ! Here it is assumed that the model has gone through spinup
@@ -1003,10 +746,6 @@ end if
         write(*,*)
         write(*,*) "Performing transient. [hysteresis]"
         write(*,*)
-
-        ! Get current time
-        time    = ctl%time_init
-        time_bp = time - 1950.0_wp
 
         ! === HYST ============
 
@@ -1019,7 +758,7 @@ end if
 
         ! Update forcing to constant reference time with initial hyst forcing
         call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-                    time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
+                    time=ts%time,time_bp=ts%time_rel, &
                     dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
 
         yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
@@ -1035,33 +774,26 @@ end if
             mask=yelmo1%bnd%ice_allowed)
         call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
         call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
-                                    irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
-        call yelmo_write_init(yelmo1, file2D_small, time_init=time, units="years")
-        call yelmo_write_init(yelmo1, file3D, time_init=time, units="years")
+            irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
+        call yelmo_write_init(yelmo1, file2D_small, time_init=ts%time, units="years")
+        call yelmo_write_init(yelmo1, file3D, time_init=ts%time, units="years")
 
-        if (reg1%write) then
-            call yelmo_write_reg_init(yelmo1,reg1%fnm,time_init=time,units="years",mask=reg1%mask)
-        end if
-
-        if (reg2%write) then
-            call yelmo_write_reg_init(yelmo1,reg2%fnm,time_init=time,units="years",mask=reg2%mask)
-        end if
-
-        if (reg3%write) then
-            call yelmo_write_reg_init(yelmo1,reg3%fnm,time_init=time,units="years",mask=reg3%mask)
-        end if
+        call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
         call timer_step(tmr,comp=1,label="initialization")
         call timer_step(tmrs,comp=-1)
 
-        ! Perform 'coupled' model simulations for desired time
-        do n = 0, ceiling((ctl%time_end-ctl%time_init)/ctl%dtt)
+        ! == Advance timesteps ===
 
-            ! Get current time
-            time         = ctl%time_init + n*ctl%dtt
-            time_bp      = time - 1950.0_wp
-            time_elapsed = time - ctl%time_init
+        call tstep_print_header(ts)
 
+        do while (.not. ts%is_finished)
+
+            ! == Update timestep ===
+
+            call tstep_update(ts,ctl%dtt)
+            call tstep_print(ts)
+            
             ! == HYSTERESIS =========================================================
 
             ! Make parameter changes relevant to hysteresis runs
@@ -1098,23 +830,23 @@ end if
             call timer_step(tmrs,comp=0)
 
             ! == ISOSTASY and SEA LEVEL ===========================================
-            call bsl_update(bsl, time_bp)
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            call bsl_update(bsl, ts%time_rel)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
             yelmo1%bnd%z_bed = isos1%out%z_bed
             yelmo1%bnd%z_sl  = isos1%out%z_ss
 
-            call timer_step(tmrs,comp=1,time_mod=[time-ctl%dtt,time]*1e-3,label="isostasy")
+            call timer_step(tmrs,comp=1,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="isostasy")
 
             ! == ICE SHEET ===================================================
-            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,time)
+            if (ctl%with_ice_sheet) call yelmo_update(yelmo1,ts%time)
 
-            call timer_step(tmrs,comp=2,time_mod=[time-ctl%dtt,time]*1e-3,label="yelmo")
+            call timer_step(tmrs,comp=2,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="yelmo")
 
 
             ! === HYST ============
 
             ! snapclim call using anomaly from the hyster package
-            call hyster_calc_forcing(hyst1,time=time,var=yelmo1%reg%V_ice*convert_km3_Gt)
+            call hyster_calc_forcing(hyst1,time=ts%time,var=yelmo1%reg%V_ice*convert_km3_Gt)
 
             ! =====================
 
@@ -1122,7 +854,7 @@ end if
 
             ! Update forcing to initial time with initial hyst forcing
             call calc_climate_ismip6(snp1,smbpal1,mshlf1,ismp1,yelmo1, &
-                        time=ctl%time_const,time_bp=ctl%time_const-1950.0_wp, &
+                        time=ts%time,time_bp=ts%time_rel, &
                         dTa=hyst1%f_now*ctl%hyst_f_ta,dTo=hyst1%f_now*ctl%hyst_f_to)
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
@@ -1131,63 +863,46 @@ end if
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
 
-            call timer_step(tmrs,comp=3,time_mod=[time-ctl%dtt,time]*1e-3,label="climate")
+            call timer_step(tmrs,comp=3,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="climate")
 
             ! == MODEL OUTPUT ===================================
 
             ! ** Using routines from yelmox_hysteresis_help **
+
+            if (timeout_check(tm_1D, time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+                call bsl_write_step(bsl, file_bsl, time)
+            end if
+
+            if (timeout_check(tm_2D, time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
+            end if
 
             if (timeout_check(tm_2D_fastiso, time)) then
                 write(*,*) "writing 2D at t=", time
                 call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
                 call isos_write_step_extended(isos1, file_isos, time)
             end if
-
-
+            
             if (timeout_check(tm_2Dsm,time)) then
-                write(*,*) "writing 2D small at t=", time
                 call yelmox_write_step_small(yelmo1, isos1, snp1, &
                     mshlf1,smbpal1,file2D_small,time)
             end if
 
             if ( timeout_check(tm_2Dwais,time) ) then
-                write(*,*) "writing 2D wais at t=", time
                 call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, time, &
                     i1wais, i2wais, j1wais, j2wais)
             end if
 
             if (timeout_check(tm_3D, time)) then
-                write(*,*) "writing 3D at t=", time
                 call yelmo_write_step(yelmo1, file3D, time, nms=["ux","uy","uz"])
             end if
+            
+            call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io")
 
-            if (timeout_check(tm_1D, time)) then
-                write(*,*) "writing 1D at t=", time
-
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
-                call yelmo_write_hyst_reg_step(hyst1, file1D, time=time)
-                call bsl_write_step(bsl, file_bsl, time)
-                
-                if (reg1%write) then
-                    call yelmo_write_reg_step(yelmo1,reg1%fnm,time=time,mask=reg1%mask)
-                end if
-
-                if (reg2%write) then
-                    call yelmo_write_reg_step(yelmo1,reg2%fnm,time=time,mask=reg2%mask)
-                end if
-
-                if (reg3%write) then
-                    call yelmo_write_reg_step(yelmo1,reg3%fnm,time=time,mask=reg3%mask)
-                end if
-
-            end if
-
-
-            call timer_step(tmrs,comp=4,time_mod=[time-ctl%dtt,time]*1e-3,label="io")
-
-            if (mod(time_elapsed,10.0)==0) then
+            if (mod(ts%time_elapsed,10.0)==0) then
                 ! Print timestep timing info and write log table
-                call timer_write_table(tmrs,[time,ctl%dtt]*1e-3,"m",tmr_file,init=time_elapsed .eq. 0.0)
+                call timer_write_table(tmrs,[ts%time,ctl%dtt]*1e-3,"m",tmr_file,init=ts%time_elapsed .eq. 0.0)
             end if
 
             ! if ((hyst1%f_now) .gt. ((counter_restart+1) * restart_every_df)) then
@@ -1212,32 +927,32 @@ end if
                 else if (counter_restart .lt. 1000) then
                     write (counter_restart_str, '(i3)') counter_restart
                 end if
-                call yelmox_restart_write(bsl,isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
+                call yelmox_restart_write(bsl,isos1,yelmo1,ts%time_rel,fldr="restart-"//counter_restart_str)
             end if
 
-            if (mod(time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
-                write(*,"(a,f14.4)") "yelmo:: time = ", time
+            if (mod(ts%time_elapsed,10.0)==0 .and. (.not. yelmo_log)) then
+                write(*,"(a,f14.4)") "yelmo:: time = ", ts%time
             end if
 
         end do
 
         ! Stop timing
-        call timer_step(tmr,comp=2,time_mod=[ctl%time_init,time]*1e-3,label="timeloop")
+        call timer_step(tmr,comp=2,time_mod=[ts%time_init,ts%time]*1e-3,label="timeloop")
 
         write(*,*)
         write(*,*) "Transient complete."
         write(*,*)
 
         ! Write the restart snapshot for the end of the transient simulation
-        call yelmox_restart_write(bsl,isos1,yelmo1,time)
+        call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
 
     end select
 
     ! Finalize program
-    call yelmo_end(yelmo1,time=time)
+    call yelmo_end(yelmo1,time=ts%time)
 
     ! Print timing summary
-    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=time*1e-3)
+    call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=ts%time*1e-3)
     
 contains
 
@@ -1256,7 +971,7 @@ contains
 
         ! Step 1: udpate the climate to the present time
 
-        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=time_bp,domain=ylmo%par%domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time_rel,domain=ylmo%par%domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
         ! Step 2: update the smb fields
 
@@ -1640,7 +1355,6 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call yelmo_write_var(filename,"pd_err_H_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_z_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_uxy_s",ylmo,n,ncid)
-        ! call yelmo_write_var(filename,"pd_err_smb",ylmo,n,ncid)
 
         ! == yelmo extra fields ==
 
@@ -1664,9 +1378,6 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
-
-        call nc_write(filename,"err_pd_smb_ref",ylmo%bnd%smb-ylmo%dta%pd%smb,units="m/a ice equiv.",long_name="Surface mass balance error wrt present day", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"Q_strn_alt_units",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
                       dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
@@ -1850,7 +1561,7 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 a)",long_name="hyst: forcing rate of change", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt,units="Gt/a",long_name="hyst: volume rate of change", &
+        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt_ave,units="Gt/a",long_name="hyst: volume rate of change", &
                       dim1="time",start=[n],ncid=ncid)
 
         ! ===== Total ice variables =====

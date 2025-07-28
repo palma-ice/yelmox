@@ -94,25 +94,36 @@
 ! ====== ATMOSPHERE ================
 
 &gcm_ts_ref
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
-    name        = "ts_clim"
+    filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
+    name        = "t2m"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
-    with_time   = FALSE 
-    time_par    = 1995, 2014, 0
+    with_time   = TRUE 
+    time_par    = 1979, 2019, 1
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
-    name        = "pr_clim"
-    units_in    = "kg m-2 s-1"
+    filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
+    name        = "precip"
+    units_in    = "kg m-2 yr-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year 
+    unit_scale  = 1.0         
     unit_offset = 0.0 
-    with_time   = FALSE 
-    time_par    = 1995, 2014, 0
+    with_time   = TRUE 
+    time_par    = 1979, 2019, 1
+/
+
+&gcm_sf_ref
+    filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
+    name        = "snowfall"
+    units_in    = "kg m-2 yr-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 1.0         
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1979, 2019, 1
 /
 
 &gcm_smb_ref
@@ -123,7 +134,7 @@
     unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
     unit_offset = 0.0 
     with_time   = FALSE 
-    time_par    = 1995, 2014, 0
+    time_par    = 1995, 2014, 1
 /
 
 &gcm_ts_hist

@@ -8,6 +8,8 @@ module marine_shelf
 
     use nml 
     use ncio 
+    use mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+                                            gen_map_filename, nc_read_interp
 
     use pico 
 
@@ -51,6 +53,7 @@ module marine_shelf
         character(len=56)   :: interp_method 
         character(len=56)   :: interp_depth 
         logical             :: find_ocean 
+        character(len=512)  :: restart
         logical             :: use_obs
         character(len=512)  :: obs_path
         character(len=56)   :: obs_name 
@@ -77,18 +80,36 @@ module marine_shelf
         real(wp)            :: c_grz, kappa_grz, f_grz_shlf, grz_length
         
         character(len=512) :: domain   
+        character(len=512) :: grid_name
         real(wp) :: rho_ice, rho_sw
+
+        ! Internal parameter
+        logical :: use_restart
 
     end type 
 
+    type marshelf_grid_class
+        real(wp), allocatable :: xc(:)
+        real(wp), allocatable :: yc(:)
+        integer :: nx 
+        integer :: ny
+    end type
+
     type marshelf_state_class 
+        real(wp), allocatable :: tmp(:,:)
         real(wp), allocatable :: bmb_shlf(:,:)          ! Shelf basal mass balance [m/a]
         real(wp), allocatable :: bmb_ref(:,:)           ! Basal mass balance reference field
         real(wp), allocatable :: bmb_corr(:,:)          ! Basal mass balance correction field
         
+        !real(wp), allocatable :: T_ocn(:,:,:)           ! [K] Shelf temperature
+        !real(wp), allocatable :: dT_ocn(:,:,:)          ! [K] Shelf temperature anomaly relative to ref. state
+        !real(wp), allocatable :: S_ocn(:,:,:)           ! [PSU] Shelf salinity
+        !real(wp), allocatable :: dS_ocn(:,:,:)          ! [PSU] Shelf salinity anomaly relative to ref. state
+
         real(wp), allocatable :: T_shlf(:,:)            ! [K] Shelf temperature
         real(wp), allocatable :: dT_shlf(:,:)           ! [K] Shelf temperature anomaly relative to ref. state
         real(wp), allocatable :: S_shlf(:,:)            ! [PSU] Shelf salinity
+        real(wp), allocatable :: dS_shlf(:,:)           ! [PSU] Shelf salinity anomaly relative to ref. state
         real(wp), allocatable :: T_fp_shlf(:,:)         ! [K] Shelf freezing-point temperature
         real(wp), allocatable :: T_shlf_basin(:,:)      ! [K] Shelf temperature
         real(wp), allocatable :: S_shlf_basin(:,:)      ! [PSU] Shelf salinity
@@ -108,6 +129,7 @@ module marine_shelf
 
     type marshelf_class
         type(marshelf_param_class) :: par 
+        type(marshelf_grid_class)  :: grd
         type(marshelf_state_class) :: now
         type(pico_class)           :: pico  
     end type
@@ -120,9 +142,13 @@ module marine_shelf
     private
     public :: marshelf_class
     public :: marshelf_update_shelf
+    public :: marshelf_interp_shelf
     public :: marshelf_update
     public :: marshelf_init
     public :: marshelf_end 
+    public :: marshelf_restart_write
+    public :: marshelf_restart_read
+    public :: ocn_variable_extrapolation
 
 contains 
     
@@ -294,6 +320,117 @@ contains
         return 
 
     end subroutine marshelf_update_shelf_3D
+
+    subroutine marshelf_interp_shelf(out2D,mshlf,in3d,H_ice,z_bed,f_grnd,z_sl,depth)
+        ! Calculate 2D fields from 3D ocean fields representative
+
+        implicit none
+
+        real(wp), intent(INOUT) :: out2d(:,:)
+        type(marshelf_class), intent(IN) :: mshlf
+        real(wp), intent(IN) :: in3d(:,:,:)
+        real(wp), intent(IN) :: H_ice(:,:)
+        real(wp), intent(IN) :: z_bed(:,:)
+        real(wp), intent(IN) :: f_grnd(:,:)
+        real(wp), intent(IN) :: z_sl(:,:)
+        real(wp), intent(IN) :: depth(:)
+
+        ! Local variables
+        integer :: i, j, nx, ny, nz
+        real(wp), allocatable :: depth_shlf
+        real(wp), allocatable :: wt_shlf(:)
+
+        nx = size(H_ice,1)
+        ny = size(H_ice,2)
+        nz = size(depth,1)
+
+        ! Allocate objects
+        allocate(wt_shlf(nz))
+        wt_shlf = 0.0
+        out2d   = 0.0
+
+        ! Loop over domain and update variables at each point (vertical interpolation)
+        do j = 1, ny
+        do i = 1, nx
+
+            ! 1. Calculate the depth of the current shelf base
+
+            select case(trim(mshlf%par%interp_depth))
+
+                case("shlf")
+                ! Assign the depth to the shelf depth
+
+                if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .lt. 1.0) then
+                ! Floating ice, depth == z_ice_base
+                depth_shlf = H_ice(i,j)*rho_ice_sw
+                else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
+                ! Grounded ice, depth == H_ocn = z_sl-z_bed
+                depth_shlf = z_sl(i,j) - z_bed(i,j)
+                else
+                ! Open ocean, depth == constant value, eg 2000 m.
+                depth_shlf = mshlf%par%depth_const
+                end if
+
+                case("bed")
+                ! Assign the depth corresponding to the bedrock
+
+                depth_shlf = z_sl(i,j) - z_bed(i,j)
+
+                case("const")
+
+                depth_shlf = mshlf%par%depth_const
+
+                case DEFAULT
+
+                write(*,*) "marshelf_interp_shelf:: Error: interp_depth method not recognized."
+                write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
+
+            end select
+
+            ! 2. Calculate weighting function for vertical depths ===========================
+
+            select case(trim(mshlf%par%interp_method))
+
+                case("mean")
+                ! Equal weighting of layers within a specified depth range
+
+                call calc_shelf_variable_mean(wt_shlf,depth, &
+                        depth_range=[mshlf%par%depth_min,mshlf%par%depth_max])
+
+                case("layer")
+                ! All weight given to the nearest layer to depth of shelf
+
+                call calc_shelf_variable_layer(wt_shlf,depth,depth_shlf)
+
+                case("interp")
+                ! Interpolation weights from the two nearest layers to depth of shelf
+
+                call  calc_shelf_variable_depth(wt_shlf,depth,depth_shlf)
+
+                case DEFAULT
+                write(*,*) "marshelf_interp_shelf:: error: interp_method not recognized: ", mshlf%par%interp_method
+                write(*,*) "Must be one of [mean,layer,interp]"
+                stop
+
+            end select
+
+            ! Normalize weighting function
+            if (sum(wt_shlf) .gt. 0.0_wp) then
+                wt_shlf = wt_shlf / sum(wt_shlf)
+            else
+                write(*,*) "marshelf_interp_shelf:: Error: weighting should be > 0."
+                stop
+            end if
+
+            ! 3. Calculate water properties at depths of interest ============================
+            out2d(i,j)  = sum(in3d(i,j,:) * wt_shlf)
+
+        end do
+        end do 
+
+        return
+
+    end subroutine marshelf_interp_shelf
 
     subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
         
@@ -485,10 +622,19 @@ contains
                                                         f_grnd,basins,H_ice,mshlf%now%mask_ocn)
 
                         ! Ensure tf_basin is non-negative following Lipscomb et al (2021)
-                        where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp 
+                        ! jalv: this line overcomes the option of bmb_max being greater than 0 (some refreezing) if temperatures
+                        ! decrease enoughe (for quad-nl cases)
+                        !where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp
 
                         call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
                             mshlf%par%gamma_quad_nl,omega)
+
+                        ! jalv: beacuse of the previous limitation of tf_basin to 0, do the following line if want to play and allow some accretion
+                        ! option 1: simply impose bmb_max where tf_basin is negative (quite brutal)
+                        !where(mshlf%now%tf_basin .le. 0.0_wp) mshlf%now%bmb_shlf = mshlf%par%bmb_max
+                        ! option 2: (more physical) asign a positive value of bmb where both tf_basin and tf are negative.
+                        ! This value will after be limited by bmb_max            
+                        where((mshlf%now%tf_basin .le. 0.0_wp).and.(mshlf%now%tf_shlf .le. 0.0_wp)) mshlf%now%bmb_shlf = -mshlf%now%bmb_shlf
                     
                     case("anom")
 
@@ -516,6 +662,7 @@ contains
         ! Below we should apply specific limitations. 
 
         ! Apply maximum refreezing rate 
+        ! test jalv: disable for testing whether bmb_max refreezing limitatiomns are properly coded
         where (mshlf%now%bmb_shlf .gt. mshlf%par%bmb_max)   &
                                 mshlf%now%bmb_shlf = mshlf%par%bmb_max
 
@@ -539,7 +686,7 @@ contains
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins,xc,yc,dx)
 
         implicit none 
 
@@ -547,21 +694,52 @@ contains
         character(len=*), intent(IN)      :: filename
         character(len=*), intent(IN)      :: group
         integer, intent(IN)               :: nx, ny 
-        character(len=*), intent(IN)      :: domain, grid_name
-        real(wp), intent(IN)            :: regions(:,:)
-        real(wp), intent(IN)            :: basins(:,:)
-        
+        character(len=*), intent(IN)      :: domain
+        character(len=*), intent(IN)      :: grid_name
+        real(wp), intent(IN)              :: regions(:,:)
+        real(wp), intent(IN)              :: basins(:,:)
+        real(wp), intent(IN), optional    :: xc(:)
+        real(wp), intent(IN), optional    :: yc(:)
+        real(wp), intent(IN), optional    :: dx 
+
         ! Local variables
         integer  :: j 
         integer  :: num
         character(len=56) :: group_now
         real(wp) :: basin_number_now
         real(wp) :: tf_corr_now 
+        real(wp) :: grd_dx 
 
         ! Load parameters
         call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
 
-        ! Allocate the object 
+        ! Set grid
+        mshlf%grd%nx = nx
+        mshlf%grd%ny = ny
+        if (allocated(mshlf%grd%xc)) deallocate(mshlf%grd%xc)
+        if (allocated(mshlf%grd%yc)) deallocate(mshlf%grd%yc)
+        allocate(mshlf%grd%xc(nx))
+        allocate(mshlf%grd%yc(ny))
+        
+        if (present(dx)) then
+            grd_dx = dx
+        else
+            grd_dx = 1.0
+        end if
+        
+        if (present(xc)) then
+            mshlf%grd%xc = xc
+        else
+            call axis_init(mshlf%grd%xc,x0=0.0_wp,dx=grd_dx)
+        end if
+
+        if (present(yc)) then
+            mshlf%grd%yc = yc
+        else
+            call axis_init(mshlf%grd%yc,x0=0.0_wp,dx=grd_dx)
+        end if
+        
+        ! Allocate the object
         call marshelf_allocate(mshlf%now,nx,ny)
         
         ! Decide whether to load observations or use psuedo-observations
@@ -745,7 +923,28 @@ contains
         ! Initialize variables 
         mshlf%now%bmb_shlf      = 0.0
         mshlf%now%tf_shlf       = 0.0
-        mshlf%now%tf_basin      = 0.0 
+        mshlf%now%tf_basin      = 0.0
+
+
+        ! ============================================================
+        ! Finally, load all fields from a restart file?
+
+        if (trim(mshlf%par%restart) .ne. "none" .and. &
+            trim(mshlf%par%restart) .ne. ""     .and. &
+            trim(mshlf%par%restart) .ne. "None") then 
+            ! Load fields from restart file. This is mainly important for reloading
+            ! an already defined (optimized) tf_corr field from a previous run.
+
+            call marshelf_restart_read(mshlf,mshlf%par%restart)
+            
+            mshlf%par%use_restart = .TRUE.
+        
+        else
+            mshlf%par%use_restart = .FALSE.
+        end if
+
+        ! ============================================================
+
 
         return 
 
@@ -832,6 +1031,7 @@ contains
         call nml_read(filename,group,"interp_depth",   par%interp_depth,   init=init_pars)
         call nml_read(filename,group,"interp_method",  par%interp_method,  init=init_pars)
         call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)
+        call nml_read(filename,group,"restart",        par%restart,        init=init_pars)
         call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
         call nml_read(filename,group,"basin_number",   par%basin_number,   init=init_pars)
         call nml_read(filename,group,"basin_bmb_corr", par%basin_bmb_corr, init=init_pars)
@@ -873,7 +1073,9 @@ contains
         ! Determine derived parameters
         call parse_path(par%obs_path,domain,grid_name)
         call parse_path(par%tf_path,domain,grid_name)
-        par%domain = trim(domain)
+        
+        par%domain    = trim(domain)
+        par%grid_name = trim(grid_name)
 
         ! Consistency checks 
         if (par%f_grz_shlf .eq. 0.0) then 
@@ -1648,6 +1850,7 @@ contains
         allocate(now%T_shlf(nx,ny))
         allocate(now%dT_shlf(nx,ny))
         allocate(now%S_shlf(nx,ny))
+        allocate(now%dS_shlf(nx,ny))
         allocate(now%T_fp_shlf(nx,ny))
         allocate(now%T_shlf_basin(nx,ny))
         allocate(now%S_shlf_basin(nx,ny))       
@@ -1671,6 +1874,7 @@ contains
         now%T_shlf          = 0.0
         now%dT_shlf         = 0.0
         now%S_shlf          = 0.0
+        now%dS_shlf          = 0.0
         now%T_fp_shlf       = 0.0 
         now%T_shlf_basin    = 0.0
         now%S_shlf_basin    = 0.0 
@@ -1705,6 +1909,7 @@ contains
         if (allocated(now%T_shlf))          deallocate(now%T_shlf)
         if (allocated(now%dT_shlf))         deallocate(now%dT_shlf)
         if (allocated(now%S_shlf))          deallocate(now%S_shlf)
+        if (allocated(now%dS_shlf))          deallocate(now%dS_shlf)
         if (allocated(now%T_fp_shlf))       deallocate(now%T_fp_shlf)
         if (allocated(now%T_shlf_basin))    deallocate(now%T_shlf_basin)
         if (allocated(now%S_shlf_basin))    deallocate(now%S_shlf_basin)       
@@ -1723,6 +1928,260 @@ contains
         return
 
     end subroutine marshelf_deallocate
+
+    subroutine marshelf_restart_write(mshlf,filename,time,init,irange,jrange)
+
+        implicit none
+
+        type(marshelf_class), intent(IN) :: mshlf
+        character(len=*),     intent(IN) :: filename
+        real(wp),             intent(IN) :: time 
+        logical,              intent(IN), optional :: init 
+        integer,              intent(IN), optional :: irange(2)
+        integer,              intent(IN), optional :: jrange(2)
+        
+        ! Local variables
+        integer  :: ncid, n, q, nt, nx, ny
+        integer :: i1, i2, j1, j2 
+        logical  :: initialize_file  
+        character(len=16) :: xnm 
+        character(len=16) :: ynm 
+        character(len=16) :: grid_mapping_name
+
+        xnm = "xc"
+        ynm = "yc" 
+        grid_mapping_name = "crs" 
+
+        initialize_file = .TRUE. 
+        if (present(init)) initialize_file = init
+
+        nx = size(mshlf%now%bmb_shlf,1)
+        ny = size(mshlf%now%bmb_shlf,2)
+        
+        grid_mapping_name = "crs" 
+
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+        
+        ! == Initialize netcdf file ==============================================
+
+        if (initialize_file) then
+            ! Initialize netcdf file and dimensions
+            ! Create the empty netcdf file
+            call nc_create(filename)
+
+            ! Write some general attributes that can be useful (e.g., for interpolation etc)
+            call nc_write_attr(filename, "domain",    trim(mshlf%par%domain))
+            call nc_write_attr(filename, "grid_name", trim(mshlf%par%grid_name))
+
+            ! Add grid axis variables to netcdf file
+            call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
+            call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
+            call nc_write_dim(filename,"month", x=1,dx=1,nx=12,       units="month")            
+            call nc_write_dim(filename,"time",  x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
+
+        end if 
+        
+        ! == Begin writing data ==============================================
+        
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+        
+        if (initialize_file) then 
+            ! Current time index to write will be the first and only one 
+            n = 1
+
+        else 
+            ! Determine current writing time step 
+            n = nc_time_index(filename,"time",time,ncid)
+
+            ! Update the time step
+            call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        end if 
+
+        ! Write variables
+        
+        call nc_write(filename,"bmb_shlf",mshlf%now%bmb_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"bmb_ref",mshlf%now%bmb_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"bmb_corr",mshlf%now%bmb_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+                                        dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
+
+        ! Close the netcdf file
+        call nc_close(ncid)
+          
+        return
+
+    end subroutine marshelf_restart_write
+
+    subroutine marshelf_restart_read(mshlf,filename)
+
+        implicit none
+
+        type(marshelf_class), intent(INOUT) :: mshlf
+        character(len=*),     intent(IN) :: filename
+
+        ! Local variables
+        integer :: n
+        character(len=56) :: restart_domain 
+        character(len=56) :: restart_grid_name 
+        type(map_scrip_class) :: mps
+        logical :: restart_interpolated
+
+        write(*,*) "marshelf_restart_read:: reading file: "//trim(filename)
+        
+        ! Load restart file grid attributes 
+        if (nc_exists_attr(filename,"domain")) then 
+            call nc_read_attr(filename,"domain",    restart_domain)
+        else 
+            restart_domain = trim(mshlf%par%domain)
+        end if 
+
+        if (nc_exists_attr(filename,"grid_name")) then 
+            call nc_read_attr(filename,"grid_name", restart_grid_name)
+        else 
+            restart_grid_name = trim(mshlf%par%grid_name)
+        end if 
+
+        if (trim(restart_grid_name) .ne. trim(mshlf%par%grid_name)) then 
+            restart_interpolated = .TRUE. 
+        else 
+            restart_interpolated = .FALSE. 
+        end if 
+
+        ! Assume that first time dimension value is to be read in
+        n = 1 
+
+        if (restart_interpolated) then
+            ! Load the scrip map from file (should already have been generated via cdo externally)
+            call map_scrip_init(mps,restart_grid_name,mshlf%par%grid_name, &
+                                    method="con",fldr="maps",load=.TRUE.)
+
+            ! Read the fields, using the mapping object to interpolate to target grid
+            call marshelf_restart_read_fields(mshlf,filename,n,mps)
+        
+        else
+            ! Read the fields assuming the grid of the file matches the target grid
+            call marshelf_restart_read_fields(mshlf,filename,n)
+        end if 
+
+        return
+
+    end subroutine marshelf_restart_read
+
+    subroutine marshelf_restart_read_fields(mshlf,filename,n,mps)
+
+        implicit none
+
+        type(marshelf_class),   intent(INOUT) :: mshlf
+        character(len=*),       intent(IN) :: filename
+        integer,                intent(IN) :: n
+        type(map_scrip_class),  intent(IN), optional :: mps
+
+        ! Local variables
+        integer :: ncid 
+        integer :: nx, ny
+
+        nx = mshlf%grd%nx
+        ny = mshlf%grd%ny
+
+        ! Open the file for reading
+
+        call nc_open(filename,ncid,writable=.FALSE.)
+
+        call nc_read_interp(filename,"bmb_shlf",mshlf%now%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"bmb_ref",mshlf%now%bmb_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"bmb_corr",mshlf%now%bmb_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"T_shlf",mshlf%now%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dT_shlf",mshlf%now%dT_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"S_shlf",mshlf%now%S_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"dS_shlf",mshlf%now%dS_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"S_shlf_basin",mshlf%now%S_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"tf_shlf",mshlf%now%tf_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"tf_basin",mshlf%now%tf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"tf_corr",mshlf%now%tf_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"z_base",mshlf%now%z_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"slope_base",mshlf%now%slope_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"mask_ocn",mshlf%now%mask_ocn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        
+        ! Close the netcdf file
+        call nc_close(ncid)
+        
+        return
+
+    end subroutine marshelf_restart_read_fields
+
+    subroutine get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+        ! Get indices for a region based on bounds. 
+        ! If no bounds provided, use whole domain.
+
+        implicit none
+
+        integer, intent(OUT) :: i1
+        integer, intent(OUT) :: i2
+        integer, intent(OUT) :: j1
+        integer, intent(OUT) :: j2
+        integer, intent(IN)  :: nx
+        integer, intent(IN)  :: ny
+        integer, intent(IN), optional :: irange(2)
+        integer, intent(IN), optional :: jrange(2)
+
+        
+        if (present(irange)) then
+            i1 = irange(1)
+            i2 = irange(2)
+        else
+            i1 = 1
+            i2 = nx
+        end if
+
+        if (present(jrange)) then
+            j1 = jrange(1)
+            j2 = jrange(2)
+        else
+            j1 = 1
+            j2 = ny
+        end if
+
+        return
+
+    end subroutine get_region_indices
 
     subroutine parse_path(path,domain,grid_name)
 
@@ -1774,6 +2233,137 @@ contains
 
     end function interp_linear
     
+    subroutine axis_init(x,x0,dx)
+
+        implicit none 
+
+        real(wp) :: x(:)
+        real(wp), optional :: x0, dx
+        real(wp) :: dx_tmp 
+        integer :: i, nx  
+
+        nx = size(x) 
+
+        do i = 1, nx 
+            x(i) = real(i-1,wp)
+        end do 
+
+        dx_tmp = 1.d0 
+        if (present(dx)) dx_tmp = dx 
+        
+        x = x*dx_tmp  
+
+        if (present(x0)) then 
+            x = x + x0 
+        else
+            x = x + (-(nx-1.0)/2.0*dx_tmp)
+        end if 
+
+        return 
+    end subroutine axis_init
+
+    subroutine ocn_variable_extrapolation(var, H_ice, basin_mask, depth, z_bed)
+
+        ! First we convert to mv (missing values) the regions where there is ice or no ocean data information.
+        ! Then we take the ocean information of the grid points which are in contact with mv.
+        ! We do the mean of these grid points at different basins and depths and extrapolate them into the ice shelf cavities.
+        ! If we reach a depth where there are no surrounding grid points because we have reached a sill, then we do vertical extrapolation inside the ice-shelf cavity from the level above.
+    
+
+
+        implicit none
+        
+        real(wp), intent(INOUT) :: var(:,:,:)
+        real(wp), intent(IN)    :: H_ice(:,:), basin_mask(:,:), depth(:), z_bed(:,:)
+        
+        ! Local variables
+        integer :: i, j, k, l
+        integer :: nx, ny, nz, nb
+        real(wp), allocatable :: mask_border(:,:)
+        real(wp), allocatable :: mean_var_basin(:,:), npts_basin(:,:)
+        ! Define default missing value
+        real(wp), parameter :: mv = -9999.0_wp
+        
+        nx = size(var, 1)
+        ny = size(var, 2)
+        nz = size(var, 3)
+        nb = maxval(int(basin_mask))
+
+        ! Allocate objects
+        allocate(mask_border(nx, ny))
+        allocate(mean_var_basin(nb, nz))
+        allocate(npts_basin(nb, nz))
+        
+        ! Initialize variables
+        mask_border = 0.0_wp
+        mean_var_basin = 0.0_wp
+        npts_basin = 0.0_wp
+
+        ! 1. Define the mask of grid points with information closest to the ice front or mv.
+        ! 0 -> ocean; 2 -> mv or ice; 1 -> ocean point in contact with mv
+        where (H_ice .gt. 0.0_wp .or. var(:,:,1) .eq. mv)
+            mask_border = 2.0_wp
+        end where
+        
+        ! Loop to set mask_border to 1.0_wp for ocean points in contact with mv
+        do j = 2, ny-1
+        do i = 2, nx-1
+            if (mask_border(i, j) .eq. 0.0_wp) then
+                if (mask_border(i+1, j) .eq. 2.0_wp .or. mask_border(i-1, j) .eq. 2.0_wp .or. &
+                    mask_border(i, j+1) .eq. 2.0_wp .or. mask_border(i, j-1) .eq. 2.0_wp) then
+                        mask_border(i, j) = 1.0_wp
+                end if
+            end if
+        end do
+        end do
+        
+        ! 2. Compute the mean of the border by basins and depth.
+        do k = 1, nz
+        do j = 1, ny
+        do i = 1, nx
+            if (mask_border(i, j) .eq. 1.0_wp .and. z_bed(i, j) .lt. depth(k)) then
+                l = int(basin_mask(i, j))
+                ! ignore basin 0 for the moment (outside of continental-shelf break)
+                if (l .gt. 0) then
+                    mean_var_basin(l, k) = mean_var_basin(l, k) + var(i, j, k)
+                    npts_basin(l, k)     = npts_basin(l, k) + 1.0_wp
+                end if
+            end if
+        end do
+        end do
+        end do
+        
+        mean_var_basin = mean_var_basin / (npts_basin+1e-8)
+        
+        ! If the number of points is zero at some depth, set to previous value
+        do l = 1, nb
+        do k = 2, nz
+            if (npts_basin(l, k) .eq. 0.0_wp) then
+                mean_var_basin(l, k) = mean_var_basin(l, k-1)
+            end if
+        end do
+        end do
+        
+        ! 3. Assign the mean value by basin
+        do k = 1, nz
+        do j = 1, ny
+        do i = 1, nx
+            if (mask_border(i, j) .eq. 2.0_wp) then
+                l = int(basin_mask(i, j))
+                ! ignore basin 0 for the moment (outside of continental-shelf break)
+                if (l .gt. 0) var(i, j, k) = mean_var_basin(l, k)
+            end if
+        end do
+        end do
+        end do
+        
+        !if (.TRUE.) then
+        !    write(*,*) "var_max = ",maxval(var(:,:,:))
+        !    write(*,*) "var_min = ",minval(var(:,:,:))
+        !end if
+
+        return
+
+    end subroutine ocn_variable_extrapolation
+
 end module marine_shelf
-
-
