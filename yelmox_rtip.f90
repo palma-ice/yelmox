@@ -33,7 +33,7 @@ program yelmox_rtip
     integer  :: n, m, i1wais, i2wais, j1wais, j2wais, xmargin, ymargin
     real(wp) :: time_wt
 
-    real(wp)            :: restart_every_df
+    real(wp)            :: restart_every_df, f_last_restart
     integer             :: counter_restart
     character(len=16)   :: counter_restart_str
     character(len=512)  :: filename_restarts
@@ -53,7 +53,7 @@ program yelmox_rtip
     type(ismip6_forcing_class)  :: ismp1
     type(hyster_class)          :: hyst1
 
-    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm, tm_2Dwais, tm_3D
+    type(timeout_class) :: tm_1D, tm_2D, tm_2D_fastiso, tm_2Dsm, tm_2Dwais, tm_3D
 
     ! Model timing
     type(timer_class)  :: tmr
@@ -147,9 +147,10 @@ program yelmox_rtip
 
         case("hysteresis")
 
-            call nml_read(path_par,"hysteresis","scenario",      ctl%hyst_scenario)
-            call nml_read(path_par,"hysteresis","f_to",          ctl%hyst_f_to)
-            call nml_read(path_par,"hysteresis","f_ta",          ctl%hyst_f_ta)
+            call nml_read(path_par,"hysteresis","scenario",         ctl%hyst_scenario)
+            call nml_read(path_par,"hysteresis","f_to",             ctl%hyst_f_to)
+            call nml_read(path_par,"hysteresis","f_ta",             ctl%hyst_f_ta)
+            call nml_read(path_par,"hysteresis","restart_every_df", restart_every_df)
 
     end select
 
@@ -160,6 +161,7 @@ program yelmox_rtip
     call timeout_init(tm_2Dsm,path_par,"tm_2Dsm", "medium", ctl%time_init,ctl%time_end)
     call timeout_init(tm_2Dwais, path_par, "tm_2Dwais", "medium", ctl%time_init, ctl%time_end)
     call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ctl%time_init, ctl%time_end)
+    call timeout_init(tm_2D_fastiso, path_par, "tm_2D_fastiso", "medium", ctl%time_init, ctl%time_end)
     call timeout_init(tm_3D, path_par, "tm_3D", "heavy", ctl%time_init, ctl%time_end)
 
     ! Assume program is running from the output folder
@@ -182,7 +184,7 @@ program yelmox_rtip
     tmr_file            = trim(outfldr)//"timer_table.txt"
 
     ! Init restart file tracking
-    restart_every_df = 0.5
+    restart_every_df = 0.4
     counter_restart = 0
 
     !  =========================================================
@@ -266,9 +268,8 @@ program yelmox_rtip
             call get_ice_sub_region(tmp_mask,"EAIS",yelmo1%par%domain,yelmo1%par%grid_name)
             call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
 
-            ! Set WAIS indices too
-            i1wais = 25
-            j1wais = 50
+            i1wais = 70 ! 25
+            j1wais = 130! 50
             i2wais = i1wais + 63
             j2wais = j1wais + 63
             ! call get_cropwais_indices(regions_mask, 1.0, i1wais, i2wais, j1wais, j2wais, xmargin, ymargin)
@@ -328,8 +329,9 @@ program yelmox_rtip
 
     ! Initialize the isostasy reference state using reference topography fields
     call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
-    call isos_write_init_extended(isos1, file_isos, ts%time)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
+    call isos_write_init_extended(isos1, file_isos, time)
+    call isos_write_step_extended(isos1, file_isos, time)
 
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
@@ -566,7 +568,12 @@ program yelmox_rtip
             if (timeout_check(tm_2D, ts%time)) then
                 call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
             end if
-
+            
+            if (timeout_check(tm_2D_fastiso, time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
+                call isos_write_step_extended(isos1, file_isos, time)
+            end if
+            
             if (timeout_check(tm_2Dsm, ts%time)) then
                 call yelmox_write_step_small(yelmo1, isos1, snp1, &
                     mshlf1,smbpal1,file2D_small,ts%time)
@@ -681,8 +688,9 @@ program yelmox_rtip
 
             ! == MODEL OUTPUT ===================================
 
-            if (timeout_check(tm_1D, ts%time)) then
-                call yelmo_regions_write(yelmo1,ts%time)
+            if (timeout_check(tm_1D, time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+                call bsl_write_step(bsl, file_bsl, time)
             end if
 
             if (timeout_check(tm_2D, ts%time)) then
@@ -742,7 +750,8 @@ program yelmox_rtip
         ! === HYST ============
 
         ! Initialize hysteresis module for transient forcing experiments
-        call hyster_init(hyst1,path_par,ts%time)
+        call hyster_init(hyst1,path_par,time)
+        f_last_restart = hyst1%f_now
         convert_km3_Gt = yelmo1%bnd%c%rho_ice *1e-3
 
         ! =====================
@@ -760,10 +769,12 @@ program yelmox_rtip
 
 
         ! Initialize hysteresis output files
-        call yelmo_write_init(yelmo1, file1D, time_init=ts%time, units="years")
-        call yelmo_write_init(yelmo1, file2D, time_init=ts%time, units="years")
-        call yelmo_write_init(yelmo1, file2D_wais, ts%time, "years", &
-                                    irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
+        ! call yelmo_write_init(yelmo1, file1D, time_init=time, units="years")
+        call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", &
+            mask=yelmo1%bnd%ice_allowed)
+        call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
+        call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
+            irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
         call yelmo_write_init(yelmo1, file2D_small, time_init=ts%time, units="years")
         call yelmo_write_init(yelmo1, file3D, time_init=ts%time, units="years")
 
@@ -858,38 +869,35 @@ program yelmox_rtip
 
             ! ** Using routines from yelmox_hysteresis_help **
 
-            if (timeout_check(tm_1D, ts%time)) then
-                write(*,*) "writing 1D at t=", ts%time
-
-                call yelmox_write_step_1D(yelmo1,hyst1,snp1,bsl,file1D,time=ts%time)
-
-                call yelmo_regions_write(yelmo1,ts%time)
-
+            if (timeout_check(tm_1D, time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=time)
+                call bsl_write_step(bsl, file_bsl, time)
             end if
 
-            if (timeout_check(tm_2D, ts%time)) then
-                write(*,*) "writing 2D at t=", ts%time
-                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
+            if (timeout_check(tm_2D, time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
             end if
 
-
-            if (timeout_check(tm_2Dsm,ts%time)) then
-                write(*,*) "writing 2D small at t=", ts%time
+            if (timeout_check(tm_2D_fastiso, time)) then
+                write(*,*) "writing 2D at t=", time
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
+                call isos_write_step_extended(isos1, file_isos, time)
+            end if
+            
+            if (timeout_check(tm_2Dsm,time)) then
                 call yelmox_write_step_small(yelmo1, isos1, snp1, &
-                    mshlf1,smbpal1,file2D_small,ts%time)
+                    mshlf1,smbpal1,file2D_small,time)
             end if
 
-            if ( timeout_check(tm_2Dwais,ts%time) ) then
-                write(*,*) "writing 2D wais at t=", ts%time
-                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, ts%time, &
+            if ( timeout_check(tm_2Dwais,time) ) then
+                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, time, &
                     i1wais, i2wais, j1wais, j2wais)
             end if
 
-            if (timeout_check(tm_3D, ts%time)) then
-                write(*,*) "writing 3D at t=", ts%time
-                call yelmo_write_step(yelmo1, file3D, ts%time, nms=["ux","uy","uz"])
+            if (timeout_check(tm_3D, time)) then
+                call yelmo_write_step(yelmo1, file3D, time, nms=["ux","uy","uz"])
             end if
-
+            
             call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io")
 
             if (mod(ts%time_elapsed,10.0)==0) then
@@ -897,13 +905,27 @@ program yelmox_rtip
                 call timer_write_table(tmrs,[ts%time,ctl%dtt]*1e-3,"m",tmr_file,init=ts%time_elapsed .eq. 0.0)
             end if
 
-            if ((hyst1%f_now) .gt. ((counter_restart+1) * restart_every_df)) then
+            ! if ((hyst1%f_now) .gt. ((counter_restart+1) * restart_every_df)) then
+            !     write (*,*) "writing restart file at f=", hyst1%f_now
+            !     counter_restart = counter_restart + 1
+            !     if (counter_restart .lt. 10) then
+            !         write (counter_restart_str, '(i1)') counter_restart
+            !     else if (counter_restart .lt. 100) then
+            !         write (counter_restart_str, '(i2)') counter_restart
+            !     end if
+            !     call yelmox_restart_write(bsl,isos1,yelmo1,time_bp,fldr="restart-"//counter_restart_str)
+            ! end if
+
+            if (abs(hyst1%f_now - f_last_restart) .gt. restart_every_df) then
                 write (*,*) "writing restart file at f=", hyst1%f_now
                 counter_restart = counter_restart + 1
+                f_last_restart = hyst1%f_now
                 if (counter_restart .lt. 10) then
                     write (counter_restart_str, '(i1)') counter_restart
                 else if (counter_restart .lt. 100) then
                     write (counter_restart_str, '(i2)') counter_restart
+                else if (counter_restart .lt. 1000) then
+                    write (counter_restart_str, '(i3)') counter_restart
                 end if
                 call yelmox_restart_write(bsl,isos1,yelmo1,ts%time_rel,fldr="restart-"//counter_restart_str)
             end if
@@ -1070,6 +1092,85 @@ contains
 
     end subroutine calc_climate_ismip6
 
+    subroutine load_tf_corr_from_restart(tf_corr,file_restart,domain,grid_name)
+
+        use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
+                                            gen_map_filename, nc_read_interp
+
+        implicit none
+
+        real(wp),         intent(INOUT) :: tf_corr(:,:)
+        character(len=*), intent(IN)    :: file_restart
+        character(len=*), intent(IN)    :: domain
+        character(len=*), intent(IN)    :: grid_name
+
+        ! Local variables
+        integer :: i0, i1, n, nx, ny
+        character(len=1024) :: path_tf_corr
+
+        character(len=56) :: restart_domain
+        character(len=56) :: restart_grid_name
+        type(map_scrip_class) :: mps
+        logical :: restart_interpolated
+
+        nx = size(tf_corr,1)
+        ny = size(tf_corr,2)
+
+        ! Load restart file grid attributes
+        if (nc_exists_attr(file_restart,"domain")) then
+            call nc_read_attr(file_restart,"domain",    restart_domain)
+        else
+            restart_domain = trim(domain)
+        end if
+
+        if (nc_exists_attr(file_restart,"grid_name")) then
+            call nc_read_attr(file_restart,"grid_name", restart_grid_name)
+        else
+            restart_grid_name = trim(grid_name)
+        end if
+
+        if (trim(restart_grid_name) .ne. trim(grid_name)) then
+            restart_interpolated = .TRUE.
+        else
+            restart_interpolated = .FALSE.
+        end if
+
+        if (restart_interpolated) then
+            ! Load the scrip map from file (should already have been generated via cdo externally)
+            call map_scrip_init(mps,restart_grid_name,grid_name, &
+                                    method="con",fldr="maps",load=.TRUE.)
+        end if
+
+        ! Get folder holding the restart file and
+        ! append filename holding the tf_corr field we want
+        ! (should be in yelmo2D.nc)
+        i0 = index(file_restart,"/",back=.TRUE.)
+        path_tf_corr = file_restart(1:i0)//"../yelmo2D.nc"
+
+        ! Old alternative method that only works if restart file
+        ! is named "yelmo_restart.nc"
+        !path_tf_corr = file_restart
+        !call nml_replace(path_tf_corr,"yelmo_restart.nc","yelmo2D.nc")
+
+
+        ! Load the tf_corr field from the last timestep of the yelmo2D file
+        n = nc_size(path_tf_corr,"time")
+
+        if (restart_interpolated) then
+            call nc_read_interp(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        else
+            call nc_read(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1])
+        end if
+
+        ! Write summary to screen
+        write(*,*) "load_tf_corr_from_restart:: loaded tf_corr field."
+        write(*,*) "path_tf_corr: ", trim(path_tf_corr)
+        write(*,*) "tf_corr: ", minval(tf_corr), maxval(tf_corr)
+
+        return
+
+    end subroutine load_tf_corr_from_restart
+
 ! ======================================
 !
 ! Hysteresis related output routines
@@ -1142,6 +1243,10 @@ subroutine yelmox_write_step_reg2D(ylmo, mshlf, filename, time, i1, i2, j1, j2)
     call yelmo_write_var(filename,"smb",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])  
     call yelmo_write_var(filename,"bmb",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])  
     call yelmo_write_var(filename,"z_sl",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])  
+    call yelmo_write_var(filename,"N_eff",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])
+    call yelmo_write_var(filename,"taub",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])
+    call yelmo_write_var(filename,"T_srf",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])
+    call yelmo_write_var(filename,"visc_eff_int",ylmo,n,ncid,irange=[i1,i2],jrange=[j1,j2])
     
     ! marine_shelf
     call nc_write(filename, "T_shlf", mshlf%now%T_shlf(i1:i2, j1:j2), &
@@ -1250,7 +1355,6 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call yelmo_write_var(filename,"pd_err_H_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_z_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"pd_err_uxy_s",ylmo,n,ncid)
-        call yelmo_write_var(filename,"pd_err_smb_ref",ylmo,n,ncid)
 
         ! == yelmo extra fields ==
 
@@ -1947,5 +2051,31 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         return
 
     end subroutine yelmox_restart_write
+
+
+    subroutine yelmo_write_hyst_reg_step(hyst,filename,time)
+
+        implicit none 
+        
+        type(hyster_class),   intent(IN) :: hyst
+        character(len=*),     intent(IN) :: filename
+        real(wp),             intent(IN) :: time
+
+        ! Local variables
+        integer    :: ncid, n
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+        n = nc_size(filename,"time",ncid)
+
+        call nc_write(filename,"hyst_f_now",hyst%f_now,units="K",long_name="hyst: forcing value", &
+            dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 a)",&
+            long_name="hyst: forcing rate of change", dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt_ave,units="Gt/a", &
+            long_name="hyst: volume rate of change", dim1="time",start=[n],ncid=ncid)
+        call nc_close(ncid)
+
+    end subroutine yelmo_write_hyst_reg_step
 
 end program yelmox_rtip

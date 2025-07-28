@@ -63,6 +63,12 @@
  file            = 'input/timeout_ramp_100kyr.txt'
  times           = 0          
 /
+
+&tm_2D_fastiso
+ method          = 'const'
+ dt              = 500.0
+/
+
 &tm_2Dsm
  method          = 'const'    
  dt              = 1000000.0  
@@ -156,51 +162,52 @@
  pc_eps          = 1.0        
 /
 &ytopo
- solver          = 'impl-lis' 
- calv_flt_method = 'vm-l19'   
- calv_grnd_method = 'stress-b12'
- bmb_gl_method   = 'pmpt'     
- fmb_method      = 1          
- dmb_method      = 0          
- surf_gl_method  = 0          
- margin_flt_subgrid = .true.  
- margin2nd       = .false.    
- use_bmb         = .true.     
- topo_fixed      = .false.    
- topo_rel        = 0          
- topo_rel_tau    = 10.0       
- topo_rel_field  = 'H_ref'    
- calv_tau        = 1.0        
- calv_thin       = 30.0       
- H_min_grnd      = 5.0        
- H_min_flt       = 0.0        
- sd_min          = 100.0      
- sd_max          = 500.0      
- calv_grnd_max   = 0.0        
- grad_lim        = 0.05       
- grad_lim_zb     = 0.05       
- dist_grz        = 200.0      
- gl_sep          = 1          
- gz_nx           = 15         
- gz_Hg0          = 0.0        
- gz_Hg1          = 100.0      
- fmb_scale       = 1.0        
- k2              = 3200000000.0
- w2              = 25         
- kt_ref          = 0.0025     
- kt_deep         = 0.1        
- Hc_ref          = 100.0      
- Hc_ref_thin     = 25.0       
- Hc_deep         = 250.0      
- zb_deep_0       = -1000.0    
- zb_deep_1       = -1500.0    
- zb_sigma        = 0.0        
- dmb_alpha_max   = 60.0       
- dmb_tau         = 100.0      
- dmb_sigma_ref   = 300.0      
- dmb_m_d         = 3.0        
- dmb_m_r         = 1.0        
+ solver              = "impl-lis"        ! "expl", "impl-lis"
+ calv_flt_method     = "vm-l19"          ! "zero", "simple", "flux", "vm-l19", "kill"
+ calv_grnd_method    = "stress-b12"      ! "zero", "stress-b12"
+ bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt; "pmpt": partial melt and grounding zone
+ fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+ dmb_method          = 0                 ! 0: no subgrid discharge, 1: subgrid discharge on
+ surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
+ margin_flt_subgrid  = True              ! Allow fractional ice area for floating margins
+ margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
+ use_bmb             = True              ! Use basal mass balance in mass conservation equation
+ topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
+ topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points, 4: gl-zone only
+ topo_rel_tau        = 10.0              ! [a] Time scale for relaxation
+ topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
+ calv_tau            = 1.0               ! [a] Characteristic calving time
+ calv_thin           = 30.0              ! [m/yr] Calving rate to apply to very thin ice
+ H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability
+ H_min_flt           = 0.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+ sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <  = sd_min)     = 0.0
+ sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >  = sd_max)     = calv_max
+ calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
+ grad_lim            = 0.05              ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+ grad_lim_zb         = 0.05              ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
+ dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
+ gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
+ gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+ gz_Hg0              = 0.0               ! [m] Grounding zone, limit of penetration of bmb_grnd
+ gz_Hg1              = 100.0             ! [m] Grounding zone, limit of penetration of bmb_shlf
+ fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+ k2                  = 3.2e9             ! [m yr] eigen calving scaling factor (Albrecht et al, 2021 recommend 1e17 m s == 3.2e9 m yr)
+ w2                  = 25                ! [-] vm-l19 calving eigenvalue weighting coefficient
+ kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
+ kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
+ Hc_ref              = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+ Hc_ref_thin         = 50.0              ! [m] Reference ice thickness for thin ice calving
+ Hc_deep             = 500.0             ! [m] Calving limit in ice thickness (thinner ice calves)
+ zb_deep_0           = -1000.0           ! [m] Bedrock elevation to begin transition to deep ocean
+ zb_deep_1           = -1500.0           ! [m] Bedrock elevation to end transition to deep ocean
+ zb_sigma            = 0.0               ! [m] Gaussian filtering of bedrock for calving transition to deep ocean
+ dmb_alpha_max       = 60.0              ! [deg] Maximum angle of slope from coast at which to allow discharge
+ dmb_tau             = 100.0             ! [yr]  Discharge timescale
+ dmb_sigma_ref       = 300.0             ! [m]   Reference bed roughness
+ dmb_m_d             = 3.0               ! [-]   Discharge distance scaling exponent
+ dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
 /
+
 &ydyn
  solver          = 'diva'     
  visc_method     = 1          
@@ -294,6 +301,7 @@
  cp_rock         = 1000.0     
  kt_rock         = 63000000.0 
 /
+
 &yelmo_masks
  basins_load     = .true.     
  basins_path     = 'ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc'
@@ -302,6 +310,7 @@
  regions_path    = 'ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc'
  regions_nms     = 'mask' 'None'
 /
+
 &yelmo_init_topo
  init_topo_load  = .true.     
  init_topo_path  = 'ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc'
@@ -311,25 +320,27 @@
  smooth_H_ice    = 0.0        
  smooth_z_bed    = 0.0        
 /
+
 &yelmo_data
- pd_topo_load    = .true.     
- pd_topo_path    = 'ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc'
- pd_topo_names   = 'H_ice' 'z_bed' 'z_bed_sd' 'z_srf' 'mask'
- pd_tsrf_load    = .true.     
- pd_tsrf_path    = 'ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc'
- pd_tsrf_name    = 'T_srf'    
- pd_tsrf_monthly = .true.     
- pd_smb_load     = .true.     
- pd_smb_path     = 'ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc'
- pd_smb_name     = 'smb'      
- pd_smb_monthly  = .true.     
- pd_vel_load     = .true.     
- pd_vel_path     = 'ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc'
- pd_vel_names    = 'ux_srf' 'uy_srf'
- pd_age_load     = .false.    
- pd_age_path     = 'input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc'
- pd_age_names    = 'age_iso' 'depth_iso'
+ pd_topo_load      = True
+ pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+ pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf" "mask" ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+ pd_tsrf_load      = True
+ pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc"
+ pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
+ pd_tsrf_monthly   = True
+ pd_smb_load       = True
+ pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc"
+ pd_smb_name       = "smb"                        ! Surface mass balance
+ pd_smb_monthly    = True
+ pd_vel_load       = True
+ pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
+ pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity
+ pd_age_load       = False
+ pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+ pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones
 /
+
 &snap
  atm_type        = 'snap_1ind'
  ocn_type        = 'anom'     
@@ -357,18 +368,21 @@
  f_seas          = 1.0        
  f_to            = 0.2        
 /
+
 &snap_clim0
- clim_path       = 'ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc'
- clim_names      = 'zs' 'T_srf' 'pr' ''
- clim_monthly    = .true.     
- clim_time       = 0          
- clim_stdev_path = 'None'     
- clim_stdev_name = 'pr'       
- ocn_path        = 'ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc'
- ocn_names       = 'depth' 'mask_ocn' 'to' 'so'
- ocn_monthly     = .false.    
- ocn_time        = 0          
+ clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO-VW23.nc"
+ clim_names      = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
+ clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
+ clim_time       = 0
+ clim_stdev_path = "None"
+ clim_stdev_name = "pr"
+ !ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+ ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
+ ocn_names       = "depth" "mask_ocn" "to" "so"
+ ocn_monthly     = False
+ ocn_time        = 0
 /
+
 &snap_clim1
  clim_path       = 'ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc'
  clim_names      = 'z_srf' 't2m_ann' 't2m_djf' 'pr_ann'
@@ -506,44 +520,70 @@
  ghf_const       = 50.0       
 /
 &isos
- heterogeneous_ssh = .true.   
- interactive_sealevel = .true.
- correct_distortion = .false. 
- method          = 3          
- dt_prognostics  = 0.1        
- dt_diagnostics  = 10.0       
- pad             = 1024.0     
- mantle          = 'rheology_file'
- lithosphere     = 'rheology_file'
- lithospheric_smoothing = 0.0 
- viscosity_scaling_method = 'stddev'
- viscosity_scaling = 0.0      
- layering        = 'parallel' 
- nl              = 5          
- dl              = 25.0       
- zl              = 100 150 200 250 300
- viscosities     = 1e+21 1e+21 1e+21 1e+21 2e+21
- tau             = 2000.0     
- E               = 66.0       
- nu              = 0.28       
- rho_ice         = 910.0      
- rho_seawater    = 1028.0     
- rho_water       = 1000.0     
- rho_uppermantle = 3400.0     
- rho_litho       = 3200.0     
- g               = 9.81       
- r_earth         = 6378000.0  
- m_earth         = 5.972e+24  
- restart         = 'None'     
- mask_file       = 'None'     
- rheology_file   = 'isostasy_data/earth_structure/ANT-16KM_GIA_HR24.nc'
+    ! Options
+    heterogeneous_ssh = .true.      ! Sea level varies spatially?
+    interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
+    include_elastic = .true.        ! Include elastic deformation?
+    correct_distortion = .false.    ! Account for distortion of projection?
+    method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
+    dt_prognostics  = 1.0           ! [yr] Max. timestep to recalculate prognostics
+    dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
+    pad         = 1024.             ! [km] Padding around the domain (preferably chosen as a power
+                                    ! of 2 multiplied by the resolution)
+
+    ! Rheology
+    mantle = "rheology_file"        ! Choose mantle viscosity field, options:
+                                    ! "uniform", "rheology_file"
+    lithosphere = "rheology_file"   ! Choose lithospheric thickness field:
+                                    ! "uniform", "rheology_file"
+    rheo_smoothing_radius = 0.0     ! [km] Gaussian moothing radius for lithospheric thickness
+                                    ! and mantle viscosity
+    viscosity_scaling_method = "scale"     ! "scale", "std", "min" or "max"
+    viscosity_scaling = 1.          ! "scale"   => visc = viscosity_scaling * visc
+                                    ! "std"     => visc = visc + viscosity_scaling * stddev(visc)
+                                    ! "min"     => visc = min(visc) * viscosity_scaling
+                                    ! "max"     => visc = max(visc) * viscosity_scaling
+    layering    = "parallel"        ! "parallel", "equalized" or "folded"
+    nl          = 5                 ! [1] Number of viscous layers for sub-lithospheric mantle
+    dl          = 25.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 100, 150, 200, 250, 300     ! [km] Depth of layer boundaries.
+                                    ! Only used if layering="equalized". First value 
+                                    ! overwritten if visc_method="rheology_file".
+    viscosities = 1e21, 1e21, 1e21, 1e21, 2e21     ! [Pa s] Layer viscosities. Only used if
+                                    ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
+                                    ! viscosity field is provided.
+    tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
+
+    ! Physical constants
+    E               = 66.0          ! [GPa] Young modulus
+    nu              = 0.28          ! [-] Poisson ratio
+    rho_ice         = 910.          ! [kg/m^3]
+    rho_seawater    = 1028.0        ! [kg/m^3]
+    rho_water       = 1000.0        ! [kg/m^3]
+    rho_uppermantle = 3400.0        ! [kg/m^3]
+    rho_litho       = 3200.0        ! [kg/m^3]  Optionally set to 0 ==> decouple the elastic
+                                    ! displacement from the viscous one
+    g               = 9.81          ! [m/s^2]
+    r_earth         = 6.378e6       ! [m]  Earth radius, Coulon et al. (2021)
+    m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
+
+    ! Files
+    restart = "None"
+    mask_file = "None"
+    rheology_file = "isostasy_data/earth_structure/ANT-16KM_GIA_HR24.nc"
+    litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
+    log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
+    stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
+
 /
 &barysealevel
- method          = 'fastiso'  
- bsl_init        = 0.0        
- sl_path         = 'none'     
- sl_name         = 'none'     
- A_ocean_pd      = 362500000000000.0
- A_ocean_path    = 'isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc'
- restart         = 'None'     
+    method      = "fastiso" ! "const": BSL = bsl_init throughout sim
+                            ! "file": BSL = time series provided from sl_path
+                            ! "fastiso": BSL = sum of contributions from fastiso domains
+    bsl_init    = 0.0       ! [m] BSL relative to present day
+    sl_path     = "none"    ! Input time series filename
+    sl_name     = "none"    ! Variable name in netcdf file, if relevant
+    A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
+    A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
+    restart    = "None"
 /
