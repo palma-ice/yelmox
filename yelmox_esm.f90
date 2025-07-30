@@ -106,9 +106,11 @@ program yelmox_esm
     call nml_read(path_par,"esm","par_file",         ctl%esm_par_file)
     call nml_read(path_par,"esm","experiment",       ctl%esm_experiment)
     call nml_read(path_par,"esm","use_esm",          ctl%esm_use_esm)
+
     ! esm cmip conventions
     call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)
     call nml_read(path_par,"esm","dt_formatted",     ctl%esm_dt_formatted)
+
     ! esm climate parameters
     call nml_read(path_par,"esm","lapse",            esm1%lapse)
     call nml_read(path_par,"esm","f_p",              esm1%beta_p)
@@ -291,10 +293,9 @@ program yelmox_esm
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update forcing to present-day reference using esm forcing
-    call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
+    call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                           time=ts%time,time_bp=ts%time_rel, &
-                          time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
-                          clim_var=ctl%clim_var,domain=yelmo1%par%domain)
+                          domain=yelmo1%par%domain)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -488,10 +489,9 @@ program yelmox_esm
 
             ! Update forcing to present-day reference, but 
             ! adjusting to ice topography
-            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1, &
+            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                                   time=ts%time,time_bp=ts%time_rel, &
-                                  time_ref=ctl%time_ref,time_hist=ctl%time_hist,time_proj=ctl%time_proj, &
-                                  clim_var=ctl%clim_var,domain=yelmo1%par%domain) 
+                                  domain=yelmo1%par%domain) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -583,10 +583,9 @@ program yelmox_esm
 
             ! == CLIMATE and OCEAN ==========================================
 
-            ! Get ISMIP6 climate and ocean forcing
-            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ts%time,ts%time_rel, &
-                                  ctl%time_ref,ctl%time_hist,ctl%time_proj, &
-                                  clim_var=ctl%clim_var,domain=yelmo1%par%domain)
+            ! Get ESM climate and ocean forcing
+            call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl,ts%time,ts%time_rel, &
+                                  domain=yelmo1%par%domain)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -1063,7 +1062,7 @@ contains
 
     ! === CLIMATE ====
 
-    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,time,time_bp,time_ref,time_hist,time_proj,clim_var,domain,use_ref_atm,use_ref_ocn)
+    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,ctl,time,time_bp,domain,use_ref_atm,use_ref_ocn)
 
         implicit none 
 
@@ -1071,23 +1070,22 @@ contains
         type(marshelf_class),       intent(INOUT) :: mshlf 
         type(esm_forcing_class),    intent(INOUT) :: esm
         type(yelmo_class),          intent(IN)    :: ylmo
+        type(ctrl_params),          intent(IN)    :: ctl
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp
-        real(wp),                   intent(IN)    :: time_ref(2),time_hist(2),time_proj(2)
-        logical,                    intent(IN)    :: clim_var
         character(len=*),           intent(IN)    :: domain
         logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
 
         ! Step 1: set the reference climatologies (monthly data)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,  &
-                             time_ref,clim_var,domain)
+                             ctl%time_ref,ctl%clim_var,domain)
 
         ! Step 2: Calculate anomaly fields
-        call esm_forcing_update(esm,ylmo%tpo%now%z_srf,time, &
-                                time_ref,time_hist,time_proj, &
+        call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj, &
+                                ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
                                 use_ref_atm=.false.,use_ref_ocn=.false.)
 
-        if (.TRUE.) then
+        if (.FALSE.) then
             ! Anomaly check
             write(*,*) "dts = ",maxval(esm%dts)
             write(*,*) "dto = ",maxval(esm%dto)
@@ -1107,7 +1105,7 @@ contains
         end if
 
         ! === Oceanic boundary conditions ===
-        ! Interpolate ocean data to the interior
+        ! Interpolate ocean data to the interior of the ice shelf
         call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
         call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
 
@@ -1125,20 +1123,9 @@ contains
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
 
-        if (ctl%esm_use_esm) then
-            ! Update oceanic anomaly fields at desired level
-            ! TO DO
-            call marshelf_interp_shelf(mshlf%now%dT_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
-                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
-            call marshelf_interp_shelf(mshlf%now%dS_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
-                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
-            !mshlf%now%T_shlf = mshlf%now%T_shlf + mshlf%now%dT_shlf
-            !mshlf%now%S_shlf = mshlf%now%S_shlf + mshlf%now%dS_shlf
-        else
-            ! Homogeneous anomaly
-            mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto
-            mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso
-        end if
+        ! Add the anomaly from  
+        mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto
+        mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso
 
         ! Update bmb_shlf and mask_ocn
         ! check: how is dT and dS shelf read in marine_shelf?
@@ -1545,75 +1532,6 @@ contains
     !         General routines
     !
     ! =================================
-
-    function interp_linear(x,y,xout) result(yout)
-        ! Simple linear interpolation of a point (used for ice-shelf draft)
-
-        implicit none 
- 
-        real(wp), dimension(:), intent(IN) :: x, y
-        real(wp), intent(IN) :: xout
-        real(wp) :: yout 
-        integer :: i, j, n, nout 
-        real(wp) :: alph
-
-        n    = size(x) 
-
-        if (xout .lt. x(1)) then
-            yout = y(1)
-        else if (xout .gt. x(n)) then
-            yout = y(n)
-        else
-            do j = 1, n 
-                if (x(j) .ge. xout) exit 
-            end do
-
-            if (j .eq. 1) then 
-                yout = y(1) 
-            else if (j .eq. n+1) then 
-                yout = y(n)
-            else 
-                alph = (xout - x(j-1)) / (x(j) - x(j-1))
-                yout = y(j-1) + alph*(y(j) - y(j-1))
-
-            end if 
-        end if 
-
-        return 
-
-    end function interp_linear
-
-    !subroutine load_ocn_bnd(esm,to_ann,so_ann,depth)
-    !
-    !    implicit none 
-    !    
-    !    type(esm_forcing_class), intent(INOUT) :: esm
-    !    real(wp),                intent(IN)    :: to_ann(:,:,:) 
-    !    real(wp),                intent(IN)    :: so_ann(:,:,:)
-    !    real(wp),                intent(IN)    :: depth(:) 
-    !   
-    !    ! Local variables 
-    !    integer :: i, j, k, nx, ny, nk 
-    !    
-    !    nx = size(to_ann,1)
-    !    ny = size(to_ann,2) 
-    !    nk = size(esm%to,3)
-    !    
-    !    do k = 1, nk 
-    !    do j = 1, ny 
-    !    do i = 1, nx 
-    !    
-    !        ! Interpolate ocean variables to the levels of interest
-    !        esm%to_ann(i,j,k) = interp_linear(depth,to_ann(i,j,:),xout=esm%depth(k))
-    !        esm%so_ann(i,j,k) = interp_linear(depth,so_ann(i,j,:),xout=esm%depth(k))
-    !                
-    !    end do 
-    !    end do 
-    !    end do 
-    !    
-    !    return 
-    !    
-    !end subroutine load_ocn_bnd
 
     subroutine calc_iceberg_island(iceberg_mask,f_grnd,H_ice)
         ! Subroutine for finding icebergs 
