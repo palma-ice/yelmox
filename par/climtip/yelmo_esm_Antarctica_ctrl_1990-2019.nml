@@ -35,6 +35,7 @@
     time_proj       = 2020.0, 2300.0    ! [yr] Year interval used as Projection period
     time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization 
+    time_esm_ref    = 1995.0, 2014.0    ! [yr] Year interval used as Reference of ESM
     clim_var        = True              ! include climate variability
     clim_seed       = 10                ! Randomnes seed
     kill_shelves    = True              ! Kill ice shelves beyond PD.
@@ -45,7 +46,7 @@
 &transient
     tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2015              ! Assumed time for "const" method
-    time_init       = 1990.0            ! [yr] Starting time (years CE)
+    time_init       = 2020.0            ! [yr] Starting time (years CE)
     time_end        = 2300.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 1.0               ! [yr] Main loop timestep 
@@ -56,6 +57,7 @@
     time_proj       = 2020.0, 2300.0    ! [yr] Year interval used as Projection period
     time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization 
+    time_esm_ref    = 1995.0, 2014.0    ! [yr] Year interval used as Reference of ESM
     clim_var        = False             ! include climate variability
     clim_seed       = 1                 ! Randomnes seed
     kill_shelves    = False              ! Kill ice shelves beyond PD.
@@ -215,7 +217,7 @@
     w2                  = 0.0               ! Weighting coefficient of 2nd principal strain/stress
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
-    tau_ice             = 85.0e3           ! [Pa] Ice strength failure
+    tau_ice             = 70.0e3           ! [Pa] Ice strength failure
 
     ! === threshold method ===
     Hc_ref_flt          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)

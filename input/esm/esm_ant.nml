@@ -19,6 +19,14 @@
     experiment      = "1pctCO2"
 /
 
+&ssp126
+    experiment      = "ssp126"
+/
+
+&ssp585
+    experiment      = "ssp585"
+/
+
 ! =========== ATMOSPHERE ===========
 
 ! ======== Reference period ========
@@ -55,9 +63,32 @@
     time_par    = 2000, 2000, 0, 1
 /
 
+! ======== ESM Reference period ========
+&gcm_ts_esm_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/climatology_1995-2014/{gcm}_{scenario}.nc"
+    name        = "ts_clim"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 2014, 0, 1
+/
+
+&gcm_pr_esm_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/climatology_1995-2014/{gcm}_{scenario}.nc"
+    name        = "pr_clim"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 2014, 0, 1
+/
+
 ! ======= Historical period =======
 &gcm_ts_hist
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1950-1994/{gcm}_{scenario}.nc"
     name        = "ts_anomaly"
     units_in    = "K"
     units_out   = "K"
@@ -68,7 +99,7 @@
 /
 
 &gcm_pr_hist
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1950-1994/{gcm}_{scenario}.nc"
     name        = "pr_anomaly"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -80,8 +111,8 @@
 
 ! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
-    name        = "ts_anomaly"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "ts"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
@@ -91,8 +122,8 @@
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
-    name        = "pr_anomaly"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
     unit_scale  = 31556926.0        ! CMIP standard sec_to_year  
@@ -126,9 +157,32 @@
     time_par    = 1979, 2024, 1, 1
 /
 
+! ======== ESM Reference period ========
+&gcm_to_esm_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/climatology_1995-2014/{gcm}_{scenario}.nc"
+    name        = "temperature"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15 
+    with_time   = False
+    time_par    = 1995, 2014, 0, 1
+/
+
+&gcm_so_esm_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/climatology_1995-2014/{gcm}_{scenario}.nc"
+    name        = "salinity"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 2014, 0, 1
+/
+
 ! ======== Historical period ========
 &gcm_to_hist
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1850-1994/{gcm}_{scenario}.nc"
     name        = "temperature"
     units_in    = "degrees C"
     units_out   = "K"
@@ -139,7 +193,7 @@
 /
 
 &gcm_so_hist
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1850-1994/{gcm}_{scenario}.nc"
     name        = "salinity"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -151,18 +205,18 @@
 
 ! ======== Projection period ========
 &gcm_to_proj
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "temperature"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0
     unit_offset = 273.15 
-    with_time   = True 
+    with_time   = True
     time_par    = 1995, 2300, 1, 1
 /
 
 &gcm_so_proj
-    filename    = "ice_data/cmip-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "salinity"
     units_in    = "PSU"
     units_out   = "PSU"

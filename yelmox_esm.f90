@@ -58,10 +58,12 @@ program yelmox_esm
         real(wp)            :: time_equil   ! Only for spinup 
         real(wp)            :: dtt
 
+        real(wp)            :: time_ref(2)
         real(wp)            :: time_hist(2) 
         real(wp)            :: time_proj(2)  
-        real(wp)            :: time_ref(2)  
+        real(wp)            :: time_esm_ref(2)  
         logical             :: clim_var
+        integer             :: clim_seed
 
         character(len=56)   :: tstep_method
         real(wp)            :: tstep_const
@@ -92,9 +94,6 @@ program yelmox_esm
     integer, allocatable :: seed(:)
     call random_seed(size=seed_size) ! Get the size of the seed array
     allocate(seed(seed_size))        ! Allocate the seed array
-    seed = 100                       ! Set the seed value (any integer value as the seed)
-    call random_seed(put=seed)       ! Initialize the random number generator with the seed
-        
 
     ! Determine the parameter file from the command line 
     call yelmo_load_command_line_args(path_par)
@@ -105,6 +104,7 @@ program yelmox_esm
     ! esm parameters 
     call nml_read(path_par,"esm","par_file",         ctl%esm_par_file)
     call nml_read(path_par,"esm","experiment",       ctl%esm_experiment)
+    call nml_read(path_par,"esm","esm_name",         ctl%esm_name)
     call nml_read(path_par,"esm","use_esm",          ctl%esm_use_esm)
 
     ! esm cmip conventions
@@ -132,7 +132,9 @@ program yelmox_esm
     call nml_read(path_par,trim(ctl%run_step),"time_ref",     ctl%time_ref)     ! [yr,yr] Reference period
     call nml_read(path_par,trim(ctl%run_step),"time_hist",    ctl%time_hist)    ! [yr,yr] Historical period
     call nml_read(path_par,trim(ctl%run_step),"time_proj",    ctl%time_proj)    ! [yr,yr] Projection period
+    call nml_read(path_par,trim(ctl%run_step),"time_esm_ref", ctl%time_esm_ref) ! [yr,yr] ESM reference period
     call nml_read(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)     ! Climate variability
+    call nml_read(path_par,trim(ctl%run_step),"clim_seed",    ctl%clim_seed)     ! Climate variability
     call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method) ! Calendar choice ("const" or "rel")
     call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)  ! Assumed time bp for const method
         
@@ -179,6 +181,10 @@ program yelmox_esm
     write(*,*) "esm_experiment:      ", trim(ctl%esm_experiment)
     write(*,*) "load_esm:            ", ctl%esm_use_esm
     if (ctl%esm_use_esm) write(*,*) "esm_name: ", trim(ctl%esm_name)
+
+    ! set the seed
+    seed = ctl%clim_seed                 ! Set the seed value (any integer value as the seed)
+    call random_seed(put=seed)       ! Initialize the random number generator with the seed
     
     select case(trim(ctl%run_step))
 
@@ -192,9 +198,10 @@ program yelmox_esm
 
             write(*,*) "esm_write_formatted: ", ctl%esm_write_formatted
             write(*,*) "esm_file_suffix:     ", trim(ctl%esm_name)
-            write(*,*) "time_hist: ",           ctl%time_hist(1),ctl%time_hist(2)
             write(*,*) "time_ref: ",            ctl%time_ref(1),ctl%time_ref(2)
+            write(*,*) "time_hist: ",           ctl%time_hist(1),ctl%time_hist(2)
             write(*,*) "time_proj: ",           ctl%time_proj(1),ctl%time_proj(2)
+            write(*,*) "time_esm_ref: ",        ctl%time_esm_ref(1),ctl%time_esm_ref(2)
             
     end select
 
@@ -262,8 +269,16 @@ program yelmox_esm
     
     ! Initialize ESM atmospheric and oceanic objects 
     esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
-    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,experiment=ctl%esm_experiment)
-   
+    if(ctl%esm_use_esm) then
+        ! we are using a gcm output
+        call esm_forcing_init(esm1,esm_path_par,domain,grid_name, &
+                          gcm=ctl%esm_name,scenario=ctl%esm_experiment)!,experiment=ctl%esm_experiment)
+    else
+        ! ctrl experiment
+        call esm_forcing_init(esm1,esm_path_par,domain,grid_name, &
+                          experiment=ctl%esm_experiment)
+    end if
+
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
     
@@ -1081,7 +1096,7 @@ contains
                              ctl%time_ref,ctl%clim_var,domain)
 
         ! Step 2: Calculate anomaly fields
-        call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj, &
+        call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
                                 ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
                                 use_ref_atm=.false.,use_ref_ocn=.false.)
 
