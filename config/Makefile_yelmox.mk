@@ -27,7 +27,7 @@ $(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/pico.o
 $(objdir)/ismip6.o: $(libdir)/ismip6.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/esm.o: $(libdir)/esm.f90
+$(objdir)/esm.o: $(libdir)/esm.f90 $(objdir)/marine_shelf.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # $(objdir)/isostasy.o: $(libdir)/isostasy.f90 $(objdir)/nml.o
