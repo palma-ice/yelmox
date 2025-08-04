@@ -77,19 +77,19 @@ module esm
         type(varslice_class)   :: zs_hist
         type(varslice_class)   :: zs_proj
         
-        ! To do: eliminate this into new group
         ! === Diagnostic fields ===
+
         ! === Atmosphere ===
         ! Monthly fields (but right now constant anomaly between months)
         real(wp), allocatable :: t2m(:,:,:)   ! Monthly surface temperature [K]
         real(wp), allocatable :: pr(:,:,:)    ! Monthly precipitation [mm/yr]
         real(wp), allocatable :: dts(:,:,:)   ! Surface temperature anomaly [K]
         real(wp), allocatable :: dpr(:,:,:)   ! Precipitation relative anomaly [%]
-        ! === Ocean ===
+        ! ===    Ocean   ===
         real(wp), allocatable :: dto(:,:)     ! Surface temperature anomaly [K]
         real(wp), allocatable :: dso(:,:)     ! Precipitation relative anomaly [%]
         
-        ! Mean fields
+        ! === Mean fields ===
         real(wp), allocatable :: t2m_sum(:,:) ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:) ! Annual surface temperature [K]
         real(wp), allocatable :: pr_ann(:,:)  ! Annual precipitation [mm/yr]
@@ -317,9 +317,13 @@ contains
             if (.TRUE.) then
                 call varslice_init_nml_esm(esm%ts_esm_ref,  filename,trim(grp_ts_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%pr_esm_ref,  filename,trim(grp_pr_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
+                call varslice_update(esm%ts_esm_ref)
+                call varslice_update(esm%pr_esm_ref)
                 !call varslice_init_nml_esm(esm%zs_esm_ref,  filename,trim(grp_zs_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%to_esm_ref,  filename,trim(grp_to_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%so_esm_ref,  filename,trim(grp_so_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
+                call varslice_update(esm%to_esm_ref)
+                call varslice_update(esm%so_esm_ref)
                 !call varslice_update(esm%zs_esm_ref)
             end if
             ! ESM historical period
@@ -388,14 +392,14 @@ contains
         
             case("transient")
                 if (use_esm) then ! Fields loaded from ESM
-                    ! === Reference period   === For now it is the mean over a whole period (check if we want to add monthly data here)
+                    ! === Reference period   ===
+                    ! For now it is the mean over a whole period (check if we want to add monthly data here)
                     ! === Atmospheric fields ===
-                    call varslice_update(esm%ts_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
-                    call varslice_update(esm%pr_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
-                            
+                    !call varslice_update(esm%ts_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
+                    !call varslice_update(esm%pr_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                     ! === Oceanic fields ===
-                    call varslice_update(esm%to_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
-                    call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
+                    !call varslice_update(esm%to_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
+                    !call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                     
                     ! Interpolate ocean data to the interior of ice shelves
                     call ocn_variable_extrapolation(esm%to_esm_ref%var(:,:,:,1),H_ice,basins,-esm%to_esm_ref%z,z_bed)
