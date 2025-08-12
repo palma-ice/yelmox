@@ -363,9 +363,7 @@ program yelmox_esm
 
                 if (opt%cf_init .gt. 0.0) then 
                     ! Prescribe cb_ref to initial guess 
-                    yelmo1%dyn%now%cb_ref =  %cf_init
-                    ! jablasco 
-                    !yelmo1%dyn%now%cb_ref = opt%cf_init*(10**(5*(2-1/MAX(yelmo1%dyn%par%beta_q,1e-8))))
+                    yelmo1%dyn%now%cb_ref =  opt%cf_init
                 else 
                     ! Load cb_ref from calculated cb_tgt field
                     yelmo1%dyn%now%cb_ref = yelmo1%dyn%now%cb_tgt 
@@ -449,7 +447,7 @@ program yelmox_esm
                                                 dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
                                                 cb_tgt=yelmo1%dyn%now%cb_tgt)
                         else
-                            ! jablasco: kori opt
+                            ! Pollard & DeConto optimization 2012
                             call optimize_cb_ref_pc12(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_ice_n, &
                                 yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                 yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
