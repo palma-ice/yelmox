@@ -590,12 +590,10 @@ end if
             call yelmo_regions_write(yelmo1,ts%time)
         end if 
 
-        write(*,*) "Javi L599"
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
             call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
         end if 
  
-        write(*,*) "Javi L600"
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
         
         if (mod(ts%time_elapsed,10.0)==0) then

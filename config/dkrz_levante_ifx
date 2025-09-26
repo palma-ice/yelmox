@@ -22,7 +22,7 @@ ISOSTASYROOT = FastIsostasy
 INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
 LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
 
-YELMOROOT = yelmo
+YELMOROOT = yelmo-lsf
 INC_YELMO = -I${YELMOROOT}/libyelmo/include 
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
