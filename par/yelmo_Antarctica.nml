@@ -4,11 +4,11 @@
     time_init       = 0.0               ! [yr] Starting time 
     time_end        = 30e3              ! [yr] Ending time
     time_equil      = 1e3               ! [yr] Equilibration time 
-    dtt             = 5.0               ! [yr] Main loop timestep 
+    dtt             = 10.0               ! [yr] Main loop timestep 
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = True              ! Calculate transient climate? 
     with_ice_sheet  = True              ! Is the ice sheet active?
-    equil_method    = "relax"           ! "none", "relax", "opt"
+    equil_method    = "opt"           ! "none", "relax", "opt"
 /
 
 &tm_1D
@@ -37,7 +37,7 @@
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
-    cf_min          = 0.001             ! [--] Minimum allowed cf value
+    cf_min          = 1e-4             ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
@@ -147,12 +147,12 @@
     ! === calving method & law ===
     use_lsf             = True              ! use level-set method
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
-    calv_flt_method     = "vm-m16"          ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "zero"          ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     
     ! === numeric noise === 
-    H_min_grnd          = 0.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
-    H_min_flt           = 0.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
+    H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
@@ -205,8 +205,8 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "lin"             ! "none", "lin", or "exp" : scaling with elevation 
-    is_angle        = True              ! cb_ref is a till strength angle?
+    scale           = "none"             ! "none", "lin", or "exp" : scaling with elevation 
+    is_angle        = False              ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
@@ -214,7 +214,7 @@
     z0              = -400.0            ! [m] Bedrock rel. to sea level, lower limit
     z1              =    0.0            ! [m] Bedrock rel. to sea level, upper limit
     cf_min          =  0.1              ! [-- or deg] Minimum value of cf
-    cf_ref          =  15               ! [-- or deg] Reference/const/max value of cf
+    cf_ref          =  0.05             ! [-- or deg] Reference/const/max value of cf
 /
 
 &yneff 

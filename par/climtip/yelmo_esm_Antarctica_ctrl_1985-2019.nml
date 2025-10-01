@@ -46,7 +46,7 @@
     tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 2020.0            ! [yr] Starting time (years CE)
-    time_end        = 2300.0            ! [yr] Ending time (years CE)
+    time_end        = 3000.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 1.0               ! [yr] Main loop timestep 
 
@@ -75,7 +75,7 @@
     method          = "times"           ! "const", "file", "times"
     dt              = 50e3
     file            = "input/timeout_ramp_100kyr.txt"
-    times           = 2100, 2200, 2300
+    times           = 2020,2100,2200,2300,2400,2500,2600,2700,2800,2900,3000
 /
 
 &tm_2Dsm
@@ -427,7 +427,7 @@
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     restart         = "/home/a/a271124/Model/yelmox/output_final/climtip/opt-32km/noclimvar/1985-2019/restart-0.000-kyr/marine_shelf.nc"        ! Load fields from a restart file?
     
-    corr_method     = "tf"          ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
+    corr_method     = "tf-ant"          ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
     basin_number    = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19           ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.5 -0.17 -0.31 -0.24 0.31 0.25 -0.15 -0.1 -0.74 -0.62 -0.1 -2.5 -2.6 -1.67 0.0 -1.37 0.0 0.75 0.71
