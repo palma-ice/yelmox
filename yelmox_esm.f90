@@ -436,66 +436,24 @@ program yelmox_esm
 
                     if (opt%opt_cf .and. &
                         (ts%time_elapsed .ge. opt%cf_time_init .and. ts%time_elapsed .le. opt%cf_time_end) ) then 
-                        ! Perform cf_ref optimization
-                   
-                        ! Update cb_ref based on error metric(s) 
-                        select case("thickness-l21")
-                            case("thickness-l21")
-                                call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
+                        ! Perform cf_ref optimization based on error metric(s) 
+
+                        call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                                     yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err)!,cb_tgt=yelmo1%dyn%now%cb_tgt)
-                            
-                            case("velocity-l21")
-                                call optimize_cb_ref_vel(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
-                                                        yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd,yelmo1%dyn%now%duxydt, &
-                                                        opt%cf_min,opt%cf_max,yelmo1%thrm%now%f_pmp,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                                        dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
-                                                        cb_tgt=yelmo1%dyn%now%cb_tgt)
-                            case("thickness-pc12")
-                                ! Pollard & DeConto optimization 2012
-                                call optimize_cb_ref_pc12(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_ice_n, &
-                                    yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
-                                    cb_tgt=yelmo1%dyn%now%cb_tgt)
-                            case("mix-vel-thick")
-                                if (ts%time_elapsed .lt. 10e3) then
-                                        yelmo1%tpo%par%topo_fixed = .True.
-                                        call optimize_cb_ref_vel(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
-                                                        yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd,yelmo1%dyn%now%duxydt, &
-                                                        opt%cf_min,opt%cf_max,yelmo1%thrm%now%f_pmp,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,1000.0, &
-                                                        dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
-                                                        cb_tgt=yelmo1%dyn%now%cb_tgt)
-                                else
-                                        yelmo1%tpo%par%topo_fixed = .False.
-                                        call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
-                                                    yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                                    yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err)
-                                end if 
-
-                        end select
-
+                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, opt%scaleH, &
+                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err,cb_tgt=yelmo1%dyn%now%cb_tgt)
+                        
                     end if
 
                     if (opt%opt_tf .and. &
                         (ts%time_elapsed .ge. opt%tf_time_init .and. ts%time_elapsed .le. opt%tf_time_end) ) then
                         ! Perform tf_corr optimization
-                        if (.True.) then
-                                call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                                                        yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
-                                                        opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
-                        else
-                                call optimize_tf_corr_basin(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
-                                                            yelmo1%dta%pd%H_ice,yelmo1%bnd%basins,opt%H_grnd_lim,opt%tau_m,opt%m_temp, &
-                                                            opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
-                        end if
+
+                        call optimize_tf_corr(mshlf1%now%tf_corr,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_grnd,yelmo1%tpo%now%dHidt, &
+                                                        yelmo1%dta%pd%H_ice,yelmo1%dta%pd%H_grnd,opt%H_grnd_lim,yelmo1%bnd%basins, &
+                                                        opt%basin_fill,opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,yelmo1%tpo%par%dx,sigma=opt%tf_sigma,dt=ctl%dtt)
+                        
                     end if 
 
                 case("relax")
