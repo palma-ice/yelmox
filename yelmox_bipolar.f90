@@ -1694,12 +1694,11 @@ contains
                 
                     ! Update cb_ref based on error metric(s) 
                     call optimize_cb_ref(yelmox%yelmo1%dyn%now%cb_ref,yelmox%yelmo1%tpo%now%H_ice, &
-                                            yelmox%yelmo1%tpo%now%dHidt,yelmox%yelmo1%bnd%z_bed,yelmox%yelmo1%bnd%z_sl,yelmox%yelmo1%dyn%now%ux_s,yelmox%yelmo1%dyn%now%uy_s, &
-                                            yelmox%yelmo1%dta%pd%H_ice,yelmox%yelmo1%dta%pd%uxy_s,yelmox%yelmo1%dta%pd%H_grnd, &
-                                            yelmox%opt%cf_min,yelmox%opt%cf_max,yelmox%yelmo1%tpo%par%dx,yelmox%opt%sigma_err,yelmox%opt%sigma_vel,yelmox%opt%tau_c,yelmox%opt%H0, &
-                                            dt=ctl%dtt,fill_method=yelmox%opt%fill_method,fill_dist=yelmox%opt%sigma_err, &
-                                            cb_tgt=yelmox%yelmo1%dyn%now%cb_tgt)
-
+                                                    yelmox%yelmo1%tpo%now%dHidt,yelmox%yelmo1%bnd%z_bed,yelmox%yelmo1%bnd%z_sl,yelmox%yelmo1%dyn%now%ux_s,yelmox%yelmo1%dyn%now%uy_s, &
+                                                    yelmox%yelmo1%dta%pd%H_ice,yelmox%yelmo1%dta%pd%uxy_s,yelmox%yelmo1%dta%pd%H_grnd, &
+                                                    yelmox%opt%cf_min,yelmox%opt%cf_max,yelmox%yelmo1%tpo%par%dx,yelmox%opt%sigma_err,yelmox%opt%sigma_vel,yelmox%opt%tau_c,yelmox%opt%H0,yelmox%opt%scaleH, &
+                                                    dt=ctl%dtt,fill_method=yelmox%opt%fill_method,fill_dist=yelmox%opt%sigma_err,cb_tgt=yelmox%yelmo1%dyn%now%cb_tgt)
+                    
                 end if
 
                 if (yelmox%opt%opt_tf .and. &
@@ -1707,11 +1706,8 @@ contains
                     ! Perform tf_corr optimization
 
                     call optimize_tf_corr(yelmox%mshlf1%now%tf_corr,yelmox%yelmo1%tpo%now%H_ice,yelmox%yelmo1%tpo%now%H_grnd,yelmox%yelmo1%tpo%now%dHidt, &
-                                                yelmox%yelmo1%dta%pd%H_ice,yelmox%yelmo1%dta%pd%H_grnd,yelmox%opt%H_grnd_lim,yelmox%opt%tau_m,yelmox%opt%m_temp, &
-                                                yelmox%opt%tf_min,yelmox%opt%tf_max,yelmox%yelmo1%tpo%par%dx,sigma=yelmox%opt%tf_sigma,dt=ctl%dtt)
-                    ! call optimize_tf_corr(yelmox%mshlf1%now%tf_corr,yelmox%yelmo1%tpo%now%H_ice,yelmox%yelmo1%tpo%now%H_grnd,yelmox%yelmo1%tpo%now%dHidt, &
-                    !                         yelmox%yelmo1%dta%pd%H_ice,yelmox%yelmo1%bnd%basins,opt%H_grnd_lim, &
-                    !                         opt%tau_m,opt%m_temp,opt%tf_min,opt%tf_max,opt%tf_basins,dt=ctl%dtt)
+                                          yelmox%yelmo1%dta%pd%H_ice,yelmox%yelmo1%dta%pd%H_grnd,yelmox%opt%H_grnd_lim,yelmox%yelmo1%bnd%basins, &
+                                          yelmox%opt%basin_fill,yelmox%opt%tau_m,yelmox%opt%m_temp,yelmox%opt%tf_min,yelmox%opt%tf_max,yelmox%yelmo1%tpo%par%dx,sigma=yelmox%opt%tf_sigma,dt=ctl%dtt)
                 
                 end if 
 

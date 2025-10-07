@@ -37,14 +37,15 @@
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
-    cf_min          = 1e-4             ! [--] Minimum allowed cf value
+    cf_min          = 1e-4              ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
-    
+    scaleH          = False             ! If True: use observed ice thickness as error scaling (not H0)   
+
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
-    
+
     rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
     rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
     rel_time1       = 2e3               ! [yr] Time limit for time period 1
@@ -62,8 +63,7 @@
     tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
-
-    cf_ref_wais     = 0.01
+    basin_fill      = False             ! If true: Fill grounded basins with ice-shelf mean tf-corr values
 /
 
 &yelmo
@@ -118,7 +118,6 @@
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
-    grounded_melt       = True
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
@@ -147,7 +146,7 @@
     ! === calving method & law ===
     use_lsf             = True              ! use level-set method
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
-    calv_flt_method     = "zero"          ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill", "threshold"
     calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     
     ! === numeric noise === 
@@ -164,7 +163,7 @@
     w2                  = 0.0               ! Weighting coefficient of 2nd principal strain/stress
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
-    tau_ice             = 85.0e3           ! [Pa] Ice strength failure
+    tau_ice             = 100.0e3           ! [Pa] Ice strength failure
 
     ! === threshold method ===
     Hc_ref_flt          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
@@ -541,30 +540,33 @@
     ! Options
     heterogeneous_ssh = .true.      ! Sea level varies spatially?
     interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
+    include_elastic = .true.        ! Include elastic deformation?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
-    dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    pad         = 512.              ! [km] Padding around the domain (preferably chosen as a power
+    dt_prognostics  = 0.1           ! [yr] Max. timestep to recalculate prognostics
+    dt_diagnostics  = 10.0          ! [yr] Min. timestep to recalculate diagnostics
+    pad             = 1024.0        ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
 
     ! Rheology
-    mantle = "uniform"              ! Choose mantle viscosity field, options:
+    mantle = "rheology_file"        ! Choose mantle viscosity field, options:
                                     ! "uniform", "rheology_file"
-    lithosphere = "uniform"         ! Choose lithospheric thickness field:
+    lithosphere = "rheology_file"   ! Choose lithospheric thickness field:
                                     ! "uniform", "rheology_file"
-    viscosity_scaling_method = "scale"  ! "scale" or "min" or "max"
-    viscosity_scaling = 1.              ! Only used if viscosity_scaling_method = "scale"
-    layering    = "equalized"       ! "parallel", "equalized" or "folded"
-    nl          = 2                 ! [1] Number of viscous layers for sub-lithospheric mantle
-    dl          = 10.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
-    zl          = 88., 600.         ! [km] Depth of layer boundaries.
-                                    ! Only used if layering="equalized". First value 
-                                    ! overwritten if visc_method="rheology_file".
-    viscosities = 1.e21, 2.e21      ! [Pa s] Layer viscosities. Only used if
-                                    ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
-                                    ! viscosity field is provided.
-    tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
+    lithospheric_smoothing = 0.0
+    viscosity_scaling_method = "stddev"  ! "scale" or "min" or "max"
+    viscosity_scaling = 0.0              ! Only used if viscosity_scaling_method = "scale"
+    rheo_smoothing_radius = 40.0         ! [km] Smoothing radius for rheology
+    layering    = "parallel"             ! "parallel", "equalized" or "folded"
+    nl          = 5                      ! [1] Number of viscous layers for sub-lithospheric mantle
+    dl          = 25.0                   ! [km] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 100.0, 150.0, 200.0, 250.0, 300.0         ! [km] Depth of layer boundaries.
+                                         ! Only used if layering="equalized". First value
+                                         ! overwritten if visc_method="rheology_file".
+    viscosities = 1.e21, 1.e21, 1.e21, 1.e21, 2.e21      ! [Pa s] Layer viscosities. Only used if
+                                         ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
+                                         ! viscosity field is provided.
+    tau         = 2000.0                 ! [yr] Relaxation time. Only used if method=1 or 2.
 
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
@@ -582,7 +584,10 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "None"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc"
+    litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
+    log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
+    stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
 /
 
 &barysealevel
