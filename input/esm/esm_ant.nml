@@ -63,6 +63,41 @@
     time_par    = 2000, 2000, 0, 1
 /
 
+! ======== Variability =============
+
+&gcm_ts_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "t2m"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1979.0, 2022.0, 1.0, 12.0
+/
+
+&gcm_pr_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "precip"
+    units_in    = "kg m-2 month-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 0.08333         
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 1979.0, 2022.0, 1.0, 12.0
+/
+
+&gcm_zs_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0         
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 2000, 2000, 0, 1
+/
+
 ! ======== ESM Reference period ========
 &gcm_ts_esm_ref
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/climatology_1995-2014/{gcm}_{scenario}.nc"
@@ -138,6 +173,36 @@
 &gcm_to_ref
     filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_thetao.nc"
     name        = "thetao"
+    !filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    !name        = "to"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = True
+    time_par    = 1979, 2024, 1, 1
+    !with_time   = False
+    !time_par    = 1995, 2017, 0, 1
+/
+
+&gcm_so_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_so.nc"
+    !filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    name        = "so"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 1979, 2024, 1, 1
+    !with_time   = False
+    !time_par    = 1995, 2017, 0, 1
+/
+
+! ======== Variability period ========
+&gcm_to_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_thetao.nc"
+    name        = "thetao"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0 
@@ -146,7 +211,7 @@
     time_par    = 1979, 2024, 1, 1
 /
 
-&gcm_so_ref
+&gcm_so_var
     filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_so.nc"
     name        = "so"
     units_in    = "PSU"
