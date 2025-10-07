@@ -8,7 +8,7 @@
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 10.0              ! [yr] Main loop timestep 
     write_restart   = True              ! Write restart files
-    use_hyster      = True              ! Use hysteresis module? 
+    use_hyster      = False             ! Use hysteresis module? 
     dT              = 0.0               ! [K]  Contant summer warming anomaly              
     lim_pd_ice      = True              ! Apply extra melting outside of PD ice extent
     greenland_init_marine_H = False     ! Initialize ice thickness to LGM-like state
@@ -127,8 +127,9 @@
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
     surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
-    grad_lim            = 0.05               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
-    grad_lim_zb         = 0.05               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
+    grad_lim            = 0.05              ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    grad_lim_zb         = 0.05              ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
+    dHdt_dyn_lim        = 100.0             ! [m/yr] Maximum allowed ice thickness change due to dynamics
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
     use_bmb             = True              ! Use basal mass balance in mass conservation equation

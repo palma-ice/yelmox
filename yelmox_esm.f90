@@ -436,7 +436,25 @@ program yelmox_esm
 
                     if (opt%opt_cf .and. &
                         (ts%time_elapsed .ge. opt%cf_time_init .and. ts%time_elapsed .le. opt%cf_time_end) ) then 
-                        ! Perform cf_ref optimization based on error metric(s) 
+                        ! Perform cf_ref optimization
+                    
+                        ! Update cb_ref based on error metric(s) 
+                        if (.True.) then
+                            call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
+                                                yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
+                                                opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                                dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
+                                                cb_tgt=yelmo1%dyn%now%cb_tgt)
+                        else
+                            ! Pollard & DeConto optimization 2012
+                            call optimize_cb_ref_pc12(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_ice_n, &
+                                yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
+                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
+                                opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
+                                dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
+                                cb_tgt=yelmo1%dyn%now%cb_tgt)
+                        end if
 
                         call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                                     yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
