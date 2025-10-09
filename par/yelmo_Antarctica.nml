@@ -39,8 +39,7 @@
     cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
-    H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
-    scaleH          = False             ! If True: use observed ice thickness as error scaling (not H0)   
+    H0              = 0.0.              ! [m]  L21: Optimization ice-thickness error scaling 
 
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
