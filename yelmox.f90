@@ -264,12 +264,14 @@ end if
 
     ! === Initialize external models (forcing for ice sheet) ======
 
-    ! Initialize barysealevel model
-    call bsl_init(bsl, path_par, ts%time_rel)
+    ! jablasco
+    if (.FALSE.) then
+        ! Initialize barysealevel model
+        call bsl_init(bsl, path_par, ts%time_rel)
 
-    ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
-
+        ! Initialize fastisosaty
+        call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
+    end if
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
@@ -290,16 +292,19 @@ end if
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
     ! Barystatic sea level
-    call bsl_update(bsl, year_bp=ts%time_rel)
-    call bsl_write_init(bsl, file_bsl, ts%time)
+    ! jablasco
+    if (.FALSE.) then
+        call bsl_update(bsl, year_bp=ts%time_rel)
+        call bsl_write_init(bsl, file_bsl, ts%time)
 
-    ! Initialize the isostasy reference state using reference topography fields
-    call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
-    call isos_write_init_extended(isos1, file_isos, ts%time)
+        ! Initialize the isostasy reference state using reference topography fields
+        call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+        call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
+        call isos_write_init_extended(isos1, file_isos, ts%time)
 
-    yelmo1%bnd%z_bed = isos1%out%z_bed
-    yelmo1%bnd%z_sl  = isos1%out%z_ss
+        yelmo1%bnd%z_bed = isos1%out%z_bed
+        yelmo1%bnd%z_sl  = isos1%out%z_ss
+    end if
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -468,7 +473,7 @@ end if
                     call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                                     yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, opt%scaleH, &
+                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                                     dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err,cb_tgt=yelmo1%dyn%now%cb_tgt)
                     
                 end if
@@ -512,10 +517,13 @@ end if
         call timer_step(tmrs,comp=0) 
         
         ! == ISOSTASY and SEA LEVEL ======================================================
-        call bsl_update(bsl, ts%time_rel)
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = isos1%out%z_bed
-        yelmo1%bnd%z_sl  = isos1%out%z_ss
+        ! jablasco
+        if (.FALSE.) then
+                call bsl_update(bsl, ts%time_rel)
+                call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+                yelmo1%bnd%z_bed = isos1%out%z_bed
+                yelmo1%bnd%z_sl  = isos1%out%z_ss
+        end if
 
         call timer_step(tmrs,comp=1,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="isostasy") 
         
@@ -587,7 +595,8 @@ end if
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-            call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+            ! jablasco
+            !call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
         end if 
  
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
@@ -607,7 +616,8 @@ end if
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,ts%time]*1e-3,label="timeloop") 
     
     ! Write the restart snapshot for the end of the simulation
-    call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+    ! jablasco
+    !call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=ts%time)
@@ -685,12 +695,10 @@ contains
         call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain=domain,dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
 
         ! Update smbpal
-        write(*,*) "Javi: L 692"
         call smbpal_update_monthly(smb,snp%now%tas,snp%now%pr, &
                                     ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,ts%time_rel) 
         ylmo%bnd%smb   = smb%ann%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
         ylmo%bnd%T_srf = smb%ann%tsrf 
-        write(*,*) "Javi: L697"
 
         if (trim(method) .eq. "const") then
             ! Additionally ensure smb is postive for land above 50degN in Laurentide region
@@ -854,7 +862,7 @@ contains
         call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
 
         ! Write present-day data metrics (rmse[H],etc)
-        !call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
+        call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
                 
         ! == yelmo_topography ==
         call yelmo_write_var(filename,"H_ice",ylmo,n,ncid)
@@ -871,7 +879,8 @@ contains
         call yelmo_write_var(filename,"f_grnd",ylmo,n,ncid)
         call yelmo_write_var(filename,"f_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"dHidt",ylmo,n,ncid)
-        
+        call yelmo_write_var(filename,"lsf",ylmo,n,ncid)
+
         call yelmo_write_var(filename,"cmb_flt",ylmo,n,ncid)
         call yelmo_write_var(filename,"cmb_grnd",ylmo,n,ncid)
 
@@ -978,7 +987,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! == smbpal ==
-        write(*,*) "Javi smbpal"
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -1071,8 +1079,7 @@ contains
         call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
-        ! jablasco: false for pyrenees
-        !call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
+        call marshelf_restart_write(mshlf,trim(outfldr)//"/"//file_mshlf,time)
 
         return
 

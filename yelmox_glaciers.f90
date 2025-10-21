@@ -305,7 +305,7 @@ program yelmox
                     call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                                     yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, opt%scaleH, &
+                                                    opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                                     dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err,cb_tgt=yelmo1%dyn%now%cb_tgt)
                     
                 end if
@@ -347,7 +347,7 @@ program yelmox
         ! == ICE SHEET ===================================================
 
         ! Update Yelmo
-        if (ctl%with_ice_sheet .and. (.not. (ts%n .eq. 0 .and. yelmo1%par%use_restart)) ) then
+        if (ctl%with_ice_sheet) then
             call yelmo_update(yelmo1,ts%time)
         end if
         
@@ -386,12 +386,10 @@ program yelmox
             call yelmo_regions_write(yelmo1,ts%time)
         end if 
 
-        write(*,*) "Javi L599"
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
             call yelmox_restart_write(bsl,isos1,yelmo1,ts%time)
         end if 
  
-        write(*,*) "Javi L600"
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
         
         if (mod(ts%time_elapsed,10.0)==0) then
@@ -467,7 +465,8 @@ contains
         call yelmo_write_var(filename,"f_grnd",ylmo,n,ncid)
         call yelmo_write_var(filename,"f_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"dHidt",ylmo,n,ncid)
-        
+        call yelmo_write_var(filename,"lsf",ylmo,n,ncid)
+
         call yelmo_write_var(filename,"cmb_flt",ylmo,n,ncid)
         call yelmo_write_var(filename,"cmb_grnd",ylmo,n,ncid)
 
@@ -505,10 +504,9 @@ contains
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_sl",ylmo,n,ncid)
-        !call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)
+        call yelmo_write_var(filename,"smb",ylmo,n,ncid)
         call yelmo_write_var(filename,"T_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_shlf",ylmo,n,ncid)
-        write(*,*) "javi qgeo"
         call yelmo_write_var(filename,"Q_geo",ylmo,n,ncid)
 
         if (.FALSE.) then
@@ -520,7 +518,6 @@ contains
         end if
 
         ! == yelmo extra fields ==
-        write(*,*) "yelmox extra"
         call yelmo_write_var(filename,"ssa_mask_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"ssa_mask_acy",ylmo,n,ncid)
         call yelmo_write_var(filename,"dzsdx",ylmo,n,ncid)
@@ -540,10 +537,6 @@ contains
         call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
 
-        write(*,*) "javi 1"
-        call nc_write(filename,"Q_strn_alt_units",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-
         call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
@@ -556,16 +549,14 @@ contains
         end if
 
         ! == snapclim ==
-        write(*,*) "Javi snapclim"
         call nc_write(filename,"Ta_ann",snp%now%ta_ann,units="K",long_name="Near-surface air temperature (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"Ta_sum",snp%now%ta_sum,units="K",long_name="Near-surface air temperature (sum)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
+        call nc_write(filename,"pr_ann",snp%now%pr_ann*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        !call nc_write(filename,"pr",snp%now%pr*1e-3,units="m/a water equiv.",long_name="Precipitation (ann)", &
-        !              dim1="xc",dim2="yc",dim3="month",dim4="time",start=[1,1,1,n],ncid=ncid)
+        call nc_write(filename,"smb_bnd",ylmo%bnd%smb,units="m/a water equiv.",long_name="Boundary SMB", &
+                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
               
         call nc_write(filename,"dTa_ann",snp%now%ta_ann-snp%clim0%ta_ann,units="K",long_name="Near-surface air temperature anomaly (ann)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -575,7 +566,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! == smbpal ==
-        write(*,*) "Javi smbpal"
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
@@ -621,9 +611,7 @@ contains
         
         call bsl_restart_write(bsl,trim(outfldr)//"/"//file_bsl,time)
         call isos_restart_write(isos,trim(outfldr)//"/"//file_isos,time)
-        write(*,*) "Javi restart 1"
         call yelmo_restart_write(ylmo,trim(outfldr)//"/"//file_yelmo,time) 
-        write(*,*) "Javi restart 2"
 
         return
 

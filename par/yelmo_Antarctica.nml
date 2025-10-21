@@ -40,7 +40,6 @@
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
-    scaleH          = False             ! If True: use observed ice thickness as error scaling (not H0)   
 
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
@@ -60,9 +59,9 @@
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = 1, 12, 14, 15     ! Basin numbers to optimize (-1 for all basins)
+    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
+    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False             ! If true: Fill grounded basins with ice-shelf mean tf-corr values
 /
 
@@ -92,7 +91,7 @@
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
-    dt_min          = 0.01              ! [a] Minimum timestep 
+    dt_min          = 0.1              ! [a] Minimum timestep 
     cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
     cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
@@ -121,7 +120,7 @@
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
 
     ! === Grounding line ===
-    bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
+    bmb_gl_method       = "pmpt"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
     gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
     gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
 
@@ -147,8 +146,8 @@
     ! === calving method & law ===
     use_lsf             = True              ! use level-set method
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
-    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill", "threshold"
-    calv_grnd_method    = "zero"            ! "zero", "stress-b12"
+    calv_flt_method     = "equil"           ! "zero", "simple", "flux", "vm-l19", "kill", "threshold"
+    calv_grnd_method    = "equil"           ! "zero", "stress-b12"
     
     ! === numeric noise === 
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
@@ -240,9 +239,9 @@
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
     de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
-    enh_shear               = 3.0
+    enh_shear               = 1.0
     enh_stream              = 1.0
-    enh_shlf                = 0.7
+    enh_shlf                = 0.5
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
     calc_age                = False         ! Calculate age tracer field?
@@ -301,11 +300,11 @@
     pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_RACMO23-VW23.nc" 
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = True
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERA-INTERIM_monthly_1981-2010.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_RACMO23-VW23.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = True 
@@ -349,14 +348,12 @@
 /
 
 &snap_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    clim_path       = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_RACMO23-VW23.nc"
     clim_names      = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
     clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    !ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
-    !ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_S14.nc"
     ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     ocn_names       = "z" "mask_ocn" "to" "so"
     ocn_monthly     = False
@@ -364,7 +361,6 @@
 /
 
 &snap_clim1
-    ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_present.nc"
     clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
     clim_monthly    = False
@@ -378,7 +374,6 @@
 /
 
 &snap_clim2
-    ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
     clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
     clim_monthly    = False
