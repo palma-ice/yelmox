@@ -558,7 +558,6 @@
     pad         = 1024.             ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
 
-
     ! Rheology methods
     mantle = "rheology_file"        ! Choose mantle viscosity field, options:
                                     ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
@@ -578,6 +577,7 @@
     viscosities = 1e21, 1e21, 1e21, 1e21, 2e21     ! [Pa s] Layer viscosities. Only used if
                                     ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
                                     ! viscosity field is provided.
+    ref_viscosity = 1.e21       ! [Pa s] Reference viscosity for scaling
     tau = 3000.0                ! [yr] Relaxation time used for "method" = 2
     rheo_smoothing_radius = 40.0! [km] Gaussian moothing radius for lithospheric thickness
                                 ! and mantle viscosity
@@ -598,7 +598,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
