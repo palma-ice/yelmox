@@ -579,6 +579,7 @@
     
     ! Rheology parameters
     nl          = 5             ! [1] Number of viscous layers for sub-lithospheric mantle
+    dl          = 25.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
     zl          = 100, 150, 200, 250, 300     ! [km] Depth of layer boundaries.
                                     ! Only used if layering="equalized". First value 
                                     ! overwritten if visc_method="rheology_file".
