@@ -671,11 +671,6 @@ contains
 
         end select 
         
-        ! Load sediment mask 
-        path_lgm = "ice_data/Laurentide/"//trim(ylmo%par%grid_name)//&
-                    "/"//trim(ylmo%par%grid_name)//"_SED-L97.nc"
-        call nc_read(path_lgm,"z_sed",ylmo%bnd%H_sed) 
-
         if (with_ice_sheet) then
             ! Run Yelmo for briefly to update surface topography
             call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
