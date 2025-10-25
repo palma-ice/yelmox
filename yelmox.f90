@@ -395,7 +395,7 @@ end if
                 if (ctl%with_ice_sheet) then
                     ! Run yelmo for a few years with constant boundary conditions
                     ! to synchronize all model fields a bit
-                    call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+                    call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_wp, dt=1.0_wp,topo_fixed=.FALSE.)
                 end if 
 
             end if
@@ -406,7 +406,7 @@ end if
             if (ctl%with_ice_sheet) then
                 ! Run yelmo for a few years with constant boundary conditions
                 ! to synchronize all model fields a bit
-                call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+                call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_wp, dt=1.0_wp,topo_fixed=.FALSE.)
             end if 
 
         end select
@@ -415,8 +415,12 @@ end if
 
     ! ===== Initialize output files ===== 
     
-    call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years") 
-    call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years") 
+    if (tm_2D%active) then
+        call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
+    end if
+    if (tm_2Dsm%active) then
+        call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years")
+    end if
     
     call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
@@ -578,7 +582,7 @@ end if
             call yelmox_write_step(yelmo1,snp1,mshlf1,smbpal1,file2D,ts%time)
         end if
 
-        if (timeout_check(tm_2Dsm,ts%time) .and. .FALSE.) then 
+        if (timeout_check(tm_2Dsm,ts%time)) then 
             call yelmo_write_step(yelmo1,file2D_small,ts%time,compare_pd=.FALSE.)
         end if
 
@@ -674,23 +678,21 @@ contains
 
         if (with_ice_sheet) then
             ! Run Yelmo for briefly to update surface topography
-            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
             ! Addtional cleanup - remove floating ice 
             where( ylmo%tpo%now%mask_bed .eq. 5) ylmo%tpo%now%H_ice = 0.0 
-            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
         end if 
 
         ! Update snapclim to reflect new topography 
         call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain=domain,dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
 
         ! Update smbpal
-        write(*,*) "Javi: L 692"
         call smbpal_update_monthly(smb,snp%now%tas,snp%now%pr, &
                                     ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,ts%time_rel) 
         ylmo%bnd%smb   = smb%ann%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-        ylmo%bnd%T_srf = smb%ann%tsrf 
-        write(*,*) "Javi: L697"
+        ylmo%bnd%T_srf = smb%ann%tsrf
 
         if (trim(method) .eq. "const") then
             ! Additionally ensure smb is postive for land above 50degN in Laurentide region
@@ -906,14 +908,21 @@ contains
         call yelmo_write_var(filename,"bmb_grnd",ylmo,n,ncid)
         call yelmo_write_var(filename,"H_w",ylmo,n,ncid)
         
+        !call yelmo_write_var(filename,"Q_strn",ylmo,n,ncid)
+        ! Write Q_strn in K/yr instead of mW/m^3:
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+        call yelmo_write_var(filename,"Q_ice_b",ylmo,n,ncid)
+        call yelmo_write_var(filename,"Q_b",ylmo,n,ncid)
+        
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_sl",ylmo,n,ncid)
         !call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)
         call yelmo_write_var(filename,"T_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_shlf",ylmo,n,ncid)
-        write(*,*) "javi qgeo"
-        call yelmo_write_var(filename,"Q_geo",ylmo,n,ncid)
+        !call yelmo_write_var(filename,"Q_geo",ylmo,n,ncid)     ! Written as static field below
 
         if (.FALSE.) then
                 ! == yelmo_data (comparison with present-day) ==
@@ -924,6 +933,7 @@ contains
         end if
 
         ! == yelmo extra fields ==
+if (.FALSE.) then
         write(*,*) "yelmox extra"
         call yelmo_write_var(filename,"ssa_mask_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"ssa_mask_acy",ylmo,n,ncid)
@@ -943,19 +953,13 @@ contains
         call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
+end if
 
-        write(*,*) "javi 1"
-        call nc_write(filename,"Q_strn_alt_units",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-
-        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
         ! Static fields
         if (n .le. 1) then 
             call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
+                        dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+            call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW m^-2",long_name="Geothermal heat flow at depth ", &
                         dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         end if
 
@@ -978,7 +982,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
         ! == smbpal ==
-        write(*,*) "Javi smbpal"
 !         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
 !                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
