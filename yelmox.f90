@@ -675,8 +675,8 @@ contains
             ! Run Yelmo for briefly to update surface topography
             call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
-            ! Addtional cleanup - remove floating ice 
-            where( ylmo%tpo%now%mask_bed .eq. 5) ylmo%tpo%now%H_ice = 0.0 
+            ! Addtional cleanup - remove thin floating ice 
+            where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 500.0_wp) ylmo%tpo%now%H_ice = 0.0 
             call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
         end if 
 
