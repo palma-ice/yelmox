@@ -634,6 +634,7 @@ contains
 
         ! Local variables
         character(len=1024) :: path_lgm
+        type(yelmo_class) :: ylmo_eq
 
         ! Load LGM reconstruction into reference ice thickness
         path_lgm = "ice_data/Laurentide/"//trim(ylmo%par%grid_name)//&
@@ -650,6 +651,9 @@ contains
             ylmo%tpo%now%H_ice = 0.0
             where (ylmo%bnd%regions .eq. 1.1 .and. ylmo%bnd%z_bed .gt. 0.0) ylmo%tpo%now%H_ice = 1000.0 
             where (ylmo%bnd%regions .eq. 1.12) ylmo%tpo%now%H_ice = 1000.0 
+
+            ! Apply Gaussian smoothing to keep things stable
+            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=3.0)
 
         case("ref_lgm")
             ! Set LGM reconstruction as initial ice thickness over North America
@@ -678,6 +682,12 @@ contains
             ! Addtional cleanup - remove thin floating ice 
             where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 500.0_wp) ylmo%tpo%now%H_ice = 0.0 
             call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
+
+            if (trim(method) .eq. "ref_lgm") then
+                ! Store new "clean" ice thickness as reference state
+                ylmo%bnd%H_ice_ref = ylmo%tpo%now%H_ice
+            end if
+
         end if 
 
         ! Update snapclim to reflect new topography 
@@ -700,11 +710,23 @@ contains
                 call yelmo_update_equil(ylmo,ts%time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
             end if 
 
-        else 
+        else ! method=="ref_lgm"
 
             if (with_ice_sheet) then
+
+                ! Set relaxation for equilibrium
+                ylmo_eq = ylmo
+                ylmo_eq%tpo%par%topo_rel = 3
+                ylmo_eq%tpo%par%topo_rel_tau = 100.0
+                
                 ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                call yelmo_update_equil(ylmo,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
+
+                ! Restore parameters and state back to original yelmo object
+                ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
+                ylmo_eq%tpo%par%topo_rel_tau = ylmo%tpo%par%topo_rel_tau
+                ylmo = ylmo_eq
+
             end if 
 
         end if 
