@@ -717,10 +717,12 @@ contains
                 ! Set relaxation for equilibrium
                 ylmo_eq = ylmo
                 ylmo_eq%tpo%par%topo_rel = 3
-                ylmo_eq%tpo%par%topo_rel_tau = 100.0
                 
                 ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=2e2,dt=5.0,topo_fixed=.FALSE.)
+                ylmo_eq%tpo%par%topo_rel_tau = 10.0
+                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                ylmo_eq%tpo%par%topo_rel_tau = 100.0
+                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
                 ! Restore parameters and state back to original yelmo object
                 ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
