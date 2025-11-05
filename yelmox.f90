@@ -655,6 +655,9 @@ contains
             ! Apply Gaussian smoothing to keep things stable
             call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=3.0)
 
+            ! Make sure to update topographic info (without loading anything)
+            call yelmo_init_topo(ylmo,"",ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+
         case("ref_lgm")
             ! Set LGM reconstruction as initial ice thickness over North America
             
@@ -667,7 +670,10 @@ contains
 
             ! Apply Gaussian smoothing to keep things stable
             call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
-        
+
+            ! Make sure to update topographic info (without loading anything)
+            call yelmo_init_topo(ylmo,"",ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+
         case DEFAULT
             ! Zero ice thickness
 
