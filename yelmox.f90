@@ -360,11 +360,11 @@ end if
 
             if (trim(ctl%tstep_method) .eq. "const") then
                 ! Steady-state simulation, start with lgm state
-                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,method="ref_lgm", &
+                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,path_par,method="ref_lgm", &
                                                         with_ice_sheet=ctl%with_ice_sheet)
             else
                 ! Transient simulation - start with no ice thickness
-                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,method="zero", &
+                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,path_par,method="zero", &
                                                         with_ice_sheet=ctl%with_ice_sheet)
             end if
 
@@ -621,7 +621,7 @@ end if
     
 contains
     
-    subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,method,with_ice_sheet)
+    subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,path_par,method,with_ice_sheet)
 
         implicit none
 
@@ -629,6 +629,7 @@ contains
         type(snapclim_class),   intent(INOUT) :: snp
         type(smbpal_class),     intent(INOUT) :: smb
         type(tstep_class),      intent(IN)    :: ts
+        character(len=*),       intent(IN)    :: path_par
         character(len=*),       intent(IN)    :: method
         logical,                intent(IN)    :: with_ice_sheet
 
@@ -656,7 +657,7 @@ contains
             call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=3.0)
 
             ! Make sure to update topographic info (without loading anything)
-            call yelmo_init_topo(ylmo,"",ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+            call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
 
         case("ref_lgm")
             ! Set LGM reconstruction as initial ice thickness over North America
@@ -672,7 +673,7 @@ contains
             call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
 
             ! Make sure to update topographic info (without loading anything)
-            call yelmo_init_topo(ylmo,"",ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+            call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
 
         case DEFAULT
             ! Zero ice thickness
