@@ -680,7 +680,7 @@ contains
             call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
             ! Addtional cleanup - remove thin floating ice 
-            where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 500.0_wp) ylmo%tpo%now%H_ice = 0.0 
+            where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 50.0_wp) ylmo%tpo%now%H_ice = 0.0 
             call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
             if (trim(method) .eq. "ref_lgm") then
@@ -720,7 +720,7 @@ contains
                 ylmo_eq%tpo%par%topo_rel_tau = 100.0
                 
                 ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e3,dt=5.0,topo_fixed=.FALSE.)
+                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=2e2,dt=5.0,topo_fixed=.FALSE.)
 
                 ! Restore parameters and state back to original yelmo object
                 ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
