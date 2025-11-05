@@ -723,23 +723,20 @@ contains
 
                 ! Set relaxation for equilibrium
                 ylmo_eq = ylmo
-                ylmo_eq%tpo%par%calv_flt_method = "zero"
-                ylmo_eq%tpo%par%topo_rel = 3
+                !ylmo_eq%tpo%par%calv_flt_method = "zero"
+                !ylmo_eq%tpo%par%topo_rel = 3
                 
-                write(*,*) "0 Hudson: ", 85, 85, ylmo_eq%tpo%now%H_ice(85,85)
-
                 ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                ylmo_eq%tpo%par%topo_rel_tau = 10.0
-                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                !ylmo_eq%tpo%par%topo_rel_tau = 10.0
+                !call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
                 !ylmo_eq%tpo%par%topo_rel_tau = 100.0
                 !call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
-
-                write(*,*) "1 Hudson: ", 85, 85, ylmo_eq%tpo%now%H_ice(85,85)
+                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
 
                 ! Restore parameters and state back to original yelmo object
-                ylmo_eq%tpo%par%calv_flt_method = ylmo%tpo%par%calv_flt_method
-                ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
-                ylmo_eq%tpo%par%topo_rel_tau = ylmo%tpo%par%topo_rel_tau
+                !ylmo_eq%tpo%par%calv_flt_method = ylmo%tpo%par%calv_flt_method
+                !ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
+                !ylmo_eq%tpo%par%topo_rel_tau = ylmo%tpo%par%topo_rel_tau
                 ylmo = ylmo_eq
 
             end if 
