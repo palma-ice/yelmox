@@ -549,6 +549,9 @@
     mask_file = "None"
     rheology_file = "ice_data/Laurentide/LIS-32KM/LIS-32KM_GEO-P22.nc"
     litho_thickness_varname = "T_litho"
+    log10_viscosity_varname = "none"
+    stddev_log10_viscosity_varname = "none"
+    rheo_smoothing_radius = 40.0
 /
 
 &barysealevel
