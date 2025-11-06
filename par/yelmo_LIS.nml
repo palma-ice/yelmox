@@ -515,7 +515,7 @@
     ! Rheology methods
     mantle = "uniform"          ! Choose mantle viscosity field, options:
                                 ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
-    lithosphere = "uniform"     ! Choose lithospheric thickness field:
+    lithosphere = "rheology_file"     ! Choose lithospheric thickness field:
                                 ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
     layering    = "equalized"   ! "parallel" or "equalized"
     lumping     = "min"         ! "bottom", "min", "max", "mean", "logmean", "freqdomain"
@@ -547,7 +547,8 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "None"
+    rheology_file = "ice_data/Laurentide/LIS-32KM/LIS-32KM_GEO-P22.nc"
+    litho_thickness_varname = "T_litho"
 /
 
 &barysealevel
