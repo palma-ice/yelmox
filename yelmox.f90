@@ -61,6 +61,7 @@ program yelmox
 
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
+        logical  :: write_clim_and_kill
 
     end type 
 
@@ -98,6 +99,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
+    call nml_read(path_par,"ctrl","write_clim_and_kill",   ctl%write_clim_and_kill)       ! Write climate output and kill program?
 
     ! Get output times
     call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
@@ -284,7 +286,7 @@ end if
     yelmo1%bnd%H_sed = sed1%now%H 
     
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
@@ -315,6 +317,13 @@ end if
     yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
+    ! Write out initial boundary conditions if desired
+    if (ctl%write_clim_and_kill) then
+        call snapclim_write_init(snp1,"yelmox_climate.nc",yelmo1%grd%xc,yelmo1%grd%yc,time=ts%time,units="years")
+        call snapclim_write_step(snp1,"yelmox_climate.nc",time=ts%time)
+        stop
+    end if
+    
     if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
         ! Modify glacial smb
         call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)

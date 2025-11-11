@@ -8,7 +8,7 @@
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
-
+    write_clim_and_kill = False
 /
 
 &tm_1D
@@ -20,7 +20,7 @@
 
 &tm_2D
     method          = "const"           ! "none", "const", "file", "times"
-    dt              = 1000.0
+    dt              = 5000.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /
@@ -294,9 +294,9 @@
 &snap
     atm_type           = "snap_1ind"
     ocn_type           = "fraction"
-    fname_at           = "input/fixed-1.0.dat"
-    fname_ao           = "input/fixed-1.0.dat"
-    fname_ap           = "input/fixed-1.0.dat"
+    fname_at           = "input/fixed-0.9.dat"
+    fname_ao           = "input/fixed-0.9.dat"
+    fname_ap           = "input/fixed-0.9.dat"
     fname_as           = "input/fixed-1.0.dat"
     fname_bt           = "input/fixed-1.0.dat"
     fname_bo           = "input/fixed-1.0.dat"
@@ -492,7 +492,7 @@
 
 /
 
-&geothermal
+&ghf
     use_obs   = True 
     obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-S04.nc"
     obs_name  = "ghf"
