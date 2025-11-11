@@ -12,23 +12,23 @@ module geothermal
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = sp 
+    integer,  parameter :: wp = sp 
 
-    real(prec), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
-    real(prec), parameter :: pi        = 3.14159265359
+    real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
+    real(wp), parameter :: pi        = 3.14159265359
 
     type geothermal_param_class
         logical            :: use_obs
         character(len=512) :: obs_path
         character(len=56)  :: obs_name 
         character(len=56)  :: obs_err_name
-        real(prec)         :: f_stdev
-        real(prec)         :: ghf_const 
+        real(wp)           :: f_stdev
+        real(wp)           :: ghf_const 
     end type 
 
     type geothermal_state_class 
-        real(prec), allocatable :: ghf(:,:)
-        real(prec), allocatable :: ghf_err(:,:)
+        real(wp), allocatable :: ghf(:,:)
+        real(wp), allocatable :: ghf_err(:,:)
     end type 
 
     type geothermal_class
@@ -51,23 +51,18 @@ contains
         implicit none 
 
         type(geothermal_class), intent(OUT) :: gthrm  
-        character(len=*),      intent(IN)   :: filename 
-        integer,               intent(IN)   :: nx, ny 
-        character(len=*),      intent(IN)   :: domain, grid_name
-        character(len=*),  intent(IN), optional :: group
+        character(len=*),       intent(IN)  :: filename 
+        integer,                intent(IN)  :: nx, ny 
+        character(len=*),       intent(IN)  :: domain, grid_name
+        character(len=*),       intent(IN), optional :: group
 
         ! Local variables
         character(len=32) :: nml_group
         
-        ! Make sure we know the namelist group for the geothermal block
-        if (present(group)) then
-            nml_group = trim(group)
-        else
-            nml_group = "geothermal"         ! Default parameter blcok name
-        end if
+        real(wp), parameter :: ghf_min = 0.1  ! [mW/m2] Minimum allowed ghf value
 
         ! Load geothermal parameters
-        call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.,group=nml_group)
+        call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.,group=group)
 
         ! Allocate the geothermal object 
         call geothermal_allocate(gthrm%now,nx,ny)
@@ -96,6 +91,10 @@ contains
 
                 ! Offset GHF field by desired sigma level
                 gthrm%now%ghf = gthrm%now%ghf + gthrm%par%f_stdev*gthrm%now%ghf_err
+
+                ! Make sure all values stay above set minimum
+                where (gthrm%now%ghf .lt. ghf_min) gthrm%now%ghf = ghf_min
+
             end if
             
         else 
@@ -133,7 +132,7 @@ contains
 
         type(geothermal_class) :: sed 
 
-        real(prec) :: year_bp 
+        real(wp) :: year_bp 
 
         ! === To do ====
 
@@ -173,7 +172,7 @@ contains
         if (present(group)) then
             nml_group = trim(group)
         else
-            nml_group = "geothermal"         ! Default parameter blcok name
+            nml_group = "ghf"               ! Default parameter block name
         end if
 
         init_pars = .FALSE.
