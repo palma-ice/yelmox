@@ -296,9 +296,9 @@
 &snap
     atm_type           = "snap_1ind"
     ocn_type           = "fraction"
-    fname_at           = "input/fixed-0.9.dat"
-    fname_ao           = "input/fixed-0.9.dat"
-    fname_ap           = "input/fixed-0.9.dat"
+    fname_at           = "input/fixed-1.0.dat"
+    fname_ao           = "input/fixed-1.0.dat"
+    fname_ap           = "input/fixed-1.0.dat"
     fname_as           = "input/fixed-1.0.dat"
     fname_bt           = "input/fixed-1.0.dat"
     fname_bo           = "input/fixed-1.0.dat"
