@@ -192,7 +192,7 @@
     p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
     H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
     N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    delta           = 0.04              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
+    delta           = 0.02              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
     e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
     Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
     s_const         = 0.5               ! [--] *neff_method=4* Imposed constant till water saturation level    
@@ -239,7 +239,7 @@
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
     till_rate       = 0.008             ! [m/a] Basal water till drainage rate (water equiv.)
-    H_w_max         = 0.4               ! [m] Maximum limit to basal water layer thickness (water equiv.)
+    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 
     rock_method     = "active"          ! "equil" (not active bedrock) or "active"
     nzr_aa          = 5                 ! Number of vertical points in bedrock 
@@ -489,7 +489,7 @@
 
 &sediments
     use_obs   = True
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-M23.nc"
     obs_name  = "z_sed"
 
 /
