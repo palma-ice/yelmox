@@ -60,7 +60,7 @@ function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx
     npts_tot_basin = real(count(mask_basin),wp)
     npts_flt  = real(count(mask_flt),wp)
 
-    fwf_def = "dVdt" !"dVdt_mask"
+    ! fwf_def = "dVdt" !"dVdt_mask"
 
     ! ===== Compute fwf =====
     select case(fwf_def)
