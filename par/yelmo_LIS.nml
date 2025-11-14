@@ -173,9 +173,11 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation 
+    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation
+    scale_T         = 0                 ! 0: no scaling with T, 1: linearly increase friction to cf_ref for cold ice
     is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
+    T_min           = -3.0              ! Minimum temperature
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction

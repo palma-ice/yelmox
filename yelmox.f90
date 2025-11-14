@@ -691,19 +691,16 @@ contains
 
         end select 
         
-        if (with_ice_sheet) then
-            ! Run Yelmo for briefly to update surface topography
-            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
+        ! Run Yelmo for briefly to update surface topography fields (but fixed H)
+        call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
-            ! Addtional cleanup - remove thin floating ice 
-            where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 50.0_wp) ylmo%tpo%now%H_ice = 0.0 
-            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
+        ! Addtional cleanup - remove thin floating ice 
+        where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 50.0_wp) ylmo%tpo%now%H_ice = 0.0 
+        call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
-            if (trim(method) .eq. "ref_lgm") then
-                ! Store new "clean" ice thickness as reference state
-                ylmo%bnd%H_ice_ref = ylmo%tpo%now%H_ice
-            end if
-
+        if (trim(method) .eq. "ref_lgm") then
+            ! Store new "clean" ice thickness as reference state
+            ylmo%bnd%H_ice_ref = ylmo%tpo%now%H_ice
         end if 
 
         ! Update snapclim to reflect new topography 
@@ -841,10 +838,11 @@ contains
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
         ! like normal, using the default function defined in Yelmo:
         call calc_cb_ref(ylmo%dyn%now%cb_ref,ylmo%bnd%z_bed,ylmo%bnd%z_bed_sd,ylmo%bnd%z_sl, &
-                            ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min, &
-                            ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min, &
-                            ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1,ylmo%dyn%par%till_n_sd, &
-                            ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method)
+                            ylmo%bnd%H_sed,ylmo%thrm%now%T_prime_b,ylmo%dyn%par%till_f_sed, &
+                            ylmo%dyn%par%till_sed_min,ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref, &
+                            ylmo%dyn%par%till_cf_min,ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1, &
+                            ylmo%dyn%par%till_n_sd,ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method, &
+                            ylmo%dyn%par%till_scale_T,ylmo%dyn%par%till_T_min)
 
         ! === Finally, apply NEGIS scaling =============================
 
