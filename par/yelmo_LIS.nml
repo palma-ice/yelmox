@@ -159,6 +159,8 @@
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     beta_min            = 10.0            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
+    scale_T             = 1               ! 0: no scaling of c_bed with T, 1: linearly increase c_bed to c_bed_frozen=cf_ref*N_eff for cold ice
+    T_frz               = -3.0            ! Temperature below which ice considered fully frozen (linear increase in friction )
     ssa_lis_opt         = "-i minres -p jacobi -maxiter 100 -tol 1.0e-1 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_lat_bc          = "floating"      ! "all", "marine", "floating", "none", "slab"
     ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
@@ -173,11 +175,10 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale           = "exp"             ! "none", "lin", or "exp" : scaling with elevation
-    scale_T         = 1                 ! 0: no scaling with T, 1: linearly increase friction to cf_ref for cold ice
-    is_angle        = False             ! cb_ref is a till strength angle?
+    scale_zb        = 3                 ! 0: none, 1: lin, 2: exp : scaling with elevation
+    scale_sed       = 0                 ! 0: none, 1: lambda_zb*lambda_sed, 2: min(lambda_zb,lambda_sed), 3: 2 but no lower limit
+    is_angle        = False             ! cf_ref/cf_min are till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
-    T_min           = -3.0              ! Minimum temperature
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction

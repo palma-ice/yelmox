@@ -838,11 +838,9 @@ contains
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
         ! like normal, using the default function defined in Yelmo:
         call calc_cb_ref(ylmo%dyn%now%cb_ref,ylmo%bnd%z_bed,ylmo%bnd%z_bed_sd,ylmo%bnd%z_sl, &
-                            ylmo%bnd%H_sed,ylmo%thrm%now%T_prime_b,ylmo%dyn%par%till_f_sed, &
-                            ylmo%dyn%par%till_sed_min,ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref, &
-                            ylmo%dyn%par%till_cf_min,ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1, &
-                            ylmo%dyn%par%till_n_sd,ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method, &
-                            ylmo%dyn%par%till_scale_T,ylmo%dyn%par%till_T_min)
+                ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min,ylmo%dyn%par%till_sed_max, &
+                ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min,ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1, &
+                ylmo%dyn%par%till_n_sd,ylmo%dyn%par%till_scale_zb,ylmo%dyn%par%till_scale_sed)
 
         ! === Finally, apply NEGIS scaling =============================
 
