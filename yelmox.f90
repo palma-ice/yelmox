@@ -730,11 +730,12 @@ contains
                 ! Set relaxation for equilibrium
                 ylmo_eq = ylmo
                 !ylmo_eq%tpo%par%calv_flt_method = "zero"
-                !ylmo_eq%tpo%par%topo_rel = 3
-                
+                ! ylmo_eq%tpo%par%topo_rel = 3
+                ylmo_eq%dyn%par%beta_min = 100.0
+
                 ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                !ylmo_eq%tpo%par%topo_rel_tau = 10.0
-                !call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                ! ylmo_eq%tpo%par%topo_rel_tau = 10.0
+                ! call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
                 !ylmo_eq%tpo%par%topo_rel_tau = 100.0
                 !call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
                 call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
@@ -743,6 +744,8 @@ contains
                 !ylmo_eq%tpo%par%calv_flt_method = ylmo%tpo%par%calv_flt_method
                 !ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
                 !ylmo_eq%tpo%par%topo_rel_tau = ylmo%tpo%par%topo_rel_tau
+                ylmo_eq%dyn%par%beta_min = ylmo%dyn%par%beta_min
+                
                 ylmo = ylmo_eq
 
             end if 
