@@ -12,7 +12,7 @@ module ice2ocean
 
 contains
 
-function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx,dy,mask,hemisphere, fwf_def) result(fwf)
+function calc_fwf(rho_water,rho_ice,sec_year,Hice,dHidt,f_grnd,dx,dy,mask,hemisphere, fwf_def) result(fwf)
     ! This subroutine is based on yelmo_regions.f90 calc_yregions(...)
 
     implicit none 
@@ -21,14 +21,14 @@ function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx
 
     ! Local variables
     integer  :: nx, ny
-    real(wp) :: npts_flt, npts_tot, smb_tot, bmb_tot, cmb_tot, npts_tot_basin
+    real(wp) :: npts_flt, npts_tot, npts_tot_basin
 
     real(wp) :: m3_km3 = 1e-9 
     real(wp) :: conv_km3a_Sv
 
     real(wp)   :: rho_water, rho_ice ! bnd%c%rho_w, bnd%c%rho_ice
     real(wp)   :: sec_year ! bnd%c%sec_year
-    real(wp), allocatable   :: mb(:,:), smb(:,:), bmb(:,:), cmb(:,:), Hice(:,:), dHidt(:,:) ! tpo%now%mb, tpo%now%dHidt
+    real(wp), allocatable   :: Hice(:,:), dHidt(:,:) ! tpo%now%mb, tpo%now%dHidt
     real(wp), allocatable   :: f_grnd(:,:)
     real(wp)           :: dx, dy ! tpo%par%dx, tpo%par%dy
     real(wp), allocatable :: mask(:,:) 
@@ -64,16 +64,6 @@ function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx
 
     ! ===== Compute fwf =====
     select case(fwf_def)
-        case("mb") 
-            fwf = -1*sum(mb,mask=mask_tot)*dx*dy/1e6/sec_year 
-        case("ablation")
-            where (smb .gt. 0.0) smb = 0.0
-            where (bmb .gt. 0.0) bmb = 0.0
-            where (cmb .gt. 0.0) cmb = 0.0
-            smb_tot = sum(smb,mask=mask_tot)  ! only negative values
-            bmb_tot = sum(bmb,mask=mask_tot)
-            cmb_tot = sum(cmb,mask=mask_tot)
-            fwf = -1*(smb_tot+bmb_tot+cmb_tot)*dx*dy/1e6/sec_year
         case("dVdt")
             !fwf = max(-sum(dHidt, mask=mask_tot)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
             fwf = -sum(dHidt)*dx*dy*m3_km3*conv_km3a_Sv

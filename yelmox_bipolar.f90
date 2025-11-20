@@ -213,7 +213,7 @@ program yelmox
     end if
 
     ! Hard-coded for now:
-    ctl%dt_clim = 10.0      ! [yrs] Frequency to update snapclim snapshot
+    ctl%dt_clim = 1.0      ! [yrs] Frequency to update snapclim snapshot
 
     ! Start timing
     call timer_step(tmr,comp=-1) 
@@ -271,11 +271,22 @@ program yelmox
     write(*,*) "time_bp = ", ts%time_rel 
     write(*,*) 
 
-    ! === Initialize Yelmo X domains, Group 3
+    ! === Initialize Yelmo X domains and obm, Group 3
     ! Initialize barysealevel model (common to all the domains)
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, year_bp=ts%time_rel)
     call bsl_write_init(bsl, file_bsl, ts%time)
+
+    ! Initialize ocean box model 
+    if (ctl%active_obm) then
+        obm_file = trim(outfldr)//trim(ctl%obm_name)//".nc"
+        obm_file_restart = trim(outfldr)//trim(ctl%obm_name)//"_restart.nc"
+
+        call obm_init(obm_object, path_par, ctl%obm_name)
+        call write_obm_init(obm_file, ts%time, "years")
+        call write_obm_update(obm_object, obm_file, ctl%obm_name, ts%time)
+
+    end if
 
     if (ctl%active_north) then
         call initialize_icesheet(path_par, "north", ts, ctl, yelmox_north, "yelmo_north", outfldr)  
@@ -286,19 +297,42 @@ program yelmox
             call nc_read(yelmox_north%path_hydro_mask,"mask",yelmox_north%hydro_mask)
         end if
 
+        ! ism2obm
+        if (ctl%couple_fwf_north) then
+            obm_object%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
+                                yelmox_north%yelmo1%bnd%c%sec_year, &
+                                yelmox_north%yelmo1%tpo%now%H_ice, &
+                                yelmox_north%yelmo1%tpo%now%dHidt, &
+                                yelmox_north%yelmo1%tpo%now%f_grnd, &
+                                yelmox_north%yelmo1%tpo%par%dx,yelmox_north%yelmo1%tpo%par%dy,yelmox_north%hydro_mask,"north",fwf_definition)
+        end if
+
         call initialize_external_models(path_par, yelmox_north,"isos_north","snap_north","smbpal_north","itm_north","marine_shelf_north","sediments_north","geothermal_north")   ! yelmox.f90 lines 396-419
-        
+
         if (ctl%obm2ism) then
 
             ! make sure, ocn_type is 'anom' and the index is ones.dat
             if (ctl%couple_to_north) then
                 yelmox_north%snp1%par%ocn_type = "anom"
                 yelmox_north%snp1%par%fname_ao = "input/ones.dat" 
+                yelmox_north%snp1%par%dTo_const = obm_object%tn-obm_object%par%tn_init
             end if
 
         end if
         
-        call initialize_boundary_conditions(ctl, yelmox_north, bsl, ts)   
+        call initialize_boundary_conditions(ctl, yelmox_north, bsl, ts)  
+        
+        ! atm2obm
+        if (ctl%atm2obm) then
+            at = interp_linear(yelmox_north%snp1%at%time, yelmox_north%snp1%at%var,xout=ts%time)
+            dTa_now = at*yelmox_north%snp1%par%dTa_const
+            obm_object%thetan = obm_object%par%thetan_init + dTa_now!*obm_object%par%thermal_ampl_north
+
+            obm_object%thetat = obm_object%par%thetat_init + dTa_now*obm_object%par%thermal_ampl_tropics/obm_object%par%thermal_ampl_north
+            
+            ! Update vapor flux
+            obm_object%phin = obm_object%par%phin_init + obm_object%par%hn*obm_object%par%pnh*dTa_now/obm_object%par%thermal_ampl_north ! hn * pnh * dTG = hn * pnh * dTn/pn
+        end if
 
         call initialize_output_files(outfldr, yelmox_north, ts, "north")
 
@@ -313,6 +347,16 @@ program yelmox
             allocate(yelmox_south%hydro_mask(yelmox_south%yelmo1%grd%nx,yelmox_south%yelmo1%grd%ny))
             call nc_read(yelmox_south%path_hydro_mask,"mask",yelmox_south%hydro_mask)
         end if
+
+        ! ism2obm
+        if (ctl%couple_fwf_south) then
+            obm_object%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
+                                yelmox_south%yelmo1%bnd%c%sec_year, &
+                                yelmox_south%yelmo1%tpo%now%H_ice, &
+                                yelmox_south%yelmo1%tpo%now%dHidt, &
+                                yelmox_south%yelmo1%tpo%now%f_grnd, &
+                                yelmox_south%yelmo1%tpo%par%dx,yelmox_south%yelmo1%tpo%par%dy,yelmox_south%hydro_mask,"south",fwf_definition)
+        end if
         
         call initialize_external_models(path_par, yelmox_south,"isos_south","snap_south","smbpal_south","itm_south","marine_shelf_south","sediments_south","geothermal_south")   ! yelmox.f90 lines 396-419
         
@@ -322,33 +366,28 @@ program yelmox
             if (ctl%couple_to_south) then
                 yelmox_south%snp1%par%ocn_type = "anom"
                 yelmox_south%snp1%par%fname_ao = "input/ones.dat" 
+                yelmox_south%snp1%par%dTo_const = obm_object%ts-obm_object%par%ts_init
             end if
 
         end if
 
         call initialize_boundary_conditions(ctl, yelmox_south, bsl, ts)  
+
+        ! atm2obm
+        if (ctl%atm2obm) then
+            at = series_interp(yelmox_south%snp1%at%time, yelmox_south%snp1%at%var, ts%time)
+            dTa_now = at*yelmox_south%snp1%par%dTa_const
+            obm_object%thetas = obm_object%par%thetas_init + dTa_now!*obm_object%par%thermal_ampl_south
+
+            obm_object%thetat = obm_object%par%thetat_init + dTa_now*obm_object%par%thermal_ampl_tropics/obm_object%par%thermal_ampl_south ! REDUNDANTEEE
+        
+            ! Update vapor flux
+            obm_object%phit = obm_object%par%phit_init + obm_object%par%hs*obm_object%par%psh*dTa_now/obm_object%par%thermal_ampl_south
+        end if
         
         call initialize_output_files(outfldr, yelmox_south, ts, "south")
 
         write(*,*) "Southern Hemisphere domain initialized"
-    end if
-
-    ! === Initialize ocean box model =====
-    if (ctl%active_obm) then
-        obm_file = trim(outfldr)//trim(ctl%obm_name)//".nc"
-        obm_file_restart = trim(outfldr)//trim(ctl%obm_name)//"_restart.nc"
-
-        call obm_init(obm_object, path_par, ctl%obm_name)
-        call write_obm_init(obm_file, ts%time, "years")
-        call write_obm_update(obm_object, obm_file, ctl%obm_name, ts%time)
-
-        if (ctl%couple_to_north) then
-            yelmox_north%snp1%par%dTo_const = obm_object%tn-obm_object%par%tn_init
-        end if
-        if (ctl%couple_to_south) then
-            yelmox_south%snp1%par%dTo_const = obm_object%ts-obm_object%par%ts_init
-        end if
-
     end if
     
     call timer_step(tmr,comp=1,label="initialization") 
@@ -449,66 +488,54 @@ program yelmox
                  end if
             end if
 
-        end if
+            ! atm2obm
+            if (ctl%active_north .and. ctl%atm2obm) then
+                at = interp_linear(yelmox_north%snp1%at%time, yelmox_north%snp1%at%var,xout=ts%time)
+                dTa_now = at*yelmox_north%snp1%par%dTa_const
+                obm_object%thetan = obm_object%par%thetan_init + dTa_now!*obm_object%par%thermal_ampl_north
 
-        ! atm2obm
-        if (ctl%active_north .and. ctl%atm2obm) then
-            at = interp_linear(yelmox_north%snp1%at%time, yelmox_north%snp1%at%var,xout=ts%time)
-            dTa_now = at*yelmox_north%snp1%par%dTa_const
-            obm_object%thetan = obm_object%par%thetan_init + dTa_now!*obm_object%par%thermal_ampl_north
+                obm_object%thetat = obm_object%par%thetat_init + dTa_now*obm_object%par%thermal_ampl_tropics/obm_object%par%thermal_ampl_north
+                
+                ! Update vapor flux
+                obm_object%phin = obm_object%par%phin_init + obm_object%par%hn*obm_object%par%pnh*dTa_now/obm_object%par%thermal_ampl_north ! hn * pnh * dTG = hn * pnh * dTn/pn
+            end if
+            if (ctl%active_south .and. ctl%atm2obm) then
+                at = series_interp(yelmox_south%snp1%at%time, yelmox_south%snp1%at%var, ts%time)
+                dTa_now = at*yelmox_south%snp1%par%dTa_const
+                obm_object%thetas = obm_object%par%thetas_init + dTa_now!*obm_object%par%thermal_ampl_south
 
-            obm_object%thetat = obm_object%par%thetat_init + dTa_now*obm_object%par%thermal_ampl_tropics/obm_object%par%thermal_ampl_north
+                obm_object%thetat = obm_object%par%thetat_init + dTa_now*obm_object%par%thermal_ampl_tropics/obm_object%par%thermal_ampl_south ! REDUNDANTEEE
             
-            ! Update vapor flux
-            obm_object%phin = obm_object%par%phin_init + obm_object%par%hn*obm_object%par%pnh*dTa_now/obm_object%par%thermal_ampl_north ! hn * pnh * dTG = hn * pnh * dTn/pn
-        end if
-        if (ctl%active_south .and. ctl%atm2obm) then
-            at = series_interp(yelmox_south%snp1%at%time, yelmox_south%snp1%at%var, ts%time)
-            dTa_now = at*yelmox_south%snp1%par%dTa_const
-            obm_object%thetas = obm_object%par%thetas_init + dTa_now!*obm_object%par%thermal_ampl_south
+                ! Update vapor flux
+                obm_object%phit = obm_object%par%phit_init + obm_object%par%hs*obm_object%par%psh*dTa_now/obm_object%par%thermal_ampl_south
+            end if
 
-            obm_object%thetat = obm_object%par%thetat_init + dTa_now*obm_object%par%thermal_ampl_tropics/obm_object%par%thermal_ampl_south ! REDUNDANTEEE
-        
-            ! Update vapor flux
-            obm_object%phit = obm_object%par%phit_init + obm_object%par%hs*obm_object%par%psh*dTa_now/obm_object%par%thermal_ampl_south
-        end if
-
-    ! ism2obm
-        if (ctl%couple_fwf_north) then
-            if (ctl%active_north) then 
+        ! ism2obm
+            if (ctl%active_north .and. ctl%couple_fwf_north) then 
                 obm_object%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
                                     yelmox_north%yelmo1%bnd%c%sec_year, &
-                                    yelmox_north%yelmo1%tpo%now%mb_net, &
-                                    yelmox_north%yelmo1%tpo%now%smb, &
-                                    yelmox_north%yelmo1%tpo%now%bmb, &
-                                    yelmox_north%yelmo1%tpo%now%cmb, &
                                     yelmox_north%yelmo1%tpo%now%H_ice, &
                                     yelmox_north%yelmo1%tpo%now%dHidt, &
                                     yelmox_north%yelmo1%tpo%now%f_grnd, &
                                     yelmox_north%yelmo1%tpo%par%dx,yelmox_north%yelmo1%tpo%par%dy,yelmox_north%hydro_mask,"north",fwf_definition)
             end if
-        end if
 
-        if (ctl%couple_fwf_south) then
-            if (ctl%active_south) then
+            if (ctl%active_south .and. ctl%couple_fwf_south) then
                 obm_object%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
                                     yelmox_south%yelmo1%bnd%c%sec_year, &
-                                    yelmox_south%yelmo1%tpo%now%mb_net, &
-                                    yelmox_south%yelmo1%tpo%now%smb, &
-                                    yelmox_south%yelmo1%tpo%now%bmb, &
-                                    yelmox_south%yelmo1%tpo%now%cmb, &
                                     yelmox_south%yelmo1%tpo%now%H_ice, &
                                     yelmox_south%yelmo1%tpo%now%dHidt, &
                                     yelmox_south%yelmo1%tpo%now%f_grnd, &
                                     yelmox_south%yelmo1%tpo%par%dx,yelmox_south%yelmo1%tpo%par%dy,yelmox_south%hydro_mask,"south",fwf_definition)
             end if
-        end if
             
-        if (ctl%obm_name .eq. "nautilus") then
-            if (hyster_on) then
-                call update_bipolar_hyster_forcing(ts%time, ctl%time_init, obm_object, dtt_now, hyster_positive_branch_time, hyster_rate, hyster_forcing, hyster_forcing_method)
+            if (ctl%obm_name .eq. "nautilus") then
+                if (hyster_on) then
+                    call update_bipolar_hyster_forcing(ts%time, ctl%time_init, obm_object, dtt_now, hyster_positive_branch_time, hyster_rate, hyster_forcing, hyster_forcing_method)
+                end if
             end if
-        end if
+
+    end if
 
         ! == SURFACE MASS BALANCE ==============================================
 
