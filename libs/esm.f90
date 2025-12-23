@@ -251,7 +251,8 @@ contains
             ! jablasco: change this?
             elseif (trim(experiment) .eq. "1pctCO2") then
                 gcm_now      = trim(experiment)
-                scenario_now = "transient" 
+                scenario_now = "transient"
+                experiment_now = "transient" 
             elseif (trim(experiment) .eq. "ssp126" .or. trim(experiment) .eq. "ssp585") then
                 gcm_now      = trim(experiment)
                 scenario_now = "transient"
@@ -368,8 +369,8 @@ contains
         ! Transient dependent fields
         if (trim(esm%ctrl_run_type) .eq. "transient") then
             ! ESM reference period
-            !if(trim(esm%use_ref)) then
-            if (.TRUE.) then
+            !if (esm%use_esm) then
+            if (.FALSE.) then
                 call varslice_init_nml_esm(esm%ts_esm_ref,  filename,trim(grp_ts_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%pr_esm_ref,  filename,trim(grp_pr_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%to_esm_ref,  filename,trim(grp_to_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
@@ -394,7 +395,8 @@ contains
             ! ESM projection period
             !if(trim(esm%use_proj)) then
             ! jablasco
-            if (.TRUE.) then
+            !if (esm%use_esm .and. .TRUE.) then
+            if (.FALSE.) then    
                 call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,esm%gcm,esm%scenario)
                 !call varslice_init_nml_esm(esm%zs_proj, filename,trim(grp_zs_proj), domain,grid_name,esm%gcm,esm%scenario)
@@ -511,6 +513,7 @@ contains
         integer  :: m, year, step_idx
         real(wp) :: tmp, lapse
         real(wp) :: rand, year_rand
+
             
         ! Obtain reference year climatology
         select case(trim(clim_var))
@@ -708,13 +711,13 @@ contains
                     select case(trim(esm%experiment))
                         case("1pctCO2_transient")
                             ! jablasco: TO DO change
-                            if(time .lt. 2000.0) then
+                            if(time .lt. 2020.0) then
                                 esm%dts = 0.0_wp
                                 esm%dpr = 1.0_wp
                                 esm%dto = 0.0_wp
                                 esm%dso = 0.0_wp
                             else
-                                anomaly = 0.02*(time - 2000.0)
+                                anomaly = 0.02*(time - 2020.0)
                                 if (anomaly .ge. esm%dT_lim) anomaly=esm%dT_lim
                                 esm%dts = esm%f_polar*anomaly
                                 esm%dpr = exp(esm%beta_p*esm%f_polar*anomaly)

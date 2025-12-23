@@ -8,6 +8,7 @@
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
+    kill_shelves    = False             ! Kill ice shelves beyond PD.
 /
 
 &tm_1D
