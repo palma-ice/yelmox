@@ -435,7 +435,7 @@
 
 /
 
-&sediments
+&sed
     use_obs   = False
     obs_path  = "none"
     obs_name  = "z_sed"
