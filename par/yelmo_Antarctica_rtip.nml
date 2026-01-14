@@ -247,7 +247,9 @@
  taud_gl_method  = 0          
  H_grnd_lim      = 500.0       
  beta_min        = 100.0      
- eps_0           = 1e-06      
+ eps_0           = 1e-06
+ scale_T         = 1
+T_frz            = -3.0     
  ssa_lis_opt     = '-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false'
  ssa_lat_bc      = 'floating' 
  ssa_beta_max    = 1e+20      
