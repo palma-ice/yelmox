@@ -118,6 +118,9 @@ program yelmox_esm
     call nml_read(path_par,"esm","f_polar",          esm1%f_polar)
     call nml_read(path_par,"esm","dT_threshold",     esm1%dT_lim)
 
+    ! esm source grid
+    call nml_read(path_par,"esm","grid_src",         esm1%grid_src)
+
     ! What does this?: needed?
     if (index(ctl%esm_par_file,"ant") .gt. 0) then
         ! Running Antarctica domain, load Antarctica specific parameters
@@ -273,12 +276,13 @@ program yelmox_esm
     esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
     if(ctl%esm_use_esm) then
         ! we are using a gcm output
-        call esm_forcing_init(esm1,esm_path_par,domain,grid_name, &
-                          gcm=ctl%esm_name,scenario=ctl%esm_experiment)!,experiment=ctl%esm_experiment)
+        call esm_forcing_init(esm1,esm_path_par,domain,grid_name,gcm=ctl%esm_name,scenario=ctl%esm_experiment)
     else
         ! ctrl experiment
-        call esm_forcing_init(esm1,esm_path_par,domain,grid_name, &
-                          experiment=ctl%esm_experiment)
+        call esm_forcing_init(esm1,esm_path_par,domain,grid_name,experiment=ctl%esm_experiment)
+        ! jablasco
+        !if(trim(grid_name) .ne. trim(grid_src))
+        !    call esm_src_init(esm1,esm_path_par,domain,grid_src,experiment=ctl%esm_experiment)    
     end if
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
@@ -312,7 +316,7 @@ program yelmox_esm
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                           time=ts%time,time_bp=ts%time_rel, &
-                          domain=yelmo1%par%domain)
+                          domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -439,28 +443,11 @@ program yelmox_esm
                         ! Perform cf_ref optimization
                     
                         ! Update cb_ref based on error metric(s) 
-                        if (.True.) then
-                            call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
-                                                yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                                opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                                dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
-                                                cb_tgt=yelmo1%dyn%now%cb_tgt)
-                        else
-                            ! Pollard & DeConto optimization 2012
-                            call optimize_cb_ref_pc12(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice,yelmo1%tpo%now%H_ice_n, &
-                                yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
-                                yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
-                                opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err, &
-                                cb_tgt=yelmo1%dyn%now%cb_tgt)
-                        end if
-
                         call optimize_cb_ref(yelmo1%dyn%now%cb_ref,yelmo1%tpo%now%H_ice, &
                                                     yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                                     opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err,cb_tgt=yelmo1%dyn%now%cb_tgt)
+                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err)
                         
                     end if
 
@@ -529,7 +516,7 @@ program yelmox_esm
             ! adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                                   time=ts%time,time_bp=ts%time_rel, &
-                                  domain=yelmo1%par%domain) 
+                                  domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name) 
 
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -551,6 +538,11 @@ program yelmox_esm
 
             if (timeout_check(tm_1D,ts%time)) then
                 call yelmo_regions_write(yelmo1,ts%time)
+            end if
+
+            ! isostasy checks
+            if (.FALSE. .and. (timeout_check(tm_2Dsm, ts%time))) then
+                call isos_write_step_extended(isos1, file_isos, ts%time)
             end if 
 
             call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io") 
@@ -631,7 +623,7 @@ program yelmox_esm
 
             ! Get ESM climate and ocean forcing
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl,ts%time,ts%time_rel, &
-                                  domain=yelmo1%par%domain)
+                                  domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -699,7 +691,7 @@ program yelmox_esm
 contains
 
     ! === CLIMATE ====
-    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,ctl,time,time_bp,domain,use_ref_atm,use_ref_ocn)
+    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,ctl,time,time_bp,domain,grid_name,use_ref_atm,use_ref_ocn)
 
         implicit none 
     
@@ -711,17 +703,21 @@ contains
         real(wp),                   intent(IN)    :: time 
         real(wp),                   intent(IN)    :: time_bp
         character(len=*),           intent(IN)    :: domain
+        character(len=*),           intent(IN)    :: grid_name 
         logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
     
         ! Step 1: set the reference climatologies (for reference and variability reference)
-        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,domain)
-    
+        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,domain,grid_name)
+        ! extrapolate toward sinterior of ice shelf
+        call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
+        call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+
         ! Step 2: Calculate anomaly fields (forcing)
         call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
                                 ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
                                 use_ref_atm=.false.,use_ref_ocn=.false.)
 
-        ! Step 3: Calculate the varianility anomaly field
+        ! Step 3: Calculate the variability anomaly field
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
                                     ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
                                     use_ref_atm=.false.,use_ref_ocn=.false.)
@@ -735,7 +731,11 @@ contains
         end if
     
         ! === Atmospheric boundary conditions ===
-        ! Calculate the smb fields 
+        ! Calculate the smb fields
+        if (.FALSE.) then
+                esm%dts_var = -esm%dts_var
+                esm%dpr_var = 1/esm%dpr_var
+        end if
         call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
                                     ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
     
@@ -766,7 +766,12 @@ contains
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
     
-        ! Add the anomaly from  
+        ! Add the anomaly from 
+        ! jablasco: opt test
+        if (.FALSE.) then
+                esm%dto_var = -esm%dto_var
+                esm%dso_var = -esm%dso_var
+        end if
         mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto + esm%dto_var
         mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso + esm%dso_var
     
@@ -1225,7 +1230,12 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing correction factor", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
+        if (.FALSE.) then
+        call nc_write(filename,"so_ref",esm%so_ref%var(:,:,1,1),units="PSU",long_name="Reference oceanic salinity", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"to_ref",esm%to_ref%var(:,:,1,1),units="K",long_name="Reference oceanic temperature", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)        
+        end if
 
         ! Close the netcdf file
         call nc_close(ncid)
@@ -1582,13 +1592,13 @@ contains
                         dim1="time",start=[n],ncid=ncid)
 
         ! Variability climatic fields 
-        call nc_write(filename,"dt_var_1d",dt_1d,units="K",long_name="Mean ice surf. Temp. Anomaly", &
+        call nc_write(filename,"dt_var_1d",dt_var_1d,units="K",long_name="Mean ice surf. Temp. Anomaly", &
                 standard_name="Mean ice surf. Temp. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dpr_var_1d",dpr_1d,units="%",long_name="Mean ice surf. Pr. Anomaly", &
+        call nc_write(filename,"dpr_var_1d",dpr_var_1d,units="%",long_name="Mean ice surf. Pr. Anomaly", &
                 standard_name="Mean ice surf. Pr. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dto_var_1d",dto_1d,units="K",long_name="Mean ice-shelf Temp. Anomaly", &
+        call nc_write(filename,"dto_var_1d",dto_var_1d,units="K",long_name="Mean ice-shelf Temp. Anomaly", &
                 standard_name="Mean ice-shelf Temp. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dso_var_1d",dso_1d,units="PSU",long_name="Mean ice-shelf draft Sal. Anomaly", &
+        call nc_write(filename,"dso_var_1d",dso_var_1d,units="PSU",long_name="Mean ice-shelf draft Sal. Anomaly", &
                 standard_name="Mean ice-shelf draft Sal. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
 
 

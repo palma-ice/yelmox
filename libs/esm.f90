@@ -39,6 +39,7 @@ module esm
         real(wp)               :: f_ocn
         real(wp)               :: f_polar
         real(wp)               :: dT_lim
+        character(len=256)     :: grid_src
 
         ! === Reference climatology ===
         ! Atmosphere
@@ -46,7 +47,7 @@ module esm
         type(varslice_class)   :: pr_ref
         
         ! Ocean
-        type(varslice_class)   :: to_ref
+        type(varslice_class)   :: to_ref, to_ref_src
         type(varslice_class)   :: so_ref
 
         ! ===  Variability climatologies ===
@@ -250,7 +251,8 @@ contains
             ! jablasco: change this?
             elseif (trim(experiment) .eq. "1pctCO2") then
                 gcm_now      = trim(experiment)
-                scenario_now = "transient" 
+                scenario_now = "transient"
+                experiment_now = "transient" 
             elseif (trim(experiment) .eq. "ssp126" .or. trim(experiment) .eq. "ssp585") then
                 gcm_now      = trim(experiment)
                 scenario_now = "transient"
@@ -345,6 +347,9 @@ contains
         call varslice_init_nml_esm(esm%to_ref,  filename,trim(grp_to_ref), domain,grid_name,esm%gcm,esm%scenario)
         call varslice_init_nml_esm(esm%so_ref,  filename,trim(grp_so_ref), domain,grid_name,esm%gcm,esm%scenario)
         
+        ! Initialize variables at other grids if source grid is different
+        call varslice_init_nml_esm(esm%to_ref_src, filename,trim(grp_to_ref), domain,grid_name,esm%gcm,esm%scenario)
+
         ! Variability reference period
         ! Reference period
         call varslice_init_nml_esm(esm%ts_var,  filename,trim(grp_ts_var), domain,grid_name,esm%gcm,esm%scenario)
@@ -364,8 +369,8 @@ contains
         ! Transient dependent fields
         if (trim(esm%ctrl_run_type) .eq. "transient") then
             ! ESM reference period
-            !if(trim(esm%use_ref)) then
-            if (.TRUE.) then
+            !if (esm%use_esm) then
+            if (.FALSE.) then
                 call varslice_init_nml_esm(esm%ts_esm_ref,  filename,trim(grp_ts_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%pr_esm_ref,  filename,trim(grp_pr_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%to_esm_ref,  filename,trim(grp_to_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
@@ -390,7 +395,8 @@ contains
             ! ESM projection period
             !if(trim(esm%use_proj)) then
             ! jablasco
-            if (.TRUE.) then
+            !if (esm%use_esm .and. .TRUE.) then
+            if (.FALSE.) then    
                 call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
                 call varslice_init_nml_esm(esm%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,esm%gcm,esm%scenario)
                 !call varslice_init_nml_esm(esm%zs_proj, filename,trim(grp_zs_proj), domain,grid_name,esm%gcm,esm%scenario)
@@ -408,7 +414,7 @@ contains
     
     end subroutine esm_forcing_init
 
-    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,domain)
+    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,domain,grid_name)
         ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
 
         implicit none
@@ -417,13 +423,14 @@ contains
         real(wp),                intent(IN)    :: z_srf_ylm(:,:)
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
-        character(len=*),        intent(IN)    :: domain
+        character(len=*),        intent(IN)    :: domain, grid_name
 
         ! Local variables 
         integer :: m
         real(wp) :: tmp, lapse
         real(wp), parameter :: pi = 3.14159265359 
-        character(len=56)   :: slice_method 
+        character(len=56)   :: slice_method, ref_grid_name 
+        !type(map_scrip_class) :: mps
         logical  :: south 
 
         ! Get slices for current time
@@ -438,6 +445,19 @@ contains
         call varslice_update(esm%ts_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
         call varslice_update(esm%pr_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
         ! ===   Oceanic fields   ===
+        !call nc_read_attr(esm%to_ref,"grid_name", ref_grid_name)
+        !if (trim(file_grid_name) .eq. trim(grid_name) ) then
+        !    ! Ref grid and Yelmo grid are the same
+        !    call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
+        !else
+        !    ! Ref's grid is different than Yelmo grid. Load desired time range for the source code.
+        !    call varslice_update(esm%to_ref_src, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
+        !    ! Load the scrip map from file (should already have been generated via cdo externally)
+        !    call map_scrip_init(mps,file_grid_name,grid_name,method="con",fldr="maps",load=.TRUE.)
+        !    ! Remap src into the desired target
+        !    call varslice_map_to_grid(esm%to_ref,esm%to_ref_src,mps)
+        !end if
+
         call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
         call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)  
 
@@ -493,6 +513,7 @@ contains
         integer  :: m, year, step_idx
         real(wp) :: tmp, lapse
         real(wp) :: rand, year_rand
+
             
         ! Obtain reference year climatology
         select case(trim(clim_var))
@@ -525,8 +546,8 @@ contains
                 call varslice_update(esm%ts_var,[year_rand],method="interp",rep=12)
                 call varslice_update(esm%pr_var,[year_rand],method="interp",rep=12)
                 do m = 1, 12 
-                    esm%dts_var(:,:,m) = esm%ts_var%var(:,:,1,1)-esm%ts_var_ref%var(:,:,1,1)
-                    esm%dpr_var(:,:,m) = esm%pr_var%var(:,:,1,1)/(esm%pr_var_ref%var(:,:,1,1)+1e-8)
+                    esm%dts_var(:,:,m) = esm%ts_var%var(:,:,m,1)-esm%ts_var_ref%var(:,:,m,1)
+                    esm%dpr_var(:,:,m) = esm%pr_var%var(:,:,m,1)/(esm%pr_var_ref%var(:,:,m,1)+1e-8)
                 end do
                 ! ===   Oceanic fields   ===
                 call varslice_update(esm%to_var,[year_rand],method="interp",rep=1)
@@ -690,13 +711,13 @@ contains
                     select case(trim(esm%experiment))
                         case("1pctCO2_transient")
                             ! jablasco: TO DO change
-                            if(time .lt. 2000.0) then
+                            if(time .lt. 2020.0) then
                                 esm%dts = 0.0_wp
                                 esm%dpr = 1.0_wp
                                 esm%dto = 0.0_wp
                                 esm%dso = 0.0_wp
                             else
-                                anomaly = 0.02*(time - 2000.0)
+                                anomaly = 0.02*(time - 2020.0)
                                 if (anomaly .ge. esm%dT_lim) anomaly=esm%dT_lim
                                 esm%dts = esm%f_polar*anomaly
                                 esm%dpr = exp(esm%beta_p*esm%f_polar*anomaly)
