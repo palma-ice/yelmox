@@ -79,19 +79,20 @@ contains
 
                 sed%now%H = 0.0
 
+            case(1) ! Read in observations from file
 
-        ! Read in array 
-        if (sed%par%use_obs) then 
-            ! Load sediment data from file 
-            call nc_read(sed%par%obs_path,sed%par%obs_name,sed%now%H)
-            write(*,*) "sediments_init:: Sediments loaded from: "
-            write(*,*) trim(sed%par%obs_path)//" : "//trim(sed%par%obs_name)
-        
-        else 
-            ! Set sediment thickness to zero by default 
-            sed%now%H = 0.0 
+                ! Load sediment data from file 
+                call nc_read(sed%par%obs_path,sed%par%obs_name,sed%now%H)
+                write(*,*) "sediments_init:: Sediments loaded from: "
+                write(*,*) trim(sed%par%obs_path)//" : "//trim(sed%par%obs_name)
 
-        end if 
+            case DEFAULT
+
+                write(*,*) "sediments_init:: Error: method not recognized."
+                write(*,*) "sed.method = ", sed%par%method
+                stop
+
+        end select
 
         ! ====================================
         !
@@ -166,8 +167,7 @@ contains
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
-
-        call nml_read(filename,nml_group,"use_obs",    par%use_obs,     init=init_pars)
+        
         call nml_read(filename,nml_group,"obs_path",   par%obs_path,    init=init_pars)
         call nml_read(filename,nml_group,"obs_name",   par%obs_name,    init=init_pars)
 

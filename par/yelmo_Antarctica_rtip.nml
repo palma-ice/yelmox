@@ -235,6 +235,7 @@
 
 &ydyn
  solver          = 'diva'     
+ uz_method       = 3
  visc_method     = 1          
  visc_const      = 10000000.0 
  beta_method     = 3          
@@ -262,7 +263,8 @@ T_frz            = -3.0
 /
 &ytill
  method          = -1         
- scale           = 'exp'      
+ scale_zb        = 2
+ scale_sed       = 0    
  is_angle        = .false.    
  n_sd            = 10         
  f_sed           = 1.0        
@@ -308,6 +310,7 @@ T_frz            = -3.0
 /
 &ytherm
  method          = 'temp'     
+ qb_method       = 2
  dt_method       = 'FE'       
  solver_advec    = 'impl-upwind'
  gamma           = 1.0        
@@ -536,7 +539,7 @@ T_frz            = -3.0
  C_over          = 1.0        
 /
 &sed
- use_obs         = .false.    
+ method          = 0   
  obs_path        = 'ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc'
  obs_name        = 'z_sed'    
 /
@@ -544,7 +547,10 @@ T_frz            = -3.0
  use_obs         = .true.     
  obs_path        = 'ice_data/{domain}/{grid_name}/{grid_name}_GHF-HR24.nc'
  obs_name        = 'ghf'      
- ghf_const       = 50.0       
+ obs_err_name    = 'ghf_sigma'
+ f_stdev         = 0.0
+ ghf_const       = 50.0
+      
 /
 
 &isos
