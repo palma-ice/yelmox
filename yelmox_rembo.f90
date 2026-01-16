@@ -144,7 +144,7 @@ program yelmox
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
     
-    opt%cf_min = opt%cf_min_par 
+    opt%cf_min = yelmo1%dyn%par%till_cf_min 
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define no-ice mask from present-day data

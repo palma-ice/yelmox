@@ -26,16 +26,12 @@ class DictAction(argparse.Action):
         for value in values:
             key, valstr = value.split('=')
             if ',' in valstr:
-                if '[' not in valstr:
-                    raise Exception('Only one value allowed for each parameter using -p: {}={}'.format(key,valstr))
+                raise Exception('Only one value allowed for each parameter using -p: {}={}'.format(key,valstr))
             try:
                 value = float(valstr)
                 if value % 1 == 0 and not '.' in valstr: value = int(value)
             except:
-                if ('[' == valstr[0]) and (']' == valstr[-1]):
-                    value = valstr[1:-1].split(',') # list of strings, it should be given as var="[var1,var2,var3,...]" in the nml file, without '' or ""
-                else:
-                    value = valstr 
+                value = valstr 
             getattr(namespace, self.dest)[key] = value
 
 def main():
@@ -394,7 +390,8 @@ def runjob(rundir,cmd,omp):
 
     if omp > 0:
         # && export OMP_THREAD_LIMIT=2"
-        cmd_job = "cd {} && export OMP_NUM_THREADS={} && mpiexec -n {} {} > {} &".format(rundir,omp,omp,cmd,"out.out")
+        #cmd_job = "cd {} && export OMP_NUM_THREADS={} && mpiexec -n {} {} > {} &".format(rundir,omp,omp,cmd,"out.out")
+        cmd_job = "cd {} && export OMP_NUM_THREADS={} && {} > {} &".format(rundir,omp,cmd,"out.out")
     else:
         cmd_job = "cd {} && exec {} > {} &".format(rundir,cmd,"out.out")
         #cmd_job = "cd {} && exec mpiexec -n 1 {} > {} &".format(rundir,cmd,"out.out")

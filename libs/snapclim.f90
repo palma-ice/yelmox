@@ -5,7 +5,7 @@ module snapclim
     !use yelmo_defs !,only :: sp, dp, prec, pi, yelmo_parse_path
     use ncio 
     use nml 
-
+    
     implicit none 
 
     ! Internal constants
@@ -142,6 +142,9 @@ module snapclim
     public :: snapclim_update 
 
     public :: snapclim_var_to_ocn
+
+    public :: snapclim_write_init
+    public :: snapclim_write_step
 
 !     public :: snapclim_end 
 
@@ -459,6 +462,16 @@ contains
             south = .FALSE.
         end if 
 
+        ! Step 0: store z_srf and generate mask
+
+        ! Finally update mask and elevation to make sure they are consistent
+        snp%now%z_srf = z_srf
+        where(snp%now%z_srf .gt. 1.0) 
+            snp%now%mask = 1.0
+        elsewhere
+            snp%now%mask = 0.0 
+        end where
+
         ! Step 1: Call the appropriate forcing subroutine to obtain the
         ! current monthly atmospheric sea-level temperature  and sea-level precipitation fields.
 
@@ -486,7 +499,6 @@ contains
 
             case("snap_1ind","snap_1ind_new")
 
- !HEAD
                 if (present(dx)) then 
                     ! Allow smoothing...
 
@@ -533,10 +545,6 @@ contains
                 call calc_temp_1ind(snp%now%tsl,clim0_tsl_corr,snp%clim1%tsl,snp%clim2%tsl,at)
                 call calc_precip_1ind(snp%now%prcor,clim0_prcor_corr,snp%clim1%prcor,snp%clim2%prcor,ap)
                 
-!END HEAD
-  !             call calc_temp_1ind(snp%now%tsl,snp%clim0%tsl,snp%clim1%tsl,snp%clim2%tsl,at)
-  !             call calc_precip_1ind(snp%now%prcor,snp%clim0%prcor,snp%clim1%prcor,snp%clim2%prcor,ap)
-            
             ! jablasco: miocene
             case("snap_1ind_miocene")
 
@@ -2571,112 +2579,199 @@ contains
 
     end function gauss_values
 
-    ! subroutine write_snapclim_init(snp,filename,time_init,units,irange,jrange)
-    !     ! Initialize a NetCDF file for snapclim output.
-    !     ! Produces a file with all possible dimension information 
-    !     ! to be able to plot different variables of the user's choice. 
-    !     ! Also, irange=[i1,i2] and jrange=[j1,j2] can be used to limit 
-    !     ! the dimensions to a specific horizontal region of the domain.
+    subroutine snapclim_write_init(snp,filename,xc,yc,time,units,irange,jrange)
+        ! Initialize a NetCDF file for snapclim output.
+        ! Produces a file with all possible dimension information 
+        ! to be able to plot different variables of the user's choice. 
+        ! Also, irange=[i1,i2] and jrange=[j1,j2] can be used to limit 
+        ! the dimensions to a specific horizontal region of the domain.
         
-    !     implicit none 
+        implicit none 
 
-    !     type(snapclim_class), intent(IN) :: snp 
-    !     character(len=*),  intent(IN) :: filename
-    !     real(wp),          intent(IN) :: time_init
-    !     character(len=*),  intent(IN) :: units 
-    !     integer,           intent(IN), optional :: irange(2)
-    !     integer,           intent(IN), optional :: jrange(2)
+        type(snapclim_class), intent(IN) :: snp 
+        character(len=*),  intent(IN) :: filename
+        real(wp),          intent(IN) :: xc(:)
+        real(wp),          intent(IN) :: yc(:)
+        real(wp),          intent(IN) :: time
+        character(len=*),  intent(IN) :: units 
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
         
-    !     ! Local variables
-    !     integer :: i1, i2, j1, j2
+        ! Local variables
+        integer :: nx, ny 
+        integer :: i1, i2, j1, j2
 
-    !     ! Initialize netcdf file and dimensions
-    !     call nc_write_dim(filename,"month",     x=1,dx=1,nx=12,         units="month")
-    !     call nc_write_dim(filename,"zeta",      x=ylmo%par%zeta_aa,     units="1")
-    !     call nc_write_dim(filename,"zeta_ac",   x=ylmo%par%zeta_ac,     units="1")
-    !     call nc_write_dim(filename,"zeta_rock", x=ylmo%thrm%par%zr%zeta_aa,units="1")
-    !     call nc_write_dim(filename,"age_iso",   x=ylmo%mat%par%age_iso, units="kyr")
-    !     call nc_write_dim(filename,"pd_age_iso",x=ylmo%dta%pd%age_iso,  units="kyr")
-    !     call nc_write_dim(filename,"pc_steps",  x=1,dx=1,nx=3,          units="1")
+        nx = size(xc)
+        ny = size(yc)
+
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+
+
+        ! Create the empty netcdf file
+        call nc_create(filename)
+
+        ! Add grid axis variables to netcdf file
+        call nc_write_dim(filename,"xc",x=xc(i1:i2)*1e-3,units="km")
+        call nc_write_dim(filename,"yc",x=yc(j1:j2)*1e-3,units="km")
         
-    !     call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+        ! Assume it is a projection 
+        call nc_write_attr(filename,"xc","standard_name","projection_x_coordinate")
+        call nc_write_attr(filename,"yc","standard_name","projection_y_coordinate")
 
-    !     ! Get indices for current domain of interest
-    !     call get_region_indices(i1,i2,j1,j2,snp%grd%nx,snap%grd%ny,irange,jrange)
+        ! Initialize netcdf file and dimensions
+        call nc_write_dim(filename,"month", x=1,dx=1,nx=12, units="month")
+        call nc_write_dim(filename,"depth", x=snp%now%depth, units="meters")
 
-    !     ! Write static fields
-    !     ! ...
+        call nc_write_dim(filename,"time",  x=time,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+
+        ! Write static fields
+        ! ...
         
-    !     return
+        return
 
-    ! end subroutine write_snapclim_init
+    end subroutine snapclim_write_init
 
-    ! subroutine write_snapclim_step(snp,filename,time)
+    subroutine snapclim_write_step(snp,filename,time,irange,jrange)
 
-    !     implicit none 
+        implicit none 
         
-    !     type(snapclim_class),   intent(IN) :: snp 
+        type(snapclim_class),   intent(IN) :: snp 
         
-    !     character(len=*),  intent(IN) :: filename
-    !     real(wp), intent(IN) :: time
-
-    !     ! Local variables
-    !     integer  :: ncid, n
-    !     real(wp) :: time_prev 
-
-    !     ! Open the file for writing
-    !     call nc_open(filename,ncid,writable=.TRUE.)
-
-    !     ! Determine current writing time step 
-    !     n = nc_time_index(filename,"time",time,ncid)
-
-    !     ! Update the time step
-    !     call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-    !     ! Update variables
-    !     call nc_write(filename,"mask",time,dim1="time",start=[n],count=[1],ncid=ncid)
-    !     call nc_write(filename,"mask", snp%now%mask(i1:i2,j1:j2), dim1="xc",dim2="yc",units="",long_name="Mask")
-
-    !     ! write snapclim_state_class variables in snapclim.nc
-    ! !     type snapclim_state_class 
-
-    ! !     type(snapshot_param_class) :: par 
-
-    ! !     ! Climate variables 
-    ! !     real(wp), allocatable :: mask(:,:)     
-    ! !     real(wp), allocatable :: z_srf(:,:)
-
-    ! !     real(wp), allocatable :: tas(:,:,:)
-    ! !     real(wp), allocatable :: pr(:,:,:)
-    ! !     real(wp), allocatable :: pr_stdev_frac(:,:,:)
-    ! !     real(wp), allocatable :: sf(:,:,:)
-
-    ! !     real(wp), allocatable :: ta_ann(:,:)
-    ! !     real(wp), allocatable :: ta_sum(:,:)
-    ! !     real(wp), allocatable :: pr_ann(:,:)
+        character(len=*),  intent(IN) :: filename
+        real(wp), intent(IN) :: time
+        integer,           intent(IN), optional :: irange(2)
+        integer,           intent(IN), optional :: jrange(2)
         
-    ! !     real(wp), allocatable :: pr_ann_stdev_frac(:,:)
+        ! Local variables
+        integer  :: ncid, n, nx, ny
+        integer :: i1, i2, j1, j2
 
-    ! !     real(wp), allocatable :: tsl(:,:,:)
-    ! !     real(wp), allocatable :: prcor(:,:,:)
-    ! !     real(wp), allocatable :: tsl_ann(:,:)
-    ! !     real(wp), allocatable :: tsl_sum(:,:)
-    ! !     real(wp), allocatable :: prcor_ann(:,:)
-    ! !     real(wp), allocatable :: beta_p(:,:)        
+        nx = size(snp%now%mask,1)
+        ny = size(snp%now%mask,2)
 
-    ! !     ! Oceanic variables
-    ! !     integer :: nzo
-    ! !     real(wp), allocatable :: depth(:) 
-    ! !     real(wp), allocatable :: mask_ocn(:,:,:) 
-    ! !     real(wp), allocatable :: to_ann(:,:,:) 
-    ! !     real(wp), allocatable :: so_ann(:,:,:) 
+        ! Get indices for current domain of interest
+        call get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+
+        ! Open the file for writing
+        call nc_open(filename,ncid,writable=.TRUE.)
+
+        ! Determine current writing time step 
+        n = nc_time_index(filename,"time",time,ncid)
+
+        ! Update the time step
+        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
+        call nc_write(filename,"at",snp%now%at,dim1="time",start=[n],count=[1],ncid=ncid)
+
+        ! Update variables
+        call nc_write(filename,"mask", snp%now%mask(i1:i2,j1:j2), dim1="xc",dim2="yc",dim3="time", &
+                        start=[1,1,n],long_name="Mask",units="")
+
+        call nc_write(filename,"z_srf", snp%now%z_srf(i1:i2,j1:j2), dim1="xc",dim2="yc",dim3="time", &
+                        start=[1,1,n],long_name="Surface elevation",units="m")
         
-    ! !     real(wp) :: at, ao, ap, as 
-    ! !     real(wp) :: bt, bo, bp, bs
+        call nc_write(filename,"tsl", snp%now%tsl(i1:i2,j1:j2,:), dim1="xc",dim2="yc",dim3="month",dim4="time",&
+                        start=[1,1,1,n],long_name="Sea-level air temperature",units="K")
+        call nc_write(filename,"tas", snp%now%tas(i1:i2,j1:j2,:), dim1="xc",dim2="yc",dim3="month",dim4="time",&
+                        start=[1,1,1,n],long_name="Near-surface air temperature",units="K")
+        call nc_write(filename,"pr", snp%now%pr(i1:i2,j1:j2,:), dim1="xc",dim2="yc",dim3="month",dim4="time",&
+                        start=[1,1,1,n],long_name="Precipitation",units="mm/d")
+        
+        call nc_write(filename,"ta_ann", snp%now%ta_ann(i1:i2,j1:j2), dim1="xc",dim2="yc",dim3="time",&
+                        start=[1,1,1,n],long_name="Near-surface air temperature (annual)",units="K")
+        call nc_write(filename,"ta_sum", snp%now%ta_sum(i1:i2,j1:j2), dim1="xc",dim2="yc",dim3="time",&
+                        start=[1,1,1,n],long_name="Near-surface air temperature (summer)",units="K")
+        call nc_write(filename,"pr_ann", snp%now%pr_ann(i1:i2,j1:j2), dim1="xc",dim2="yc",dim3="time",&
+                        start=[1,1,1,n],long_name="Precipitation (annual)",units="mm/yr")
 
-    ! ! end type 
+        call nc_write(filename,"mask_ocn", snp%now%mask_ocn(i1:i2,j1:j2,:), dim1="xc",dim2="yc",dim3="depth",dim4="time",&
+                        start=[1,1,1,n],long_name="Ocean mask",units="")
+        call nc_write(filename,"to_ann", snp%now%to_ann(i1:i2,j1:j2,:), dim1="xc",dim2="yc",dim3="depth",dim4="time",&
+                        start=[1,1,1,n],long_name="Ocean temperature",units="K")
+        call nc_write(filename,"so_ann", snp%now%so_ann(i1:i2,j1:j2,:), dim1="xc",dim2="yc",dim3="depth",dim4="time",&
+                        start=[1,1,1,n],long_name="Ocean salinity",units="PSU")
+
+        ! ajr: this variable doesn't work since it is not calculated for the current climatology - only applied to each snapshot loaded
+        ! call nc_write(filename,"pr_ann_stdev_frac", snp%now%pr_ann_stdev_frac(i1:i2,j1:j2), dim1="xc",dim2="yc",dim3="time",&
+        !                 start=[1,1,1,n],long_name="Precipitation (annual)",units="mm/yr")
+
+        ! write snapclim_state_class variables in snapclim.nc
+    !     type snapclim_state_class 
+
+    !     type(snapshot_param_class) :: par 
+
+    !     ! Climate variables 
+    !     real(wp), allocatable :: mask(:,:)     
+    !     real(wp), allocatable :: z_srf(:,:)
+
+    !     real(wp), allocatable :: tas(:,:,:)
+    !     real(wp), allocatable :: pr(:,:,:)
+    !     real(wp), allocatable :: pr_stdev_frac(:,:,:)
+    !     real(wp), allocatable :: sf(:,:,:)
+
+    !     real(wp), allocatable :: ta_ann(:,:)
+    !     real(wp), allocatable :: ta_sum(:,:)
+    !     real(wp), allocatable :: pr_ann(:,:)
+        
+    !     real(wp), allocatable :: pr_ann_stdev_frac(:,:)
+
+    !     real(wp), allocatable :: tsl(:,:,:)
+    !     real(wp), allocatable :: prcor(:,:,:)
+    !     real(wp), allocatable :: tsl_ann(:,:)
+    !     real(wp), allocatable :: tsl_sum(:,:)
+    !     real(wp), allocatable :: prcor_ann(:,:)
+    !     real(wp), allocatable :: beta_p(:,:)        
+
+    !     ! Oceanic variables
+    !     integer :: nzo
+    !     real(wp), allocatable :: depth(:) 
+    !     real(wp), allocatable :: mask_ocn(:,:,:) 
+    !     real(wp), allocatable :: to_ann(:,:,:) 
+    !     real(wp), allocatable :: so_ann(:,:,:) 
+        
+    !     real(wp) :: at, ao, ap, as 
+    !     real(wp) :: bt, bo, bp, bs
+
+    ! end type 
 
 
-    ! end subroutine write_snapclim
+    end subroutine snapclim_write_step
 
 end module snapclim
+
+
+subroutine get_region_indices(i1,i2,j1,j2,nx,ny,irange,jrange)
+        ! Get indices for a region based on bounds. 
+        ! If no bounds provided, use whole domain.
+
+        implicit none
+
+        integer, intent(OUT) :: i1
+        integer, intent(OUT) :: i2
+        integer, intent(OUT) :: j1
+        integer, intent(OUT) :: j2
+        integer, intent(IN)  :: nx
+        integer, intent(IN)  :: ny
+        integer, intent(IN), optional :: irange(2)
+        integer, intent(IN), optional :: jrange(2)
+
+        
+        if (present(irange)) then
+            i1 = irange(1)
+            i2 = irange(2)
+        else
+            i1 = 1
+            i2 = nx
+        end if
+
+        if (present(jrange)) then
+            j1 = jrange(1)
+            j2 = jrange(2)
+        else
+            j1 = 1
+            j2 = ny
+        end if
+
+        return
+
+    end subroutine get_region_indices

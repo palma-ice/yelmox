@@ -12,17 +12,18 @@ module sediments
     integer,  parameter :: sp  = kind(1.0)
 
     ! Choose the precision of the library (sp,dp)
-    integer,  parameter :: prec = sp 
+    integer,  parameter :: wp = sp 
 
     type sediments_param_class
-        logical            :: use_obs
+        integer            :: method
         character(len=512) :: obs_path
         character(len=56)  :: obs_name 
-        real(prec)         :: sed_limit
+        real(wp)           :: sed_limit
     end type 
 
-    type sediments_state_class 
-        real(prec), allocatable :: H(:,:)
+    type sediments_state_class
+        real(wp), allocatable :: cb(:,:)        ! [deg] Till strength
+        real(wp), allocatable :: H(:,:)         ! [m] Sediment thickness
     end type 
 
     type sediments_class
@@ -48,7 +49,7 @@ contains
         character(len=*),      intent(IN)    :: filename 
         integer,               intent(IN)    :: nx, ny 
         character(len=*),      intent(IN)    :: domain, grid_name
-        character(len=*),  intent(IN), optional :: group
+        character(len=*),      intent(IN), optional :: group
 
         ! Local variables
         character(len=32) :: nml_group
@@ -57,7 +58,7 @@ contains
         if (present(group)) then
             nml_group = trim(group)
         else
-            nml_group = "sediments"         ! Default parameter blcok name
+            nml_group = "sed"         ! Default parameter blcok name
         end if
 
         ! Load sediments parameters
@@ -68,22 +69,30 @@ contains
 
         ! ====================================
         !
-        ! Read in the sediment thickness
+        ! Read in the sediment information
         !
         ! ====================================
         
-        ! Read in array 
-        if (sed%par%use_obs) then 
-            ! Load sediment data from file 
-            call nc_read(sed%par%obs_path,sed%par%obs_name,sed%now%H)
-            write(*,*) "sediments_init:: Sediments loaded from: "
-            write(*,*) trim(sed%par%obs_path)//" : "//trim(sed%par%obs_name)
-        
-        else 
-            ! Set sediment thickness to zero by default 
-            sed%now%H = 0.0 
+        select case(sed%par%method)
 
-        end if 
+            case(0) ! No sediment information
+
+                sed%now%H = 0.0
+
+            case(1) ! Read in observations from file
+
+                ! Load sediment data from file 
+                call nc_read(sed%par%obs_path,sed%par%obs_name,sed%now%H)
+                write(*,*) "sediments_init:: Sediments loaded from: "
+                write(*,*) trim(sed%par%obs_path)//" : "//trim(sed%par%obs_name)
+
+            case DEFAULT
+
+                write(*,*) "sediments_init:: Error: method not recognized."
+                write(*,*) "sed.method = ", sed%par%method
+                stop
+
+        end select
 
         ! ====================================
         !
@@ -113,7 +122,7 @@ contains
 
         type(sediments_class) :: sed 
 
-        real(prec) :: year_bp 
+        real(wp) :: year_bp 
 
         ! === To do ====
 
@@ -153,13 +162,12 @@ contains
         if (present(group)) then
             nml_group = trim(group)
         else
-            nml_group = "sediments"         ! Default parameter blcok name
+            nml_group = "sed"         ! Default parameter blcok name
         end if
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
-
-        call nml_read(filename,nml_group,"use_obs",    par%use_obs,     init=init_pars)
+        
         call nml_read(filename,nml_group,"obs_path",   par%obs_path,    init=init_pars)
         call nml_read(filename,nml_group,"obs_name",   par%obs_name,    init=init_pars)
 

@@ -61,6 +61,7 @@ program yelmox
 
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
+        logical  :: write_clim_and_kill
 
     end type 
 
@@ -98,6 +99,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
+    call nml_read(path_par,"ctrl","write_clim_and_kill",   ctl%write_clim_and_kill)       ! Write climate output and kill program?
 
     ! Get output times
     call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
@@ -172,7 +174,7 @@ program yelmox
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
     
-    opt%cf_min = opt%cf_min_par 
+    opt%cf_min = yelmo1%dyn%par%till_cf_min
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define specific regions of interest =====================
@@ -286,7 +288,7 @@ end if
     yelmo1%bnd%H_sed = sed1%now%H 
     
     call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
-    yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
+    yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
     ! === Update initial boundary conditions for current time and yelmo state =====
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
@@ -320,6 +322,13 @@ end if
     yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
 
+    ! Write out initial boundary conditions if desired
+    if (ctl%write_clim_and_kill) then
+        call snapclim_write_init(snp1,"yelmox_climate.nc",yelmo1%grd%xc,yelmo1%grd%yc,time=ts%time,units="years")
+        call snapclim_write_step(snp1,"yelmox_climate.nc",time=ts%time)
+        stop
+    end if
+    
     if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
         ! Modify glacial smb
         call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
@@ -365,11 +374,11 @@ end if
 
             if (trim(ctl%tstep_method) .eq. "const") then
                 ! Steady-state simulation, start with lgm state
-                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,method="ref_lgm", &
+                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,path_par,method="ref_lgm", &
                                                         with_ice_sheet=ctl%with_ice_sheet)
             else
                 ! Transient simulation - start with no ice thickness
-                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,method="zero", &
+                call yelmox_init_laurentide_lgm(yelmo1,snp1,smbpal1,ts,path_par,method="zero", &
                                                         with_ice_sheet=ctl%with_ice_sheet)
             end if
 
@@ -400,7 +409,7 @@ end if
                 if (ctl%with_ice_sheet) then
                     ! Run yelmo for a few years with constant boundary conditions
                     ! to synchronize all model fields a bit
-                    call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+                    call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_wp, dt=1.0_wp,topo_fixed=.FALSE.)
                 end if 
 
             end if
@@ -411,7 +420,7 @@ end if
             if (ctl%with_ice_sheet) then
                 ! Run yelmo for a few years with constant boundary conditions
                 ! to synchronize all model fields a bit
-                call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_prec, dt=1.0_prec,topo_fixed=.FALSE.)
+                call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_wp, dt=1.0_wp,topo_fixed=.FALSE.)
             end if 
 
         end select
@@ -420,8 +429,12 @@ end if
 
     ! ===== Initialize output files ===== 
     
-    call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years") 
-    call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years") 
+    if (tm_2D%active) then
+        call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
+    end if
+    if (tm_2Dsm%active) then
+        call yelmo_write_init(yelmo1,file2D_small,time_init=ts%time,units="years")
+    end if
     
     call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
 
@@ -586,7 +599,7 @@ end if
             call yelmox_write_step(yelmo1,snp1,mshlf1,smbpal1,file2D,ts%time)
         end if
 
-        if (timeout_check(tm_2Dsm,ts%time) .and. .FALSE.) then 
+        if (timeout_check(tm_2Dsm,ts%time)) then 
             call yelmo_write_step(yelmo1,file2D_small,ts%time,compare_pd=.FALSE.)
         end if
 
@@ -627,7 +640,7 @@ end if
     
 contains
     
-    subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,method,with_ice_sheet)
+    subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,path_par,method,with_ice_sheet)
 
         implicit none
 
@@ -635,11 +648,13 @@ contains
         type(snapclim_class),   intent(INOUT) :: snp
         type(smbpal_class),     intent(INOUT) :: smb
         type(tstep_class),      intent(IN)    :: ts
+        character(len=*),       intent(IN)    :: path_par
         character(len=*),       intent(IN)    :: method
         logical,                intent(IN)    :: with_ice_sheet
 
         ! Local variables
         character(len=1024) :: path_lgm
+        type(yelmo_class) :: ylmo_eq
 
         ! Load LGM reconstruction into reference ice thickness
         path_lgm = "ice_data/Laurentide/"//trim(ylmo%par%grid_name)//&
@@ -657,6 +672,12 @@ contains
             where (ylmo%bnd%regions .eq. 1.1 .and. ylmo%bnd%z_bed .gt. 0.0) ylmo%tpo%now%H_ice = 1000.0 
             where (ylmo%bnd%regions .eq. 1.12) ylmo%tpo%now%H_ice = 1000.0 
 
+            ! Apply Gaussian smoothing to keep things stable
+            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=3.0)
+
+            ! Make sure to update topographic info (without loading anything)
+            call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+
         case("ref_lgm")
             ! Set LGM reconstruction as initial ice thickness over North America
             
@@ -669,7 +690,10 @@ contains
 
             ! Apply Gaussian smoothing to keep things stable
             call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
-        
+
+            ! Make sure to update topographic info (without loading anything)
+            call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+
         case DEFAULT
             ! Zero ice thickness
 
@@ -677,18 +701,16 @@ contains
 
         end select 
         
-        ! Load sediment mask 
-        path_lgm = "ice_data/Laurentide/"//trim(ylmo%par%grid_name)//&
-                    "/"//trim(ylmo%par%grid_name)//"_SED-L97.nc"
-        call nc_read(path_lgm,"z_sed",ylmo%bnd%H_sed) 
+        ! Run Yelmo for briefly to update surface topography fields (but fixed H)
+        call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
-        if (with_ice_sheet) then
-            ! Run Yelmo for briefly to update surface topography
-            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+        ! Addtional cleanup - remove thin floating ice 
+        where( ylmo%tpo%now%mask_bed .eq. 5 .and. ylmo%tpo%now%H_ice .lt. 50.0_wp) ylmo%tpo%now%H_ice = 0.0 
+        call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
-            ! Addtional cleanup - remove floating ice 
-            where( ylmo%tpo%now%mask_bed .eq. 5) ylmo%tpo%now%H_ice = 0.0 
-            call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_prec,dt=1.0,topo_fixed=.TRUE.)
+        if (trim(method) .eq. "ref_lgm") then
+            ! Store new "clean" ice thickness as reference state
+            ylmo%bnd%H_ice_ref = ylmo%tpo%now%H_ice
         end if 
 
         ! Update snapclim to reflect new topography 
@@ -711,11 +733,31 @@ contains
                 call yelmo_update_equil(ylmo,ts%time,time_tot=5e3,dt=5.0,topo_fixed=.FALSE.)
             end if 
 
-        else 
+        else ! method=="ref_lgm"
 
             if (with_ice_sheet) then
+
+                ! Set relaxation for equilibrium
+                ylmo_eq = ylmo
+                !ylmo_eq%tpo%par%calv_flt_method = "zero"
+                ! ylmo_eq%tpo%par%topo_rel = 3
+                ylmo_eq%dyn%par%beta_min = 100.0
+
                 ! Run yelmo for several years with constant boundary conditions to stabilize fields
-                call yelmo_update_equil(ylmo,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                ! ylmo_eq%tpo%par%topo_rel_tau = 10.0
+                ! call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                !ylmo_eq%tpo%par%topo_rel_tau = 100.0
+                !call yelmo_update_equil(ylmo_eq,ts%time,time_tot=1e2,dt=5.0,topo_fixed=.FALSE.)
+                call yelmo_update_equil(ylmo_eq,ts%time,time_tot=2e2,dt=5.0,topo_fixed=.FALSE.)
+
+                ! Restore parameters and state back to original yelmo object
+                !ylmo_eq%tpo%par%calv_flt_method = ylmo%tpo%par%calv_flt_method
+                !ylmo_eq%tpo%par%topo_rel = ylmo%tpo%par%topo_rel 
+                !ylmo_eq%tpo%par%topo_rel_tau = ylmo%tpo%par%topo_rel_tau
+                ylmo_eq%dyn%par%beta_min = ylmo%dyn%par%beta_min
+
+                ylmo = ylmo_eq
+
             end if 
 
         end if 
@@ -809,10 +851,9 @@ contains
         ! Update bed roughness coefficients cb_ref and c_bed (which are independent of velocity)
         ! like normal, using the default function defined in Yelmo:
         call calc_cb_ref(ylmo%dyn%now%cb_ref,ylmo%bnd%z_bed,ylmo%bnd%z_bed_sd,ylmo%bnd%z_sl, &
-                            ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min, &
-                            ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min, &
-                            ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1,ylmo%dyn%par%till_n_sd, &
-                            ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method)
+                ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min,ylmo%dyn%par%till_sed_max, &
+                ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min,ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1, &
+                ylmo%dyn%par%till_n_sd,ylmo%dyn%par%till_scale_zb,ylmo%dyn%par%till_scale_sed)
 
         ! === Finally, apply NEGIS scaling =============================
 
@@ -915,14 +956,21 @@ contains
         call yelmo_write_var(filename,"bmb_grnd",ylmo,n,ncid)
         call yelmo_write_var(filename,"H_w",ylmo,n,ncid)
         
+        !call yelmo_write_var(filename,"Q_strn",ylmo,n,ncid)
+        ! Write Q_strn in K/yr instead of mW/m^3:
+        call nc_write(filename,"Q_strn",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
+                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
+
+        call yelmo_write_var(filename,"Q_ice_b",ylmo,n,ncid)
+        call yelmo_write_var(filename,"Q_b",ylmo,n,ncid)
+        
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_sl",ylmo,n,ncid)
         !call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)
         call yelmo_write_var(filename,"T_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_shlf",ylmo,n,ncid)
-        write(*,*) "javi qgeo"
-        call yelmo_write_var(filename,"Q_geo",ylmo,n,ncid)
+        !call yelmo_write_var(filename,"Q_geo",ylmo,n,ncid)     ! Written as static field below
 
         if (.FALSE.) then
                 ! == yelmo_data (comparison with present-day) ==
@@ -933,6 +981,7 @@ contains
         end if
 
         ! == yelmo extra fields ==
+if (.FALSE.) then
         write(*,*) "yelmox extra"
         call yelmo_write_var(filename,"ssa_mask_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"ssa_mask_acy",ylmo,n,ncid)
@@ -952,19 +1001,13 @@ contains
         call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
         call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
+end if
 
-        write(*,*) "javi 1"
-        call nc_write(filename,"Q_strn_alt_units",ylmo%thrm%now%Q_strn/(ylmo%bnd%c%rho_ice*ylmo%thrm%now%cp),units="K a-1",long_name="Strain heating", &
-                      dim1="xc",dim2="yc",dim3="zeta",dim4="time",start=[1,1,1,n],ncid=ncid)
-
-        call nc_write(filename,"Q_ice_b",ylmo%thrm%now%Q_ice_b,units="mW m-2",long_name="Basal ice heat flux", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"Q_b",ylmo%thrm%now%Q_b,units="mW m-2",long_name="Basal frictional heating", &
-                      dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
         ! Static fields
         if (n .le. 1) then 
             call nc_write(filename,"H_sed",ylmo%bnd%H_sed,units="m",long_name="Sediment thickness", &
+                        dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
+            call nc_write(filename,"Q_geo",ylmo%bnd%Q_geo,units="mW m^-2",long_name="Geothermal heat flow at depth ", &
                         dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
         end if
 

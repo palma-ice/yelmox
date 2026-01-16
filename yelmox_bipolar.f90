@@ -698,7 +698,7 @@ contains
                             ylmo%bnd%H_sed,ylmo%dyn%par%till_f_sed,ylmo%dyn%par%till_sed_min, &
                             ylmo%dyn%par%till_sed_max,ylmo%dyn%par%till_cf_ref,ylmo%dyn%par%till_cf_min, &
                             ylmo%dyn%par%till_z0,ylmo%dyn%par%till_z1,ylmo%dyn%par%till_n_sd, &
-                            ylmo%dyn%par%till_scale,ylmo%dyn%par%till_method)
+                            ylmo%dyn%par%till_scale_zb,ylmo%dyn%par%till_scale_sed)
 
         ! === Finally, apply NEGIS scaling =============================
 
@@ -1282,7 +1282,7 @@ contains
         allocate(yelmox%opt%cf_min(yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny))
         allocate(yelmox%opt%cf_max(yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny))
         
-        yelmox%opt%cf_min = yelmox%opt%cf_min_par 
+        yelmox%opt%cf_min = yelmox%yelmo1%dyn%par%till_cf_min 
         yelmox%opt%cf_max = yelmox%yelmo1%dyn%par%till_cf_ref
 
         ! Define specific regions of interest =====================
