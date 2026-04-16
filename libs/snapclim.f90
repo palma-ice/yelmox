@@ -481,6 +481,8 @@ contains
                     dTa_now = at*snp%par%dTa_const
                 end if
 
+                !dTa_now = 0.0
+
                 call calc_temp_anom(snp%now%tsl,snp%clim0%tsl,dTa_now)
                 call calc_precip_anom(snp%now%prcor,snp%clim0%prcor,snp%now%tsl-snp%clim0%tsl,snp%clim0%beta_p)
 
@@ -1800,6 +1802,7 @@ contains
 
                 call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%ta_ann)
                 call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%ta_sum)
+                
                 call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
                 
                 if (minval(clim%ta_ann) .lt. 100.0) then

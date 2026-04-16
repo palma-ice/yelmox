@@ -4,46 +4,23 @@
     time_init       = 0                 ! [yr] Starting time 
     time_end        = 30e3              ! [yr] Ending time
     time_equil      = 0.0               ! [yr] Equilibration time 
-    dtt             = 1.0               ! [yr] Main loop timestep 
-    dt_restart      = 15e3              ! [yr] Frequency of writing restart files
+    dtt             = 5.0               ! [yr] Main loop timestep 
+    dt_restart      = 10e3              ! [yr] Frequency of writing restart files
     transient_clim  = True              ! Calculate transient climate? 
     with_ice_sheet  = True              ! Is the ice sheet active?
-    equil_method    = 'opt'            ! 'none', 'relax', 'opt'
-    
-    ! Bipolar domains (ISM = Ice Sheet Model; OBM = Ocean Box Model; ATM = Atmosphere)
-    active_north = True                 ! Is YelmoX north active?
-    active_south = True                 ! Is YelmoX south active?
-    active_obm   = True                 ! Is Ocean Box Model active?
-    obm_name     = 'nautilus'           ! OBM parameters block name
-
-    ! Coupling parameters    
-    ism2obm          = False                    ! Activate ISM to OBM coupling?
-    couple_fwf_north = False 
-    couple_fwf_south = False
-    couple_to_north = False 
-    couple_to_south = False
-    fwf_definition   = 'dVdt'               ! 'dVdt', 'dVdt_mask'
-    hydro_mask_north = 'ice_data/Greenland/GRL-16KM/GRL-16KM_HYDRO-BASINS_zickfeld2004.nc'
-    hydro_mask_south = 'ice_data/Antarctica/ANT-32KM/ANT-32KM_HYDRO-BASINS_zickfeld2004.nc' 
-    fwf_frac_north = 1.0    ! fraction of total fwf that is applied to obm box
-    fwf_frac_south = 1.0    ! fraction of total fwf that is applied to obm box
-
-    obm2ism = False                             ! Activate OBM to ISM coupling?
-
-    atm2obm = False                             ! Activate ATM to OBM coupling?
-    
+    equil_method    = 'opt'             ! 'none', 'relax', 'opt'
 /
 
 &tm_1D
     method          = 'const'           ! 'const', 'file', 'times'
-    dt              = 100.0
+    dt              = 10.0
     file            = 'input/timeout_ramp_100kyr.txt'
     times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
 /
 
 &tm_2D
     method          = 'const'           ! 'const', 'file', 'times'
-    dt              = 100.0
+    dt              = 50.0
     file            = 'input/timeout_ramp_100kyr.txt'
     times           = 0
 /
@@ -53,6 +30,45 @@
     dt              = 5000000.0
     file            = 'input/timeout_ramp_100kyr.txt'
     times           = 0
+/
+
+&bipolar
+    ! Bipolar domains (ISM = Ice Sheet Model; OBM = Ocean Box Model; ATM = Atmosphere)
+    active_north = False                ! Is YelmoX north active?
+    active_south = True                 ! Is YelmoX south active?
+    active_obm   = False                ! Is Ocean Box Model active?
+    obm_name     = 'nautilus'           ! OBM parameters block name
+
+    ! TIPMIP protocol for OBM sims
+    apply_fwf_ramp = False
+    fname_ft="none"
+    fwf_amplitude = 0.1
+    isdouble_hosing = false
+
+    is_hosing_experiment = false    ! deactivate atmosphere coupling in the ocean
+
+    ! Coupling parameters    
+    atm2obm = True                      ! Activate ATM to OBM coupling?
+    f_o = 1.0                           ! Atmosphere-ocean temperature relationship in the ocean box model
+    global_dTa_const = 0.0              ! Global anomaly to apply, NOTE: the index apply to snap_north and snap_south should be the same
+    thermal_ampl_north = 1.8            ! Polar amplification factor for north yelmox domain
+    thermal_ampl_south = 1.8            ! Polar amplification factor for south yelmox domain
+    obm_index_is_gis = True             ! Use GIS index for OBM?
+
+    ism2obm          = False            ! Activate ISM to OBM coupling?
+    couple_fwf_north = False 
+    couple_fwf_south = False
+    fwf_definition   = 'dVdt'           ! 'dVdt', 'dVdt_mask'
+    hydro_mask_north = 'ice_data/Greenland/GRL-16KM/GRL-16KM_HYDRO-BASINS_zickfeld2004.nc'
+    hydro_mask_south = 'ice_data/Antarctica/ANT-32KM/ANT-32KM_HYDRO-BASINS_zickfeld2004.nc' 
+    fwf_frac_north = 1.0                ! fraction of total fwf that is applied to obm box
+    fwf_frac_south = 1.0                ! fraction of total fwf that is applied to obm box
+
+    obm2ism = False                     ! Activate OBM to ISM coupling?
+    couple_to_north = False 
+    couple_to_south = False
+    amoc_fraction_north = 0.5   ! coupling parameter
+    amoc_fraction_south = 0.5   ! 
 /
 
 &nautilus
@@ -117,9 +133,9 @@
     phit_init = 0.014              ! [Sv] Freshwater transport from southern to tropical box
     phin_init = 0.065              ! [Sv] Freshwater transport from tropical to northern box
 
-    thetas_init = 6.6                   ! [ºC] Relaxation temperature of the southern box
-    thetan_init = 2.7                   ! [ºC] Relaxation temperature of the northern box
-    thetat_init = 11.7                  ! [ºC] Relaxation temperature of the tropical box
+    tstars_init = 6.6                   ! [ºC] Relaxation temperature of the southern box
+    tstarn_init = 2.7                   ! [ºC] Relaxation temperature of the northern box
+    tstart_init = 11.7                  ! [ºC] Relaxation temperature of the tropical box
 
     lambdan_init = 0.05934959349593496  ! Gamma / (c * rho * z)
     lambdas_init = 0.05934959349593496
@@ -300,7 +316,7 @@
 /
 
 &barysealevel
-    method      = 'fastiso' ! 'const': BSL = bsl_init throughout sim
+    method      = 'const' ! 'const': BSL = bsl_init throughout sim
                             ! 'file': BSL = time series provided from sl_path
                             ! 'fastiso': BSL = sum of contributions from fastiso domains
     bsl_init    = 0.0       ! [m] BSL relative to present day
@@ -715,7 +731,7 @@
     const_insol = True 
     const_kabp = 0.0 
     insol_fldr = 'input' 
-    abl_method = 'pdd' ! 'itm' or 'pdd'
+    abl_method = 'itm' ! 'itm' or 'pdd'
     sigma_snow = 5.0 ! Standard deviation of temperature [K] over ice and snow
     sigma_melt = 5.0 ! Standard deviation of temperature [K] in ablation zone
     sigma_land = 5.0 ! Standard deviation of temperature [K] over land
@@ -730,7 +746,7 @@
     const_insol = True 
     const_kabp = 0.0 
     insol_fldr = 'input' 
-    abl_method = 'pdd' ! 'itm' or 'pdd'
+    abl_method = 'itm' ! 'itm' or 'pdd'
     sigma_snow = 5.0 ! Standard deviation of temperature [K] over ice and snow
     sigma_melt = 5.0 ! Standard deviation of temperature [K] in ablation zone
     sigma_land = 5.0 ! Standard deviation of temperature [K] over land
@@ -747,9 +763,9 @@
     trans_a = 0.46 
     trans_b = 6e-5 
     trans_c = 0.01 
-    itm_c = -75.0 
+    itm_c = -26.2396 
     itm_t = 10.0 
-    itm_b = -2.0 
+    itm_b = -2.7618 
     itm_lat0 = 65.0 
     alb_snow_dry = 0.8 
     alb_snow_wet = 0.65 
@@ -763,44 +779,44 @@
 /
 
 &itm_south
-    H_snow_max = 5.0e3 ! Maximum allowed snowpack thickness [mm w.e.]
-    Pmaxfrac = 0.6 ! Refreezing factor
-    trans_a = 0.46 
-    trans_b = 6e-5 
-    trans_c = 0.01 
-    itm_c = -75.0 
-    itm_t = 10.0 
-    itm_b = -2.0 
-    itm_lat0 = 65.0 
-    alb_snow_dry = 0.8 
-    alb_snow_wet = 0.65 
-    alb_ice = 0.4 
-    alb_land = 0.2 
-    alb_forest = 0.1 
-    alb_ocean = 0.1 
-    H_snow_crit_desert = 10.0 
-    H_snow_crit_forest = 100.0 
-    melt_crit = 0.5 ! Critical melt rate to reduce snow albedo [mm/day]
+    H_snow_max      = 5000.0     
+    Pmaxfrac        = 0.6        
+    trans_a         = 0.46       
+    trans_b         = 6e-05      
+    trans_c         = 0.01       
+    itm_c           = -55.0      
+    itm_t           = 10.0       
+    itm_b           = 3.0       
+    itm_lat0        = -60.0       
+    alb_snow_dry    = 0.8        
+    alb_snow_wet    = 0.65       
+    alb_ice         = 0.7        
+    alb_land        = 0.2        
+    alb_forest      = 0.1        
+    alb_ocean       = 0.1        
+    H_snow_crit_desert = 10.0    
+    H_snow_crit_forest = 100.0   
+    melt_crit       = 0.5  
 /
 
 &marine_shelf_north
-    bmb_method = 'quad-nl'      ! 'pico', 'anom', 'lin', 'quad', 'quad-nl', '*-slope'
+    bmb_method = 'anom'      ! 'pico', 'anom', 'lin', 'quad', 'quad-nl', '*-slope'
     tf_method = 2               ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf, 3: nahosmip
     interp_depth = 'shlf'       ! 'shlf', 'bed', 'const'
     interp_method = 'interp'    ! 'mean', 'layer', 'interp'
     find_ocean = True           ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     restart = 'none'            ! Load fields from a restart file?
-    corr_method = 'tf-grl'      ! 'tf': corrected tf basin, 'bmb': corrected bmb basin, 'tf-ant': use values in tf_corr_ant parameter section
+    corr_method = 'none'      ! 'tf': corrected tf basin, 'bmb': corrected bmb basin, 'tf-ant': use values in tf_corr_ant parameter section
     basin_number = 1            ! 1 2 3
     basin_bmb_corr = 0.0        ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr = 0.5         ! 1.0   2.0  3.0
+    basin_tf_corr = 0.0         ! 1.0   2.0  3.0
     tf_correction = False 
-    tf_path = 'ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc' 
+    tf_path = 'ice_data/ISMIP6/{domain}/{grid_name}/Ocean/Ocean_parameterization_J20.nc' 
     tf_name = 'dT_nl' 
     bmb_max = 0.0               ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0)
     c_deep = -10.0              ! [m/yr] Melt rate in deep ocean, should be negative but not huge
-    depth_deep = 2000.0         ! [m] Depth at which deep ocean is assumed
-    depth_const = 1000.0        ! [m] Constant shelf depth for interp_depth=const
+    depth_deep = 500.0         ! [m] Depth at which deep ocean is assumed
+    depth_const = 0.0        ! [m] Constant shelf depth for interp_depth=const
     depth_min = 1100.0          ! [m] interp_method=mean, min depth to include
     depth_max = 1500.0          ! [m] interp_method=mean, max depth to include
     lambda1 = -0.0575           ! [degC PSU−1] Liquidus slope
@@ -810,7 +826,7 @@
     gamma_quad = 11100.0        ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
     gamma_quad_nl = 14500       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
     gamma_prime = 100.0         ! [-] Scalar when '*-slope' method is used
-    kappa_grz = 10.0            ! [m/yr K-1] Heat flux coefficient [kappa*dT]
+    kappa_grz = 15.0            ! [m/yr K-1] Heat flux coefficient [kappa*dT]
     c_grz = 1.0                 ! [-] bmb_ref scalar [c_grz*bmb_ref]
     f_grz_shlf = 10.0           ! [-] Ratio of grz melt to shelf melt
     grz_length = 32.0           ! [km] Length scale of assumed grounding zone
@@ -1037,10 +1053,10 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
-    stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
+    stddev_log10_viscosity_varname = "none"     ! Variable name in netcdf file
 /
 
 &negis
@@ -1054,7 +1070,7 @@
 &tf_corr_ant
     ronne   =  0.0                  ! [K] tf_corr for ronne basin (basin=1)
     ross    =  0.0                  ! [K] tf_corr for ronne ross  (basin=12)
-    pine    = -1.5                  ! [K] tf_corr for ronne pine  (basin=14)
+    pine    =  0.0                  ! [K] tf_corr for ronne pine  (basin=14)
     abbott  =  0.0                  ! [K] tf_corr for Abbott glacier (basin=15)
 /
 
@@ -1064,10 +1080,4 @@
     se      = 0.0 !3.0                   ! [K] tf_corr for southeast basin (basin=4)
     w       = 0.0                   ! [K] tf_corr for western basin (basins=[6,7,8])
     nw      = 0.0 !2.0
-/
-
-&isos_ant
-    tau = 100.0 
-    tau_eais = 5000.0 
-    sigma = 200e3 
 /

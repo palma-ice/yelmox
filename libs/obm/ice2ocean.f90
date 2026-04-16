@@ -17,11 +17,11 @@ function calc_fwf(rho_water,rho_ice,sec_year,Hice,dHidt,f_grnd,dx,dy,mask,hemisp
 
     implicit none 
 
-    real(wp) :: fwf
+    real(wp) :: fwf, fwf_atl, fwf_pac, fwf_arc
 
     ! Local variables
     integer  :: nx, ny
-    real(wp) :: npts_flt, npts_tot, npts_tot_basin
+    real(wp) :: npts_flt, npts_tot, npts_tot_basin, npts_atl, npts_pac, npts_arc
 
     real(wp) :: m3_km3 = 1e-9 
     real(wp) :: conv_km3a_Sv
@@ -35,6 +35,8 @@ function calc_fwf(rho_water,rho_ice,sec_year,Hice,dHidt,f_grnd,dx,dy,mask,hemisp
     character(len=*) :: hemisphere
 
     logical, allocatable :: mask_tot(:,:), mask_basin(:,:), mask_flt(:,:), basin_mask(:,:), extended_north_basin_mask(:,:)
+    logical, allocatable :: mask_atl(:,:), mask_pac(:,:), mask_arc(:,:)
+
     real(wp), allocatable :: H_af(:,:) 
     logical, parameter :: use_extended_north=.TRUE.
 
@@ -74,6 +76,33 @@ function calc_fwf(rho_water,rho_ice,sec_year,Hice,dHidt,f_grnd,dx,dy,mask,hemisp
             else
                 fwf = 0.0
             end if
+        case("dVdt_hydromask")
+            ! fwf = max(-sum(dHidt, mask=mask_basin)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
+            mask_atl = (mask .eq. 1.0) 
+            mask_pac = (mask .eq. 5.0) 
+            mask_arc = (mask .ge. 2.0 .and. mask .le. 3.0)
+            npts_atl  = real(count(mask_atl),wp)
+            npts_pac  = real(count(mask_pac),wp)
+            npts_arc  = real(count(mask_arc),wp)
+
+            if (npts_atl .gt. 0) then
+                fwf_atl = -sum(dHidt, mask=mask_atl)*dx*dy*m3_km3*conv_km3a_Sv
+            else
+                fwf_atl = 0.0
+            end if
+            if (npts_pac .gt. 0) then
+                fwf_pac = -sum(dHidt, mask=mask_pac)*dx*dy*m3_km3*conv_km3a_Sv
+            else
+                fwf_pac = 0.0
+            end if
+            if (npts_arc .gt. 0) then
+                fwf_arc = -sum(dHidt, mask=mask_arc)*dx*dy*m3_km3*conv_km3a_Sv
+            else
+                fwf_arc = 0.0
+            end if
+
+            fwf = fwf_atl + 0.5*fwf_pac + 0.3*fwf_arc
+
         case DEFAULT
             fwf = max(-sum(dHidt)*dx*dy*m3_km3*conv_km3a_Sv, 0.0)
         

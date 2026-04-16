@@ -449,7 +449,7 @@ end if
                     
                     ! Set model tau, and set yelmo relaxation switch (4: gl line and grounding zone relaxing; 0: no relaxation)
                     yelmo1%tpo%par%topo_rel_tau = opt%rel_tau 
-                    yelmo1%tpo%par%topo_rel     = 4
+                    yelmo1%tpo%par%topo_rel     = 3
                 
                 else 
                     ! Turn-off relaxation now
@@ -909,7 +909,7 @@ contains
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_sl",ylmo,n,ncid)
-        !call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)
+        call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)
         call yelmo_write_var(filename,"T_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_shlf",ylmo,n,ncid)
         write(*,*) "javi qgeo"

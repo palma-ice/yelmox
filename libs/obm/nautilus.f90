@@ -90,9 +90,9 @@ module nautilus
             call nc_read(ocn_restart,"fs",ntls%par%fs_init,start=[n],count=[1]) 
             call nc_read(ocn_restart,"phin",ntls%par%phin_init,start=[n],count=[1]) 
             call nc_read(ocn_restart,"phit",ntls%par%phit_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetan",ntls%par%thetan_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetat",ntls%par%thetat_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetas",ntls%par%thetas_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tstarn",ntls%par%tstarn_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tstart",ntls%par%tstart_init,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tstars",ntls%par%tstars_init,start=[n],count=[1]) 
             call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
             call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
             call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
@@ -111,9 +111,9 @@ module nautilus
             call nml_read(filename, group, "fs_init", ntls%par%fs_init) 
             call nml_read(filename, group, "phin_init", ntls%par%phin_init)
             call nml_read(filename, group, "phit_init", ntls%par%phit_init) 
-            call nml_read(filename, group, "thetan_init", ntls%par%thetan_init)
-            call nml_read(filename, group, "thetat_init", ntls%par%thetat_init) 
-            call nml_read(filename, group, "thetas_init", ntls%par%thetas_init)
+            call nml_read(filename, group, "tstarn_init", ntls%par%tstarn_init)
+            call nml_read(filename, group, "tstart_init", ntls%par%tstart_init) 
+            call nml_read(filename, group, "tstars_init", ntls%par%tstars_init)
             call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
             call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
             call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
@@ -133,9 +133,9 @@ module nautilus
         ntls%fs = ntls%par%fs_init  
         ntls%phin = ntls%par%phin_init
         ntls%phit = ntls%par%phit_init    
-        ntls%thetan = ntls%par%thetan_init
-        ntls%thetat = ntls%par%thetat_init
-        ntls%thetas = ntls%par%thetas_init    
+        ntls%tstarn = ntls%par%tstarn_init
+        ntls%tstart = ntls%par%tstart_init
+        ntls%tstars = ntls%par%tstars_init    
         ntls%lambdan = ntls%par%lambdan_init
         ntls%lambdat = ntls%par%lambdat_init
         ntls%lambdatd = ntls%par%lambdatd_init
@@ -172,9 +172,9 @@ module nautilus
         call calc_all_lambda(ntls)
 
         ! Compute time derivatives, box loop: [...-> South --> Tropics --> North --> Tropics Deep -...]
-        dTsdt = calc_temperature_derivative(ntls%par%vol_s, ntls%lambdas, ntls%m, -ntls%ts, ntls%ttd, ntls%thetas)               
-        dTtdt = calc_temperature_derivative(ntls%par%vol_t, ntls%lambdat, ntls%m, -ntls%tt, ntls%ts, ntls%thetat)
-        dTndt = calc_temperature_derivative(ntls%par%vol_n, ntls%lambdan, ntls%m, -ntls%tn, ntls%tt, ntls%thetan)                                          
+        dTsdt = calc_temperature_derivative(ntls%par%vol_s, ntls%lambdas, ntls%m, -ntls%ts, ntls%ttd, ntls%tstars)               
+        dTtdt = calc_temperature_derivative(ntls%par%vol_t, ntls%lambdat, ntls%m, -ntls%tt, ntls%ts, ntls%tstart)
+        dTndt = calc_temperature_derivative(ntls%par%vol_n, ntls%lambdan, ntls%m, -ntls%tn, ntls%tt, ntls%tstarn)                                          
         dTtddt = calc_temperature_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%ttd, ntls%tn, 0.0)   
         
         dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%par%reference_salinity, ntls%m, -ntls%ss, ntls%std, phit, -fs)
@@ -228,10 +228,10 @@ module nautilus
         return
     end function calc_overturning
 
-    function calc_temperature_derivative(vol1, lambda1, m, t1, t2, theta1) result(dTdt)
+    function calc_temperature_derivative(vol1, lambda1, m, t1, t2, tstar1) result(dTdt)
         ! WARNING: make sure you provide the correct sign to the flux
-        real(prec) :: vol1, lambda1, m, t1, t2, theta1, dTdt
-        dTdt = m / vol1 * (t2 + t1) + lambda1 * (theta1 + t1)
+        real(prec) :: vol1, lambda1, m, t1, t2, tstar1, dTdt
+        dTdt = m / vol1 * (t2 + t1) + lambda1 * (tstar1 + t1)
         return
     end function calc_temperature_derivative
 
