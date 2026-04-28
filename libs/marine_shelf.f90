@@ -2268,14 +2268,14 @@ contains
         ! Then we take the ocean information of the grid points which are in contact with mv.
         ! We do the mean of these grid points at different basins and depths and extrapolate them into the ice shelf cavities.
         ! If we reach a depth where there are no surrounding grid points because we have reached a sill, then we do vertical extrapolation inside the ice-shelf cavity from the level above.
-    
-
-
-        implicit none
         
+    
+    
+        implicit none
+            
         real(wp), intent(INOUT) :: var(:,:,:)
         real(wp), intent(IN)    :: H_ice(:,:), basin_mask(:,:), depth(:), z_bed(:,:)
-        
+            
         ! Local variables
         integer :: i, j, k, l
         integer :: nx, ny, nz, nb
@@ -2283,28 +2283,28 @@ contains
         real(wp), allocatable :: mean_var_basin(:,:), npts_basin(:,:)
         ! Define default missing value
         real(wp), parameter :: mv = -9999.0_wp
-        
+            
         nx = size(var, 1)
         ny = size(var, 2)
         nz = size(var, 3)
         nb = maxval(int(basin_mask))
-
+    
         ! Allocate objects
         allocate(mask_border(nx, ny))
         allocate(mean_var_basin(nb, nz))
         allocate(npts_basin(nb, nz))
-        
+            
         ! Initialize variables
         mask_border = 0.0_wp
         mean_var_basin = 0.0_wp
         npts_basin = 0.0_wp
-
+    
         ! 1. Define the mask of grid points with information closest to the ice front or mv.
         ! 0 -> ocean; 2 -> mv or ice; 1 -> ocean point in contact with mv
-        where (H_ice .gt. 0.0_wp .or. var(:,:,1) .eq. mv)
+        where (H_ice .gt. 0.0_wp .or. var(:,:,1) .lt. (mv + 1.0_wp) .or. z_bed .gt. 0.0_wp)
             mask_border = 2.0_wp
         end where
-        
+            
         ! Loop to set mask_border to 1.0_wp for ocean points in contact with mv
         do j = 2, ny-1
         do i = 2, nx-1
@@ -2316,14 +2316,14 @@ contains
             end if
         end do
         end do
-        
+            
         ! 2. Compute the mean of the border by basins and depth.
         do k = 1, nz
         do j = 1, ny
         do i = 1, nx
-            if (mask_border(i, j) .eq. 1.0_wp .and. z_bed(i, j) .lt. depth(k)) then
+            if (mask_border(i, j) .eq. 1.0_wp .and. &
+                abs(z_bed(i, j)) .ge. abs(depth(k)) .and. (var(i, j, k) .gt. mv)) then
                 l = int(basin_mask(i, j))
-                ! ignore basin 0 for the moment (outside of continental-shelf break)
                 if (l .gt. 0) then
                     mean_var_basin(l, k) = mean_var_basin(l, k) + var(i, j, k)
                     npts_basin(l, k)     = npts_basin(l, k) + 1.0_wp
@@ -2332,9 +2332,11 @@ contains
         end do
         end do
         end do
-        
-        mean_var_basin = mean_var_basin / (npts_basin+1e-8)
-        
+            
+        where (npts_basin .gt. 0.0_wp)
+            mean_var_basin = mean_var_basin / npts_basin
+        end where
+            
         ! If the number of points is zero at some depth, set to previous value
         do l = 1, nb
         do k = 2, nz
@@ -2343,7 +2345,7 @@ contains
             end if
         end do
         end do
-        
+            
         ! 3. Assign the mean value by basin
         do k = 1, nz
         do j = 1, ny
@@ -2356,14 +2358,14 @@ contains
         end do
         end do
         end do
-        
-        !if (.TRUE.) then
-        !    write(*,*) "var_max = ",maxval(var(:,:,:))
-        !    write(*,*) "var_min = ",minval(var(:,:,:))
-        !end if
-
+            
+        if (.FALSE.) then
+            write(*,*) "var_max = ",maxval(var(:,:,:))
+            write(*,*) "var_min = ",minval(var(:,:,:))
+        end if
+    
         return
-
+    
     end subroutine ocn_variable_extrapolation
 
 end module marine_shelf
