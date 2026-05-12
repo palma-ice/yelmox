@@ -269,25 +269,15 @@ program yelmox_esm
     call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
-        yelmo1%grd%dx, yelmo1%grd%dy)
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
     
     ! Initialize ESM atmospheric and oceanic objects 
     esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
-    if(ctl%esm_use_esm) then
-        ! we are using a gcm output
-        call esm_forcing_init(esm1,esm_path_par,domain,grid_name,gcm=ctl%esm_name,scenario=ctl%esm_experiment)
-    else
-        ! ctrl experiment
-        call esm_forcing_init(esm1,esm_path_par,domain,grid_name,experiment=ctl%esm_experiment)
-        ! jablasco
-        !if(trim(grid_name) .ne. trim(grid_src))
-        !    call esm_src_init(esm1,esm_path_par,domain,grid_src,experiment=ctl%esm_experiment)    
-    end if
+    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,gcm=ctl%esm_name,scenario=ctl%esm_experiment,use_esm=ctl%esm_use_esm)
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
-    
+
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
@@ -447,7 +437,7 @@ program yelmox_esm
                                                     yelmo1%tpo%now%dHidt,yelmo1%bnd%z_bed,yelmo1%bnd%z_sl,yelmo1%dyn%now%ux_s,yelmo1%dyn%now%uy_s, &
                                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                                     opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
-                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err)
+                                                    dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err,cb_tgt=yelmo1%dyn%now%cb_tgt)
                         
                     end if
 
@@ -572,10 +562,6 @@ program yelmox_esm
         write(*,*)
         write(*,*) "Performing transient."
         write(*,*) 
-
-        ! Additionally make sure isostasy is updated every timestep 
-        isos1%par%dt_prognostics = 1.0_wp 
-        isos1%par%dt_diagnostics = 10.0_wp 
 
         ! Initialize output files 
         call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
@@ -722,30 +708,24 @@ contains
                                     ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
                                     use_ref_atm=.false.,use_ref_ocn=.false.)
         
+        ! Check anomalies
         if (.FALSE.) then
-            ! Anomaly check
+            ! ATM Anomaly check
             write(*,*) "dts = ",     maxval(esm%dts)
-            write(*,*) "dto = ",     maxval(esm%dto)
             write(*,*) "dts_var = ", maxval(esm%dts_var)
+            write(*,*) "dpr = ",     maxval(esm%dpr)
+            write(*,*) "dpr_var = ", maxval(esm%dpr_var)
+            ! OCN Anomaly check
+            write(*,*) "dto = ",     maxval(esm%dto)
             write(*,*) "dto_var = ", maxval(esm%dto_var)
+            write(*,*) "dso = ",     maxval(esm%dso)
+            write(*,*) "dso_var = ", maxval(esm%dso_var)
         end if
     
         ! === Atmospheric boundary conditions ===
-        ! Calculate the smb fields
-        if (.FALSE.) then
-                esm%dts_var = -esm%dts_var
-                esm%dpr_var = 1/esm%dpr_var
-        end if
+        ! Calculate SMB fields
         call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
                                     ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
-    
-        if (.FALSE.) then
-            ! Atm check
-            write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
-            write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
-            write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
-            write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
-        end if
     
         ! === Oceanic boundary conditions ===
         ! Interpolate ocean data to the interior of the ice shelf
@@ -753,6 +733,11 @@ contains
         call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
     
         if (.FALSE.) then
+            ! Atm check
+            write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
+            write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
             ! Ocean check
             write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
             write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
@@ -766,12 +751,7 @@ contains
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
                                         ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
     
-        ! Add the anomaly from 
-        ! jablasco: opt test
-        if (.FALSE.) then
-                esm%dto_var = -esm%dto_var
-                esm%dso_var = -esm%dso_var
-        end if
+        ! Add anomaly to reference ocean
         mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto + esm%dto_var
         mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso + esm%dso_var
     
@@ -1231,10 +1211,14 @@ contains
         call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing correction factor", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         if (.FALSE.) then
-        call nc_write(filename,"so_ref",esm%so_ref%var(:,:,1,1),units="PSU",long_name="Reference oceanic salinity", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"to_ref",esm%to_ref%var(:,:,1,1),units="K",long_name="Reference oceanic temperature", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)        
+            call nc_write(filename,"so_ref",esm%so_ref%var(:,:,1,1),units="PSU",long_name="Reference oceanic salinity", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"to_ref",esm%to_ref%var(:,:,1,1),units="K",long_name="Reference oceanic temperature", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)    
+            call nc_write(filename,"smb",ylmo%tpo%now%smb,units="m/a ice equiv.",long_name="Net surface mass balance", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)    
         end if
 
         ! Close the netcdf file
