@@ -9,6 +9,20 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     kill_shelves    = False             ! Kill ice shelves beyond PD.
+    run_step        = "lgmpd"           ! "spinup" or "transient"
+/
+
+&lgmpd
+    tstep_method    = "rel"             ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_const     = 0.0               ! Assumed time for "const" method
+    time_init       = -22e3             ! [yr] Starting time 
+    time_end        = 0.0               ! [yr] Ending time
+    time_equil      = 15e3              ! [yr] Equilibration time 
+    dtt             = 10.0              ! [yr] Main loop timestep 
+    dt_restart      = 20e3              ! [yr] Frequency of writing restart files
+    with_ice_sheet  = True              ! Is the ice sheet active?
+    equil_method    = "none"            ! "none", "relax", "opt"
+    kill_shelves    = False             ! Kill ice shelves beyond PD.
 /
 
 &tm_1D
@@ -328,6 +342,24 @@
     enh_path = "input/alpha_orbital_r2020.dat"
     enh_glac = 3.0                              ! Glacial enhancement factor 
     enh_int  = 1.0                              ! Interglacial enhancement factor 
+/
+
+&esm
+    par_file = "input/esm/esm_grl_recon.nml
+    experiment = "lgmpd"
+    esm_name = "B18-RECON"
+    use_esm = True
+
+    write_formatted = False
+    dt_formatted = 1000.0
+
+    lapse = 0.0065
+    f_p = 0.05
+    f_ocn = 0.25
+    f_polar = 1.0
+    dT_threshold = 0.0
+
+    grid_src = "B18-RECON"
 /
 
 &snap

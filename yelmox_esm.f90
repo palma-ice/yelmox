@@ -126,7 +126,7 @@ program yelmox_esm
         ! Running Antarctica domain, load Antarctica specific parameters
         call esm_experiment_def(esmexp,ctl%esm_experiment,ctl%esm_par_file,"UCM","YELMO",yelmo1%par%domain)
     end if
-
+    
     ! Read run_step specific control parameters
     call nml_read(path_par,trim(ctl%run_step),"time_init",    ctl%time_init)    ! [yr] Starting time
     call nml_read(path_par,trim(ctl%run_step),"time_end",     ctl%time_end)     ! [yr] Ending time
@@ -221,6 +221,8 @@ program yelmox_esm
     call tstep_init(ts,ctl%time_init,ctl%time_end,method=ctl%tstep_method,units="year", &
                     time_ref=2000.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
     
+    stop "LOADED PARAMETERS."
+    
     ! === Initialize ice sheet model =====
     
     ! Initialize data objects and load initial topography
@@ -284,6 +286,8 @@ program yelmox_esm
         !if(trim(grid_name) .ne. trim(grid_src))
         !    call esm_src_init(esm1,esm_path_par,domain,grid_src,experiment=ctl%esm_experiment)    
     end if
+
+    stop "GOT HERE!!!"
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
