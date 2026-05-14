@@ -329,7 +329,7 @@ program yelmox_esm
 
     ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
     if (ctl%kill_shelves) then
-        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%ice_allowed = .FALSE.
+        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%mask_ice = -1
     end if
     
 ! ================= RUN STEPS ===============================================
@@ -567,12 +567,12 @@ program yelmox_esm
         call yelmo_write_init(yelmo1,file2D,time_init=ts%time,units="years")
         call yelmo_write_init(yelmo1,file2Dsm,time_init=ts%time,units="years")
         call yelmo_regions_write(yelmo1,ts%time,init=.TRUE.,units="years")
-        call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed) 
+        call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
 
         if (ctl%esm_write_formatted) then
             ! Initialize output files for esm
             call yelmo_write_init(yelmo1,file2D_esm,time_init=ts%time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed) 
+            call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
         end if 
 
         call timer_step(tmr,comp=1,label="initialization") 
@@ -808,7 +808,7 @@ contains
         call nc_write(filename,"lsf",ylmo%tpo%now%lsf,units="",long_name="LSF mask", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"ice_allowed",ylmo%bnd%ice_allowed,units="",long_name="Ice allowed mask", &
+        call nc_write(filename,"mask_ice",ylmo%bnd%mask_ice,units="",long_name="Ice mask", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &

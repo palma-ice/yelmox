@@ -529,7 +529,7 @@ program yelmox_ismip6
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
             call yelmo_write_init(yelmo1,file2D_ismip6,time_init=ts%time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=yelmo1%bnd%ice_allowed) 
+            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
         end if 
 
         call timer_step(tmr,comp=1,label="initialization") 
@@ -658,7 +658,7 @@ contains
         call nc_write(filename,"mask_grz",ylmo%tpo%now%mask_grz,units="",long_name="Grounding-zone mask", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
-        call nc_write(filename,"ice_allowed",ylmo%bnd%ice_allowed,units="",long_name="Ice allowed mask", &
+        call nc_write(filename,"mask_ice",ylmo%bnd%mask_ice,units="",long_name="Ice mask", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         !call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &
