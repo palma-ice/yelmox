@@ -264,18 +264,34 @@ end if
 
         case("Patagonia")
 
-            ! By default fix every point to the reference ice thickness
-            yelmo1%bnd%mask_ice                  = 0
-            yelmo1%bnd%mask_ice(1,:)             = 0
-            yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = 0
-            yelmo1%bnd%mask_ice(:,1)             = 0
-            yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = 0
+            if (.FALSE.) then
+                ! Fix ice thickness to obs everywhere outside of masked region
 
-            ! Dynamically evolve ice where region mask == 1
-            where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
-                yelmo1%bnd%mask_ice = 1
-            end where
+                    ! Dynamically evolve ice where region mask == 1
+                    where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
+                        yelmo1%bnd%mask_ice = 1
+                    elsewhere
+                        yelmo1%bnd%mask_ice = 0
+                    end where
+
+            else
+                ! Fix ice thickness to obs on the margins, relax to obs outside of masked region
+
+                ! Evolve ice everywhere except the domain borders
+                yelmo1%bnd%mask_ice(1,:)             = 1
+                yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = 0
+                yelmo1%bnd%mask_ice(:,1)             = 0
+                yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = 0
+
+                ! Impose relaxation where region mask == 0 (if ytopo.topo_rel=-1 in param file)
+                where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
+                    yelmo1%tpo%now%tau_relax = -1.0
+                elsewhere
+                    yelmo1%tpo%now%tau_relax = 50.0 ! Relaxation timescale [yrs]
+                end where
             
+            end if
+
     end select
 
     ! === Initialize external models (forcing for ice sheet) ======
