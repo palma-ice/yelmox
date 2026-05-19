@@ -262,6 +262,36 @@ end if
 
             end if 
 
+        case("Patagonia")
+
+            if (.FALSE.) then
+                ! Fix ice thickness to obs everywhere outside of masked region
+
+                    ! Dynamically evolve ice where region mask == 1
+                    where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
+                        yelmo1%bnd%mask_ice = 1
+                    elsewhere
+                        yelmo1%bnd%mask_ice = 0
+                    end where
+
+            else
+                ! Fix ice thickness to obs on the margins, relax to obs outside of masked region
+
+                ! Evolve ice everywhere except the domain borders
+                yelmo1%bnd%mask_ice(1,:)             = 1
+                yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = 0
+                yelmo1%bnd%mask_ice(:,1)             = 0
+                yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = 0
+
+                ! Impose relaxation where region mask == 0 (if ytopo.topo_rel=-1 in param file)
+                where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
+                    yelmo1%tpo%now%tau_relax = -1.0
+                elsewhere
+                    yelmo1%tpo%now%tau_relax = 50.0 ! Relaxation timescale [yrs]
+                end where
+            
+            end if
+
     end select
 
     ! === Initialize external models (forcing for ice sheet) ======
@@ -308,6 +338,8 @@ end if
         yelmo1%bnd%z_sl  = isos1%out%z_ss
     end if
 
+!patagonia-test!
+if (.FALSE.) then
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
@@ -328,7 +360,12 @@ end if
         call snapclim_write_step(snp1,"yelmox_climate.nc",time=ts%time)
         stop
     end if
-    
+
+else
+    yelmo1%bnd%smb   = 0.3
+    yelmo1%bnd%T_srf = 270.0
+end if
+
     if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
         ! Modify glacial smb
         call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
@@ -343,6 +380,9 @@ end if
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+
+    yelmo1%bnd%bmb_shlf = -0.5
+    yelmo1%bnd%T_shlf   = 270.0
 
     call yelmo_print_bound(yelmo1%bnd) 
     
@@ -577,6 +617,9 @@ end if
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         if (trim(yelmo1%par%domain) .eq. "Pyrenees") then
+                yelmo1%bnd%bmb_shlf = 0.0_wp
+                yelmo1%bnd%T_shlf   = 0.0_wp
+        else if (trim(yelmo1%par%domain) .eq. "Patagonia") then
                 yelmo1%bnd%bmb_shlf = 0.0_wp
                 yelmo1%bnd%T_shlf   = 0.0_wp
         else
