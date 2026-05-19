@@ -201,7 +201,9 @@
 &ycalv
     ! === calving method & law ===
     use_lsf             = True              ! use level-set method
+    lsf_method          = "snap"            ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
+    lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations. redist mode only.
     calv_flt_method     = "equil"           ! "zero", "simple", "flux", "vm-l19", "kill"
     calv_grnd_method    = "equil"           ! "zero", "stress-b12"
     
