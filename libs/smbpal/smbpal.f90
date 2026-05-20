@@ -650,12 +650,15 @@ contains
         real(prec), intent(IN) :: tann, H_ice, melt_net, fac 
         real(prec) :: ts 
 
-        ! Adjust temp to account for positive melt_net (refreezing) warms firn
-        ts = (tann+fac*max(0.0,melt_net))    
-
-        ! Limit temps to freezing temperature on the ice sheet 
-        if (H_ice .gt. 0.0) ts = min(273.15,ts)        
-
+        if (H_ice .gt. 0.0) then
+            ! Adjust temp to account for positive melt_net (refreezing) warms firn
+            ts = tann + fac * max(0.0, melt_net)
+            ! Limit temps to freezing temperature on the ice sheet 
+            ts = min(273.15, ts)  
+        else
+            ts = tann
+        end if
+        
         return 
 
     end function calc_temp_surf

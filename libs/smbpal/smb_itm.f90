@@ -183,7 +183,11 @@ contains
     ! Get amount of potential melt from ITM scheme
 !     atrans   = calc_atmos_transmissivity(z_srf,H_ice,par%trans_a,par%trans_b,par%trans_c)
     atrans   = calc_atmos_transmissivity(z_srf,par%trans_a,par%trans_b)
-    itm_c    = itm_c_lat(par%itm_c,par%itm_b,par%itm_lat0,lat)
+    if (abs(par%itm_lat0) .lt. 90.0) then
+        itm_c    = itm_c_lat(par%itm_c,par%itm_b,par%itm_lat0,lat)
+    else 
+        itm_c = par%itm_c
+    end if
     melt_pot = calc_itm(S,t2m-273.15,alb_s,atrans,itm_c,par%itm_t)
 
     ! Determine how much snow and ice would be melted today [mm]

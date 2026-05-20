@@ -278,16 +278,16 @@ end if
                 ! Fix ice thickness to obs on the margins, relax to obs outside of masked region
 
                 ! Evolve ice everywhere except the domain borders
-                yelmo1%bnd%mask_ice(1,:)             = 1
+                yelmo1%bnd%mask_ice                  = 1
+                yelmo1%bnd%mask_ice(1,:)             = 0
                 yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = 0
                 yelmo1%bnd%mask_ice(:,1)             = 0
                 yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = 0
 
-                ! Impose relaxation where region mask == 0 (if ytopo.topo_rel=-1 in param file)
                 where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
-                    yelmo1%tpo%now%tau_relax = -1.0
+                    yelmo1%bnd%tau_relax = -1.0      ! inside icefield: free evolution
                 elsewhere
-                    yelmo1%tpo%now%tau_relax = 50.0 ! Relaxation timescale [yrs]
+                    yelmo1%bnd%tau_relax = 50.0      ! outside: Relaxation timescale [yrs], relax toward H_ice_ref
                 end where
             
             end if
@@ -297,7 +297,7 @@ end if
     ! === Initialize external models (forcing for ice sheet) ======
 
     ! jablasco
-    if (.FALSE.) then
+    if (.TRUE.) then
         ! Initialize barysealevel model
         call bsl_init(bsl, path_par, ts%time_rel)
 
@@ -325,7 +325,7 @@ end if
 
     ! Barystatic sea level
     ! jablasco
-    if (.FALSE.) then
+    if (.TRUE.) then
         call bsl_update(bsl, year_bp=ts%time_rel)
         call bsl_write_init(bsl, file_bsl, ts%time)
 
@@ -338,8 +338,6 @@ end if
         yelmo1%bnd%z_sl  = isos1%out%z_ss
     end if
 
-!patagonia-test!
-if (.FALSE.) then
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
@@ -360,11 +358,6 @@ if (.FALSE.) then
         call snapclim_write_step(snp1,"yelmox_climate.nc",time=ts%time)
         stop
     end if
-
-else
-    yelmo1%bnd%smb   = 0.3
-    yelmo1%bnd%T_srf = 270.0
-end if
 
     if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
         ! Modify glacial smb
@@ -620,6 +613,7 @@ end if
                 yelmo1%bnd%bmb_shlf = 0.0_wp
                 yelmo1%bnd%T_shlf   = 0.0_wp
         else if (trim(yelmo1%par%domain) .eq. "Patagonia") then
+                ! For now, set ocean to zero!!!
                 yelmo1%bnd%bmb_shlf = 0.0_wp
                 yelmo1%bnd%T_shlf   = 0.0_wp
         else
@@ -651,8 +645,7 @@ end if
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
-            ! jablasco
-            !call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+            call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
         end if 
  
         call timer_step(tmrs,comp=4,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="io") 
@@ -672,8 +665,7 @@ end if
     call timer_step(tmr,comp=2,time_mod=[ctl%time_init,ts%time]*1e-3,label="timeloop") 
     
     ! Write the restart snapshot for the end of the simulation
-    ! jablasco
-    !call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
+    call yelmox_restart_write(bsl,isos1,yelmo1,mshlf1,ts%time)
 
     ! Finalize program
     call yelmo_end(yelmo1,time=ts%time)
@@ -952,6 +944,7 @@ contains
         call yelmo_write_var(filename,"H_ice",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"mask_bed",ylmo,n,ncid)
+        call yelmo_write_var(filename,"tau_relax",ylmo,n,ncid)
         call yelmo_write_var(filename,"mb_net",ylmo,n,ncid)
         call yelmo_write_var(filename,"mb_resid",ylmo,n,ncid)
         call yelmo_write_var(filename,"smb",ylmo,n,ncid)
