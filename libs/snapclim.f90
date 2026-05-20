@@ -19,6 +19,13 @@ module snapclim
     real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
     real(wp), parameter :: pi        = 3.14159265359
 
+    ! Missing value and aliases
+    real(wp), parameter :: MISSING_VALUE_DEFAULT = real(-9999.0,wp)
+    real(wp), parameter :: MISSING_VALUE         = MISSING_VALUE_DEFAULT
+    real(wp), parameter :: MV                    = MISSING_VALUE_DEFAULT
+    integer,  parameter :: MISSING_VALUE_INT     = int(MISSING_VALUE)
+    integer,  parameter :: MV_INT                = int(MISSING_VALUE)
+    
     type series_type
         character(len=512) :: filename 
         real(wp), allocatable :: time(:), var(:), sigma(:)
@@ -1697,6 +1704,7 @@ contains
         ! Local variables
         real(wp) :: lapse_mon(12)   
         real(wp), allocatable :: rf(:,:,:)
+        logical, allocatable :: mask_missing(:,:,:)
         character(len=56)  :: tmp_str 
         integer :: m 
         logical :: south 
@@ -1709,6 +1717,7 @@ contains
 
         ! Allocate helper array
         allocate(rf(nx,ny,12))
+        allocate(mask_missing(nx,ny,12))
 
         if (trim(clim%par%clim_path) .eq. "None") then 
             ! Simply set fields to zero 
@@ -1734,7 +1743,8 @@ contains
             ! Read data using parameters
 
             ! Read in the elevation
-            call nc_read(clim%par%clim_path,clim%par%clim_names(1),clim%z_srf)
+            call nc_read(clim%par%clim_path,clim%par%clim_names(1),clim%z_srf,missing_value=MV)
+            where(clim%z_srf .eq. MV) clim%z_srf = sum(clim%z_srf,mask=clim%z_srf.ne.MV)/count(clim%z_srf.ne.MV)
 
             ! Define mask based on elevations 
             clim%mask = 0.0 
@@ -1747,22 +1757,48 @@ contains
             if (clim%par%clim_monthly) then 
                 ! Read in monthly climate fields, then get the averages
 
-                call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%tas)
+                call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%tas,missing_value=MV)
                 call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
 
-                if (minval(clim%tas) .lt. 100.0) then
+                where(clim%tas .eq. MV) 
+                    mask_missing = .TRUE.
+                elsewhere
+                    mask_missing = .FALSE.
+                end where
+
+                if (minval(clim%tas,mask=.not.mask_missing) .lt. 100.0) then
                     clim%tas=clim%tas+273.15
                 end if
 
-                call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%sf)
+                ! Fix missing values
+                where(mask_missing) clim%tas = sum(clim%tas,mask=.not.mask_missing)/count(.not.mask_missing)
+                
+                call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%sf,missing_value=MV)
+                
+                where(clim%sf .eq. MV) 
+                    mask_missing = .TRUE.
+                elsewhere
+                    mask_missing = .FALSE.
+                end where
+                
                 ! Check the rainfall field also needs to be loaded, or if 
                 ! precip was provided as the second name 
                 if (trim(clim%par%clim_names(3)) .eq. "sf") then 
-                    call nc_read(clim%par%clim_path,clim%par%clim_names(4),rf)
+                    call nc_read(clim%par%clim_path,clim%par%clim_names(4),rf,missing_value=MV)
                     clim%pr = clim%sf+rf        ! [mm/d]
                 else
                     clim%pr = clim%sf           ! [mm/d]
                 end if 
+
+                ! Fix missing values
+                where(mask_missing) 
+                    clim%pr = sum(clim%pr,mask=.not.mask_missing)/count(.not.mask_missing)
+                    clim%sf = sum(clim%sf,mask=.not.mask_missing)/count(.not.mask_missing)
+                end where
+
+                ! Also eliminate negative precipitation values
+                where(clim%pr .lt. 0.0) clim%pr = 0.0
+                where(clim%sf .lt. 0.0) clim%sf = 0.0 
 
                 if ( (.not.  trim(clim%par%clim_stdev_path) .eq. "None") .and. &
                      (.not.  trim(clim%par%clim_stdev_path) .eq. "none") .and. &
@@ -1806,18 +1842,31 @@ contains
             else
                 ! Read in specific derived climate fields 
 
-                call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%ta_ann)
-                call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%ta_sum)
+                call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%ta_ann,missing_value=MV)
+                call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%ta_sum,missing_value=MV)
                 call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
                 
-                if (minval(clim%ta_ann) .lt. 100.0) then
+                where(clim%ta_ann .eq. MV) 
+                    mask_missing(:,:,1) = .TRUE.
+                elsewhere
+                    mask_missing(:,:,1) = .FALSE.
+                end where
+                
+                if (minval(clim%ta_ann,mask=.not.mask_missing(:,:,1)) .lt. 100.0) then
                    clim%ta_ann = clim%ta_ann + 273.15
                    clim%ta_sum = clim%ta_sum + 273.15
                 end if
 
+                ! Fix missing values
+                where(mask_missing(:,:,1)) 
+                    clim%ta_ann = sum(clim%ta_ann,mask=.not.mask_missing(:,:,1))/count(.not.mask_missing(:,:,1))
+                    clim%ta_sum = sum(clim%ta_sum,mask=.not.mask_missing(:,:,1))/count(.not.mask_missing(:,:,1))
+                end where
+
                 ! Read in precip field [mm/d]
-                call nc_read(clim%par%clim_path,clim%par%clim_names(4),clim%pr_ann)
+                call nc_read(clim%par%clim_path,clim%par%clim_names(4),clim%pr_ann,missing_value=MV)
             
+                where(clim%pr_ann .eq. MV) clim%pr_ann = sum(clim%pr_ann,mask=clim%pr_ann.ne.MV)/count(clim%pr_ann.ne.MV)
 
                 if ( (.not.  trim(clim%par%clim_stdev_path) .eq. "None") .and. &
                      (.not.  trim(clim%par%clim_stdev_path) .eq. "none") .and. &    
@@ -1895,7 +1944,7 @@ contains
                 clim%prcor(:,:,m) = clim%pr(:,:,m) / exp(clim%beta_p*(clim%tas(:,:,m)-clim%tsl(:,:,m)))   ! [m/a]
 
             end do 
-        
+
         end if 
 
         ! ====================================
