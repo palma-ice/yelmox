@@ -129,7 +129,7 @@ module nautilus
         ntls%std = ntls%par%std_init
         ntls%ss = ntls%par%ss_init    
         ntls%fn = ntls%par%fn_init
-        ntls%ft = ntls%par%tt_init
+        ntls%ft = ntls%par%ft_init
         ntls%fs = ntls%par%fs_init  
         ntls%phin = ntls%par%phin_init
         ntls%phit = ntls%par%phit_init    
@@ -157,19 +157,26 @@ module nautilus
         real(prec) :: dTsdt, dTndt, dTtdt, dTtddt 
         real(prec) :: dSsdt, dSndt, dStdt, dStddt 
         real(prec) :: fn, ft, fs, phin, phit
-        real(prec), parameter :: maximum_overturning=100.0, maximum_salinity=50.0, minimum_salinity=0.0
+        real(prec), parameter :: maximum_overturning=40.0, maximum_salinity=40.0, minimum_salinity=25.0
+        real(prec) :: mean_salt
+
+        ! Compute mean salinity
+        mean_salt = (ntls%ss + ntls%st + ntls%sn + ntls%std) / 4
 
         ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1)
         fn = ntls%fn * factor
         ft = ntls%ft * factor
         fs = ntls%fs * factor
 
+        ! also internal fluxes
         phin = ntls%phin * factor
         phit = ntls%phit * factor
 
         ! Update diagnostic variables
         ntls%m = max(calc_overturning(ntls%par%emp_flow_k, ntls%par%haline_exp_coeff, ntls%par%therm_exp_coeff, ntls%ts, ntls%ss, ntls%tn, ntls%sn), ntls%par%overturning_threshold*factor)
-        call calc_all_lambda(ntls)
+        ! call calc_all_lambda(ntls)
+
+        write(*,*) "Nautilus: ", ntls%lambdas
 
         ! Compute time derivatives, box loop: [...-> South --> Tropics --> North --> Tropics Deep -...]
         dTsdt = calc_temperature_derivative(ntls%par%vol_s, ntls%lambdas, ntls%m, -ntls%ts, ntls%ttd, ntls%tstars)               
@@ -177,10 +184,20 @@ module nautilus
         dTndt = calc_temperature_derivative(ntls%par%vol_n, ntls%lambdan, ntls%m, -ntls%tn, ntls%tt, ntls%tstarn)                                          
         dTtddt = calc_temperature_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%ttd, ntls%tn, 0.0)   
         
-        dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%par%reference_salinity, ntls%m, -ntls%ss, ntls%std, phit, -fs)
-        dStdt = calc_salinity_derivative(ntls%par%vol_t, ntls%par%reference_salinity, ntls%m, -ntls%st, ntls%ss, phin, -phit)
-        dSndt = calc_salinity_derivative(ntls%par%vol_n, ntls%par%reference_salinity, ntls%m, -ntls%sn, ntls%st, -fn, -phin)
-        dStddt = calc_salinity_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%std, ntls%sn, 0.0, 0.0)
+        ! dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%par%reference_salinity, ntls%m, -ntls%ss, ntls%std, phit, -fs)  ! Zickfeld S0 method
+        ! dStdt = calc_salinity_derivative(ntls%par%vol_t, ntls%par%reference_salinity, ntls%m, -ntls%st, ntls%ss, phin, -phit)
+        ! dSndt = calc_salinity_derivative(ntls%par%vol_n, ntls%par%reference_salinity, ntls%m, -ntls%sn, ntls%st, -fn, -phin)
+        ! dStddt = calc_salinity_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%std, ntls%sn, 0.0, 0.0)
+
+        ! dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%ss, ntls%m, -ntls%ss, ntls%std, phit, -fs)    ! Reference salinity evolves
+        ! dStdt = calc_salinity_derivative(ntls%par%vol_t, ntls%st, ntls%m, -ntls%st, ntls%ss, phin, -phit)
+        ! dSndt = calc_salinity_derivative(ntls%par%vol_n, ntls%sn, ntls%m, -ntls%sn, ntls%st, -fn, -phin)
+        ! dStddt = calc_salinity_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%std, ntls%sn, 0.0, 0.0)
+
+        dSsdt = (ntls%m/ntls%par%vol_s)*(ntls%std - ntls%ss) + (mean_salt/ntls%par%vol_s)*phit - (ntls%ss/ntls%par%vol_s)*fs ! reference salinity is the mean, external fwf depends on actual box salinity
+        dStdt = (ntls%m/ntls%par%vol_t)*(ntls%ss - ntls%st) + (mean_salt/ntls%par%vol_t)*(phin - phit)
+        dSndt = (ntls%m/ntls%par%vol_n)*(ntls%st - ntls%sn) - (mean_salt/ntls%par%vol_n)*phin - (ntls%sn/ntls%par%vol_n)*fn
+        dStddt = (ntls%m/ntls%par%vol_td)*(ntls%sn - ntls%std)
 
         ! Update prognostic variables
         ntls%ts = update_state(ntls%ts, dTsdt, dt)
@@ -188,10 +205,10 @@ module nautilus
         ntls%tn = update_state(ntls%tn, dTndt, dt)
         ntls%ttd = update_state(ntls%ttd, dTtddt, dt)
 
-        ntls%ss = max(min(update_state(ntls%ss, dSsdt, dt), maximum_salinity), minimum_salinity)
-        ntls%st = max(min(update_state(ntls%st, dStdt, dt), maximum_salinity), minimum_salinity)
-        ntls%sn = max(min(update_state(ntls%sn, dSndt, dt), maximum_salinity), minimum_salinity)
-        ntls%std = max(min(update_state(ntls%std, dStddt, dt), maximum_salinity), minimum_salinity)
+        ntls%ss = update_state(ntls%ss, dSsdt, dt) ! max(min(update_state(ntls%ss, dSsdt, dt), maximum_salinity), minimum_salinity)
+        ntls%st = update_state(ntls%st, dStdt, dt) ! max(min(update_state(ntls%st, dStdt, dt), maximum_salinity), minimum_salinity)
+        ntls%sn = update_state(ntls%sn, dSndt, dt) ! max(min(update_state(ntls%sn, dSndt, dt), maximum_salinity), minimum_salinity)
+        ntls%std = update_state(ntls%std, dStddt, dt) ! max(min(update_state(ntls%std, dStddt, dt), maximum_salinity), minimum_salinity)
 
         return
 

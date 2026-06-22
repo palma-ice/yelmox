@@ -161,6 +161,7 @@ program yelmox_bipolar
 
         logical  :: with_ice_sheet 
         character(len=56) :: equil_method
+
     end type 
 
     type bipolar_params
@@ -174,7 +175,7 @@ program yelmox_bipolar
         real(wp)           :: thermal_ampl_north, thermal_ampl_south
         real(wp)           :: fwf_frac_north, fwf_frac_south
         real(wp)           :: amoc_fraction_north, amoc_fraction_south 
-        logical            :: apply_fwf_ramp, isdouble_hosing, obm_index_is_gis
+        logical            :: apply_fwf_ramp, isdouble_hosing, obm_index_is_gis, is_hosing_experiment, switch_atmospheric_feedback_on_gis
         real(wp)           :: fwf_amplitude, f_o
         character(len=512) :: fname_ft
         type(series_type)  :: ft
@@ -194,8 +195,9 @@ program yelmox_bipolar
     logical            :: hyster_on
     character(len=512) :: hyster_forcing, hyster_forcing_method, fwf_definition
     real(wp)           :: hyster_rate, hyster_positive_branch_time
-    real(wp) :: at_n, at_s, at_obm, at, ao, ft 
+    real(wp) :: at_n, at_s, at_t, at, ao, ft 
     real(wp) :: dtheta_now, dTo_now
+    real(wp) :: Tn_init, Tt_init, Ts_init, Td_init
     real(wp) :: fwf_extra, fwf_slope
     integer  :: n
     
@@ -220,6 +222,7 @@ program yelmox_bipolar
     call nml_read(path_par, "bipolar", "fwf_amplitude",        bplr%fwf_amplitude)
     call nml_read(path_par, "bipolar", "isdouble_hosing",        bplr%isdouble_hosing)
     call nml_read(path_par, "bipolar", "is_hosing_experiment",        bplr%is_hosing_experiment)
+    call nml_read(path_par, "bipolar", "switch_atmospheric_feedback_on_gis",        bplr%switch_atmospheric_feedback_on_gis)
 
     call nml_read(path_par, "bipolar", "atm2obm",             bplr%atm2obm)
     call nml_read(path_par, "bipolar", "f_o",             bplr%f_o)
@@ -343,6 +346,14 @@ program yelmox_bipolar
             call obm_update(obm_object, 10.0, bplr%obm_name)
         end do
 
+        ! Store initial and equilibrated box temperatures
+        Ts_init = obm_object%ts
+        Tt_init = obm_object%tt
+        Tn_init = obm_object%tn
+        Td_init = obm_object%ttd
+        write(*,*) "OBM initial temperatures (Ts0, Tt0, Tn0, Td0) = ", Ts_init, Tt_init, Tn_init, Td_init, "K"
+
+        ! write stuff
         call write_obm_init(obm_file, ts%time, "years")
         call write_obm_update(obm_object, obm_file, bplr%obm_name, ts%time)
 
@@ -357,19 +368,6 @@ program yelmox_bipolar
             call nc_read(yelmox_north%path_hydro_mask,"mask",yelmox_north%hydro_mask)
         end if
 
-        ! allocate(yelmox_north%T_2D(yelmox_north%yelmo1%grd%nx,yelmox_north%yelmo1%grd%ny))
-
-        ! ! ism2obm
-        ! if (bplr%couple_fwf_north) then
-        !     obm_object%fn = calc_fwf(yelmox_north%yelmo1%bnd%c%rho_w,yelmox_north%yelmo1%bnd%c%rho_ice, &
-        !                         yelmox_north%yelmo1%bnd%c%sec_year, &
-        !                         yelmox_north%yelmo1%tpo%now%H_ice, &
-        !                         yelmox_north%yelmo1%tpo%now%dHidt, &
-        !                         yelmox_north%yelmo1%tpo%now%f_grnd, &
-        !                         yelmox_north%yelmo1%tpo%par%dx,yelmox_north%yelmo1%tpo%par%dy,yelmox_north%hydro_mask,"north",fwf_definition)
-        !     obm_object%fn = bplr%fwf_frac_north*obm_object%fn
-        ! end if
-
         call initialize_external_models(path_par, yelmox_north,"isos_north","snap_north","smbpal_north","itm_north","marine_shelf_north","sediments_north","geothermal_north")   ! yelmox.f90 lines 396-419
 
         if (bplr%obm2ism) then
@@ -377,11 +375,7 @@ program yelmox_bipolar
             if (bplr%couple_to_north) then
                 yelmox_north%snp1%par%ocn_type = "anom"
                 yelmox_north%snp1%par%fname_ao = "input/ones.dat" 
-                if (obm_object%tn-obm_object%par%tn_init >= 0.0) then
-                    yelmox_north%snp1%par%dTo_const = bplr%amoc_fraction_north*(obm_object%tn-obm_object%par%tn_init)
-                else
-                    yelmox_north%snp1%par%dTo_const = (1.0+bplr%amoc_fraction_north)*(obm_object%tn-obm_object%par%tn_init)
-                end if
+                yelmox_north%snp1%par%dTo_const = bplr%amoc_fraction_north*(obm_object%tn-Tn_init)
             end if
 
         end if
@@ -390,55 +384,10 @@ program yelmox_bipolar
 
         call initialize_output_files(outfldr, yelmox_north, ts, "north")
         
-        ! if (bplr%active_obm .and. bplr%obm2ism) then
-            ! Calculate virtual box volume, mean depth and thermal coupling constant
-            ! yelmox_north%mean_depth = calc_dom_mean_depth(yelmox_north%yelmo1%bnd%z_bed, yelmox_north%mshlf1%now%mask_ocn)
-            ! yelmox_north%volume = calc_dom_ocean_volume(yelmox_north%yelmo1%bnd%z_bed, yelmox_north%mshlf1%now%mask_ocn, &
-            !                                             yelmox_north%yelmo1%tpo%par%dx, yelmox_north%yelmo1%tpo%par%dy)
-            ! yelmox_north%lambda = calc_dom_thermal_coupling_constant(obm_object%par%thermal_coupling_constant, &
-            !                                                         obm_object%par%specific_heat_capacity, obm_object%par%density_of_seawater, &
-            !                                                         yelmox_north%mean_depth)
-            
-            ! yelmox_north%theta0 = calc_mean_temp(yelmox_north%snp1%now%ta_ann, yelmox_north%mshlf1%now%mask_ocn) - 273.15
-            ! yelmox_north%theta = calc_mean_temp(yelmox_north%snp1%now%ta_ann, yelmox_north%mshlf1%now%mask_ocn) - 273.15
-
-            ! yelmox_north%T0 = calc_ocn_temp_init(bplr%amoc_fraction_north*obm_object%m, &
-            !                                      yelmox_north%volume, &
-            !                                      obm_object%tn, &
-            !                                      yelmox_north%snp1%par%f_to, &
-            !                                      yelmox_north%theta0, &
-            !                                      yelmox_north%lambda)
-
-            ! yelmox_north%T_2D = calc_to_ann_2D(yelmox_north%mshlf1, &
-            !                                     yelmox_north%yelmo1%tpo%now%H_ice, &
-            !                                     yelmox_north%yelmo1%bnd%z_bed, &
-            !                                     yelmox_north%yelmo1%tpo%now%f_grnd, &
-            !                                     yelmox_north%yelmo1%bnd%z_sl, &
-            !                                     yelmox_north%snp1%now%depth, yelmox_north%snp1%now%to_ann) 
-            ! yelmox_north%T0 = calc_mean_temp(yelmox_north%T_2D, yelmox_north%mshlf1%now%mask_ocn) - 273.15 
-            ! yelmox_north%T = calc_mean_temp(yelmox_north%T_2D, yelmox_north%mshlf1%now%mask_ocn) - 273.15 
-
-            ! yelmox_north%dTdt = calc_dom_ocean_temp_anom(bplr%amoc_fraction_north*obm_object%m, &
-            !                                            yelmox_north%volume, &
-            !                                            obm_object%tn, &
-            !                                            yelmox_north%T, &
-            !                                            bplr%f_o, &
-            !                                            yelmox_north%theta, &
-            !                                            yelmox_north%lambda)
-
-            !yelmox_north%T = yelmox_north%T0 + yelmox_north%dTdt*1.0
-
-            ! write(*,*) "BIPOLAR, virtual north box:"
-            ! write(*,*) "z, V, lambda = ", yelmox_north%mean_depth, yelmox_north%volume, yelmox_north%lambda
-            ! write(*,*) "theta0, theta, tn, Tis0, dTis, Tis = ", yelmox_north%theta0, yelmox_north%theta, obm_object%tn, yelmox_north%T0, yelmox_north%dTdt*dtt_now, yelmox_north%T
-
-        ! end if
-
         write(*,*) "Northern Hemisphere domain initialized"
     end if
 
     if (bplr%active_south) then
-        write(*,*) "HERE 1"
         call initialize_icesheet(path_par, "south", ts, ctl, yelmox_south, "yelmo_south", outfldr)  
         
         ! BIPOLAR: allocate and load hydrographic mask
@@ -446,19 +395,6 @@ program yelmox_bipolar
             allocate(yelmox_south%hydro_mask(yelmox_south%yelmo1%grd%nx,yelmox_south%yelmo1%grd%ny))
             call nc_read(yelmox_south%path_hydro_mask,"mask",yelmox_south%hydro_mask)
         end if
-
-        ! allocate(yelmox_south%T_2D(yelmox_south%yelmo1%grd%nx,yelmox_south%yelmo1%grd%ny))
-
-        ! ! ism2obm
-        ! if (bplr%couple_fwf_south) then
-        !     obm_object%fs = calc_fwf(yelmox_south%yelmo1%bnd%c%rho_w,yelmox_south%yelmo1%bnd%c%rho_ice, &
-        !                         yelmox_south%yelmo1%bnd%c%sec_year, &
-        !                         yelmox_south%yelmo1%tpo%now%H_ice, &
-        !                         yelmox_south%yelmo1%tpo%now%dHidt, &
-        !                         yelmox_south%yelmo1%tpo%now%f_grnd, &
-        !                         yelmox_south%yelmo1%tpo%par%dx,yelmox_south%yelmo1%tpo%par%dy,yelmox_south%hydro_mask,"south",fwf_definition)
-        !     obm_object%fs = bplr%fwf_frac_south*obm_object%fs
-        ! end if
         
         call initialize_external_models(path_par, yelmox_south,"isos_south","snap_south","smbpal_south","itm_south","marine_shelf_south","sediments_south","geothermal_south")   ! yelmox.f90 lines 396-419
         
@@ -467,11 +403,7 @@ program yelmox_bipolar
             if (bplr%couple_to_south) then
                 yelmox_south%snp1%par%ocn_type = "anom"
                 yelmox_south%snp1%par%fname_ao = "input/ones.dat" 
-                if (obm_object%ts-obm_object%par%ts_init >= 0.0) then 
-                    yelmox_south%snp1%par%dTo_const = bplr%amoc_fraction_south*(obm_object%ts-obm_object%par%ts_init)
-                else
-                    yelmox_south%snp1%par%dTo_const = (1.0+bplr%amoc_fraction_south)*(obm_object%ts-obm_object%par%ts_init)
-                end if
+                yelmox_south%snp1%par%dTo_const = bplr%amoc_fraction_south*(obm_object%ts-Ts_init)
             end if
 
         end if
@@ -479,48 +411,6 @@ program yelmox_bipolar
         call initialize_boundary_conditions(ctl, bplr, yelmox_south, bsl, ts, "south")  
         
         call initialize_output_files(outfldr, yelmox_south, ts, "south")
-
-        ! if (bplr%active_obm .and. bplr%obm2ism) then
-        !     ! Calculate virtual box volume, mean depth and thermal coupling constant
-        !     yelmox_south%mean_depth = calc_dom_mean_depth(yelmox_south%yelmo1%bnd%z_bed, yelmox_south%mshlf1%now%mask_ocn)
-        !     yelmox_south%volume = calc_dom_ocean_volume(yelmox_south%yelmo1%bnd%z_bed, yelmox_south%mshlf1%now%mask_ocn, &
-        !                                                 yelmox_south%yelmo1%tpo%par%dx, yelmox_south%yelmo1%tpo%par%dy)
-        !     yelmox_south%lambda = calc_dom_thermal_coupling_constant(obm_object%par%thermal_coupling_constant, &
-        !                                                             obm_object%par%specific_heat_capacity, obm_object%par%density_of_seawater, &
-        !                                                             yelmox_south%mean_depth)
-            
-        !     yelmox_south%theta0 = calc_mean_temp(yelmox_south%snp1%now%ta_ann, yelmox_south%mshlf1%now%mask_ocn) - 273.15
-        !     yelmox_south%theta = calc_mean_temp(yelmox_south%snp1%now%ta_ann, yelmox_south%mshlf1%now%mask_ocn) - 273.15
-
-        !     ! yelmox_south%T0 = calc_ocn_temp_init(bplr%amoc_fraction_south*obm_object%m, &
-        !     !                                      yelmox_south%volume, &
-        !     !                                      obm_object%ts, &
-        !     !                                      yelmox_south%snp1%par%f_to, &
-        !     !                                      yelmox_south%theta0, &
-        !     !                                      yelmox_south%lambda)
-
-        !     yelmox_south%T_2D = calc_to_ann_2D(yelmox_south%mshlf1, &
-        !                                         yelmox_south%yelmo1%tpo%now%H_ice, &
-        !                                         yelmox_south%yelmo1%bnd%z_bed, &
-        !                                         yelmox_south%yelmo1%tpo%now%f_grnd, &
-        !                                         yelmox_south%yelmo1%bnd%z_sl, &
-        !                                         yelmox_south%snp1%now%depth, yelmox_south%snp1%now%to_ann) 
-        !     yelmox_south%T0 = calc_mean_temp(yelmox_south%T_2D, yelmox_south%mshlf1%now%mask_ocn) - 273.15 
-        !     yelmox_south%T = calc_mean_temp(yelmox_south%T_2D, yelmox_south%mshlf1%now%mask_ocn) - 273.15 
-
-        !     yelmox_south%dTdt = calc_dom_ocean_temp_anom(bplr%amoc_fraction_south*obm_object%m, &
-        !                                                yelmox_south%volume, &
-        !                                                obm_object%ts, &
-        !                                                yelmox_south%T, &
-        !                                                bplr%f_o, &
-        !                                                yelmox_south%theta, &
-        !                                                yelmox_south%lambda)
-
-        !     write(*,*) "BIPOLAR, virtual south box:"
-        !     write(*,*) "z, V, lambda = ", yelmox_south%mean_depth, yelmox_south%volume, yelmox_south%lambda
-        !     write(*,*) "theta0, theta, tn, Tis0, dTis, Tis = ", yelmox_south%theta0, yelmox_south%theta, obm_object%ts, yelmox_south%T0, yelmox_south%dTdt*dtt_now, yelmox_south%T
-
-        ! end if
 
         write(*,*) "Southern Hemisphere domain initialized"
     end if
@@ -605,25 +495,25 @@ program yelmox_bipolar
                 at_n = interp_linear(yelmox_north%snp1%at%time, yelmox_north%snp1%at%var,xout=ts%time)
                 at_s = interp_linear(yelmox_south%snp1%at%time, yelmox_south%snp1%at%var,xout=ts%time)
                 if (bplr%obm_index_is_gis) then
-                    at_obm = at_n
+                    at_t = at_n
                 else
-                    at_obm = at_s
+                    at_t = at_s
                 end if
             else
                 if (bplr%active_north) then
                     at_n = interp_linear(yelmox_north%snp1%at%time, yelmox_north%snp1%at%var,xout=ts%time)
-                    at_s = 0.0
-                    at_obm = at_n
+                    at_s = at_n
+                    at_t = at_n
                 end if
                 if (bplr%active_south) then
-                    at_n = 0.0
                     at_s = interp_linear(yelmox_south%snp1%at%time, yelmox_south%snp1%at%var,xout=ts%time)
-                    at_obm = at_s
+                    at_n = at_s
+                    at_t = at_s
                 end if
             end if
 
             if (bplr%is_hosing_experiment) then
-                at_obm = 0.0
+                at_t = 0.0
             end if
 
             ! Update snapclim
@@ -631,44 +521,16 @@ program yelmox_bipolar
                 dtheta_now = bplr%thermal_ampl_north*at_n*bplr%global_dTa_const
 
                 if (bplr%couple_to_north) then
-                    if (obm_object%tn-obm_object%par%tn_init >= 0.0) then
-                        dTo_now = bplr%amoc_fraction_north*(obm_object%tn-obm_object%par%tn_init)
-                    else
-                        dTo_now = (1.0+bplr%amoc_fraction_north)*(obm_object%tn-obm_object%par%tn_init)
-                    end if
-
-                    ! yelmox_north%theta = calc_mean_temp(yelmox_north%snp1%now%ta_ann, yelmox_north%mshlf1%now%mask_ocn) - 273.15
-                    
-                    ! write(*,*) "BIPOLAR, virtual north box:"
-                    ! write(*,*) "dtt, theta0, theta = ", dtt_now, yelmox_north%theta0, yelmox_north%theta
-                    ! write(*,*) "mstar, tn, fto*theta, Tis =", bplr%amoc_fraction_north*obm_object%m, obm_object%tn, yelmox_north%snp1%par%f_to*yelmox_north%theta, yelmox_north%T
-
-                    ! yelmox_north%T_2D = calc_to_ann_2D(yelmox_north%mshlf1, &
-                                                            ! yelmox_north%yelmo1%tpo%now%H_ice, &
-                                                            ! yelmox_north%yelmo1%bnd%z_bed, &
-                                                            ! yelmox_north%yelmo1%tpo%now%f_grnd, &
-                                                            ! yelmox_north%yelmo1%bnd%z_sl, &
-                                                            ! yelmox_north%snp1%now%depth, yelmox_north%snp1%now%to_ann) 
-                    ! write(*,*)"north, mean T"
-                    ! yelmox_north%T = calc_mean_temp(yelmox_north%T_2D, yelmox_north%mshlf1%now%mask_ocn) - 273.15 
-                    ! write(*,*)"T =", yelmox_north%T 
-
-                    ! yelmox_north%dTdt = calc_dom_ocean_temp_anom(bplr%amoc_fraction_north*obm_object%m, &
-                    !                                    yelmox_north%volume, &
-                    !                                    obm_object%tn, &
-                    !                                    yelmox_north%T, &
-                    !                                    bplr%f_o, &
-                    !                                    yelmox_north%theta, &
-                    !                                    yelmox_north%lambda)
-
-                    ! ! write(*,*) "dTis", yelmox_north%dTdt*dtt_now
-
-                    ! !yelmox_north%T = yelmox_north%T + yelmox_north%dTdt*dtt_now
-
-                    ! dTo_now = yelmox_north%dTdt*dtt_now
+                    dTo_now = bplr%amoc_fraction_north*(obm_object%tn-Tn_init)
 
                     yelmox_north%dtheta = dtheta_now
                     yelmox_north%dTo = dTo_now
+
+                    if (bplr%switch_atmospheric_feedback_on_gis) then
+                        dtheta_now = (dtheta_now + 1/(yelmox_north%snp1%par%f_to)*dTo_now)/2 ! Take the mean value to use the atmospheric feedback into account
+
+                        yelmox_north%dtheta = dtheta_now
+                    end if
                     
                     call snapclim_update(yelmox_north%snp1, &
                                          z_srf=yelmox_north%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox_north%domain, &
@@ -684,41 +546,14 @@ program yelmox_bipolar
                                          dx=yelmox_north%yelmo1%grd%dx,basins=yelmox_north%yelmo1%bnd%basins) 
                 end if
 
-                yelmox_north%dthetaG = at_obm*bplr%global_dTa_const
+                yelmox_north%dthetaG = at_t*bplr%global_dTa_const
 
             end if
             if (bplr%active_south) then
                 dtheta_now = bplr%thermal_ampl_south*at_s*bplr%global_dTa_const
 
                 if (bplr%couple_to_south) then
-                    if (obm_object%ts-obm_object%par%ts_init >= 0.0) then
-                        dTo_now = bplr%amoc_fraction_south*(obm_object%ts-obm_object%par%ts_init)
-                    else
-                        dTo_now = (1.0+bplr%amoc_fraction_south)*(obm_object%ts-obm_object%par%ts_init)
-                    end if
-
-                !     yelmox_south%theta = calc_mean_temp(yelmox_south%snp1%now%ta_ann, yelmox_south%mshlf1%now%mask_ocn) - 273.15
-
-                !     yelmox_south%T_2D = calc_to_ann_2D(yelmox_south%mshlf1, &
-                !                                             yelmox_south%yelmo1%tpo%now%H_ice, &
-                !                                             yelmox_south%yelmo1%bnd%z_bed, &
-                !                                             yelmox_south%yelmo1%tpo%now%f_grnd, &
-                !                                             yelmox_south%yelmo1%bnd%z_sl, &
-                !                                             yelmox_south%snp1%now%depth, yelmox_south%snp1%now%to_ann)
-                !     write(*,*)"south, mean T"
-                !     yelmox_south%T = calc_mean_temp(yelmox_south%T_2D, yelmox_south%mshlf1%now%mask_ocn) - 273.15 
-                !     write(*,*)"T =", yelmox_south%T 
-
-                !     yelmox_south%dTdt = calc_dom_ocean_temp_anom(bplr%amoc_fraction_south*obm_object%m, &
-                !                                        yelmox_south%volume, &
-                !                                        obm_object%ts, &
-                !                                        yelmox_south%T, &
-                !                                        bplr%f_o, &
-                !                                        yelmox_south%theta, &
-                !                                        yelmox_south%lambda)
-                !    ! yelmox_south%T = yelmox_south%T + yelmox_south%dTdt*dtt_now ! REVISAR ESTO
-
-                !     dTo_now = yelmox_south%dTdt*dtt_now
+                    dTo_now = bplr%amoc_fraction_south*(obm_object%ts-Ts_init)
 
                     yelmox_south%dtheta = dtheta_now
                     yelmox_south%dTo = dTo_now
@@ -736,21 +571,24 @@ program yelmox_bipolar
                                          dTa=dtheta_now, &
                                          dx=yelmox_south%yelmo1%grd%dx,basins=yelmox_south%yelmo1%bnd%basins) 
                 end if
-                yelmox_south%dthetaG = at_obm*bplr%global_dTa_const
+                yelmox_south%dthetaG = at_t*bplr%global_dTa_const
             end if
 
             ! Update atmospheric temperature in the OBM
             if (bplr%active_obm .and. bplr%atm2obm) then 
-                dtheta_now = obm_object%par%thermal_ampl_north*at_obm*bplr%global_dTa_const
+                ! Update North Atlantic box
+                dtheta_now = obm_object%par%thermal_ampl_north*at_n*bplr%global_dTa_const
                 obm_object%tstarn = obm_object%par%tstarn_init + bplr%f_o*dtheta_now
-                obm_object%phin = obm_object%par%phin_init + obm_object%par%hn*obm_object%par%pnh*at_obm*bplr%global_dTa_const ! hn * pnh * dTG
+                obm_object%phin = obm_object%par%phin_init + obm_object%par%hn*obm_object%par%pnh*at_n*bplr%global_dTa_const ! hn * pnh * dTG
 
-                dtheta_now = obm_object%par%thermal_ampl_tropics*at_obm*bplr%global_dTa_const
+                ! Update Tropical Atlantic box
+                dtheta_now = obm_object%par%thermal_ampl_tropics*at_t*bplr%global_dTa_const
                 obm_object%tstart = obm_object%par%tstart_init + bplr%f_o*dtheta_now
-                obm_object%phit = obm_object%par%phit_init + obm_object%par%hs*obm_object%par%psh*at_obm*bplr%global_dTa_const
 
-                dtheta_now = obm_object%par%thermal_ampl_south*at_obm*bplr%global_dTa_const
+                ! Update South Atlantic box
+                dtheta_now = obm_object%par%thermal_ampl_south*at_s*bplr%global_dTa_const
                 obm_object%tstars = obm_object%par%tstars_init + bplr%f_o*dtheta_now
+                obm_object%phit = obm_object%par%phit_init + obm_object%par%hs*obm_object%par%psh*at_s*bplr%global_dTa_const
 
             end if 
 

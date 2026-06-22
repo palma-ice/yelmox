@@ -46,6 +46,7 @@
     isdouble_hosing = false
 
     is_hosing_experiment = false    ! deactivate atmosphere coupling in the ocean
+    switch_atmospheric_feedback_on_gis = false ! activate atmosperic feedback on Greenland
 
     ! Coupling parameters    
     atm2obm = True                      ! Activate ATM to OBM coupling?
